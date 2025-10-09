@@ -2,3 +2,6 @@
 .secrets/
 .env
 .secrets/
+.env
+.secrets/
+__pycache__/
