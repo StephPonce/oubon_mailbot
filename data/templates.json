@@ -1,0 +1,14 @@
+{
+  "support_default": {
+    "subject": "We received your message",
+    "body": "<p>Hi there,</p><p>We’ve received your message and opened a ticket (#{{ticket_id}}). A team member will reply within 1 business day.</p><p>— <b>Oubon Support</b></p>"
+  },
+  "vip_welcome": {
+    "subject": "Thanks for reaching out, {{name}}",
+    "body": "<p>Hi {{name}},</p><p>We’ll jump on this right away.</p><p>— Oubon VIP Support</p>"
+  },
+  "order_missing": {
+    "subject": "We’re on it – order {{order_id}}",
+    "body": "<p>Hi there,</p><p>Sorry your package hasn’t arrived. Please reply with your order number and we’ll investigate right away.</p><p>— Oubon Support</p>"
+  }
+}
