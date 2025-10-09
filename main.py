@@ -209,13 +209,25 @@ def parse_order_id(subject: str, body: str) -> Optional[str]:
     return m.group(1) if m else None
 
 def lookup_order(order_id: str) -> Optional[dict]:
-    path = DATA_DIR / "orders.json"
-    if not path.exists(): return None
-    try: orders = json.loads(path.read_text(encoding="utf-8"))
-    except Exception: return None
-    for o in orders:
-        if o.get("order_id", "").upper() == (order_id or "").upper():
-            return o
+    # Replace this local lookup:
+    # path = DATA_DIR / "orders.json"
+    # ...
+    
+    # With this:
+    import requests
+    url = f"https://{SHOPIFY_STORE}/admin/api/2024-10/orders.json?name={order_id}"
+    headers = {"X-Shopify-Access-Token": SHOPIFY_API_TOKEN}
+    res = requests.get(url, headers=headers)
+    data = res.json()
+    if data.get("orders"):
+        order = data["orders"][0]
+        return {
+            "order_id": order["name"],
+            "status": order["fulfillment_status"] or "Processing",
+            "carrier": order.get("shipping_lines", [{}])[0].get("title", ""),
+            "tracking": order.get("shipping_lines", [{}])[0].get("tracking_number", ""),
+            "last_update": order["updated_at"],
+        }
     return None
 
 def _match_label(body: str, subject: str, rules: Dict[str, Any]) -> Optional[RuleItem]:
