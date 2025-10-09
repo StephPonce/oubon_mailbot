@@ -1,0 +1,54 @@
+{
+  "rules": [
+    {
+      "if_any": [
+        "refund",
+        "return",
+        "broken",
+        "damaged",
+        "wrong item",
+        "warranty"
+      ],
+      "apply_label": "Support",
+      "auto_reply_template": "support_default"
+    },
+    {
+      "if_any": [
+        "order",
+        "package",
+        "tracking",
+        "shipment",
+        "arrived",
+        "missing",
+        "unreceived",
+        "not received",
+        "not arrived",
+        "delayed"
+      ],
+      "apply_label": "Orders",
+      "auto_reply_template": "order_missing"
+    },
+    {
+      "if_any": [
+        "press",
+        "investor",
+        "wholesale",
+        "partnership"
+      ],
+      "apply_label": "VIP",
+      "auto_reply_template": null
+    },
+    {
+      "if_any": [
+        "mailer-daemon",
+        "delivery status notification",
+        "failure notice",
+        "postmaster",
+        "no-reply",
+        "do-not-reply"
+      ],
+      "apply_label": "Admin",
+      "auto_reply_template": null
+    }
+  ]
+}
