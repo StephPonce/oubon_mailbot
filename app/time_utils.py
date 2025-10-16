@@ -38,8 +38,8 @@ def is_quiet_hours(now: datetime | None = None) -> bool:
     except pytz.UnknownTimeZoneError:
         tz = pytz.timezone("America/Chicago")  # fallback
     now = now or datetime.now(tz)
-    start = _as_int(s.quiet_hours_start, 22)
-    end = _as_int(s.quiet_hours_end, 7)
+    start = _as_int(s.QUIET_HOURS_START, 22)
+    end = _as_int(s.QUIET_HOURS_END, 7)
     if start < end:
         return start <= now.hour < end
     # overnight window (e.g., 22–7)
