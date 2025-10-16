@@ -251,64 +251,97 @@ def lookup_order(order_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-async def get_order_by_name(order_name: str) -> Optional[Dict[str, Any]]:
-    if not order_name:
+async def get_order_by_name(order_name: str) -> Dict[str, Any] | None:
+    """
+    Retrieve an order by name via Shopify REST Admin API.
+    """
+    import json
+    from urllib import request as urlreq, parse as urlparse
+
+    s = get_settings()
+    store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
+    token = getattr(s, "SHOPIFY_API_TOKEN", "")
+    if not store or not token:
         return None
 
-    candidates = []
-    if order_name.startswith("#"):
-        candidates.extend([order_name, order_name.lstrip("#")])
-    else:
-        candidates.extend([order_name, f"#{order_name}"])
+    candidates = (
+        [order_name, order_name.lstrip("#")]
+        if order_name and order_name.startswith("#")
+        else [order_name, f"#{order_name}"]
+    )
 
-    def _fetch() -> Optional[Dict[str, Any]]:
-        for cand in candidates:
-            try:
-                data = _shopify_request("GET", "/orders.json", params={"status": "any", "name": cand})
-            except Exception:
-                data = None
-            orders = (data or {}).get("orders") if data else None
+    for candidate in candidates:
+        try:
+            querystring = urlparse.urlencode({"name": candidate})
+            url = f"https://{store}/admin/api/2024-10/orders.json?{querystring}"
+            req = urlreq.Request(
+                url,
+                headers={"X-Shopify-Access-Token": token, "Accept": "application/json"},
+            )
+            with urlreq.urlopen(req, timeout=15) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+            orders = payload.get("orders") or []
             if orders:
                 return orders[0]
-        for cand in candidates:
-            try:
-                data = _shopify_request("GET", "/orders.json", params={"status": "any", "query": cand})
-            except Exception:
-                data = None
-            orders = (data or {}).get("orders") if data else None
-            if orders:
-                return orders[0]
-        return None
-
-    return await asyncio.to_thread(_fetch)
+        except Exception:
+            continue
+    return None
 
 
 async def cancel_unfulfilled_order(order: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Cancel an unfulfilled order via Shopify REST Admin API.
+    """
+    import json
+    from urllib import request as urlreq
+
+    s = get_settings()
+    store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
+    token = getattr(s, "SHOPIFY_API_TOKEN", "")
     order_id = order.get("id")
-    if not order_id:
-        raise ValueError("order missing id")
+    if not (store and token and order_id):
+        return {"ok": False, "error": "missing_shopify_config_or_id"}
 
-    def _cancel() -> Dict[str, Any]:
-        payload = {"email": False, "reason": "customer"}
-        return _shopify_post(f"/orders/{order_id}/cancel.json", payload) or {}
+    url = f"https://{store}/admin/api/2024-10/orders/{order_id}/cancel.json"
+    req = urlreq.Request(
+        url,
+        method="POST",
+        headers={"X-Shopify-Access-Token": token, "Accept": "application/json"},
+    )
+    with urlreq.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    return {"ok": True, "data": data}
 
-    return await asyncio.to_thread(_cancel)
 
+async def update_order_address(order: Dict[str, Any], new_addr: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update order shipping address via Shopify REST Admin API.
+    """
+    import json
+    from urllib import request as urlreq
 
-async def update_order_address(order: Dict[str, Any], address: Dict[str, Optional[str]]) -> Dict[str, Any]:
+    s = get_settings()
+    store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
+    token = getattr(s, "SHOPIFY_API_TOKEN", "")
     order_id = order.get("id")
-    if not order_id:
-        raise ValueError("order missing id")
+    if not (store and token and order_id):
+        return {"ok": False, "error": "missing_shopify_config_or_id"}
 
-    clean_address = {k: v for k, v in (address or {}).items() if v}
-    if not clean_address:
-        raise ValueError("no address fields supplied")
-
-    def _update() -> Dict[str, Any]:
-        payload = {"order": {"id": order_id, "shipping_address": clean_address}}
-        return _shopify_put(f"/orders/{order_id}.json", payload) or {}
-
-    return await asyncio.to_thread(_update)
+    url = f"https://{store}/admin/api/2024-10/orders/{order_id}.json"
+    payload = json.dumps({"order": {"id": order_id, "shipping_address": new_addr}}).encode("utf-8")
+    req = urlreq.Request(
+        url,
+        data=payload,
+        method="PUT",
+        headers={
+            "X-Shopify-Access-Token": token,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    with urlreq.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    return {"ok": True, "data": data}
 
 
 def get_shop_timezone() -> str:
