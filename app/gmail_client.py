@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import pathlib
 from email.mime.multipart import MIMEMultipart
@@ -8,7 +9,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
-from app.settings import Settings
+from app.settings import Settings, get_settings
 
 
 class GmailClient:
@@ -69,7 +70,45 @@ class GmailClient:
         msg = MIMEMultipart("alternative")
         msg["To"] = to
         msg["Subject"] = subject
+        msg["Auto-Submitted"] = "auto-replied"
+        msg["X-Auto-Response-Suppress"] = "All"
+        msg["Precedence"] = "bulk"
         msg.attach(MIMEText("Please view this email in an HTML-capable client.", "plain"))
         msg.attach(MIMEText(body, "html"))
         raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
         svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+
+async def send_plain_email(to: str, subject: str, body: str) -> None:
+    """
+    Send a plain-text confirmation email asynchronously via Gmail.
+    """
+    gc = get_gmail_client()
+
+    def _send():
+        svc = gc.service()
+        msg = MIMEText(body, "plain")
+        msg["To"] = to
+        msg["Subject"] = subject
+        msg["Auto-Submitted"] = "auto-replied"
+        msg["X-Auto-Response-Suppress"] = "All"
+        msg["Precedence"] = "bulk"
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+        svc.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+    await asyncio.to_thread(_send)
+
+
+# -----------------------------------------------------------------------------
+# Compatibility shims (for older main.py references)
+# -----------------------------------------------------------------------------
+_settings = get_settings()
+_gmail_client = GmailClient(_settings)
+
+def get_gmail_client() -> GmailClient:
+    """Return the singleton Gmail client (used by main.py)."""
+    return _gmail_client
+
+def _svc(gc: GmailClient):
+    """Return the Gmail API service instance."""
+    return gc.service()
