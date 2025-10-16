@@ -1,71 +1,84 @@
+import json
+import re
+from pathlib import Path
 from typing import List, Optional
 
-# Keyword groups for classification
-KEYWORDS_IMPORTANT = [
-    "refund", "return", "chargeback", "angry", "complaint",
-    "wrong item", "broken", "cancel", "late", "delayed"
-]
-
-KEYWORDS_VIP = [
-    "press", "investor", "wholesale", "bulk order", "partnership",
-    "collaboration", "media", "sponsorship"
-]
-
-KEYWORDS_ORDER = [
-    "order",
-    "package",
-    "delivery",
-    "tracking",
-    "shipment",
-    "arrived",
-    "missing",
-    "unreceived",
-    "not received",
-    "where is",
-    "hasn't arrived",
-    "hasnt arrived",
-]
+from pydantic import BaseModel
 
 
-# Simple message classifier
-def classify_message(subject: str, body: str) -> List[str]:
-    text = f"{subject} {body}".lower()
-    tags = []
-
-    if any(k in text for k in KEYWORDS_VIP):
-        tags.append("VIP")
-    elif any(k in text for k in KEYWORDS_ORDER):
-        tags.append("Orders")
-    elif any(k in text for k in KEYWORDS_IMPORTANT):
-        tags.append("Important")
-    else:
-        tags.append("Routine")
-
-    return tags
+class Rule(BaseModel):
+    apply_label: str
+    match: List[str]
+    name: Optional[str] = None
+    auto_reply: bool = False
+    auto_reply_template: Optional[str] = None
 
 
-# Map tags to auto-reply behavior and templates
-def get_rule_for_tags(tags: List[str]) -> Optional[dict]:
-    # Priority order: VIP > Orders > Important > Routine
-    if "VIP" in tags:
-        return {
-            "apply_label": "VIP",
-            "auto_reply": True,
-            "auto_reply_template": "vip_welcome"
-        }
-    if "Orders" in tags:
-        return {
-            "apply_label": "Orders",
-            "auto_reply": True,
-            "auto_reply_template": "order_missing"
-        }
-    if "Important" in tags:
-        return {
-            "apply_label": "Admin",
-            "auto_reply": True,
-            "auto_reply_template": "support_default"
-        }
-    return {
-        "apply_label": "Routine",
-        "auto_reply": False,
-    }
+def _load_rules() -> List[Rule]:
+    paths = [Path("data/rules.json"), Path("rules.json")]
+    for path in paths:
+        if path.exists():
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                records = raw.get("rules") if isinstance(raw, dict) else raw
+                rules: List[Rule] = []
+                for entry in records or []:
+                    data = dict(entry)
+                    match_terms = data.get("match") or data.get("keywords") or data.get("if_any") or []
+                    if isinstance(match_terms, str):
+                        match_terms = [match_terms]
+                    rule = Rule(
+                        match=list(match_terms),
+                        apply_label=data.get("apply_label"),
+                        name=data.get("name"),
+                        auto_reply=data.get("auto_reply", False),
+                        auto_reply_template=data.get("auto_reply_template"),
+                    )
+                    rules.append(rule)
+                if rules:
+                    return rules
+            except Exception as e:
+                print(f"Rules load error: {e}—fallback to defaults")
+    return [
+        Rule(
+            match=[
+                "order",
+                "package",
+                "delivery",
+                "tracking",
+                "shipment",
+                "arrived",
+                "missing",
+                "unreceived",
+                "not received",
+                "not arrived",
+            ],
+            apply_label="Orders",
+            auto_reply=True,
+            auto_reply_template="order_missing",
+        ),
+        Rule(
+            match=["help", "issue", "support", "problem"],
+            apply_label="Support",
+            auto_reply=True,
+            auto_reply_template="support_default",
+        ),
+    ]
+
+
+def _match_label(body: str, subject: str, rules: List[Rule]) -> Optional[Rule]:
+    text = f"{subject.lower()} {body.lower()}"
+    for rule in rules:
+        for word in rule.match:
+            if re.search(rf"\b{re.escape(word.lower())}\b", text):
+                return rule
+    return None
+
+
+_RULE_CACHE: List[Rule] = _load_rules()
+
+
+def match_label_for_message(subject: str, body: str) -> Optional[str]:
+    rule = _match_label(body or "", subject or "", _RULE_CACHE)
+    return rule.apply_label if rule else None

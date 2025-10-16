@@ -8,7 +8,7 @@
     "body": "<p>Hi {{name}},</p><p>We’ll jump on this right away.</p><p>— Oubon VIP Support</p>"
   },
   "order_missing": {
-    "subject": "We’re on it – order {{order_id}}",
-    "body": "<p>Hi there,</p><p>Sorry your package hasn’t arrived. Please reply with your order number and we’ll investigate right away.</p><p>— Oubon Support</p>"
+    "subject": "We received your message",
+    "body": "Hi,\n\nWe received your message and we will investigate. If you have an order number, please reply with it so we can check status and tracking.\n\n— Oubon Support"
   }
 }
