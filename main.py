@@ -453,11 +453,39 @@ async def support_request(payload: SupportPayload, request: Request) -> Dict[str
     else:
         body = f"Hello — we’ve received your request for {order_name}. We’ll follow up shortly."
 
+    help_host = getattr(SETTINGS, "STORE_DOMAIN", getattr(SETTINGS, "SHOPIFY_STORE", ""))
+    help_host = (help_host or "").replace("https://", "").replace("http://", "")
+    help_url = f"https://{help_host}/pages/help" if help_host else "https://example.com/pages/help"
+
+    if performed == "cancelled":
+        body = (
+            f"Hello — we’ve cancelled order {order_name}. You’ll see a void/refund confirmation shortly.\n\n"
+            f"Need anything else? Use our Help With Orders page:\n{help_url}"
+        )
+    elif performed == "address_updated":
+        body = (
+            f"Hello — we’ve updated the shipping address for {order_name}.\n\n"
+            f"If further changes are needed, you can submit here:\n{help_url}"
+        )
+    elif performed == "needs_human":
+        body = (
+            f"Hello — thanks for your request about {order_name}. A specialist will review and follow up shortly.\n\n"
+            f"For faster service next time, you can also use our Help With Orders page:\n{help_url}"
+        )
+    else:
+        body = (
+            f"Hello — we’ve received your request for {order_name}. We’ll follow up shortly.\n\n"
+            f"You can check status or submit details here:\n{help_url}"
+        )
+
+    if payload.note:
+        body = f"{body}\n\nNote: {payload.note}"
+
     try:
         await send_plain_email(
             to=payload.email,
             subject=subject,
-            body=body + ("\n\nNote: " + payload.note if payload.note else ""),
+            body=body,
         )
     except Exception as exc:  # pragma: no cover - Gmail edge cases
         logger.exception("Failed to send confirmation email for order %s.", order_name)

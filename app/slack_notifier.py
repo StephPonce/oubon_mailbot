@@ -32,3 +32,11 @@ def send_slack_alert(channel: str, message: str) -> None:
     except Exception:
         # Slack failures should never break the main app flow.
         return
+
+
+def notify_action(summary: str) -> None:
+    """Convenience helper to post automation summaries."""
+    try:
+        send_slack_alert("#ai-actions", summary)
+    except Exception:
+        pass

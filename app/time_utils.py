@@ -1,8 +1,6 @@
 from datetime import datetime
 import os
-
 import pytz
-
 from app.settings import get_settings
 
 
@@ -31,15 +29,22 @@ def is_quiet_hours(now: datetime | None = None) -> bool:
         return False
     if mode in ("night", "quiet"):
         return True
+
     # --- normal behavior ---
     s = get_settings()
+    tz_name = (
+        getattr(s, "STORE_TIMEZONE", None)
+        or getattr(s, "store_timezone", None)
+        or "America/Chicago"
+    )
     try:
-        tz = pytz.timezone(s.store_timezone)
+        tz = pytz.timezone(tz_name)
     except pytz.UnknownTimeZoneError:
-        tz = pytz.timezone("America/Chicago")  # fallback
+        tz = pytz.timezone("America/Chicago")  # robust fallback
+
     now = now or datetime.now(tz)
-    start = _as_int(s.QUIET_HOURS_START, 22)
-    end = _as_int(s.QUIET_HOURS_END, 7)
+    start = _as_int(getattr(s, "QUIET_HOURS_START", 22), 22)
+    end = _as_int(getattr(s, "QUIET_HOURS_END", 7), 7)
     if start < end:
         return start <= now.hour < end
     # overnight window (e.g., 22–7)
