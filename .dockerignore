@@ -1,0 +1,25 @@
+# Speed up Docker context and keep secrets out
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.log
+.git
+.gitignore
+.gitmodules
+.github
+.DS_Store
+.env
+.env.*
+node_modules
+dist
+build
+coverage
+.pytest_cache
+*.sqlite
+*.db
+oubon_mailbot.iml
+.idea
+.vscode
+*.ipynb

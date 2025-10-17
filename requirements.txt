@@ -1,20 +1,36 @@
-fastapi>=0.115.0
-uvicorn>=0.30.0
-pydantic>=2.8.0
-pydantic-settings>=2.4.0
-aiosqlite>=0.21.0
-python-dotenv>=1.0.0
-google-auth>=2.34.0
-google-auth-oauthlib>=1.2.0
-google-api-python-client>=2.141.0
-SQLAlchemy>=2.0.32
-alembic>=1.13.2
-openai>=1.42.0
-requests>=2.32.3
-jinja2>=3.1.4
-slack_sdk>=3.33.1
-python-amazon-paapi>=5.0.0
-tenacity>=9.0.0
-pytrends>=4.9.2
-pandas>=2.2.2
-responses==0.25.0
+# --- FastAPI stack ---
+fastapi==0.114.2
+uvicorn[standard]==0.30.6
+pydantic[email]==2.12.0
+pydantic-settings==2.6.1
+
+# --- HTTP / async ---
+httpx==0.27.2
+requests==2.32.3
+aiohttp==3.10.5
+
+# --- Scheduling / time ---
+schedule==1.2.2
+python-dateutil==2.9.0.post0
+pytz==2024.2
+tzdata==2024.1
+
+# --- Google APIs (Gmail) ---
+google-api-python-client==2.143.0
+google-auth==2.33.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+httplib2==0.22.0
+
+# --- Slack (alerts) ---
+slack-sdk==3.33.2
+
+# --- Data / sqlite helpers (if used by your code) ---
+sqlite-utils==3.36
+pandas==2.2.2
+
+# --- Shopify client (REST/GraphQL via requests/httpx) ---
+# (If you use a specific lib, pin it here; otherwise requests/httpx above suffice)
+
+# --- Env / config ---
+python-dotenv==1.0.1

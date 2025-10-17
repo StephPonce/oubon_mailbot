@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  mailbot:
+    build: .
+    ports:
+      - "8011:8011"
+    env_file: .env
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: oubon
+      POSTGRES_PASSWORD: oubon
+      POSTGRES_DB: mailbot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:

@@ -1,7 +1,6 @@
 # app/shopify_client.py
 from __future__ import annotations
 
-import asyncio
 import json
 import re
 from pathlib import Path
@@ -13,6 +12,7 @@ except Exception:  # requests not strictly required (we can still use local orde
     requests = None  # type: ignore
 
 from app.settings import get_settings
+from urllib import request as urlreq, parse as urlparse
 
 
 def _s(v: Any) -> str:
@@ -251,33 +251,18 @@ def lookup_order(order_id: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-async def get_order_by_name(order_name: str) -> Dict[str, Any] | None:
-    """
-    Retrieve an order by name via Shopify REST Admin API.
-    """
-    import json
-    from urllib import request as urlreq, parse as urlparse
-
+async def get_order_by_name(order_name: str) -> dict | None:
     s = get_settings()
     store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
     token = getattr(s, "SHOPIFY_API_TOKEN", "")
     if not store or not token:
         return None
-
-    candidates = (
-        [order_name, order_name.lstrip("#")]
-        if order_name and order_name.startswith("#")
-        else [order_name, f"#{order_name}"]
-    )
-
+    candidates = [order_name, order_name.lstrip("#")] if order_name.startswith("#") else [order_name, f"#{order_name}"]
     for candidate in candidates:
         try:
-            querystring = urlparse.urlencode({"name": candidate})
-            url = f"https://{store}/admin/api/2024-10/orders.json?{querystring}"
-            req = urlreq.Request(
-                url,
-                headers={"X-Shopify-Access-Token": token, "Accept": "application/json"},
-            )
+            qs = urlparse.urlencode({"name": candidate})
+            url = f"https://{store}/admin/api/2024-10/orders.json?{qs}"
+            req = urlreq.Request(url, headers={"X-Shopify-Access-Token": token, "Accept": "application/json"})
             with urlreq.urlopen(req, timeout=15) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
             orders = payload.get("orders") or []
@@ -288,57 +273,34 @@ async def get_order_by_name(order_name: str) -> Dict[str, Any] | None:
     return None
 
 
-async def cancel_unfulfilled_order(order: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Cancel an unfulfilled order via Shopify REST Admin API.
-    """
-    import json
-    from urllib import request as urlreq
-
+async def cancel_unfulfilled_order(order: dict) -> dict:
     s = get_settings()
     store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
     token = getattr(s, "SHOPIFY_API_TOKEN", "")
     order_id = order.get("id")
     if not (store and token and order_id):
         return {"ok": False, "error": "missing_shopify_config_or_id"}
-
     url = f"https://{store}/admin/api/2024-10/orders/{order_id}/cancel.json"
-    req = urlreq.Request(
-        url,
-        method="POST",
-        headers={"X-Shopify-Access-Token": token, "Accept": "application/json"},
-    )
+    req = urlreq.Request(url, method="POST", headers={"X-Shopify-Access-Token": token, "Accept": "application/json"})
     with urlreq.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return {"ok": True, "data": data}
 
 
-async def update_order_address(order: Dict[str, Any], new_addr: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Update order shipping address via Shopify REST Admin API.
-    """
-    import json
-    from urllib import request as urlreq
-
+async def update_order_address(order: dict, new_addr: dict) -> dict:
     s = get_settings()
     store = getattr(s, "SHOPIFY_STORE", "").replace("https://", "").replace("http://", "")
     token = getattr(s, "SHOPIFY_API_TOKEN", "")
     order_id = order.get("id")
     if not (store and token and order_id):
         return {"ok": False, "error": "missing_shopify_config_or_id"}
-
     url = f"https://{store}/admin/api/2024-10/orders/{order_id}.json"
     payload = json.dumps({"order": {"id": order_id, "shipping_address": new_addr}}).encode("utf-8")
-    req = urlreq.Request(
-        url,
-        data=payload,
-        method="PUT",
-        headers={
-            "X-Shopify-Access-Token": token,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-    )
+    req = urlreq.Request(url, data=payload, method="PUT", headers={
+        "X-Shopify-Access-Token": token,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    })
     with urlreq.urlopen(req, timeout=15) as resp:
         data = json.loads(resp.read().decode("utf-8"))
     return {"ok": True, "data": data}

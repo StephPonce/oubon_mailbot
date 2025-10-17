@@ -1,111 +1,136 @@
-from functools import lru_cache
+from __future__ import annotations
 
-from pydantic import Field
+from functools import lru_cache
+from typing import Optional
+
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _strip_quotes_and_slash(v: Optional[str]) -> Optional[str]:
+    """
+    Normalize env strings by trimming whitespace, removing surrounding quotes,
+    and stripping trailing slashes so downstream URL joins remain predictable.
+    """
+    if not v:
+        return v
+    v = v.strip()
+    if (v.startswith("'") and v.endswith("'")) or (v.startswith('"') and v.endswith('"')):
+        v = v[1:-1].strip()
+    return v.rstrip("/")
+
+
 class Settings(BaseSettings):
-    # App configuration
+    # --- App / runtime ---
     APP_HOST: str = Field(default="localhost")
     APP_PORT: int = Field(default=8011)
     APP_DEBUG: bool = Field(default=True)
+    DATABASE_URL: str = Field(default="sqlite+aiosqlite:///./data/mailbot.db")
 
-    # OAuth / Google
-    GOOGLE_CLIENT_ID: str = Field(default="")
-    GOOGLE_CLIENT_SECRET: str = Field(default="")
+    # --- Google API / Gmail ---
+    GOOGLE_CLIENT_ID: Optional[str] = Field(default=None)
+    GOOGLE_CLIENT_SECRET: Optional[str] = Field(default=None)
     GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:8011/oauth2callback")
     GOOGLE_SCOPES: str = Field(default="https://www.googleapis.com/auth/gmail.modify")
     GOOGLE_TOKEN_FILE: str = Field(default=".secrets/gmail_token.json")
     GOOGLE_CREDENTIALS_FILE: str = Field(default=".secrets/credentials.json")
 
-    # Database
-    DATABASE_URL: str = Field(default="sqlite+aiosqlite:///./data/mailbot.db")
+    # --- Slack / notifications ---
+    SLACK_WEBHOOK_URL: Optional[str] = Field(default=None)
 
-    # AI defaults
+    # --- AI settings ---
     AI_PROVIDER: str = Field(default="openai")
     AI_MODEL: str = Field(default="gpt-4o-mini")
-    OPENAI_API_KEY: str = Field(default="")
-    GROK_API_KEY: str | None = Field(default=None)
+    AI_FORCE_OPENAI_ONLY: bool = Field(default=False)
     AI_DAILY_QUOTA: int = Field(default=100000)
+    AI_BUDGET_CAP: float = Field(default=10.0)
     REPLY_ALWAYS: bool = Field(default=False)
-    HELPBOT_SHARED_SECRET: str | None = Field(default=None)
+    GROK_API_KEY: Optional[str] = Field(default=None)
+    HELPBOT_SHARED_SECRET: Optional[str] = Field(default=None)
+    PUBLIC_FORM_SECRET: Optional[str] = Field(default=None)
 
-    # Shopify
-    SHOPIFY_STORE: str = Field(default="")
-    SHOPIFY_API_TOKEN: str = Field(default="")
+
+    # --- Research feature toggles ---
+    ENABLE_RESEARCH_REDDIT: bool | None = False
+    ENABLE_RESEARCH_INSTAGRAM: bool | None = False
+    ENABLE_RESEARCH_TIKTOK: bool | None = False
+    ENABLE_RESEARCH_GOOGLE: bool | None = True
+
+    # --- Research API credentials ---
+    REDDIT_CLIENT_ID: Optional[str] = Field(default=None)
+    REDDIT_CLIENT_SECRET: Optional[str] = Field(default=None)
+    REDDIT_USER_AGENT: Optional[str] = Field(default="oubon-research/1.0")
+
+    META_APP_ID: Optional[str] = Field(default=None)
+    META_APP_SECRET: Optional[str] = Field(default=None)
+    META_IG_BUSINESS_ID: Optional[str] = Field(default=None)
+    META_ACCESS_TOKEN: Optional[str] = Field(default=None)
+
+    SERPAPI_KEY: Optional[str] = Field(default=None)
+    GOOGLE_CSE_ID: Optional[str] = Field(default=None)
+
+    RESEARCH_MAX_RESULTS: Optional[int] = Field(default=10)
+    RESEARCH_TIMEOUT_SEC: Optional[int] = Field(default=15)
+
+    # --- Shopify / store ---
+    STORE_DOMAIN: Optional[str] = Field(default=None)
+    SUPPORT_FORM_URL: Optional[str] = Field(default=None)
+    ALLOWED_ORIGIN: Optional[str] = Field(default=None)
+    SHOPIFY_STORE: Optional[str] = Field(default=None)
+    SHOPIFY_API_TOKEN: Optional[str] = Field(default=None)
     SHOPIFY_API_VERSION: str = Field(default="2025-10")
     SHOPIFY_MODE: str = Field(default="safe")
-    SHOPIFY_API_KEY: str = Field(default="")
-    SHOPIFY_API_SECRET: str = Field(default="")
-    SHOPIFY_DOMAIN: str = Field(default="")
+    SHOPIFY_API_KEY: Optional[str] = Field(default=None)
+    SHOPIFY_API_SECRET: Optional[str] = Field(default=None)
 
-    # Ads and affiliate
-    FB_ADS_DAILY_LIMIT: float = Field(default=0.0)
-    GOOGLE_ADS_DAILY_LIMIT: float = Field(default=0.0)
-    ADS_BUDGET_CAP: float = Field(default=100.0)
-    AMAZON_ACCESS_KEY: str = Field(default="")
-    AMAZON_SECRET_KEY: str = Field(default="")
-    AMAZON_ASSOC_TAG: str = Field(default="")
-    AMAZON_COUNTRY: str = Field(default="us")
-    ALIEXPRESS_API_KEY: str = Field(default="")
-
-    # Store behaviour
+    # --- Time / scheduling ---
     STORE_TIMEZONE: str = Field(default="America/Chicago")
     QUIET_HOURS_START: int = Field(default=22)
     QUIET_HOURS_END: int = Field(default=7)
 
-    # Slack
-    SLACK_WEBHOOK_URL: str | None = Field(default=None)
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
+        extra="allow",
     )
 
-    # Backwards-compatible lowercase accessors
-    @property
-    def google_client_id(self) -> str:
-        return self.GOOGLE_CLIENT_ID
+    @field_validator(
+        "STORE_DOMAIN",
+        "SUPPORT_FORM_URL",
+        "ALLOWED_ORIGIN",
+        "SHOPIFY_STORE",
+        mode="before",
+    )
+    @classmethod
+    def _sanitize_links(cls, v: Optional[str]) -> Optional[str]:
+        return _strip_quotes_and_slash(v)
 
-    @property
-    def google_client_secret(self) -> str:
-        return self.GOOGLE_CLIENT_SECRET
-
-    @property
-    def google_redirect_uri(self) -> str:
-        return self.GOOGLE_REDIRECT_URI
-
+    # --- Compatibility helpers (legacy lowercase attributes) ---
     @property
     def google_scopes(self) -> str:
         return self.GOOGLE_SCOPES
-
-    @property
-    def google_token_file(self) -> str:
-        return self.GOOGLE_TOKEN_FILE
 
     @property
     def google_credentials_file(self) -> str:
         return self.GOOGLE_CREDENTIALS_FILE
 
     @property
-    def openai_api_key(self) -> str:
-        return self.OPENAI_API_KEY
+    def google_token_file(self) -> str:
+        return self.GOOGLE_TOKEN_FILE
 
     @property
-    def slack_webhook_url(self) -> str | None:
+    def google_redirect_uri(self) -> str:
+        return self.GOOGLE_REDIRECT_URI
+
+    @property
+    def slack_webhook_url(self) -> Optional[str]:
         return self.SLACK_WEBHOOK_URL
-
-    @property
-    def grok_api_key(self) -> str | None:
-        return self.GROK_API_KEY
 
     @property
     def store_timezone(self) -> str:
         return self.STORE_TIMEZONE
 
 
-@lru_cache()
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()

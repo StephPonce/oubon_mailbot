@@ -4,9 +4,13 @@ Utilities for pulling external market signals (Google Trends + Amazon catalog).
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import urllib.parse as _urlparse
+import urllib.request as _urlreq
 from typing import Any, Dict, List
 
+from fastapi import APIRouter, Query
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.settings import get_settings
@@ -146,6 +150,85 @@ async def get_x_research(keyword: str) -> Any:
         return f"X research error: {exc}—fallback to cached"
 
 
+def _http_get_json(url: str, headers: Dict[str, str] | None = None, timeout: int = 15) -> Dict[str, Any] | List[Dict[str, Any]]:
+    req = _urlreq.Request(url, headers=headers or {})
+    with _urlreq.urlopen(req, timeout=timeout) as resp:
+        data = resp.read().decode("utf-8", errors="ignore")
+    try:
+        return json.loads(data)
+    except Exception:
+        return {"raw": data}
+
+
+def research_google(query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    settings = get_settings()
+    out: List[Dict[str, Any]] = []
+    if not settings.ENABLE_RESEARCH_GOOGLE:
+        return out
+    limit = min(limit, int(settings.RESEARCH_MAX_RESULTS or 10))
+    timeout = int(settings.RESEARCH_TIMEOUT_SEC or 15)
+    if settings.SERPAPI_KEY:
+        q = _urlparse.quote(query)
+        url = f"https://serpapi.com/search.json?engine=google&q={q}&num={min(limit, 20)}&api_key={settings.SERPAPI_KEY}"
+        payload = _http_get_json(url, timeout=timeout)
+        for item in (payload.get("organic_results") or []):
+            out.append({"title": item.get("title"), "link": item.get("link"), "snippet": item.get("snippet")})
+        return out
+    return out
+
+
+def research_reddit(query: str, limit: int = 10) -> List[Dict[str, Any]]:
+    settings = get_settings()
+    if not settings.ENABLE_RESEARCH_REDDIT:
+        return []
+    limit = min(limit, int(settings.RESEARCH_MAX_RESULTS or 10))
+    timeout = int(settings.RESEARCH_TIMEOUT_SEC or 15)
+    q = _urlparse.quote(query)
+    url = f"https://www.reddit.com/search.json?q={q}&sort=top&t=year&limit={min(limit, 25)}"
+    payload = _http_get_json(url, headers={"User-Agent": settings.REDDIT_USER_AGENT or "oubon-research/1.0"}, timeout=timeout)
+    out: List[Dict[str, Any]] = []
+    for child in (payload.get("data", {}).get("children", []) or []):
+        data = child.get("data", {})
+        out.append({"title": data.get("title"), "link": f"https://www.reddit.com{data.get('permalink')}", "ups": data.get("ups"), "subreddit": data.get("subreddit")})
+    return out
+
+
+def research_instagram_hashtag(tag: str, limit: int = 10) -> List[Dict[str, Any]]:
+    settings = get_settings()
+    if not settings.ENABLE_RESEARCH_INSTAGRAM:
+        return []
+    if not (settings.META_ACCESS_TOKEN and settings.META_IG_BUSINESS_ID):
+        return []
+    return []
+
+
+def research_tiktok_hashtag(tag: str, limit: int = 10) -> List[Dict[str, Any]]:
+    settings = get_settings()
+    if not settings.ENABLE_RESEARCH_TIKTOK:
+        return []
+    return []
+
+
+def research_aggregate(query: str, limit: int = 10) -> Dict[str, Any]:
+    settings = get_settings()
+    limit = int(limit or settings.RESEARCH_MAX_RESULTS or 10)
+    return {"google": research_google(query, limit), "reddit": research_reddit(query, limit), "instagram": research_instagram_hashtag(query.lstrip("#"), limit) if query.startswith("#") else [], "tiktok": research_tiktok_hashtag(query.lstrip("#"), limit) if query.startswith("#") else []}
+
+
+research_router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+@research_router.get("/research")
+def ai_research(q: str = Query(..., min_length=2), limit: int = Query(10, ge=1, le=50)):
+    """Aggregate public signals for product/topic research across enabled sources."""
+    try:
+        data = research_aggregate(q, limit)
+        return {"ok": True, "query": q, "limit": limit, "data": data}
+    except Exception as exc:
+        logger.exception("Research aggregate failed")
+        return {"ok": False, "error": str(exc)}
+
+
 def product_research(keyword: str, store_token: str | None = None) -> Dict[str, Any]:
     """
     Synchronous helper that wraps get_external_trends for scheduled jobs or webhook triggers.
@@ -172,5 +255,11 @@ __all__ = [
     "get_external_trends",
     "get_tiktok_research",
     "get_x_research",
+    "research_google",
+    "research_reddit",
+    "research_instagram_hashtag",
+    "research_tiktok_hashtag",
+    "research_aggregate",
+    "research_router",
     "product_research",
 ]
