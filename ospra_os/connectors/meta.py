@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Dict
-from oubon_os.core.settings import get_settings
+from ospra_os.core.settings import get_settings
 
 
 def get_meta_trending_interests(limit: int = 10) -> List[Dict]:

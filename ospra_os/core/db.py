@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from oubon_os.core.settings import get_settings
+from ospra_os.core.settings import get_settings
 
 
 def _ensure_dir(path: str) -> None:

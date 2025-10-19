@@ -22,4 +22,4 @@ COPY . /app
 EXPOSE 8011
 
 # Uvicorn entrypoint
-CMD ["uvicorn", "oubon_os.main:app", "--host", "0.0.0.0", "--port", "8011"]
+CMD ["uvicorn", "ospra_os.main:app", "--host", "0.0.0.0", "--port", "8011"]

@@ -6,10 +6,10 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
-from oubonos.ads_bot import AdBot
-from oubonos.evaluator import Evaluator
-from oubonos.market_bot import MarketBot
-from oubonos.prophet_forecaster import ProphetPredictor
+from ospra_os.ai.ads_bot import AdBot
+from ospra_os.analytics.evaluator import Evaluator
+from ospra_os.ai.market_bot import MarketBot
+from ospra_os.forecaster.prophet_forecaster import ProphetPredictor
 
 logger = logging.getLogger(__name__)
 

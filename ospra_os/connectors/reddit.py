@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import List, Dict
-from oubon_os.core.settings import get_settings
+from ospra_os.core.settings import get_settings
 
 
 def get_reddit_hot_topics(subreddit: str = "Entrepreneur", limit: int = 10) -> List[Dict]:

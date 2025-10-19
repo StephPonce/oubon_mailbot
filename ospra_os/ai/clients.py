@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 
-from oubon_os.core.settings import get_settings
+from ospra_os.core.settings import get_settings
 
 
 def ask_ai(prompt: str, model: str = "gpt-4o-mini") -> str:
