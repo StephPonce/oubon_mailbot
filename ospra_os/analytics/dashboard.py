@@ -3,7 +3,8 @@ from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 import json
 
-from oubon_os.core.db import recent_events, latest_forecast
+from ospra_os.core.db import recent_events, latest_forecast
+from ospra_os.research.models import list_candidates
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -39,6 +40,32 @@ def dashboard() -> str:
           <td>{row['p90']:.2f}</td>
         </tr>
         """
+
+    candidates = list_candidates(limit=10)
+
+    cand_row_tpl = []
+    for c in candidates:
+        url_html = f"<a href='{c['url']}' target='_blank'>link</a>" if c.get("url") else "—"
+        cand_row_tpl.append(
+            "<tr>"
+            f"<td>{c['id']}</td>"
+            f"<td>{c['title']}</td>"
+            f"<td>{c['source']}</td>"
+            f"<td>{c['score']:.2f}</td>"
+            f"<td>{c['status']}</td>"
+            f"<td>{url_html}</td>"
+            "<td>"
+            f"<form method='post' action='/admin/research/candidates/{c['id']}/approve' style='display:inline'>"
+            "<button type='submit'>Approve</button>"
+            "</form>"
+            " "
+            f"<form method='post' action='/admin/research/candidates/{c['id']}/reject' style='display:inline;margin-left:6px'>"
+            "<button type='submit'>Reject</button>"
+            "</form>"
+            "</td>"
+            "</tr>"
+        )
+    cand_rows = "".join(cand_row_tpl)
 
     return f"""
     <html>
@@ -82,6 +109,34 @@ def dashboard() -> str:
               <li><a href="/admin/logs?limit=20">/admin/logs (JSON)</a></li>
               <li><a href="/admin/dashboard">/admin/dashboard (you are here)</a></li>
             </ul>
+          </div>
+          <div class="card">
+            <h2>Product Candidates (latest 10)</h2>
+            <div style="margin-bottom:12px;">
+              <form method="post" action="/admin/research/queue" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input name="terms" placeholder="comma separated terms e.g. baby blanket, phone case" style="flex:1; min-width:240px;" />
+                <div style="display:flex; gap:6px;">
+                  <button type="submit">Enqueue Terms</button>
+                  <button type="submit" formaction="/admin/research/run">Run Research</button>
+                </div>
+              </form>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Title</th>
+                  <th>Source</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>URL</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cand_rows or "<tr><td colspan='7'>No candidates yet.</td></tr>"}
+              </tbody>
+            </table>
           </div>
         </div>
       </body>

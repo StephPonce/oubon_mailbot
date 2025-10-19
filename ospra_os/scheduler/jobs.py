@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from random import random
 
-from oubon_os.core.db import log_event
+from ospra_os.core.db import log_event
 
 
 def daily_health_probe() -> None:

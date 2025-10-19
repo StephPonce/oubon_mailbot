@@ -15,8 +15,8 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from app.ai_client import ai_client
 from app.database import conn
-from oubonos.forecast_ingestor import iso_day
-from oubonos.prophet_forecaster import generate_dummy_daily_series
+from ospra_os.forecaster.ingestor import iso_day
+from ospra_os.forecaster.prophet_forecaster import generate_dummy_daily_series
 
 logger = logging.getLogger(__name__)
 

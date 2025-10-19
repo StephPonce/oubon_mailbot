@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Data
     DATABASE_PATH: str = Field(default="data/oubon.db")
 
+    # Research module knobs
+    RESEARCH_MAX_TERMS: int = Field(default=5)
+    RESEARCH_MAX_CANDIDATES_PER_TERM: int = Field(default=3)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
