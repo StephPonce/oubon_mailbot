@@ -20,3 +20,10 @@ class Branding(BaseSettings):
 @lru_cache(maxsize=1)
 def get_branding() -> Branding:
     return Branding()
+
+# --- Compatibility exports for simple import checks ---
+try:
+    _b = get_branding()
+    BRAND_NAME = getattr(_b, "OS_BRAND", None) or getattr(_b, "brand", None) or "Ospra"
+except Exception:
+    BRAND_NAME = "Ospra"

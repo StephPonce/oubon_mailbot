@@ -1,7 +1,117 @@
-.env
-.secrets/
-.env
-.secrets/
-.env
-.secrets/
+# Python
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+build/
+dist/
+
+# Virtual environments
+.venv/
+env/
+venv/
+*.env.bak
+
+# Editor and system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs and runtime
+*.log
+*.sqlite3
+.run.local.log
+
+# Secrets
+.secrets/
+secrets/
+config/
+
+# Docker
+*.pid
+*.sock
+
+# Cache
+*.cache/
+__pycache__/
+
+# --- Oubon / Ospra ignores ---
+.env
+.env.*.local
+.secrets/
+data/
+logs/
+*.sqlite
+*.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Node/web build artifacts (future dashboard)
+dist/
+build/
+.next/
+*.log
+
+# IDE junk
+.vscode/
+.idea/
+
+# --- Oubon / Ospra ---
+.env
+.env.*.local
+.secrets/
+data/
+logs/
+*.sqlite
+*.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Builds (future dashboard)
+dist/
+build/
+.next/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# --- Oubon / Ospra ---
+.env
+.env.*.local
+.secrets/
+data/
+logs/
+*.sqlite
+*.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# Builds (future dashboard)
+dist/
+build/
+.next/
+*.log
+
+# IDE
+.vscode/
+.idea/
