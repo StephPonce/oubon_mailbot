@@ -1,73 +1,143 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Oubon Shop — TikTok Integration Demo</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Oubon Shop · TikTok Integration Demo</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0f1320; color:#e8eefc; }
-    header { padding:24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #293049; }
-    header img { width:36px; height:36px; border-radius:8px; }
-    header h1 { font-size:18px; margin:0; opacity:.95; }
-    main { max-width:980px; margin:0 auto; padding:32px 20px 64px; }
-    .card { background:#12172a; border:1px solid #293049; border-radius:16px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
-    .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
-    .col { flex:1 1 320px; }
-    .btn { display:inline-block; background:#5b8cff; color:white; text-decoration:none; padding:12px 16px; border-radius:10px; font-weight:600; }
-    .btn:active { transform: translateY(1px); }
-    .muted { color:#9fb2d9; }
-    .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; background:#1a2140; border:1px solid #2c3766; color:#a9c1ff; }
-    footer { text-align:center; padding:24px; color:#8ea4d2; border-top:1px solid #293049; }
-    .callout { background:#0f1a35; border:1px dashed #3b4a7a; padding:12px 14px; border-radius:12px; margin-top:12px; color:#cfe0ff; font-size:14px; }
-    ul { margin:10px 0 0 18px; }
-    a { color:#a9c1ff; }
+    :root { --bg:#0b0d10; --panel:#12161b; --muted:#98a2b3; --text:#e6e7ea; --accent:#00f2ea; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+    header { display:flex; align-items:center; gap:12px; padding:18px 20px; border-bottom:1px solid #1c222b; }
+    header img { height:28px; }
+    .wrap { max-width:1120px; margin:0 auto; padding:28px 20px 60px; }
+    h1 { font-size:20px; margin:0 0 8px; }
+    .muted { color:var(--muted); }
+    .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; margin-top:18px; }
+    .card { grid-column: span 12; background:var(--panel); border:1px solid #1c222b; border-radius:14px; padding:18px; }
+    @media (min-width:900px){ .span6{grid-column:span 6} .span8{grid-column:span 8} .span4{grid-column:span 4} }
+    .row { display:flex; align-items:center; gap:10px; }
+    .btn { appearance:none; border:0; background:#1f2937; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; }
+    .btn.primary { background:linear-gradient(90deg,#25F4EE,#2a94ff); color:#0b0d10; font-weight:600; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    code, .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background:#0f1318; border:1px solid #1c222b; padding:2px 6px; border-radius:8px; }
+    .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid #243042; border-radius:999px; color:#d2d6dd; }
+    .feed { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .vid { background:#0f1318; border:1px solid #1c222b; aspect-ratio:9/16; border-radius:10px; display:flex; align-items:end; justify-content:space-between; padding:8px; }
+    .vid .kpi { background:rgba(0,0,0,.4); padding:4px 6px; border-radius:6px; font-size:12px; }
+    textarea { width:100%; min-height:110px; resize:vertical; background:#0f1318; color:#e6e7ea; border:1px solid #1c222b; border-radius:10px; padding:10px; }
+    .small { font-size:12px; }
+    footer { margin-top:28px; color:var(--muted); }
   </style>
 </head>
 <body>
-  <header>
-    <img src="/logo.svg" alt="Oubon logo" />
-    <h1>Oubon Shop — TikTok Integration (Demo)</h1>
-  </header>
-
-  <main>
-    <div class="row">
-      <div class="col card">
-        <h2 style="margin-top:0">Connect TikTok</h2>
-        <p class="muted">Authorize your TikTok account to enable posting, analytics, and ad workflows.</p>
-        <p><a class="btn" href="./oauth.html">Connect TikTok Account</a></p>
-        <div class="callout">
-          <strong>On-screen explainer (for review video):</strong>
-          <ul>
-            <li>Uses TikTok Login Kit OAuth flow</li>
-            <li>No posting without user consent</li>
-            <li>Revocable at any time in TikTok settings</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="col card">
-        <h2 style="margin-top:0">What happens after connect?</h2>
-        <p class="muted">Once connected, Oubon Shop can:</p>
-        <ul>
-          <li>Post new Shopify products to TikTok</li>
-          <li>Generate captions & schedule posts</li>
-          <li>Read engagement metrics (analytics)</li>
-        </ul>
-        <span class="badge">Sandbox demo — non-production</span>
-      </div>
+<header>
+  <img src="../logo.svg" alt="Oubon logo"/>
+  <div>
+    <div class="row" style="gap:8px;">
+      <strong>Oubon Shop</strong>
+      <span class="pill"><span style="width:6px;height:6px;border-radius:50%;background:#25F4EE;display:inline-block"></span> TikTok Demo</span>
     </div>
+    <div class="muted small">Static sandbox demonstration for TikTok review (no live posting).</div>
+  </div>
+</header>
 
-    <div class="card" style="margin-top:20px">
-      <h3 style="margin-top:0">Compliance</h3>
-      <p class="muted">
-        We handle data under our <a href="https://policies.oubonshop.com/privacy.html" target="_blank">Privacy Policy</a> and
-        <a href="https://policies.oubonshop.com/terms.html" target="_blank">Terms of Service</a>.
+<div class="wrap">
+  <h1>Integration Overview</h1>
+  <div class="muted">This page demonstrates Login Kit, Display API, Share Kit, and Content Posting (sandbox UI). Scopes are listed below.</div>
+
+  <div class="grid">
+    <!-- Login Kit -->
+    <section class="card span4">
+      <h3>Login Kit</h3>
+      <p class="muted small">OAuth consent simulated. Toggle the state with the button.</p>
+      <div class="row" style="justify-content:space-between;">
+        <div id="login-state" class="pill"><strong>State:</strong> <span id="state-value">Disconnected</span></div>
+        <button id="connect" class="btn primary">Connect with TikTok</button>
+      </div>
+      <div class="small muted" style="margin-top:10px;">Redirect targets: <span class="code">/demo/oauth.html</span> → <span class="code">/demo/success.html</span></div>
+    </section>
+
+    <!-- Display API -->
+    <section class="card span8">
+      <h3>Display API (mock feed)</h3>
+      <p class="muted small">Example embed grid representing recent videos & metrics.</p>
+      <div class="feed">
+        <div class="vid"><span class="kpi">Views 12.4k</span><span class="kpi">♥ 1.1k</span></div>
+        <div class="vid"><span class="kpi">Views 9.1k</span><span class="kpi">♥ 780</span></div>
+        <div class="vid"><span class="kpi">Views 22.0k</span><span class="kpi">♥ 2.6k</span></div>
+      </div>
+    </section>
+
+    <!-- Share Kit -->
+    <section class="card span8">
+      <h3>Share Kit</h3>
+      <p class="muted small">Prepare a caption and thumbnail; sharing action is represented (no live API calls here).</p>
+      <label class="small muted">Caption</label>
+      <textarea id="caption">Unbox with #Oubon — AI-curated finds, fast shipping. 🔥 #TikTokShop #SmallBusiness</textarea>
+      <div class="row" style="margin-top:10px; gap:8px;">
+        <button id="copy" class="btn">Copy caption</button>
+        <button class="btn" disabled title="Sandbox demo">Select video…</button>
+        <button class="btn" disabled title="Sandbox demo">Share to TikTok</button>
+      </div>
+    </section>
+
+    <!-- Posting -->
+    <section class="card span4">
+      <h3>Content Posting API</h3>
+      <p class="muted small">Upload & post flow shown for review; disabled in static demo.</p>
+      <input type="file" disabled/>
+      <div class="small muted" style="margin-top:8px;">Requires server token exchange & selected scopes.</div>
+    </section>
+
+    <!-- Scopes -->
+    <section class="card span12">
+      <h3>Requested products & scopes</h3>
+      <div class="row" style="flex-wrap:wrap; gap:8px;">
+        <span class="pill">Login Kit</span>
+        <span class="pill">Display API</span>
+        <span class="pill">Share Kit</span>
+        <span class="pill">Content Posting API</span>
+      </div>
+      <p class="muted small" style="margin-top:10px;">
+        Example scopes (to be matched in app config): 
+        <span class="code">user.info.basic</span>,
+        <span class="code">video.list</span>,
+        <span class="code">video.upload</span>,
+        <span class="code">video.publish</span>.
       </p>
-    </div>
-  </main>
+    </section>
+  </div>
 
-  <footer>
-    © Ospra LLC — Oubon Shop • <a href="mailto:support@oubonshop.com">support@oubonshop.com</a>
+  <footer class="small">
+    Questions? <a href="mailto:support@oubonshop.com">support@oubonshop.com</a>
   </footer>
+</div>
+
+<script>
+  // Read ?connected=1 to reflect a "logged-in" state for reviewers
+  const params = new URLSearchParams(location.search);
+  const isConnected = params.get('connected') === '1';
+  const stateEl = document.getElementById('state-value');
+  const btn = document.getElementById('connect');
+  function render() {
+    stateEl.textContent = isConnected ? 'Connected' : 'Disconnected';
+    btn.textContent = isConnected ? 'Disconnect' : 'Connect with TikTok';
+  }
+  render();
+  btn.addEventListener('click', () => {
+    const next = isConnected ? '0' : '1';
+    const url = new URL(location.href);
+    url.searchParams.set('connected', next);
+    location.href = url.toString();
+  });
+
+  // Copy caption helper
+  document.getElementById('copy').addEventListener('click', async () => {
+    const t = document.getElementById('caption');
+    try { await navigator.clipboard.writeText(t.value); btn.innerText='Copied!'; setTimeout(render, 800); }
+    catch { alert('Copy failed'); }
+  });
+</script>
 </body>
 </html>
