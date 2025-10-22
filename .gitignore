@@ -115,3 +115,5 @@ build/
 # IDE
 .vscode/
 .idea/
+.env
+.env.bak
