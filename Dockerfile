@@ -6,8 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # System deps (build-essential needed for some libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl \
+    build-essential curl ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/*
+RUN update-ca-certificates
 
 WORKDIR /app
 
