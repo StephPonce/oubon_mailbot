@@ -2,72 +2,190 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Oubon Shop — TikTok Integration Demo</title>
+  <title>Oubon × TikTok Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#0f1320; color:#e8eefc; }
-    header { padding:24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #293049; }
-    header img { width:36px; height:36px; border-radius:8px; }
-    header h1 { font-size:18px; margin:0; opacity:.95; }
-    main { max-width:980px; margin:0 auto; padding:32px 20px 64px; }
-    .card { background:#12172a; border:1px solid #293049; border-radius:16px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.35); }
-    .row { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-start; }
-    .col { flex:1 1 320px; }
-    .btn { display:inline-block; background:#5b8cff; color:white; text-decoration:none; padding:12px 16px; border-radius:10px; font-weight:600; }
-    .btn:active { transform: translateY(1px); }
-    .muted { color:#9fb2d9; }
-    .badge { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; background:#1a2140; border:1px solid #2c3766; color:#a9c1ff; }
-    footer { text-align:center; padding:24px; color:#8ea4d2; border-top:1px solid #293049; }
-    .callout { background:#0f1a35; border:1px dashed #3b4a7a; padding:12px 14px; border-radius:12px; margin-top:12px; color:#cfe0ff; font-size:14px; }
-    ul { margin:10px 0 0 18px; }
-    a { color:#a9c1ff; }
+    :root { --bg:#0b0c10; --card:#111318; --muted:#9aa3af; --text:#e5e7eb; --acc:#7c3aed; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --border:#1f2430; }
+    html,body { margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .wrap { max-width:1080px; margin:0 auto; padding:24px; }
+    header { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+    .logo { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#a78bfa,#06b6d4); display:grid; place-items:center; box-shadow: 0 6px 24px rgba(124,58,237,.28);}
+    .logo svg { width:28px; height:28px; }
+    .muted { color:var(--muted); }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; }
+    h1 { font-size:20px; margin:0; }
+    h2 { font-size:16px; margin:0 0 8px 0;}
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#161922; color:var(--text); cursor:pointer; text-decoration:none; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; }
+    .btn.ok { border-color:#173a31; background:#0e1f1b; color:#c7f9e6; }
+    .btn.warn { border-color:#3d300f; background:#211a0a; color:#ffe6b0; }
+    .btn.err { border-color:#3a1316; background:#1a0c0d; color:#ffc6cc; }
+    code, pre { background:#0b0d12; border:1px solid var(--border); border-radius:10px; padding:10px; color:#d1d5db; overflow:auto; }
+    .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .pill { font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--border); background:#0b0d12; color:var(--muted)}
+    footer { margin-top:24px; display:flex; gap:12px; align-items:center; color:var(--muted); }
+    a { color:#a78bfa; }
+    .badge { font-size:12px; padding:4px 8px; border-radius:999px; background:#1a1428; border:1px solid #2b2142; color:#d9c5ff;}
+    .oktxt { color:var(--ok); }
   </style>
 </head>
 <body>
-  <header>
-    <img src="/logo-128.png" alt="Oubon logo" />
-    <h1>Oubon Shop — TikTok Integration (Demo)</h1>
-  </header>
+  <div class="wrap">
+    <header>
+      <!-- Inline SVG fixes the “blank logo” (no external file path needed) -->
+      <div class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <defs>
+            <linearGradient id="g" x1="0" y1="0" x2="24" y2="24">
+              <stop stop-color="#ffffff" stop-opacity="0.95"/>
+              <stop offset="1" stop-color="#e5e7eb" stop-opacity="0.9"/>
+            </linearGradient>
+          </defs>
+          <path d="M12 3.5c4.694 0 8.5 3.806 8.5 8.5s-3.806 8.5-8.5 8.5-8.5-3.806-8.5-8.5S7.306 3.5 12 3.5Zm0 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z" fill="url(#g)"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Oubon TikTok Integration (Sandbox Demo)</h1>
+        <div class="muted">Shows Login Kit, Display API, Share Kit & Content Posting API (demo).</div>
+      </div>
+      <span class="badge">Sandbox</span>
+    </header>
 
-  <main>
-    <div class="row">
-      <div class="col card">
-        <h2 style="margin-top:0">Connect TikTok</h2>
-        <p class="muted">Authorize your TikTok account to enable posting, analytics, and ad workflows.</p>
-        <p><a class="btn" href="./oauth.html">Connect TikTok Account</a></p>
-        <div class="callout">
-          <strong>On-screen explainer (for review video):</strong>
-          <ul>
-            <li>Uses TikTok Login Kit OAuth flow</li>
-            <li>No posting without user consent</li>
-            <li>Revocable at any time in TikTok settings</li>
-          </ul>
+    <div class="grid">
+
+      <!-- LOGIN KIT -->
+      <section class="card">
+        <h2>1) Login Kit</h2>
+        <p class="muted">Start OAuth, then return with a <code>code</code> on the redirect URI.</p>
+        <div class="row">
+          <a class="btn" href="./oauth.html">Start TikTok OAuth (Sandbox)</a>
+          <button id="resetBtn" class="btn warn" onclick="resetDemo()">Reset</button>
+          <span id="loginStatus" class="pill">Status: Not connected</span>
         </div>
-      </div>
+      </section>
 
-      <div class="col card">
-        <h2 style="margin-top:0">What happens after connect?</h2>
-        <p class="muted">Once connected, Oubon Shop can:</p>
-        <ul>
-          <li>Post new Shopify products to TikTok</li>
-          <li>Generate captions & schedule posts</li>
-          <li>Read engagement metrics (analytics)</li>
+      <!-- DISPLAY API -->
+      <section class="card">
+        <h2>2) Display API (Profile)</h2>
+        <p class="muted">After OAuth, we’d call TikTok Display API to fetch basic profile.</p>
+        <div class="row">
+          <button class="btn" onclick="simulateProfile()">Fetch Profile (Demo)</button>
+          <span id="profileStatus" class="pill">Awaiting login</span>
+        </div>
+        <pre id="profileJson" style="margin-top:10px;display:none;"></pre>
+      </section>
+
+      <!-- SHARE KIT -->
+      <section class="card">
+        <h2>3) Share Kit</h2>
+        <p class="muted">Open a share intent (demo). This previews the data we’d share.</p>
+        <div class="row">
+          <input id="shareText" class="pill" style="min-width:200px" value="New Oubon drop just landed 🚀" />
+          <input id="shareUrl" class="pill" style="min-width:240px" value="https://oubonshop.com/products/demo" />
+          <button class="btn" onclick="simulateShare()">Open Share (Demo)</button>
+        </div>
+        <pre id="sharePreview" style="margin-top:10px;display:none;"></pre>
+      </section>
+
+      <!-- CONTENT POSTING API -->
+      <section class="card">
+        <h2>4) Content Posting API (Video Upload)</h2>
+        <p class="muted">Upload a video to the connected TikTok account (sandbox simulation here).</p>
+        <div class="row">
+          <input id="videoFile" type="file" accept="video/mp4,video/quicktime" class="pill" />
+          <button class="btn ok" onclick="simulateUpload()">Upload (Sandbox)</button>
+          <span id="uploadStatus" class="pill">No upload started</span>
+        </div>
+        <pre id="uploadJson" style="margin-top:10px;display:none;"></pre>
+      </section>
+
+      <!-- SCOPES -->
+      <section class="card">
+        <h2>5) Requested Scopes</h2>
+        <p class="muted">These are the scopes this app requests during OAuth.</p>
+        <ul style="margin:0 0 8px 18px;">
+          <li><span class="oktxt">✓</span> <code>user.info.basic</code> – read basic profile</li>
+          <li><span class="oktxt">✓</span> <code>video.list</code> – list user videos</li>
+          <li><span class="oktxt">✓</span> <code>video.upload</code> – upload content</li>
+          <li><span class="oktxt">✓</span> <code>share.media</code> – invoke Share Kit</li>
         </ul>
-        <span class="badge">Sandbox demo — non-production</span>
-      </div>
+        <div class="muted">Reviewers: this demo is static and clearly marks sandbox behavior.</div>
+      </section>
+
     </div>
 
-    <div class="card" style="margin-top:20px">
-      <h3 style="margin-top:0">Compliance</h3>
-      <p class="muted">
-        We handle data under our <a href="https://policies.oubonshop.com/privacy.html" target="_blank">Privacy Policy</a> and
-        <a href="https://policies.oubonshop.com/terms.html" target="_blank">Terms of Service</a>.
-      </p>
-    </div>
-  </main>
+    <footer>
+      <a href="../privacy.html">Privacy</a> ·
+      <a href="../terms.html">Terms</a> ·
+      <span class="muted">Contact: <a href="mailto:support@oubonshop.com">support@oubonshop.com</a></span>
+    </footer>
+  </div>
 
-  <footer>
-    © Ospra LLC — Oubon Shop • <a href="mailto:support@oubonshop.com">support@oubonshop.com</a>
-  </footer>
+  <script>
+    // restore 'connected' state if we arrived from success.html
+    const qs = new URLSearchParams(location.search);
+    const connected = qs.get('connected') === 'true';
+    const st = document.getElementById('loginStatus');
+    if (connected) { st.textContent = 'Status: Connected (Sandbox)'; st.classList.add('oktxt'); }
+
+    function resetDemo(){
+      localStorage.removeItem('oubon_demo_profile');
+      document.getElementById('profileJson').style.display='none';
+      document.getElementById('profileStatus').textContent='Awaiting login';
+      document.getElementById('sharePreview').style.display='none';
+      document.getElementById('uploadJson').style.display='none';
+      document.getElementById('uploadStatus').textContent='No upload started';
+      document.getElementById('loginStatus').textContent='Status: Not connected';
+      history.replaceState({}, '', './');
+    }
+
+    function simulateProfile(){
+      const status = document.getElementById('profileStatus');
+      status.textContent = 'Calling Display API (demo)…';
+      const demo = {
+        data: {
+          user_id: "7063xxxxxxx",
+          display_name: "oubon_demo",
+          avatar_url: "https://picsum.photos/seed/oubon/120",
+          follower_count: 12345
+        }
+      };
+      setTimeout(()=>{
+        status.textContent = 'Profile fetched (demo)';
+        const pre = document.getElementById('profileJson');
+        pre.textContent = JSON.stringify(demo, null, 2);
+        pre.style.display='block';
+        localStorage.setItem('oubon_demo_profile', JSON.stringify(demo));
+      }, 600);
+    }
+
+    function simulateShare(){
+      const text = document.getElementById('shareText').value;
+      const url = document.getElementById('shareUrl').value;
+      const payload = { product: "Share Kit", intent: "share", text, url, status: "opened (demo)" };
+      const pre = document.getElementById('sharePreview');
+      pre.textContent = JSON.stringify(payload, null, 2);
+      pre.style.display='block';
+      alert('Share intent opened (demo). In production this would open TikTok’s share UI.');
+    }
+
+    function simulateUpload(){
+      const input = document.getElementById('videoFile');
+      const status = document.getElementById('uploadStatus');
+      if (!input.files || !input.files[0]) { alert('Pick a video first (mp4/mov)'); return; }
+      status.textContent = 'Uploading (demo)…';
+      setTimeout(()=>{
+        status.textContent = 'Upload completed (demo)';
+        const pre = document.getElementById('uploadJson');
+        pre.textContent = JSON.stringify({
+          job_id: "upl_abc123",
+          file_name: input.files[0].name,
+          state: "completed (demo)"
+        }, null, 2);
+        pre.style.display='block';
+      }, 900);
+    }
+  </script>
 </body>
 </html>
