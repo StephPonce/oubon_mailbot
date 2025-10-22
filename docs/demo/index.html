@@ -1,143 +1,160 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Oubon Shop · TikTok Integration Demo</title>
-  <style>
-    :root { --bg:#0b0d10; --panel:#12161b; --muted:#98a2b3; --text:#e6e7ea; --accent:#00f2ea; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
-    header { display:flex; align-items:center; gap:12px; padding:18px 20px; border-bottom:1px solid #1c222b; }
-    header img { height:28px; }
-    .wrap { max-width:1120px; margin:0 auto; padding:28px 20px 60px; }
-    h1 { font-size:20px; margin:0 0 8px; }
-    .muted { color:var(--muted); }
-    .grid { display:grid; grid-template-columns:repeat(12,1fr); gap:16px; margin-top:18px; }
-    .card { grid-column: span 12; background:var(--panel); border:1px solid #1c222b; border-radius:14px; padding:18px; }
-    @media (min-width:900px){ .span6{grid-column:span 6} .span8{grid-column:span 8} .span4{grid-column:span 4} }
-    .row { display:flex; align-items:center; gap:10px; }
-    .btn { appearance:none; border:0; background:#1f2937; color:#fff; padding:10px 14px; border-radius:10px; cursor:pointer; }
-    .btn.primary { background:linear-gradient(90deg,#25F4EE,#2a94ff); color:#0b0d10; font-weight:600; }
-    .btn:disabled { opacity:.5; cursor:not-allowed; }
-    code, .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background:#0f1318; border:1px solid #1c222b; padding:2px 6px; border-radius:8px; }
-    .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid #243042; border-radius:999px; color:#d2d6dd; }
-    .feed { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
-    .vid { background:#0f1318; border:1px solid #1c222b; aspect-ratio:9/16; border-radius:10px; display:flex; align-items:end; justify-content:space-between; padding:8px; }
-    .vid .kpi { background:rgba(0,0,0,.4); padding:4px 6px; border-radius:6px; font-size:12px; }
-    textarea { width:100%; min-height:110px; resize:vertical; background:#0f1318; color:#e6e7ea; border:1px solid #1c222b; border-radius:10px; padding:10px; }
-    .small { font-size:12px; }
-    footer { margin-top:28px; color:var(--muted); }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Oubon × TikTok Demo</title>
+<style>
+  :root{
+    --bg:#0b0c10; --card:#14161a; --text:#e6e8eb; --muted:#a8b0b8; --brand:#25F4EE; --brand2:#FE2C55;
+    --border:#23262b; --chip:#1d2026;
+  }
+  *{box-sizing:border-box} body{margin:0;background:#0b0c10;color:var(--text);
+    font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:980px;margin:36px auto;padding:0 18px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  header img{width:44px;height:44px;border-radius:10px;background:#111;object-fit:cover}
+  h1{font-size:22px;margin:0}
+  .badge{display:inline-flex;gap:8px;background:var(--chip);border:1px solid var(--border);
+    border-radius:999px;padding:6px 10px;margin-top:6px}
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;margin-top:16px}
+  .card{grid-column:span 12;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+  @media(min-width:900px){.half{grid-column:span 6}}
+  h2{font-size:18px;margin:0 0 8px}
+  p{margin:8px 0;color:var(--muted)}
+  button,.btn{background:#1f242b;border:1px solid var(--border);color:var(--text);
+    padding:9px 13px;border-radius:10px;cursor:pointer}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+  .scope{background:var(--chip);border:1px solid var(--border);padding:6px 10px;border-radius:999px}
+  code,pre{background:#0e1014;border:1px solid var(--border);border-radius:10px;padding:10px;overflow:auto}
+  .muted{color:var(--muted)}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap}
+  .kv{background:var(--chip);border:1px solid var(--border);border-radius:10px;padding:8px 12px}
+</style>
 </head>
 <body>
-<header>
-  <img src="../logo.png?v=11" alt="Oubon logo"/>
-  <div>
-    <div class="row" style="gap:8px;">
-      <strong>Oubon Shop</strong>
-      <span class="pill"><span style="width:6px;height:6px;border-radius:50%;background:#25F4EE;display:inline-block"></span> TikTok Demo</span>
-    </div>
-    <div class="muted small">Static sandbox demonstration for TikTok review (no live posting).</div>
-  </div>
-</header>
-
 <div class="wrap">
-  <h1>Integration Overview</h1>
-  <div class="muted">This page demonstrates Login Kit, Display API, Share Kit, and Content Posting (sandbox UI). Scopes are listed below.</div>
+  <header>
+    <img src="../logo.png" onerror="this.src='../logo.svg';" alt="Oubon logo">
+    <div>
+      <h1>Oubon × TikTok Integration Demo</h1>
+      <div class="badge"><span id="domainSpan"></span></div>
+    </div>
+  </header>
 
   <div class="grid">
-    <!-- Login Kit -->
-    <section class="card span4">
-      <h3>Login Kit</h3>
-      <p class="muted small">OAuth consent simulated. Toggle the state with the button.</p>
-      <div class="row" style="justify-content:space-between;">
-        <div id="login-state" class="pill"><strong>State:</strong> <span id="state-value">Disconnected</span></div>
-        <button id="connect" class="btn primary">Connect with TikTok</button>
+    <section class="card half" id="loginCard">
+      <h2>Login Kit</h2>
+      <p>OAuth connect and post-auth state (sandbox).</p>
+      <div class="row" id="loginBtns">
+        <a class="btn" href="./oauth.html">Start OAuth (sandbox)</a>
+        <button onclick="connectMock()">Simulate Connect</button>
       </div>
-      <div class="small muted" style="margin-top:10px;">Redirect targets: <span class="code">/demo/oauth.html</span> → <span class="code">/demo/success.html</span></div>
+      <div id="loginState" style="display:none">
+        <p>Connected as <b>@sandbox_user</b> (mock). Access token stored server-side (simulated).</p>
+      </div>
+      <p class="muted">Tip: open with <code>?connected=1</code> to preload connected state.</p>
+    </section>
+    <section class="card half">
+      <h2>Display API</h2>
+      <p>Fetch profile + recent videos (mocked for review).</p>
+      <div class="row">
+        <button onclick="showProfile()">Fetch Profile</button>
+        <button onclick="showVideos()">Fetch Recent Videos</button>
+      </div>
+      <div class="kpi">
+        <div class="kv"><b>Followers</b> <span id="kpiFollowers">—</span></div>
+        <div class="kv"><b>Likes</b> <span id="kpiLikes">—</span></div>
+        <div class="kv"><b>Videos</b> <span id="kpiVideos">—</span></div>
+      </div>
+      <pre id="displayOut">/* Click a button above */</pre>
     </section>
 
-    <!-- Display API -->
-    <section class="card span8">
-      <h3>Display API (mock feed)</h3>
-      <p class="muted small">Example embed grid representing recent videos & metrics.</p>
-      <div class="feed">
-        <div class="vid"><span class="kpi">Views 12.4k</span><span class="kpi">♥ 1.1k</span></div>
-        <div class="vid"><span class="kpi">Views 9.1k</span><span class="kpi">♥ 780</span></div>
-        <div class="vid"><span class="kpi">Views 22.0k</span><span class="kpi">♥ 2.6k</span></div>
+    <section class="card half">
+      <h2>Share Kit</h2>
+      <p>Share product content from Oubon to TikTok with a caption.</p>
+      <div class="row">
+        <button onclick="openShare()">Share This Product</button>
       </div>
+      <pre id="shareOut">/* Click “Share This Product” */</pre>
     </section>
 
-    <!-- Share Kit -->
-    <section class="card span8">
-      <h3>Share Kit</h3>
-      <p class="muted small">Prepare a caption and thumbnail; sharing action is represented (no live API calls here).</p>
-      <label class="small muted">Caption</label>
-      <textarea id="caption">Unbox with #Oubon — AI-curated finds, fast shipping. 🔥 #TikTokShop #SmallBusiness</textarea>
-      <div class="row" style="margin-top:10px; gap:8px;">
-        <button id="copy" class="btn">Copy caption</button>
-        <button class="btn" disabled title="Sandbox demo">Select video…</button>
-        <button class="btn" disabled title="Sandbox demo">Share to TikTok</button>
-      </div>
+    <section class="card half">
+      <h2>Content Posting API</h2>
+      <p>Upload short video w/ caption (mocked server flow for review).</p>
+      <form onsubmit="return uploadMock(event)">
+        <div class="row">
+          <input type="file" accept="video/*" required>
+          <input type="text" id="caption" placeholder="Caption (e.g., New drop — 20% off!)"
+            style="flex:1;padding:10px;border-radius:10px;border:1px solid #23262b;background:#0f1318;color:#e6e8eb">
+          <button type="submit">Upload (sandbox)</button>
+        </div>
+      </form>
+      <pre id="uploadOut">/* Choose a file then Upload */</pre>
     </section>
 
-    <!-- Posting -->
-    <section class="card span4">
-      <h3>Content Posting API</h3>
-      <p class="muted small">Upload & post flow shown for review; disabled in static demo.</p>
-      <input type="file" disabled/>
-      <div class="small muted" style="margin-top:8px;">Requires server token exchange & selected scopes.</div>
-    </section>
-
-    <!-- Scopes -->
-    <section class="card span12">
-      <h3>Requested products & scopes</h3>
-      <div class="row" style="flex-wrap:wrap; gap:8px;">
-        <span class="pill">Login Kit</span>
-        <span class="pill">Display API</span>
-        <span class="pill">Share Kit</span>
-        <span class="pill">Content Posting API</span>
+    <section class="card">
+      <h2>Requested Products & Scopes</h2>
+      <div class="row">
+        <span class="scope">Login Kit</span>
+        <span class="scope">Display API</span>
+        <span class="scope">Share Kit</span>
+        <span class="scope">Content Posting API</span>
       </div>
-      <p class="muted small" style="margin-top:10px;">
-        Example scopes (to be matched in app config): 
-        <span class="code">user.info.basic</span>,
-        <span class="code">video.list</span>,
-        <span class="code">video.upload</span>,
-        <span class="code">video.publish</span>.
+      <div class="row">
+        <span class="scope">user.info.basic</span>
+        <span class="scope">video.list</span>
+        <span class="scope">video.upload</span>
+        <span class="scope">video.publish</span>
+      </div>
+      <p class="muted">
+        Demo env: <b>Sandbox / mocked</b> · Domain: <b id="domainText"></b><br>
+        Privacy: <a href="https://policies.oubonshop.com/privacy.html" target="_blank">Privacy Policy</a> ·
+        Terms: <a href="https://policies.oubonshop.com/terms.html" target="_blank">Terms of Service</a>
       </p>
     </section>
   </div>
 
-  <footer class="small">
-    Questions? <a href="mailto:support@oubonshop.com">support@oubonshop.com</a>
-  </footer>
+  <p class="muted">Support: <a href="mailto:support@oubonshop.com">support@oubonshop.com</a></p>
 </div>
-
 <script>
-  // Read ?connected=1 to reflect a "logged-in" state for reviewers
-  const params = new URLSearchParams(location.search);
-  const isConnected = params.get('connected') === '1';
-  const stateEl = document.getElementById('state-value');
-  const btn = document.getElementById('connect');
-  function render() {
-    stateEl.textContent = isConnected ? 'Connected' : 'Disconnected';
-    btn.textContent = isConnected ? 'Disconnect' : 'Connect with TikTok';
-  }
-  render();
-  btn.addEventListener('click', () => {
-    const next = isConnected ? '0' : '1';
-    const url = new URL(location.href);
-    url.searchParams.set('connected', next);
-    location.href = url.toString();
-  });
+  const qs = new URLSearchParams(location.search);
+  document.getElementById('domainText').textContent = location.hostname;
+  document.getElementById('domainSpan').textContent = location.origin.replace(/^https?:\/\//,'');
 
-  // Copy caption helper
-  document.getElementById('copy').addEventListener('click', async () => {
-    const t = document.getElementById('caption');
-    try { await navigator.clipboard.writeText(t.value); btn.innerText='Copied!'; setTimeout(render, 800); }
-    catch { alert('Copy failed'); }
-  });
+  function setConnectedUI(){ 
+    document.getElementById('loginBtns').style.display='none';
+    document.getElementById('loginState').style.display='block';
+  }
+  function connectMock(){ setConnectedUI(); }
+  if(qs.get('connected')==='1') setConnectedUI();
+
+  function showProfile(){
+    const profile={ username:"sandbox_user", nickname:"Oubon Demo", followers:12400, likes:87210, videos:57 };
+    document.getElementById('kpiFollowers').textContent=profile.followers.toLocaleString();
+    document.getElementById('kpiLikes').textContent=profile.likes.toLocaleString();
+    document.getElementById('kpiVideos').textContent=profile.videos;
+    document.getElementById('displayOut').textContent=JSON.stringify(profile,null,2);
+  }
+  function showVideos(){
+    const items=[
+      {id:"vid_001", title:"Fall Collection Sneak Peek", views:15600, url:"#"},
+      {id:"vid_002", title:"Unboxing — Oubon Hoodie", views:8300, url:"#"},
+      {id:"vid_003", title:"Styling Tips (30s)", views:12100, url:"#"}
+    ];
+    document.getElementById('displayOut').textContent=JSON.stringify({items},null,2);
+  }
+  function openShare(){
+    const payload={ title:"Share to TikTok", caption:"New Oubon drop! #oubon #streetwear", url:location.origin+"/demo/product/123" };
+    document.getElementById('shareOut').textContent=JSON.stringify(payload,null,2);
+  }
+  function uploadMock(e){
+    e.preventDefault();
+    const caption=document.getElementById('caption').value||"Oubon — new drop";
+    const result={ status:"queued", upload_id:"upl_"+Math.random().toString(36).slice(2,8), caption, note:"Server would call upload+publish." };
+    document.getElementById('uploadOut').textContent=JSON.stringify(result,null,2);
+    return false;
+  }
 </script>
 </body>
 </html>
