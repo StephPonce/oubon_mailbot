@@ -4,21 +4,23 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# System deps (build-essential needed for some libs)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential curl ca-certificates tzdata \
- && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 RUN update-ca-certificates
 
 WORKDIR /app
 
-# Leverage cache when requirements/poetry files don't change
+# If present, install deps from requirements/poetry first to leverage Docker layer cache
 COPY requirements.txt* pyproject.toml* poetry.lock* /tmp/dep/
 RUN python -m pip install --upgrade pip \
- && if [ -f /tmp/dep/requirements.txt ]; then pip install -r /tmp/dep/requirements.txt; fi
+    && if [ -f /tmp/dep/requirements.txt ]; then pip install -r /tmp/dep/requirements.txt; fi
 
-# App
+# Copy app code
 COPY . /app
 
-# The app listens on 8011 inside the container
 EXPOSE 8011
+
+# Uvicorn entrypoint
 CMD ["uvicorn", "ospra_os.main:app", "--host", "0.0.0.0", "--port", "8011"]
