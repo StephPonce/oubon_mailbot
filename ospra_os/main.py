@@ -29,7 +29,7 @@ if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
 
 if _HAS_TIKTOK:
-    app.include_router(tiktok_router, prefix="/tiktok")
+    app.include_router(tiktok_router)
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
