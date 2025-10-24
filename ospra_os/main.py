@@ -1,7 +1,7 @@
 from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from starlette.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 from ospra_os.analytics.dashboard import router as admin_router
 from ospra_os.ai.routes import router as ai_router
@@ -19,15 +19,17 @@ BRAND = get_branding()
 
 app = FastAPI(title=f"{BRAND.OS_BRAND} API", version="0.1")
 
-# CORS — allow your Shopify domain if set
+# CORS — allow web frontends and tunnel access
 s = get_settings()
 _inbox_worker = get_worker(s)
-allow_origin = s.ALLOWED_ORIGIN or (f"https://{s.STORE_DOMAIN}" if s.STORE_DOMAIN else None)
-cors_origins = [allow_origin] if allow_origin else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=[
+        "https://app.oubonshop.com",
+        "https://policies.oubonshop.com",
+        "https://TUNNEL_URL",   # replace with your actual tunnel host
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,3 +76,6 @@ app.include_router(catalog_router)
 @app.on_event("shutdown")
 async def on_shutdown():
     await _inbox_worker.stop()
+
+from ospra_os.tiktok.routes import router as tiktok_router
+app.include_router(tiktok_router)
