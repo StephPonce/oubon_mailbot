@@ -2,8 +2,12 @@ from fastapi import FastAPI, Depends
 from fastapi.responses import RedirectResponse
 from ospra_os.core.settings import Settings, get_settings
 
-# add this (Gmail OAuth router)
-from ospra_os.gmail.routes import router as gmail_oauth_router  # noqa: E402
+# Gmail OAuth router (optional)
+try:
+    from ospra_os.gmail.routes import router as gmail_oauth_router  # type: ignore
+except Exception as e:
+    print("Gmail OAuth router not loaded:", e)
+    gmail_oauth_router = None
 
 # TikTok router is optional — don’t crash if it’s not present
 try:
@@ -20,7 +24,9 @@ except Exception:
     from ospra_os.gmail.util import GmailClient
 
 app = FastAPI(title="OspraOS API", version="0.1")
-app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
+
+if gmail_oauth_router:
+    app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
 
 if _HAS_TIKTOK:
     app.include_router(tiktok_router, prefix="/tiktok")
