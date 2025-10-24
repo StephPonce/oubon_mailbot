@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.responses import RedirectResponse
 from ospra_os.core.settings import Settings, get_settings
 
-# Gmail OAuth endpoints (we’ll add the router file next)
+# add this (Gmail OAuth router)
 from ospra_os.gmail.routes import router as gmail_oauth_router  # noqa: E402
 
 # TikTok router is optional — don’t crash if it’s not present

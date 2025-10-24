@@ -1,4 +1,3 @@
-# ospra_os/gmail/routes.py
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 import os, json, pathlib
@@ -19,21 +18,23 @@ def _paths():
         raise HTTPException(status_code=500, detail=f"Credentials file not found at {cred_path}")
     return cred_path, token_path
 
-def _load_client_dict(cred_path: str):
+def _client_config(cred_path: str):
     with open(cred_path, "r") as f:
         raw = json.load(f)
-    if "web" in raw:
+    if "web" in raw:         # preferred for web servers
         return {"web": raw["web"]}
-    if "installed" in raw:  # fallback
+    if "installed" in raw:   # fallback if creds are of “installed app” type
         return {"web": raw["installed"]}
-    raise HTTPException(status_code=500, detail="Invalid Google client JSON (missing 'web' or 'installed').")
+    raise HTTPException(status_code=500, detail="Invalid Google client JSON")
 
 @router.get("/start")
-async def gmail_auth_start(request: Request):
+async def start(request: Request):
     cred_path, _ = _paths()
-    client_config = _load_client_dict(cred_path)
-    redirect_uri = str(request.url_for("gmail_auth_callback"))
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+    flow = Flow.from_client_config(
+        _client_config(cred_path),
+        scopes=SCOPES,
+        redirect_uri=str(request.url_for("gmail_oauth_callback")),
+    )
     auth_url, state = flow.authorization_url(
         access_type="offline", include_granted_scopes=True, prompt="consent"
     )
@@ -41,38 +42,31 @@ async def gmail_auth_start(request: Request):
     resp.set_cookie("gmail_oauth_state", state, httponly=True, secure=True, samesite="lax", max_age=600)
     return resp
 
-@router.get("/callback", name="gmail_auth_callback", response_class=HTMLResponse)
-async def gmail_auth_callback(request: Request):
+@router.get("/callback", name="gmail_oauth_callback", response_class=HTMLResponse)
+async def callback(request: Request):
     cred_path, token_path = _paths()
     state = request.cookies.get("gmail_oauth_state")
-    client_config = _load_client_dict(cred_path)
-    redirect_uri = str(request.url_for("gmail_auth_callback"))
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, state=state, redirect_uri=redirect_uri)
+    flow = Flow.from_client_config(
+        _client_config(cred_path),
+        scopes=SCOPES,
+        state=state,
+        redirect_uri=str(request.url_for("gmail_oauth_callback")),
+    )
     flow.fetch_token(authorization_response=str(request.url))
-
-    creds = flow.credentials
-    data = {
-        "token": creds.token,
-        "refresh_token": creds.refresh_token,
-        "token_uri": creds.token_uri,
-        "client_id": creds.client_id,
-        "client_secret": creds.client_secret,
-        "scopes": list(creds.scopes or []),
-    }
+    c = flow.credentials
     with open(token_path, "w") as f:
-        json.dump(data, f)
-
-    html = f"""
-    <html><body style="font-family: system-ui; padding: 2rem">
-      <h2>Gmail connected ✅</h2>
-      <p>Tokens saved at <code>{token_path}</code>.</p>
-      <p>You can now start the worker:</p>
-      <pre>curl -X POST {str(request.base_url)}gmail/worker/start</pre>
-    </body></html>
-    """
-    return HTMLResponse(html)
+        json.dump({
+            "token": c.token,
+            "refresh_token": c.refresh_token,
+            "token_uri": c.token_uri,
+            "client_id": c.client_id,
+            "client_secret": c.client_secret,
+            "scopes": list(c.scopes or []),
+        }, f)
+    return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code>.</p>")
 
 @router.get("/status")
-async def gmail_auth_status():
+async def status():
     _, token_path = _paths()
-    return {"connected": os.path.exists(token_path) and os.path.getsize(token_path) > 0, "token_path": token_path}
+    ok = os.path.exists(token_path) and os.path.getsize(token_path) > 0
+    return {"connected": ok, "token_path": token_path}
