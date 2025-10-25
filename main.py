@@ -15,9 +15,6 @@ from app.settings import Settings, get_settings
 
 app = FastAPI(title="Oubon MailBot", version="0.1.0")
 
-# Mount static files for dashboard
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 # ---------------------------------------------------------------
 # Core helpers
 # ---------------------------------------------------------------
@@ -664,3 +661,8 @@ def gmail_watch_status(settings: Settings = Depends(get_settings)):
     """Check Gmail watch configuration status."""
     manager = GmailWatchManager(settings)
     return manager.get_watch_status()
+
+# ---------------------------------------------------------------
+# Mount static files (must be last)
+# ---------------------------------------------------------------
+app.mount("/static", StaticFiles(directory="static"), name="static")
