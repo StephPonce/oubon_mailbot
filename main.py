@@ -115,15 +115,15 @@ DEFAULT_RULES: Dict[str, Any] = {
 DEFAULT_TPLS: Dict[str, Any] = {
     "support_default": {
         "subject": "We received your message",
-        "body": ("<p>Hi there,</p><p>We’ve received your message and opened a ticket "
+        "body": ("<p>Hi there,</p><p>We've received your message and opened a ticket "
                  "(#{{ticket_id}}). A team member will reply within 1 business day.</p>"
-                 "<p>— <b>Oubon Support</b></p>")
+                 "<p>— <b>Oubon Shop Support</b></p>")
     },
     "order_missing": {
-        "subject": "We’re on it – order {{order_id}}",
-        "body": ("<p>Hi {{name}},</p><p>Sorry your package hasn’t arrived. "
-                 "Please reply with your order number and we’ll investigate right away.</p>"
-                 "<p>— Oubon Support</p>")
+        "subject": "We're on it – order {{order_id}}",
+        "body": ("<p>Hi {{name}},</p><p>Sorry your package hasn't arrived. "
+                 "Please reply with your order number and we'll investigate right away.</p>"
+                 "<p>— Oubon Shop Support</p>")
     },
 }
 
@@ -208,15 +208,17 @@ def parse_order_id(subject: str, body: str) -> Optional[str]:
     m = re.search(r"\b(\d{5,})\b", text)
     return m.group(1) if m else None
 
-def lookup_order(order_id: str) -> Optional[dict]:
-    # Replace this local lookup:
-    # path = DATA_DIR / "orders.json"
-    # ...
-    
-    # With this:
+def lookup_order(order_id: str, settings: Settings = None) -> Optional[dict]:
+    if settings is None:
+        settings = get_settings()
+
+    # Return None if Shopify not configured
+    if not settings.SHOPIFY_STORE or not settings.SHOPIFY_API_TOKEN:
+        return None
+
     import requests
-    url = f"https://{SHOPIFY_STORE}/admin/api/2024-10/orders.json?name={order_id}"
-    headers = {"X-Shopify-Access-Token": SHOPIFY_API_TOKEN}
+    url = f"https://{settings.SHOPIFY_STORE}/admin/api/2024-10/orders.json?name={order_id}"
+    headers = {"X-Shopify-Access-Token": settings.SHOPIFY_API_TOKEN}
     res = requests.get(url, headers=headers)
     data = res.json()
     if data.get("orders"):
@@ -308,7 +310,7 @@ def process_inbox2(payload: ProcessPayload):
                     if info.get("carrier") and info.get("tracking"):
                         lines += [f"Carrier: {info['carrier']}", f"Tracking: {info['tracking']}"]
                     if info.get("last_update"): lines.append(f"Last update: {info['last_update']}")
-                    lines += ["", "— Oubon Support"]
+                    lines += ["", "— Oubon Shop Support"]
                     try:
                         gc.send_simple_email(to=to_addr, subject=subject_out, body="\n".join(lines))
                         replied += 1
@@ -378,14 +380,10 @@ def debug_peek(limit: int = 5):
 class DraftReq(BaseModel):
     subject: str
     body: str
+
 # -------------------------------------------------------------------
 # Gmail inbox processor (fixed JSON-body version)
 # -------------------------------------------------------------------
-
-class ProcessPayload(BaseModel):
-    auto_reply: bool = False
-    max_messages: int = 25
-
 @app.post("/gmail/process-inbox")
 def process_inbox(payload: ProcessPayload):
     gc = get_gmail_client()

@@ -4,39 +4,75 @@
       "if_any": [
         "refund",
         "return",
+        "exchange",
+        "money back",
+        "cancel order",
+        "don't want",
+        "changed my mind"
+      ],
+      "apply_label": "Return/Refund",
+      "auto_reply_template": "refund_request",
+      "auto_reply": true
+    },
+    {
+      "if_any": [
         "broken",
         "damaged",
+        "defective",
         "wrong item",
-        "warranty"
+        "missing parts",
+        "not working",
+        "quality issue",
+        "not as described"
       ],
       "apply_label": "Support",
-      "auto_reply_template": "support_default"
+      "auto_reply_template": "support_quality",
+      "auto_reply": true
+    },
+    {
+      "if_any": [
+        "tracking",
+        "where is",
+        "shipment",
+        "hasn't arrived",
+        "hasnt arrived",
+        "not arrived",
+        "missing",
+        "unreceived",
+        "not received",
+        "delayed",
+        "late"
+      ],
+      "apply_label": "Tracking",
+      "auto_reply_template": "tracking_lookup",
+      "auto_reply": true
     },
     {
       "if_any": [
         "order",
         "package",
-        "tracking",
-        "shipment",
-        "arrived",
-        "missing",
-        "unreceived",
-        "not received",
-        "not arrived",
-        "delayed"
+        "delivery",
+        "shipping",
+        "order status",
+        "order update"
       ],
-      "apply_label": "Orders",
-      "auto_reply_template": "order_missing"
+      "apply_label": "Order Help",
+      "auto_reply_template": "order_help",
+      "auto_reply": true
     },
     {
       "if_any": [
         "press",
         "investor",
         "wholesale",
-        "partnership"
+        "bulk order",
+        "partnership",
+        "collaboration",
+        "media"
       ],
       "apply_label": "VIP",
-      "auto_reply_template": null
+      "auto_reply_template": "vip_welcome",
+      "auto_reply": true
     },
     {
       "if_any": [
@@ -45,10 +81,12 @@
         "failure notice",
         "postmaster",
         "no-reply",
-        "do-not-reply"
+        "do-not-reply",
+        "noreply"
       ],
       "apply_label": "Admin",
-      "auto_reply_template": null
+      "auto_reply_template": null,
+      "auto_reply": false
     }
   ]
 }
