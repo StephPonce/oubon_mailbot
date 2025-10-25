@@ -44,26 +44,58 @@ async def start(request: Request):
 
 @router.get("/callback", name="gmail_oauth_callback", response_class=HTMLResponse)
 async def callback(request: Request):
-    cred_path, token_path = _paths()
-    state = request.cookies.get("gmail_oauth_state")
-    flow = Flow.from_client_config(
-        _client_config(cred_path),
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=str(request.url_for("gmail_oauth_callback")),
-    )
-    flow.fetch_token(authorization_response=str(request.url))
-    c = flow.credentials
-    with open(token_path, "w") as f:
-        json.dump({
-            "token": c.token,
-            "refresh_token": c.refresh_token,
-            "token_uri": c.token_uri,
-            "client_id": c.client_id,
-            "client_secret": c.client_secret,
-            "scopes": list(c.scopes or []),
-        }, f)
-    return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code>.</p>")
+    try:
+        cred_path, token_path = _paths()
+        state = request.cookies.get("gmail_oauth_state")
+        flow = Flow.from_client_config(
+            _client_config(cred_path),
+            scopes=SCOPES,
+            state=state,
+            redirect_uri=str(request.url_for("gmail_oauth_callback")),
+        )
+        flow.fetch_token(authorization_response=str(request.url))
+        c = flow.credentials
+
+        # Ensure directory exists with proper error handling
+        token_dir = pathlib.Path(token_path).parent
+        try:
+            token_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as mkdir_err:
+            return HTMLResponse(
+                f"<h2>❌ Directory Error</h2>"
+                f"<p>Cannot create directory: {token_dir}</p>"
+                f"<p>Error: {str(mkdir_err)}</p>",
+                status_code=500
+            )
+
+        # Try to write token file
+        try:
+            with open(token_path, "w") as f:
+                json.dump({
+                    "token": c.token,
+                    "refresh_token": c.refresh_token,
+                    "token_uri": c.token_uri,
+                    "client_id": c.client_id,
+                    "client_secret": c.client_secret,
+                    "scopes": list(c.scopes or []),
+                }, f)
+        except Exception as write_err:
+            return HTMLResponse(
+                f"<h2>❌ Write Error</h2>"
+                f"<p>Cannot write to: {token_path}</p>"
+                f"<p>Error: {str(write_err)}</p>",
+                status_code=500
+            )
+
+        return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code>.</p>")
+    except Exception as e:
+        import traceback
+        return HTMLResponse(
+            f"<h2>❌ OAuth Error</h2>"
+            f"<p>Error: {str(e)}</p>"
+            f"<pre>{traceback.format_exc()}</pre>",
+            status_code=500
+        )
 
 @router.get("/status")
 async def status():
