@@ -1,9 +1,10 @@
 """Intelligent auto-reply system with hybrid AI/template responses."""
 from typing import Dict, Any, Optional
+from datetime import datetime
 from app.business_hours import BusinessHours
 from app.shopify_client import ShopifyClient
 from app.refund_processor import RefundProcessor
-from app.ai_reply import draft_reply
+from app.ai_client import AIClient
 from app.settings import Settings
 import re
 
@@ -20,10 +21,13 @@ class SmartReplySystem:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.business_hours = BusinessHours(
-            quiet_start=getattr(settings, "quiet_hours_start", None) or (21, 0),
-            quiet_end=getattr(settings, "quiet_hours_end", None) or (7, 0),
+            weekday_start=datetime.strptime("07:00", "%H:%M").time(),
+            weekday_end=datetime.strptime("21:00", "%H:%M").time(),
+            weekend_start=datetime.strptime("10:00", "%H:%M").time(),
+            weekend_end=datetime.strptime("19:00", "%H:%M").time(),
             timezone="America/New_York",  # EST/EDT for Oubon
         )
+        self.ai_client = AIClient(settings)
 
         # Initialize Shopify client if configured
         self.shopify = None
@@ -84,10 +88,11 @@ class SmartReplySystem:
             return self._handle_quality_issue(subject, body, customer_name, templates, metadata)
 
         # For other categories, use hybrid AI/template approach
-        if response_mode == "ai" and self.settings.openai_api_key:
+        if response_mode == "ai":
             # Use AI during business hours
             metadata["used_ai"] = True
-            ai_body = draft_reply(subject, body, self.settings)
+            metadata["ai_provider"] = self.ai_client.get_provider_name()
+            ai_body = self.ai_client.draft_reply(subject, body)
             return {
                 "subject": f"Re: {subject}" if subject else "Thanks for your message",
                 "body": ai_body,
@@ -200,9 +205,10 @@ class SmartReplySystem:
         # Use AI during business hours for personalized empathy
         response_mode = self.business_hours.get_response_mode()
 
-        if response_mode == "ai" and self.settings.openai_api_key:
+        if response_mode == "ai":
             metadata["used_ai"] = True
-            ai_body = draft_reply(subject, body, self.settings)
+            metadata["ai_provider"] = self.ai_client.get_provider_name()
+            ai_body = self.ai_client.draft_reply(subject, body)
             return {
                 "subject": f"Re: {subject}" if subject else "We're here to help",
                 "body": ai_body,

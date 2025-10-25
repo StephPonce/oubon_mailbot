@@ -9,32 +9,17 @@ class BusinessHours:
 
     def __init__(
         self,
-        quiet_start: time = time(21, 0),  # 9 PM
-        quiet_end: time = time(7, 0),     # 7 AM
+        weekday_start: time = time(7, 0),   # Mon-Fri: 7 AM
+        weekday_end: time = time(21, 0),    # Mon-Fri: 9 PM
+        weekend_start: time = time(10, 0),  # Sat-Sun: 10 AM
+        weekend_end: time = time(19, 0),    # Sat-Sun: 7 PM
         timezone: str = "America/New_York",  # EST/EDT
-        operating_days: Optional[list] = None,  # Mon-Fri = [0,1,2,3,4]
     ):
-        self.quiet_start = quiet_start
-        self.quiet_end = quiet_end
+        self.weekday_start = weekday_start
+        self.weekday_end = weekday_end
+        self.weekend_start = weekend_start
+        self.weekend_end = weekend_end
         self.timezone = pytz.timezone(timezone)
-        self.operating_days = operating_days or [0, 1, 2, 3, 4]  # Mon-Fri default
-
-    def is_quiet_hours(self, dt: Optional[datetime] = None) -> bool:
-        """Check if current time is during quiet hours (no AI, templates only)."""
-        if dt is None:
-            dt = datetime.now(self.timezone)
-        else:
-            dt = dt.astimezone(self.timezone)
-
-        current_time = dt.time()
-
-        # Handle quiet hours that span midnight
-        if self.quiet_start > self.quiet_end:
-            # e.g., 21:00 to 07:00 next day
-            return current_time >= self.quiet_start or current_time < self.quiet_end
-        else:
-            # e.g., 01:00 to 05:00 same day
-            return self.quiet_start <= current_time < self.quiet_end
 
     def is_operating_hours(self, dt: Optional[datetime] = None) -> bool:
         """Check if current time is during operating hours (AI + full service)."""
@@ -43,12 +28,20 @@ class BusinessHours:
         else:
             dt = dt.astimezone(self.timezone)
 
-        # Check if it's an operating day (e.g., Mon-Fri)
-        if dt.weekday() not in self.operating_days:
-            return False
+        current_time = dt.time()
+        day_of_week = dt.weekday()  # 0=Monday, 6=Sunday
 
-        # Not during quiet hours
-        return not self.is_quiet_hours(dt)
+        # Weekday (Mon-Fri): 0-4
+        if day_of_week <= 4:
+            return self.weekday_start <= current_time < self.weekday_end
+
+        # Weekend (Sat-Sun): 5-6
+        else:
+            return self.weekend_start <= current_time < self.weekend_end
+
+    def is_quiet_hours(self, dt: Optional[datetime] = None) -> bool:
+        """Check if current time is during quiet hours (no AI, templates only)."""
+        return not self.is_operating_hours(dt)
 
     def get_response_mode(self, dt: Optional[datetime] = None) -> str:
         """

@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     google_credentials_file: str = ".secrets/credentials.json"
     google_token_file: str = ".secrets/gmail_token.json"
 
-    # OpenAI / DB / Slack
+    # AI Providers
     openai_api_key: str = ""
+    claude_api_key: str = ""  # Anthropic Claude API key
+
+    # Other services
     database_url: str = "sqlite+aiosqlite:///./data/mailbot.db"
     slack_webhook_url: str = ""
 
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",  # Ignore extra env variables
     )
 
 def get_settings() -> "Settings":

@@ -15,17 +15,21 @@ def test_business_hours():
     print("=" * 60)
 
     bh = BusinessHours(
-        quiet_start=datetime.strptime("21:00", "%H:%M").time(),
-        quiet_end=datetime.strptime("07:00", "%H:%M").time(),
+        weekday_start=datetime.strptime("07:00", "%H:%M").time(),
+        weekday_end=datetime.strptime("21:00", "%H:%M").time(),
+        weekend_start=datetime.strptime("10:00", "%H:%M").time(),
+        weekend_end=datetime.strptime("19:00", "%H:%M").time(),
         timezone="America/New_York",
     )
 
     # Test different times
     test_times = [
-        ("2025-01-15 10:00:00", "Wednesday 10 AM EST"),  # Operating
-        ("2025-01-15 22:00:00", "Wednesday 10 PM EST"),  # Quiet
-        ("2025-01-18 10:00:00", "Saturday 10 AM EST"),   # Weekend
-        ("2025-01-13 08:00:00", "Monday 8 AM EST"),      # Operating
+        ("2025-01-15 10:00:00", "Wednesday 10 AM EST"),  # Weekday Operating
+        ("2025-01-15 22:00:00", "Wednesday 10 PM EST"),  # Quiet (after hours)
+        ("2025-01-18 12:00:00", "Saturday 12 PM EST"),   # Weekend Operating
+        ("2025-01-18 20:00:00", "Saturday 8 PM EST"),    # Weekend Quiet (after 7PM)
+        ("2025-01-13 08:00:00", "Monday 8 AM EST"),      # Weekday Operating
+        ("2025-01-19 09:00:00", "Sunday 9 AM EST"),      # Weekend Quiet (before 10AM)
     ]
 
     for time_str, description in test_times:
