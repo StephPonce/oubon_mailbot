@@ -10,16 +10,24 @@ class RefundProcessor:
     def __init__(
         self,
         max_auto_refund_amount: float = 100.00,  # Max $100 auto-refunds
-        auto_refund_days_limit: int = 30,        # Only auto-refund within 30 days
+        auto_refund_days_limit: int = 15,        # Only auto-refund within 15 days
         require_reason_keywords: bool = True,     # Must have valid reason
+        require_shipped_back: bool = True,        # Must confirm item will be shipped back
         valid_reasons: Optional[list] = None,
+        shipped_back_keywords: Optional[list] = None,
     ):
         self.max_auto_refund_amount = max_auto_refund_amount
         self.auto_refund_days_limit = auto_refund_days_limit
         self.require_reason_keywords = require_reason_keywords
+        self.require_shipped_back = require_shipped_back
         self.valid_reasons = valid_reasons or [
             "damaged", "broken", "defective", "wrong item", "not as described",
             "missing parts", "quality issue", "not working", "arrived broken",
+        ]
+        self.shipped_back_keywords = shipped_back_keywords or [
+            "ship back", "send back", "return", "mail back", "ship it back",
+            "send it back", "returning", "will ship", "will send", "will return",
+            "sending back", "shipping back",
         ]
 
     def should_auto_refund(
@@ -88,6 +96,19 @@ class RefundProcessor:
 
             if not reason_found:
                 result["reason"] = "No valid refund reason detected. Manual review required."
+                result["action"] = "manual_review"
+                return result
+
+        # Check 4: Customer confirms they will ship item back
+        shipped_back_confirmed = False
+        if self.require_shipped_back:
+            for keyword in self.shipped_back_keywords:
+                if keyword.lower() in message_lower:
+                    shipped_back_confirmed = True
+                    break
+
+            if not shipped_back_confirmed:
+                result["reason"] = "Customer must confirm item will be shipped back for refund. Manual review required."
                 result["action"] = "manual_review"
                 return result
 

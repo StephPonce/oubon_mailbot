@@ -39,9 +39,10 @@ class SmartReplySystem:
 
         # Initialize refund processor with safety limits
         self.refund_processor = RefundProcessor(
-            max_auto_refund_amount=100.00,  # Max $100 automatic refunds
-            auto_refund_days_limit=30,       # Only within 30 days of purchase
+            max_auto_refund_amount=100.00,   # Max $100 automatic refunds
+            auto_refund_days_limit=15,       # Only within 15 days of purchase
             require_reason_keywords=True,
+            require_shipped_back=True,       # Customer must confirm shipping back
         )
 
     def generate_reply(

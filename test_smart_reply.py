@@ -55,18 +55,19 @@ def test_refund_processor():
 
     processor = RefundProcessor(
         max_auto_refund_amount=100.00,
-        auto_refund_days_limit=30,
+        auto_refund_days_limit=15,
+        require_shipped_back=True,
     )
 
     # Test cases
     test_cases = [
         {
-            "name": "Eligible: Small order, recent, valid reason",
+            "name": "Eligible: Small order, recent, valid reason, will ship back",
             "order": {
                 "total_price": "50.00",
                 "created_at": "2025-10-20T10:00:00Z",
             },
-            "message": "The product arrived broken. I'd like a refund.",
+            "message": "The product arrived broken. I'd like a refund and will ship it back.",
         },
         {
             "name": "Too expensive for auto-refund",
@@ -74,15 +75,15 @@ def test_refund_processor():
                 "total_price": "150.00",
                 "created_at": "2025-10-20T10:00:00Z",
             },
-            "message": "Product is damaged.",
+            "message": "Product is damaged. I'll return it.",
         },
         {
-            "name": "Too old for auto-refund",
+            "name": "Too old for auto-refund (>15 days)",
             "order": {
                 "total_price": "50.00",
-                "created_at": "2024-08-01T10:00:00Z",
+                "created_at": "2025-10-01T10:00:00Z",
             },
-            "message": "Product is damaged.",
+            "message": "Product is damaged. I'll ship it back.",
         },
         {
             "name": "No valid reason",
@@ -90,7 +91,15 @@ def test_refund_processor():
                 "total_price": "50.00",
                 "created_at": "2025-10-20T10:00:00Z",
             },
-            "message": "I just don't want it anymore.",
+            "message": "I just don't want it anymore. Will send back.",
+        },
+        {
+            "name": "No shipped back confirmation",
+            "order": {
+                "total_price": "50.00",
+                "created_at": "2025-10-20T10:00:00Z",
+            },
+            "message": "The product is broken. I need a refund.",
         },
     ]
 
