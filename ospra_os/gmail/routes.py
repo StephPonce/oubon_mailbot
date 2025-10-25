@@ -70,3 +70,15 @@ async def status():
     _, token_path = _paths()
     ok = os.path.exists(token_path) and os.path.getsize(token_path) > 0
     return {"connected": ok, "token_path": token_path}
+
+@router.get("/debug")
+async def debug(request: Request):
+    cred_path, token_path = _paths()
+    redirect_uri = str(request.url_for("gmail_oauth_callback"))
+    return {
+        "redirect_uri": redirect_uri,
+        "cred_path": cred_path,
+        "token_path": token_path,
+        "creds_exist": os.path.exists(cred_path),
+        "scopes": SCOPES,
+    }
