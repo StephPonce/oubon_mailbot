@@ -1,8 +1,10 @@
 """Email processor that integrates smart reply system with Gmail."""
 from typing import Dict, Any, List, Optional
+from datetime import datetime
 from app.smart_reply import SmartReplySystem
 from app.gmail_client import GmailClient
 from app.settings import Settings
+from app.models import EmailFollowup, get_followup_session
 import base64
 import re
 
@@ -183,6 +185,18 @@ class EmailProcessor:
                     )
                     replied = True
                     reply_metadata = reply.get("metadata", {})
+
+                    # If this was a template response during quiet hours, save for follow-up
+                    if reply_metadata.get("response_mode") == "template":
+                        self._save_for_followup(
+                            message_id=message_id,
+                            from_email=from_email,
+                            from_name=from_name,
+                            subject=subject,
+                            body=body,
+                            label=label_name,
+                        )
+
                 except Exception as e:
                     print(f"Error sending reply: {e}")
 
@@ -287,3 +301,51 @@ class EmailProcessor:
         except Exception as e:
             print(f"Error creating label {label_name}: {e}")
             return None
+
+    def _save_for_followup(
+        self,
+        message_id: str,
+        from_email: str,
+        from_name: str,
+        subject: str,
+        body: str,
+        label: str,
+    ):
+        """Save email to database for AI follow-up during operating hours."""
+        try:
+            session = get_followup_session(self.settings.database_url)
+
+            # Check if already exists
+            existing = session.query(EmailFollowup).filter_by(
+                gmail_message_id=message_id
+            ).first()
+
+            if existing:
+                # Update existing record
+                existing.needs_followup = True
+                existing.template_sent_at = datetime.utcnow()
+            else:
+                # Create new record
+                followup = EmailFollowup(
+                    gmail_message_id=message_id,
+                    customer_email=from_email,
+                    customer_name=from_name,
+                    subject=subject,
+                    body=body,
+                    label=label,
+                    needs_followup=True,
+                    followup_sent=False,
+                    received_at=datetime.utcnow(),
+                    template_sent_at=datetime.utcnow(),
+                )
+                session.add(followup)
+
+            session.commit()
+            session.close()
+
+            print(f"📝 Saved for follow-up: {from_email} - {subject}")
+
+        except Exception as e:
+            print(f"❌ Error saving for follow-up: {e}")
+            import traceback
+            traceback.print_exc()

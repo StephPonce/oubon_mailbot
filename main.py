@@ -34,6 +34,11 @@ def _svc(gc: GmailClient):
 async def startup_event():
     await init_db()
 
+    # Initialize follow-up tracking database
+    from app.models import init_followup_db
+    settings = get_settings()
+    init_followup_db(settings.database_url)
+
     # Start background email checker
     from app.scheduler import start_scheduler
     start_scheduler()
