@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     SHOPIFY_STORE: str = ""          # e.g., "oubonshop.myshopify.com"
     SHOPIFY_MODE: str = "safe"       # "safe" or "live"
 
+    # Google Cloud Pub/Sub (for Gmail push notifications)
+    GOOGLE_CLOUD_PROJECT_ID: str = ""     # Your GCP project ID
+    GMAIL_PUBSUB_TOPIC: str = "gmail-notifications"  # Pub/Sub topic name
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

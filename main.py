@@ -513,3 +513,95 @@ def smart_process_inbox(payload: ProcessPayload, settings: Settings = Depends(ge
     )
 
     return result
+
+
+# ---------------------------------------------------------------
+# Gmail Push Notifications (Pub/Sub Webhook)
+# ---------------------------------------------------------------
+from fastapi import Request, BackgroundTasks
+from app.gmail_watch import GmailWatchManager
+
+@app.post("/gmail/pubsub/webhook")
+async def gmail_pubsub_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Webhook endpoint for Gmail Pub/Sub push notifications.
+
+    Google Cloud Pub/Sub calls this endpoint when new emails arrive.
+    This triggers automatic email processing in the background.
+    """
+    try:
+        # Parse Pub/Sub message
+        body = await request.json()
+
+        # Pub/Sub sends messages in this format:
+        # {
+        #   "message": {
+        #     "data": "base64-encoded-data",
+        #     "messageId": "...",
+        #     "publishTime": "..."
+        #   },
+        #   "subscription": "..."
+        # }
+
+        message = body.get("message", {})
+        message_id = message.get("messageId", "unknown")
+
+        print(f"📧 Gmail push notification received: {message_id}")
+
+        # Process emails in background (don't block the webhook response)
+        background_tasks.add_task(process_emails_background, settings)
+
+        # Return 200 immediately so Pub/Sub knows we received it
+        return {"status": "received", "message_id": message_id}
+
+    except Exception as e:
+        print(f"❌ Error processing Pub/Sub webhook: {e}")
+        # Still return 200 to avoid Pub/Sub retries
+        return {"status": "error", "error": str(e)}
+
+
+def process_emails_background(settings: Settings):
+    """Background task to process new emails."""
+    try:
+        from app.email_processor import EmailProcessor
+
+        processor = EmailProcessor(settings)
+        rules = _load_rules()
+        templates = _load_templates()
+
+        result = processor.process_inbox(
+            auto_reply=True,
+            max_messages=10,  # Process recent emails
+            rules=rules,
+            templates=templates,
+        )
+
+        print(f"✅ Processed {result['processed']} emails, replied to {result['replied']}")
+
+    except Exception as e:
+        print(f"❌ Error in background email processing: {e}")
+
+
+@app.post("/gmail/watch/start")
+def start_gmail_watch(settings: Settings = Depends(get_settings)):
+    """Start Gmail push notifications (set up watch)."""
+    manager = GmailWatchManager(settings)
+    return manager.start_watch()
+
+
+@app.post("/gmail/watch/stop")
+def stop_gmail_watch(settings: Settings = Depends(get_settings)):
+    """Stop Gmail push notifications."""
+    manager = GmailWatchManager(settings)
+    return manager.stop_watch()
+
+
+@app.get("/gmail/watch/status")
+def gmail_watch_status(settings: Settings = Depends(get_settings)):
+    """Check Gmail watch configuration status."""
+    manager = GmailWatchManager(settings)
+    return manager.get_watch_status()
