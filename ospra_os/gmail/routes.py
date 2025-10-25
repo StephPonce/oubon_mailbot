@@ -8,6 +8,7 @@ router = APIRouter(prefix="/gmail/auth", tags=["gmail"])
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/gmail.send",
 ]
 
 def _paths():
