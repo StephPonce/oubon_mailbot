@@ -1,7 +1,9 @@
 """Multi-provider AI client supporting OpenAI and Claude."""
-from typing import Optional
+from typing import Optional, Tuple
 from app.settings import Settings
 from app.oubonshop_policy import get_policy_context
+from app.response_cache import get_cached_response, cache_response
+import time
 
 
 class AIClient:
@@ -20,19 +22,48 @@ If the user asks about order status, ask for order # and email; do not invent da
 Always sign emails as "Oubon Shop Support" or "Oubon Shop".
 """
 
-    def draft_reply(self, subject: str, body: str) -> str:
+    def draft_reply(self, subject: str, body: str) -> Tuple[str, dict]:
         """
-        Draft AI reply using available provider.
+        Draft AI reply using available provider with caching and tracking.
+
+        Returns: (response_text, metrics)
 
         Priority order:
-        1. Claude (if API key available) - Better for nuanced customer service
-        2. OpenAI (if API key available) - Fallback
-        3. Template fallback (if no AI available)
+        1. Cache/FAQ (instant, free)
+        2. Claude (if API key available) - Better for nuanced customer service
+        3. OpenAI (if API key available) - Fallback
+        4. Template fallback (if no AI available)
         """
+        start_time = time.time()
+        metrics = {
+            "tokens_used": 0,
+            "estimated_cost": 0.0,
+            "processing_time_ms": 0,
+            "provider": "unknown",
+            "cache_hit": False,
+        }
+
+        # Check cache first
+        cached = get_cached_response(subject, body)
+        if cached:
+            metrics["provider"] = "cache"
+            metrics["cache_hit"] = True
+            metrics["processing_time_ms"] = (time.time() - start_time) * 1000
+            return cached, metrics
+
         # Try Claude first
         if self._has_claude():
             try:
-                return self._claude_reply(subject, body)
+                response, tokens = self._claude_reply(subject, body)
+                metrics["provider"] = "Claude 3.5 Sonnet"
+                metrics["tokens_used"] = tokens
+                metrics["estimated_cost"] = self._estimate_cost("claude", tokens)
+
+                # Cache the response
+                cache_response(subject, body, response)
+
+                metrics["processing_time_ms"] = (time.time() - start_time) * 1000
+                return response, metrics
             except Exception as e:
                 print(f"Claude API error: {e}")
                 # Fall through to OpenAI
@@ -40,13 +71,34 @@ Always sign emails as "Oubon Shop Support" or "Oubon Shop".
         # Try OpenAI
         if self._has_openai():
             try:
-                return self._openai_reply(subject, body)
+                response, tokens = self._openai_reply(subject, body)
+                metrics["provider"] = "OpenAI GPT-4o-mini"
+                metrics["tokens_used"] = tokens
+                metrics["estimated_cost"] = self._estimate_cost("openai", tokens)
+
+                # Cache the response
+                cache_response(subject, body, response)
+
+                metrics["processing_time_ms"] = (time.time() - start_time) * 1000
+                return response, metrics
             except Exception as e:
                 print(f"OpenAI API error: {e}")
                 # Fall through to template
 
         # Fallback template
-        return self._template_fallback(subject)
+        metrics["provider"] = "template"
+        metrics["processing_time_ms"] = (time.time() - start_time) * 1000
+        return self._template_fallback(subject), metrics
+
+    def _estimate_cost(self, provider: str, tokens: int) -> float:
+        """Estimate cost based on provider and tokens."""
+        if provider == "claude":
+            # Claude 3.5 Sonnet: ~$3/M input, $15/M output (approx $9/M average)
+            return (tokens / 1_000_000) * 9.0
+        elif provider == "openai":
+            # GPT-4o-mini: ~$0.15/M input, $0.60/M output (approx $0.375/M average)
+            return (tokens / 1_000_000) * 0.375
+        return 0.0
 
     def _has_claude(self) -> bool:
         """Check if Claude API is configured."""
@@ -56,8 +108,8 @@ Always sign emails as "Oubon Shop Support" or "Oubon Shop".
         """Check if OpenAI API is configured."""
         return bool(getattr(self.settings, 'openai_api_key', None))
 
-    def _claude_reply(self, subject: str, body: str) -> str:
-        """Generate reply using Claude with company policy context."""
+    def _claude_reply(self, subject: str, body: str) -> Tuple[str, int]:
+        """Generate reply using Claude with company policy context. Returns (response, tokens)."""
         try:
             from anthropic import Anthropic
         except ImportError:
@@ -65,8 +117,8 @@ Always sign emails as "Oubon Shop Support" or "Oubon Shop".
 
         client = Anthropic(api_key=self.settings.claude_api_key)
 
-        # Get company policy context
-        policy_context = get_policy_context()
+        # Smart context - only include relevant policy sections
+        policy_context = self._get_relevant_policy(subject, body)
 
         prompt = f"""A customer sent this email:
 
@@ -97,10 +149,39 @@ Reference our company policies as needed:
             ]
         )
 
-        return message.content[0].text.strip()
+        # Get token usage
+        usage = message.usage
+        total_tokens = usage.input_tokens + usage.output_tokens
 
-    def _openai_reply(self, subject: str, body: str) -> str:
-        """Generate reply using OpenAI with company policy context."""
+        return message.content[0].text.strip(), total_tokens
+
+    def _get_relevant_policy(self, subject: str, body: str) -> str:
+        """Get only relevant policy sections to reduce token usage."""
+        from app.oubonshop_policy import REFUND_POLICY, RETURN_POLICY, SHIPPING_POLICY, FAQ
+
+        text = f"{subject} {body}".lower()
+
+        # Start with basic info
+        relevant_sections = []
+
+        # Check what's relevant
+        if any(word in text for word in ["refund", "money back", "return my money"]):
+            relevant_sections.append(REFUND_POLICY)
+
+        if any(word in text for word in ["return", "send back", "ship back"]):
+            relevant_sections.append(RETURN_POLICY)
+
+        if any(word in text for word in ["shipping", "delivery", "tracking", "where is", "when will arrive"]):
+            relevant_sections.append(SHIPPING_POLICY)
+
+        # If nothing specific, include FAQ highlights
+        if not relevant_sections:
+            relevant_sections.append("## Common Questions\n" + "\n".join(f"Q: {q}\nA: {a}\n" for q, a in list(FAQ.items())[:3]))
+
+        return "\n\n".join(relevant_sections) if relevant_sections else get_policy_context()
+
+    def _openai_reply(self, subject: str, body: str) -> Tuple[str, int]:
+        """Generate reply using OpenAI with smart context. Returns (response, tokens)."""
         try:
             from openai import OpenAI
         except ImportError:
@@ -108,17 +189,26 @@ Reference our company policies as needed:
 
         client = OpenAI(api_key=self.settings.openai_api_key)
 
-        # Get company policy context
-        policy_context = get_policy_context()
+        # Smart context - only include relevant policy sections
+        policy_context = self._get_relevant_policy(subject, body)
 
-        prompt = f"""Subject: {subject}
+        prompt = f"""A customer sent this email:
 
-Customer message:
+Subject: {subject}
+
+Message:
 {body}
 
-Draft a concise, helpful reply based on our company policies below. Keep it 2-3 paragraphs. End with "— Oubon Shop Support"
+Please draft a helpful, professional reply that:
+1. Acknowledges their concern
+2. Provides helpful next steps based on our policies below
+3. Asks for any missing information (like order number)
+4. Is warm and reassuring
+5. Ends with "— Oubon Shop Support"
 
-Our policies:
+Keep it concise (2-3 short paragraphs max).
+
+Reference our company policies as needed:
 {policy_context}"""
 
         resp = client.chat.completions.create(
@@ -130,7 +220,11 @@ Our policies:
             temperature=0.4,
         )
 
-        return resp.choices[0].message.content.strip()
+        # Get token usage
+        usage = resp.usage
+        total_tokens = usage.prompt_tokens + usage.completion_tokens
+
+        return resp.choices[0].message.content.strip(), total_tokens
 
     def _template_fallback(self, subject: str) -> str:
         """Fallback response when no AI is available."""

@@ -92,8 +92,12 @@ class SmartReplySystem:
         if response_mode == "ai":
             # Use AI during business hours
             metadata["used_ai"] = True
-            metadata["ai_provider"] = self.ai_client.get_provider_name()
-            ai_body = self.ai_client.draft_reply(subject, body)
+            ai_body, ai_metrics = self.ai_client.draft_reply(subject, body)
+            metadata["ai_provider"] = ai_metrics.get("provider", "unknown")
+            metadata["tokens_used"] = ai_metrics.get("tokens_used", 0)
+            metadata["estimated_cost"] = ai_metrics.get("estimated_cost", 0.0)
+            metadata["processing_time_ms"] = ai_metrics.get("processing_time_ms", 0)
+            metadata["cache_hit"] = ai_metrics.get("cache_hit", False)
             return {
                 "subject": f"Re: {subject}" if subject else "Thanks for your message",
                 "body": ai_body,
@@ -208,8 +212,12 @@ class SmartReplySystem:
 
         if response_mode == "ai":
             metadata["used_ai"] = True
-            metadata["ai_provider"] = self.ai_client.get_provider_name()
-            ai_body = self.ai_client.draft_reply(subject, body)
+            ai_body, ai_metrics = self.ai_client.draft_reply(subject, body)
+            metadata["ai_provider"] = ai_metrics.get("provider", "unknown")
+            metadata["tokens_used"] = ai_metrics.get("tokens_used", 0)
+            metadata["estimated_cost"] = ai_metrics.get("estimated_cost", 0.0)
+            metadata["processing_time_ms"] = ai_metrics.get("processing_time_ms", 0)
+            metadata["cache_hit"] = ai_metrics.get("cache_hit", False)
             return {
                 "subject": f"Re: {subject}" if subject else "We're here to help",
                 "body": ai_body,

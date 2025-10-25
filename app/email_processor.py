@@ -5,8 +5,10 @@ from app.smart_reply import SmartReplySystem
 from app.gmail_client import GmailClient
 from app.settings import Settings
 from app.models import EmailFollowup, get_followup_session
+from app.analytics import Analytics
 import base64
 import re
+import time
 
 
 class EmailProcessor:
@@ -16,6 +18,7 @@ class EmailProcessor:
         self.settings = settings
         self.gmail_client = GmailClient(settings)
         self.smart_reply = SmartReplySystem(settings)
+        self.analytics = Analytics(settings.database_url)
 
     def process_inbox(
         self,
@@ -186,6 +189,25 @@ class EmailProcessor:
                     replied = True
                     reply_metadata = reply.get("metadata", {})
 
+                    # Track analytics
+                    response_mode = "ai" if reply_metadata.get("used_ai") else "template"
+                    self.analytics.track_email(
+                        message_id=message_id,
+                        customer_email=from_email,
+                        subject=subject,
+                        label=label_name,
+                        response_mode=response_mode,
+                        ai_provider=reply_metadata.get("ai_provider"),
+                        processing_time_ms=reply_metadata.get("processing_time_ms", 0),
+                        tokens_used=reply_metadata.get("tokens_used", 0),
+                        estimated_cost=reply_metadata.get("estimated_cost", 0.0),
+                        auto_reply_sent=True,
+                        auto_refund_processed=reply_metadata.get("auto_refund_processed", False),
+                        shopify_lookup=reply_metadata.get("shopify_lookup", False),
+                        followup_needed=(reply_metadata.get("response_mode") == "template"),
+                        success=True,
+                    )
+
                     # If this was a template response during quiet hours, save for follow-up
                     if reply_metadata.get("response_mode") == "template":
                         self._save_for_followup(
@@ -199,6 +221,16 @@ class EmailProcessor:
 
                 except Exception as e:
                     print(f"Error sending reply: {e}")
+                    # Track failed email
+                    self.analytics.track_email(
+                        message_id=message_id,
+                        customer_email=from_email,
+                        subject=subject,
+                        label=label_name,
+                        response_mode="template",
+                        success=False,
+                        error_message=str(e),
+                    )
 
         return {
             "message_id": message_id,

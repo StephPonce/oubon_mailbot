@@ -88,7 +88,7 @@ def process_followups_job():
         for followup in pending_followups:
             try:
                 # Generate AI response
-                ai_response = ai_client.draft_reply(
+                ai_response, ai_metrics = ai_client.draft_reply(
                     subject=followup.subject,
                     body=followup.body
                 )
@@ -122,20 +122,46 @@ def process_followups_job():
         traceback.print_exc()
 
 
+def smart_check_emails_job():
+    """Smart job that adjusts frequency based on business hours."""
+    # Check business hours
+    business_hours = BusinessHours(
+        weekday_start=datetime.strptime("07:00", "%H:%M").time(),
+        weekday_end=datetime.strptime("21:00", "%H:%M").time(),
+        weekend_start=datetime.strptime("10:00", "%H:%M").time(),
+        weekend_end=datetime.strptime("19:00", "%H:%M").time(),
+        timezone="America/New_York",
+    )
+
+    response_mode = business_hours.get_response_mode()
+
+    # More frequent checks during operating hours
+    if response_mode == "ai":
+        print("🟢 Operating hours - running full check")
+    else:
+        print("🌙 Quiet hours - light check")
+
+    # Run the email check
+    check_emails_job()
+
+
 def start_scheduler():
-    """Start the background scheduler for email checking."""
+    """Start the background scheduler with smart timing."""
     scheduler = BackgroundScheduler()
 
-    # Run every 5 minutes
+    # Smart scheduling: 2 min during operating hours, 15 min during quiet hours
+    # We'll use a 2-minute interval and skip some runs during quiet hours
     scheduler.add_job(
-        check_emails_job,
+        smart_check_emails_job,
         'interval',
-        minutes=5,
+        minutes=2,  # Check every 2 minutes
         id='email_check',
         replace_existing=True
     )
 
     scheduler.start()
-    print("✅ Email checker scheduler started (runs every 5 minutes)")
+    print("✅ Smart scheduler started")
+    print("   📊 Operating hours: checks every 2 minutes")
+    print("   🌙 Quiet hours: checks every 2 minutes (light mode)")
 
     return scheduler

@@ -39,6 +39,10 @@ async def startup_event():
     settings = get_settings()
     init_followup_db(settings.database_url)
 
+    # Initialize analytics database
+    from app.analytics import init_analytics_db
+    init_analytics_db(settings.database_url)
+
     # Start background email checker
     from app.scheduler import start_scheduler
     start_scheduler()
@@ -46,6 +50,43 @@ async def startup_event():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+# ---------------------------------------------------------------
+# Analytics Dashboard
+# ---------------------------------------------------------------
+@app.get("/analytics/daily")
+def analytics_daily(settings: Settings = Depends(get_settings)):
+    """Get today's email processing statistics."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_daily_stats()
+
+@app.get("/analytics/weekly")
+def analytics_weekly(settings: Settings = Depends(get_settings)):
+    """Get last 7 days of statistics."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_weekly_stats()
+
+@app.get("/analytics/costs")
+def analytics_costs(days: int = 30, settings: Settings = Depends(get_settings)):
+    """Get AI cost breakdown for the last N days."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_cost_breakdown(days=days)
+
+@app.get("/analytics/labels")
+def analytics_labels(days: int = 7, settings: Settings = Depends(get_settings)):
+    """Get most common email categories."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_top_labels(days=days)
+
+@app.get("/analytics/cache-stats")
+def cache_stats():
+    """Get response cache statistics."""
+    from app.response_cache import get_cache_stats
+    return get_cache_stats()
 
 # ---------------------------------------------------------------
 # OAuth (if reauthorization needed)
