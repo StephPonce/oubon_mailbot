@@ -34,6 +34,10 @@ def _svc(gc: GmailClient):
 async def startup_event():
     await init_db()
 
+    # Start background email checker
+    from app.scheduler import start_scheduler
+    start_scheduler()
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
