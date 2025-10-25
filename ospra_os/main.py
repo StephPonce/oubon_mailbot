@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from fastapi.responses import RedirectResponse
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
 
 # Gmail OAuth router (optional)
@@ -30,6 +31,9 @@ except Exception as e:
     GmailClient = None
 
 app = FastAPI(title="OspraOS API", version="0.1")
+
+# Trust proxy headers from Render (for HTTPS URL generation)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
