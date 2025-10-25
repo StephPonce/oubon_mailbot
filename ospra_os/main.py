@@ -21,11 +21,13 @@ except Exception as e:  # ImportError, etc.
     tiktok_router = None
     _HAS_TIKTOK = False
 
-# If your code needs GmailClient directly for the top-level callback:
+# Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
-except Exception:
-    from ospra_os.gmail.util import GmailClient
+    print("✅ GmailClient loaded from app.gmail_client")
+except Exception as e:
+    print(f"⚠️  Could not import GmailClient: {e}")
+    GmailClient = None
 
 app = FastAPI(title="OspraOS API", version="0.1")
 
@@ -38,6 +40,8 @@ if _HAS_TIKTOK and tiktok_router:
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
 def oauth_cb_root(code: str, settings: Settings = Depends(get_settings)):
+    if GmailClient is None:
+        return {"error": "GmailClient not available"}
     gc = GmailClient(settings)
     gc.exchange_code_for_tokens(code)
     return RedirectResponse(url="/admin/dashboard")
@@ -49,6 +53,7 @@ def health_check():
         "status": "ok",
         "service": "OspraOS",
         "gmail_oauth_loaded": gmail_oauth_router is not None,
+        "gmail_client_loaded": GmailClient is not None,
         "tiktok_loaded": _HAS_TIKTOK
     }
 
