@@ -486,3 +486,30 @@ def process_inbox(payload: ProcessPayload):
 def ai_reply_draft(req: DraftReq, settings: Settings = Depends(get_settings)):
     reply = draft_reply(req.subject, req.body, settings=settings)
     return {"draft": reply}
+
+# ---------------------------------------------------------------
+# Smart Reply System (TEST ENDPOINT)
+# ---------------------------------------------------------------
+@app.post("/gmail/smart-process")
+def smart_process_inbox(payload: ProcessPayload, settings: Settings = Depends(get_settings)):
+    """
+    SMART auto-reply system with:
+    - Operating hours detection (AI during hours, templates off-hours)
+    - Automatic order lookup via Shopify
+    - Automated refund processing
+    - Enhanced tracking responses
+    """
+    from app.email_processor import EmailProcessor
+
+    processor = EmailProcessor(settings)
+    rules = _load_rules()
+    templates = _load_templates()
+
+    result = processor.process_inbox(
+        auto_reply=payload.auto_reply,
+        max_messages=payload.max_messages,
+        rules=rules,
+        templates=templates,
+    )
+
+    return result

@@ -1,5 +1,3 @@
-sed -n '1,12p' app/settings.py
-
 from dotenv import load_dotenv
 load_dotenv(".env")  # force load env file into os.environ
 
