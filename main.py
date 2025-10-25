@@ -4,7 +4,8 @@ import base64, json, os, re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from app.ai_reply import draft_reply
 from app.db import init_db
@@ -13,6 +14,9 @@ from app.rules import classify_message, get_rule_for_tags
 from app.settings import Settings, get_settings
 
 app = FastAPI(title="Oubon MailBot", version="0.1.0")
+
+# Mount static files for dashboard
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ---------------------------------------------------------------
 # Core helpers
@@ -50,6 +54,11 @@ async def startup_event():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+@app.get("/dashboard")
+async def dashboard():
+    """Analytics dashboard with charts and visualizations."""
+    return FileResponse("static/dashboard.html")
 
 # ---------------------------------------------------------------
 # Analytics Dashboard
