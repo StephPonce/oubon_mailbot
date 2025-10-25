@@ -36,7 +36,7 @@ async def start(request: Request):
         redirect_uri=str(request.url_for("gmail_oauth_callback")),
     )
     auth_url, state = flow.authorization_url(
-        access_type="offline", include_granted_scopes=True, prompt="consent"
+        access_type="offline", include_granted_scopes="true", prompt="consent"
     )
     resp = RedirectResponse(auth_url, status_code=302)
     resp.set_cookie("gmail_oauth_state", state, httponly=True, secure=True, samesite="lax", max_age=600)
