@@ -1,7 +1,9 @@
 from fastapi import FastAPI, Depends
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
+from pathlib import Path
 
 # Gmail OAuth router (optional)
 try:
@@ -61,7 +63,59 @@ def health_check():
         "tiktok_loaded": _HAS_TIKTOK
     }
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    """Analytics dashboard with charts and visualizations."""
+    dashboard_path = Path(__file__).parent.parent / "static" / "dashboard.html"
+    if not dashboard_path.exists():
+        return HTMLResponse("<h1>Dashboard not found</h1><p>Please ensure static/dashboard.html exists</p>", status_code=404)
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
+# ---------------------------------------------------------------
+# Analytics API Endpoints
+# ---------------------------------------------------------------
+@app.get("/analytics/daily")
+def analytics_daily(settings: Settings = Depends(get_settings)):
+    """Get today's email processing statistics."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_daily_stats()
+
+@app.get("/analytics/weekly")
+def analytics_weekly(settings: Settings = Depends(get_settings)):
+    """Get last 7 days of statistics."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_weekly_stats()
+
+@app.get("/analytics/costs")
+def analytics_costs(days: int = 30, settings: Settings = Depends(get_settings)):
+    """Get AI cost breakdown for the last N days."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_cost_breakdown(days=days)
+
+@app.get("/analytics/labels")
+def analytics_labels(days: int = 7, settings: Settings = Depends(get_settings)):
+    """Get most common email categories."""
+    from app.analytics import Analytics
+    analytics = Analytics(settings.database_url)
+    return analytics.get_top_labels(days=days)
+
+@app.get("/analytics/cache-stats")
+def cache_stats():
+    """Get response cache statistics."""
+    from app.response_cache import get_cache_stats
+    return get_cache_stats()
+
 # (optional) quick route list for sanity checks
 @app.get("/debug/routes", include_in_schema=False)
 def debug_routes():
     return sorted([r.path for r in app.routes])
+
+# Mount static files (must be last)
+try:
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+except Exception as e:
+    print(f"⚠️  Static files not mounted: {e}")
