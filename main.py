@@ -4,7 +4,7 @@ import base64, json, os, re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from app.ai_reply import draft_reply
@@ -52,10 +52,14 @@ async def startup_event():
 async def health():
     return {"status": "ok"}
 
-@app.get("/dashboard")
+@app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     """Analytics dashboard with charts and visualizations."""
-    return FileResponse("static/dashboard.html")
+    dashboard_path = Path(__file__).parent / "static" / "dashboard.html"
+    if not dashboard_path.exists():
+        return HTMLResponse("<h1>Dashboard not found</h1><p>Please ensure static/dashboard.html exists</p>", status_code=404)
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
 
 # ---------------------------------------------------------------
 # Analytics Dashboard
