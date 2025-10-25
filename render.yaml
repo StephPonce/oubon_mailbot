@@ -1,0 +1,21 @@
+services:
+  # Main web service
+  - type: web
+    name: oubon-mailbot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+
+  # Cron job: Check Gmail every 5 minutes
+  - type: cron
+    name: oubon-mailbot-cron
+    env: python
+    schedule: "*/5 * * * *"  # Every 5 minutes
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python run_email_check.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
