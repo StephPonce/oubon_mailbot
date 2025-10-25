@@ -29,6 +29,6 @@
   },
   "quiet_hours_auto": {
     "subject": "We received your message",
-    "body": "<p>Hi {{name}},</p><p>Thanks for contacting Oubon Shop! We've received your message and will get back to you during business hours (Mon-Fri, 7 AM - 9 PM EST).</p><p>If this is about an order, please include your order number in your message for faster service.</p><p>— Oubon Shop</p>"
+    "body": "<p>Hi {{name}},</p><p>Thanks for contacting Oubon Shop! We've received your message and will send you a detailed response during our next business hours:</p><ul><li>Monday-Friday: 7 AM - 9 PM EST</li><li>Saturday-Sunday: 10 AM - 7 PM EST</li></ul><p>You'll receive a personalized reply addressing your specific question or concern shortly.</p><p>— Oubon Shop Support</p>"
   }
 }

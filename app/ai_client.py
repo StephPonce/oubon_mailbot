@@ -1,6 +1,7 @@
 """Multi-provider AI client supporting OpenAI and Claude."""
 from typing import Optional
 from app.settings import Settings
+from app.oubonshop_policy import get_policy_context
 
 
 class AIClient:
@@ -56,13 +57,16 @@ Always sign emails as "Oubon Shop Support" or "Oubon Shop".
         return bool(getattr(self.settings, 'openai_api_key', None))
 
     def _claude_reply(self, subject: str, body: str) -> str:
-        """Generate reply using Claude."""
+        """Generate reply using Claude with company policy context."""
         try:
             from anthropic import Anthropic
         except ImportError:
             raise ImportError("anthropic package not installed. Run: uv pip install anthropic")
 
         client = Anthropic(api_key=self.settings.claude_api_key)
+
+        # Get company policy context
+        policy_context = get_policy_context()
 
         prompt = f"""A customer sent this email:
 
@@ -73,12 +77,15 @@ Message:
 
 Please draft a helpful, professional reply that:
 1. Acknowledges their concern
-2. Provides helpful next steps
+2. Provides helpful next steps based on our policies below
 3. Asks for any missing information (like order number)
 4. Is warm and reassuring
 5. Ends with "— Oubon Shop Support"
 
-Keep it concise (2-3 short paragraphs max)."""
+Keep it concise (2-3 short paragraphs max).
+
+Reference our company policies as needed:
+{policy_context}"""
 
         message = client.messages.create(
             model="claude-3-5-sonnet-20241022",
@@ -93,7 +100,7 @@ Keep it concise (2-3 short paragraphs max)."""
         return message.content[0].text.strip()
 
     def _openai_reply(self, subject: str, body: str) -> str:
-        """Generate reply using OpenAI."""
+        """Generate reply using OpenAI with company policy context."""
         try:
             from openai import OpenAI
         except ImportError:
@@ -101,7 +108,18 @@ Keep it concise (2-3 short paragraphs max)."""
 
         client = OpenAI(api_key=self.settings.openai_api_key)
 
-        prompt = f"Subject: {subject}\n\nCustomer message:\n{body}\n\nDraft a concise, helpful reply."
+        # Get company policy context
+        policy_context = get_policy_context()
+
+        prompt = f"""Subject: {subject}
+
+Customer message:
+{body}
+
+Draft a concise, helpful reply based on our company policies below. Keep it 2-3 paragraphs. End with "— Oubon Shop Support"
+
+Our policies:
+{policy_context}"""
 
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
