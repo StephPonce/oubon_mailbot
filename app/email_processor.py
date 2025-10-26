@@ -166,7 +166,10 @@ class EmailProcessor:
             labeled = False
 
         # Check for duplicate reply prevention
-        # Don't reply twice UNLESS first reply was a quiet hours template
+        # Allow replies if:
+        # 1. We haven't replied to this message before, OR
+        # 2. This is a follow-up to a quiet hours template, OR
+        # 3. This is a new message in an existing thread (customer replied back)
         auto_replied_label = self.settings.LABEL_AUTO_REPLIED
         auto_replied_label_id = existing_labels.get(auto_replied_label)
 
@@ -174,20 +177,32 @@ class EmailProcessor:
 
         can_reply = True
         if already_replied:
-            # Check if we need a follow-up (previous reply was template during quiet hours)
-            session = get_followup_session(self.settings.database_url)
-            followup = session.query(EmailFollowup).filter_by(
-                message_id=message_id,
-                needs_followup=True,
-                followup_sent=False
-            ).first()
-            session.close()
+            # Check if this is a new message in the thread (customer replied back)
+            # Gmail uses References/In-Reply-To headers for threading
+            references = headers.get("references", "")
+            in_reply_to = headers.get("in-reply-to", "")
 
-            # Only allow reply if this is a follow-up to a quiet hours template
-            can_reply = followup is not None
+            # If this email has threading headers, it's a customer response - allow AI to continue
+            is_customer_response = bool(references or in_reply_to)
 
-            if not can_reply:
-                print(f"⏭️  Skipping reply to {message_id} - already replied (not a follow-up)")
+            if is_customer_response:
+                can_reply = True
+                print(f"✅ Allowing reply to {message_id} - customer responded in thread")
+            else:
+                # Check if we need a follow-up (previous reply was template during quiet hours)
+                session = get_followup_session(self.settings.database_url)
+                followup = session.query(EmailFollowup).filter_by(
+                    message_id=message_id,
+                    needs_followup=True,
+                    followup_sent=False
+                ).first()
+                session.close()
+
+                # Only allow reply if this is a follow-up to a quiet hours template
+                can_reply = followup is not None
+
+                if not can_reply:
+                    print(f"⏭️  Skipping reply to {message_id} - already replied (not a follow-up)")
 
         # Generate and send reply if enabled
         replied = False
