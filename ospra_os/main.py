@@ -37,6 +37,38 @@ app = FastAPI(title="OspraOS API", version="0.1")
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
+# ---------------------------------------------------------------
+# Startup Event - Initialize DBs and Scheduler
+# ---------------------------------------------------------------
+@app.on_event("startup")
+async def startup_event():
+    """Initialize databases and start background scheduler."""
+    settings = get_settings()
+
+    # Initialize follow-up tracking database
+    try:
+        from app.models import init_followup_db
+        init_followup_db(settings.database_url)
+        print("✅ Follow-up database initialized")
+    except Exception as e:
+        print(f"⚠️  Follow-up database initialization failed: {e}")
+
+    # Initialize analytics database
+    try:
+        from app.analytics import init_analytics_db
+        init_analytics_db(settings.database_url)
+        print("✅ Analytics database initialized")
+    except Exception as e:
+        print(f"⚠️  Analytics database initialization failed: {e}")
+
+    # Start background email checker
+    try:
+        from app.scheduler import start_scheduler
+        start_scheduler()
+        print("✅ Background scheduler started")
+    except Exception as e:
+        print(f"⚠️  Scheduler failed to start: {e}")
+
 if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
 

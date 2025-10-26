@@ -103,6 +103,7 @@ class Settings(BaseSettings):
 
     # Data
     DATABASE_PATH: str = Field(default="data/oubon.db")
+    database_url: str = Field(default="sqlite:///./data/oubon.db")
 
     # Research module knobs
     RESEARCH_MAX_TERMS: int = Field(default=5)
