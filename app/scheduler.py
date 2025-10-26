@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.email_processor import EmailProcessor
-from app.settings import get_settings
+from ospra_os.core.settings import get_settings  # Use ospra_os settings for Render compatibility
 from app.business_hours import BusinessHours
 from app.models import EmailFollowup, get_followup_session
 from app.gmail_client import GmailClient

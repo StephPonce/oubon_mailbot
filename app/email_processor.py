@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from app.smart_reply import SmartReplySystem
 from app.gmail_client import GmailClient
-from app.settings import Settings
+from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from app.models import EmailFollowup, get_followup_session
 from app.analytics import Analytics
 import base64

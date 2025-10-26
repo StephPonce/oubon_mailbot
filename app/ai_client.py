@@ -1,6 +1,6 @@
 """Multi-provider AI client supporting OpenAI and Claude."""
 from typing import Optional, Tuple
-from app.settings import Settings
+from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from app.oubonshop_policy import get_policy_context
 from app.response_cache import get_cached_response, cache_response
 import time

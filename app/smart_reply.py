@@ -5,7 +5,7 @@ from app.business_hours import BusinessHours
 from app.shopify_client import ShopifyClient
 from app.refund_processor import RefundProcessor
 from app.ai_client import AIClient
-from app.settings import Settings
+from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 import re
 
 
