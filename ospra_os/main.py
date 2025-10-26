@@ -160,6 +160,22 @@ def cache_stats():
 def debug_routes():
     return sorted([r.path for r in app.routes])
 
+@app.get("/debug/scheduler", include_in_schema=False)
+def debug_scheduler():
+    """Check scheduler status and run a manual email check."""
+    try:
+        from app.scheduler import check_emails_job
+        # Try to run the job manually
+        check_emails_job()
+        return {"status": "ok", "message": "Email check job executed"}
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 # Mount static files (must be last)
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
