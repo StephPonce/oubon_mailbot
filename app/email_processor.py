@@ -165,11 +165,35 @@ class EmailProcessor:
         else:
             labeled = False
 
+        # Check for duplicate reply prevention
+        # Don't reply twice UNLESS first reply was a quiet hours template
+        auto_replied_label = self.settings.LABEL_AUTO_REPLIED
+        auto_replied_label_id = existing_labels.get(auto_replied_label)
+
+        already_replied = auto_replied_label_id and auto_replied_label_id in full_msg.get("labelIds", [])
+
+        can_reply = True
+        if already_replied:
+            # Check if we need a follow-up (previous reply was template during quiet hours)
+            session = get_followup_session(self.settings.database_url)
+            followup = session.query(EmailFollowup).filter_by(
+                message_id=message_id,
+                needs_followup=True,
+                followup_sent=False
+            ).first()
+            session.close()
+
+            # Only allow reply if this is a follow-up to a quiet hours template
+            can_reply = followup is not None
+
+            if not can_reply:
+                print(f"⏭️  Skipping reply to {message_id} - already replied (not a follow-up)")
+
         # Generate and send reply if enabled
         replied = False
         reply_metadata = {}
 
-        if auto_reply and matched_rule.get("auto_reply"):
+        if auto_reply and matched_rule.get("auto_reply") and can_reply:
             reply = self.smart_reply.generate_reply(
                 subject=subject,
                 body=body,
@@ -188,6 +212,15 @@ class EmailProcessor:
                     )
                     replied = True
                     reply_metadata = reply.get("metadata", {})
+
+                    # Add "Auto Replied" label
+                    auto_replied_label_id = self._ensure_label(svc, self.settings.LABEL_AUTO_REPLIED, existing_labels)
+                    if auto_replied_label_id:
+                        svc.users().messages().modify(
+                            userId="me",
+                            id=message_id,
+                            body={"addLabelIds": [auto_replied_label_id]}
+                        ).execute()
 
                     # Track analytics
                     response_mode = "ai" if reply_metadata.get("used_ai") else "template"

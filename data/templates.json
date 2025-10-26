@@ -27,6 +27,10 @@
     "subject": "We're on it – order {{order_id}}",
     "body": "<p>Hi there,</p><p>Sorry your package hasn't arrived. Please reply with your order number and we'll investigate right away.</p><p>— Oubon Shop Support</p>"
   },
+  "billing_help": {
+    "subject": "We're looking into your billing inquiry",
+    "body": "<p>Hi {{name}},</p><p>We've received your billing inquiry and take payment concerns very seriously.</p><p>Our billing team is reviewing your account and will respond within 24 hours with a detailed explanation. If there's been an error, we'll fix it immediately.</p><p>— Oubon Shop Billing</p>"
+  },
   "quiet_hours_auto": {
     "subject": "We received your message",
     "body": "<p>Hi {{name}},</p><p>Thanks for contacting Oubon Shop! We've received your message and will send you a detailed response during our next business hours:</p><ul><li>Monday-Friday: 7 AM - 9 PM EST</li><li>Saturday-Sunday: 10 AM - 7 PM EST</li></ul><p>You'll receive a personalized reply addressing your specific question or concern shortly.</p><p>— Oubon Shop Support</p>"

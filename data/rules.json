@@ -10,7 +10,7 @@
         "don't want",
         "changed my mind"
       ],
-      "apply_label": "Return/Refund",
+      "apply_label": "Support",
       "auto_reply_template": "refund_request",
       "auto_reply": true
     },
@@ -43,7 +43,7 @@
         "delayed",
         "late"
       ],
-      "apply_label": "Tracking",
+      "apply_label": "Orders",
       "auto_reply_template": "tracking_lookup",
       "auto_reply": true
     },
@@ -56,9 +56,37 @@
         "order status",
         "order update"
       ],
-      "apply_label": "Order Help",
+      "apply_label": "Orders",
       "auto_reply_template": "order_help",
       "auto_reply": true
+    },
+    {
+      "if_any": [
+        "invoice",
+        "receipt",
+        "charge",
+        "payment",
+        "credit card",
+        "billing",
+        "overcharged",
+        "double charged"
+      ],
+      "apply_label": "Billing",
+      "auto_reply_template": "billing_help",
+      "auto_reply": true
+    },
+    {
+      "if_any": [
+        "unsubscribe",
+        "stop emails",
+        "remove me",
+        "opt out",
+        "newsletter",
+        "promotional"
+      ],
+      "apply_label": "Marketing",
+      "auto_reply_template": null,
+      "auto_reply": false
     },
     {
       "if_any": [
