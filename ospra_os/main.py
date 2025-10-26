@@ -24,6 +24,16 @@ except Exception as e:  # ImportError, etc.
     tiktok_router = None
     _HAS_TIKTOK = False
 
+# Product Research router
+try:
+    from ospra_os.product_research.routes import router as research_router  # type: ignore
+    _HAS_RESEARCH = True
+    print("✅ Product Research router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Product Research router not loaded: {e}")
+    research_router = None
+    _HAS_RESEARCH = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -75,6 +85,9 @@ if gmail_oauth_router:
 if _HAS_TIKTOK and tiktok_router:
     app.include_router(tiktok_router)
 
+if _HAS_RESEARCH and research_router:
+    app.include_router(research_router)  # exposes /research/*
+
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
 def oauth_cb_root(code: str, settings: Settings = Depends(get_settings)):
@@ -92,7 +105,8 @@ def health_check():
         "service": "OspraOS",
         "gmail_oauth_loaded": gmail_oauth_router is not None,
         "gmail_client_loaded": GmailClient is not None,
-        "tiktok_loaded": _HAS_TIKTOK
+        "tiktok_loaded": _HAS_TIKTOK,
+        "product_research_loaded": _HAS_RESEARCH
     }
 
 @app.get("/dashboard", response_class=HTMLResponse)

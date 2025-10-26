@@ -9,8 +9,12 @@ google-api-python-client
 SQLAlchemy
 alembic
 openai
+anthropic
 requests
 jinja2
 slack_sdk
 email-validator
 apscheduler
+pytrends
+aiosqlite
+pytz
