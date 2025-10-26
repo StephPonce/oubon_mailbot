@@ -115,6 +115,22 @@
       "apply_label": "Admin",
       "auto_reply_template": null,
       "auto_reply": false
+    },
+    {
+      "if_any": [
+        "revenue",
+        "profit",
+        "sales data",
+        "how much do you make",
+        "supplier",
+        "dropshipping",
+        "aliexpress",
+        "other customers",
+        "customer list"
+      ],
+      "apply_label": "Auto Ignored",
+      "auto_reply_template": null,
+      "auto_reply": false
     }
   ]
 }
