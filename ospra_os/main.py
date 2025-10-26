@@ -176,6 +176,51 @@ def debug_scheduler():
             "traceback": traceback.format_exc()
         }
 
+@app.get("/debug/check-inbox", include_in_schema=False)
+def debug_check_inbox(settings: Settings = Depends(get_settings)):
+    """Show what emails are in inbox and would be processed."""
+    try:
+        from app.gmail_client import GmailClient
+        gc = GmailClient(settings)
+        svc = gc.service()
+
+        # Same query as email processor
+        query = 'in:inbox (is:unread OR "order" OR "package" OR "delivery" OR "tracking" OR "shipment" OR "refund" OR "return" OR "damaged" OR "broken")'
+
+        result = svc.users().messages().list(
+            userId="me",
+            q=query,
+            maxResults=10
+        ).execute()
+
+        messages = result.get("messages", [])
+
+        email_list = []
+        for msg in messages[:5]:  # Only process first 5 for debug
+            full_msg = svc.users().messages().get(userId="me", id=msg["id"], format="full").execute()
+            headers = {h["name"].lower(): h["value"] for h in full_msg.get("payload", {}).get("headers", [])}
+
+            email_list.append({
+                "id": msg["id"],
+                "subject": headers.get("subject", ""),
+                "from": headers.get("from", ""),
+                "date": headers.get("date", ""),
+            })
+
+        return {
+            "status": "ok",
+            "query": query,
+            "total_found": len(messages),
+            "sample_emails": email_list
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
 # Mount static files (must be last)
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
