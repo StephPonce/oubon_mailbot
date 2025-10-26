@@ -87,6 +87,10 @@ class Settings(BaseSettings):
     SHOPIFY_API_SECRET: Optional[str] = None
     SHOPIFY_API_VERSION: Optional[str] = Field(default="2024-10")
 
+    # AliExpress
+    ALIEXPRESS_API_KEY: Optional[str] = None  # App Key
+    ALIEXPRESS_APP_SECRET: Optional[str] = None  # App Secret
+
     # Gmail canonical label names
     LABEL_SUPPORT: str = Field(default="Support")
     LABEL_ORDERS: str = Field(default="Orders")
