@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     GMAIL_USER_EMAIL: str
     GMAIL_TOKEN_PATH: str = Field(default=".secrets/gmail/token.json")
     GMAIL_CREDENTIALS_PATH: str = Field(default=".secrets/gmail/credentials.json")
+
+    # Gmail API settings (for compatibility with app.gmail_client)
+    google_scopes: str = Field(default="https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send")
+    google_credentials_file: str = Field(default=".secrets/gmail/credentials.json")
+    google_token_file: str = Field(default=".secrets/gmail/token.json")
+    google_redirect_uri: str = Field(default="http://localhost:8000/oauth2callback")
     GMAIL_POLL_SECONDS: int = Field(default=60)
     GMAIL_LABEL_PREFIX: str = Field(default="OUBON")
     GMAIL_LABEL_PROCESSED: Optional[str] = Field(default=None)
@@ -269,6 +275,10 @@ class Settings(BaseSettings):
             object.__setattr__(self, "GMAIL_REPLY_FROM", str(self.SUPPORT_FROM_EMAIL))
         if not self.QUIET_HOURS_BRAND:
             object.__setattr__(self, "QUIET_HOURS_BRAND", self.BRAND_NAME)
+
+        # Sync gmail client settings
+        object.__setattr__(self, "google_credentials_file", self.GMAIL_CREDENTIALS_PATH)
+        object.__setattr__(self, "google_token_file", self.GMAIL_TOKEN_PATH)
 
 
 @lru_cache(maxsize=1)
