@@ -88,7 +88,7 @@ class AliExpressConnector(BaseConnector):
         # Build API parameters
         params = {
             "app_key": self.api_key,
-            "method": "aliexpress.affiliate.productdetail.get",
+            "method": "aliexpress.affiliate.product.query",
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
@@ -117,16 +117,30 @@ class AliExpressConnector(BaseConnector):
             )
 
             if response.status_code != 200:
-                print(f"❌ AliExpress API error: {response.status_code}")
+                print(f"❌ AliExpress API error: {response.status_code} - {response.text}")
                 return []
 
             data = response.json()
 
+            # Debug: Print response structure
+            print(f"🔍 AliExpress API response keys: {list(data.keys())}")
+
+            # Check for API errors
+            if "error_response" in data:
+                error = data["error_response"]
+                print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
+                return []
+
             # Parse response and convert to ProductCandidates
             products = []
-            resp_result = data.get("aliexpress_affiliate_productdetail_get_response", {})
-            result = resp_result.get("result", {})
-            product_list = result.get("products", {}).get("product", [])
+            resp_result = data.get("aliexpress_affiliate_product_query_response", {})
+            result = resp_result.get("resp_result", {})
+
+            # Handle both nested and flat product list structures
+            if isinstance(result.get("products"), dict):
+                product_list = result.get("products", {}).get("product", [])
+            else:
+                product_list = result.get("products", [])
 
             for item in product_list:
                 product = ProductCandidate(
@@ -193,16 +207,30 @@ class AliExpressConnector(BaseConnector):
             )
 
             if response.status_code != 200:
-                print(f"❌ AliExpress API error: {response.status_code}")
+                print(f"❌ AliExpress API error: {response.status_code} - {response.text}")
                 return []
 
             data = response.json()
 
+            # Debug: Print response structure
+            print(f"🔍 AliExpress Hot Products API response keys: {list(data.keys())}")
+
+            # Check for API errors
+            if "error_response" in data:
+                error = data["error_response"]
+                print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
+                return []
+
             # Parse response
             products = []
             resp_result = data.get("aliexpress_affiliate_hotproduct_query_response", {})
-            result = resp_result.get("result", {})
-            product_list = result.get("products", {}).get("product", [])
+            result = resp_result.get("resp_result", {})
+
+            # Handle both nested and flat product list structures
+            if isinstance(result.get("products"), dict):
+                product_list = result.get("products", {}).get("product", [])
+            else:
+                product_list = result.get("products", [])
 
             for item in product_list:
                 product = ProductCandidate(
