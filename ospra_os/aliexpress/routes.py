@@ -193,3 +193,24 @@ async def debug_config(settings: Settings = Depends(get_settings)):
                 "type": type(e).__name__
             }
         )
+
+
+@router.get("/debug/auth-url")
+async def debug_auth_url(oauth: AliExpressOAuth = Depends(get_oauth_client)):
+    """Debug endpoint to see the OAuth URL without redirecting."""
+    try:
+        auth_url = oauth.get_authorization_url()
+        return {
+            "auth_url": auth_url,
+            "message": "Copy this URL and paste it in your browser to test"
+        }
+    except Exception as e:
+        import traceback
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "type": type(e).__name__,
+                "traceback": traceback.format_exc()
+            }
+        )
