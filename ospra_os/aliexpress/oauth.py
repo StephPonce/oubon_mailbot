@@ -44,7 +44,8 @@ class AliExpressOAuth:
     """
 
     # AliExpress OAuth endpoints for Dropshipping Solution API
-    AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
+    # Try openservice endpoint which is used for API calls
+    AUTHORIZE_URL = "https://openservice.aliexpress.com/oauth/authorize"
     # Use the generateSecurityToken API for token exchange
     TOKEN_URL = "https://openservice.aliexpress.com/auth/token/security/create"
 
