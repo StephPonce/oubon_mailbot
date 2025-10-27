@@ -291,10 +291,26 @@ async def debug_config(settings: Settings = Depends(get_settings)):
 async def debug_auth_url(oauth: AliExpressOAuth = Depends(get_oauth_client)):
     """Debug endpoint to see the OAuth URL without redirecting."""
     try:
+        from urllib.parse import urlparse, parse_qs
+
         auth_url = oauth.get_authorization_url()
+
+        # Parse the URL to show components
+        parsed = urlparse(auth_url)
+        params = parse_qs(parsed.query)
+
         return {
             "auth_url": auth_url,
-            "message": "Copy this URL and paste it in your browser to test"
+            "parsed": {
+                "base_url": f"{parsed.scheme}://{parsed.netloc}{parsed.path}",
+                "parameters": {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+            },
+            "credentials": {
+                "app_key": oauth.app_key,
+                "redirect_uri": oauth.redirect_uri
+            },
+            "message": "Copy auth_url and paste in browser to test",
+            "note": "If this fails, AliExpress might not support OAuth for your app type"
         }
     except Exception as e:
         import traceback
