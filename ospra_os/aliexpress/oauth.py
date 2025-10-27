@@ -43,8 +43,9 @@ class AliExpressOAuth:
     6. Store token in database
     """
 
-    AUTHORIZE_URL = "https://openservice.aliexpress.com/oauth/authorize"
-    TOKEN_URL = "https://openservice.aliexpress.com/oauth/access_token"
+    # Try the alternative OAuth endpoints for Dropshipping Solution API
+    AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
+    TOKEN_URL = "https://oauth.aliexpress.com/token"
 
     def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str):
         self.app_key = app_key
