@@ -1,6 +1,8 @@
 """Reddit connector for community-driven product discovery."""
 
 from typing import List, Optional
+import asyncio
+import re
 from ..base import BaseConnector, ProductCandidate
 
 
@@ -23,6 +25,7 @@ class RedditConnector(BaseConnector):
         super().__init__(api_key=client_id)
         self.client_id = client_id
         self.client_secret = client_secret
+        self.user_agent = "OspraOS Product Research Bot 1.0"
 
     @property
     def name(self) -> str:
@@ -35,6 +38,24 @@ class RedditConnector(BaseConnector):
     def is_available(self) -> bool:
         """Check if both client ID and secret are configured."""
         return bool(self.client_id and self.client_secret)
+
+    def _extract_product_name(self, title: str) -> str:
+        """Extract product name from Reddit post title."""
+        # Remove common Reddit title patterns
+        title = re.sub(r'\[.*?\]', '', title)  # Remove [tags]
+        title = re.sub(r'\(.*?\)', '', title)  # Remove (parentheses)
+        title = re.sub(r'Check out|Look at|Just got|My new|Love my', '', title, flags=re.IGNORECASE)
+        return title.strip()[:100]  # Limit to 100 chars
+
+    def _calculate_engagement_score(self, post) -> float:
+        """Calculate engagement score from Reddit metrics."""
+        upvotes = post.score
+        comments = post.num_comments
+        upvote_ratio = post.upvote_ratio
+
+        # Weighted score: upvotes (50%) + comments (30%) + ratio (20%)
+        score = (upvotes * 0.5) + (comments * 10 * 0.3) + (upvote_ratio * 100 * 0.2)
+        return round(score, 2)
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -52,17 +73,69 @@ class RedditConnector(BaseConnector):
             print("⚠️  Reddit API credentials not configured")
             return []
 
-        subreddits = kwargs.get("subreddits", ["ProductPorn", "shutupandtakemymoney", "BuyItForLife"])
+        try:
+            import praw
+        except ImportError:
+            print("⚠️  praw not installed. Run: pip install praw")
+            return []
+
+        subreddits = kwargs.get("subreddits", ["smarthome", "homeautomation", "HomeKit", "amazonecho"])
         time_filter = kwargs.get("time_filter", "month")
+        limit = kwargs.get("limit", 25)
 
-        # TODO: Implement Reddit API (PRAW) search
-        # - Search across target subreddits
-        # - Calculate score (upvotes - downvotes)
-        # - Track comment engagement
-        # - Find products with organic mentions (not ads)
+        # Initialize Reddit client
+        reddit = praw.Reddit(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            user_agent=self.user_agent
+        )
 
-        print(f"🤖 Reddit API call: search('{query}', subs={subreddits})")
-        return []
+        products = []
+
+        try:
+            # Search each subreddit
+            for subreddit_name in subreddits:
+                try:
+                    subreddit = reddit.subreddit(subreddit_name)
+
+                    # Search for query in subreddit
+                    loop = asyncio.get_event_loop()
+                    search_results = await loop.run_in_executor(
+                        None,
+                        lambda: list(subreddit.search(query, time_filter=time_filter, limit=limit))
+                    )
+
+                    for post in search_results:
+                        # Skip removed/deleted posts
+                        if post.removed_by_category or post.selftext == '[removed]':
+                            continue
+
+                        # Extract product info
+                        product_name = self._extract_product_name(post.title)
+                        engagement_score = self._calculate_engagement_score(post)
+
+                        product = ProductCandidate(
+                            name=product_name,
+                            source=self.source_id,
+                            url=f"https://reddit.com{post.permalink}",
+                            social_mentions=post.score,
+                            social_engagement=post.num_comments,
+                            trend_score=engagement_score,
+                            category=subreddit_name,
+                            tags=["reddit", "community-validated"]
+                        )
+                        products.append(product)
+
+                except Exception as e:
+                    print(f"⚠️  Error searching r/{subreddit_name}: {e}")
+                    continue
+
+            print(f"✅ Reddit search: Found {len(products)} products for '{query}'")
+            return products
+
+        except Exception as e:
+            print(f"❌ Reddit search error: {e}")
+            return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
         """
@@ -79,14 +152,69 @@ class RedditConnector(BaseConnector):
             print("⚠️  Reddit API credentials not configured")
             return []
 
-        # TODO: Implement trending product discovery
-        # - Query r/shutupandtakemymoney/hot
-        # - Query r/ProductPorn/top (time_filter='week')
-        # - Extract product links and names
-        # - Rank by upvote ratio + comment engagement
+        try:
+            import praw
+        except ImportError:
+            print("⚠️  praw not installed. Run: pip install praw")
+            return []
 
-        print(f"🤖 Reddit API call: get_trending(category={category})")
-        return []
+        # Initialize Reddit client
+        reddit = praw.Reddit(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            user_agent=self.user_agent
+        )
+
+        # Target subreddits based on category
+        if category and category.lower() in ["smart home", "home automation", "iot"]:
+            subreddits = ["smarthome", "homeautomation", "HomeKit"]
+        else:
+            subreddits = ["shutupandtakemymoney", "ProductPorn", "BuyItForLife"]
+
+        products = []
+
+        try:
+            for subreddit_name in subreddits:
+                try:
+                    subreddit = reddit.subreddit(subreddit_name)
+
+                    # Get hot posts
+                    loop = asyncio.get_event_loop()
+                    hot_posts = await loop.run_in_executor(
+                        None,
+                        lambda: list(subreddit.hot(limit=limit))
+                    )
+
+                    for post in hot_posts:
+                        # Skip stickied posts and removed content
+                        if post.stickied or post.removed_by_category:
+                            continue
+
+                        product_name = self._extract_product_name(post.title)
+                        engagement_score = self._calculate_engagement_score(post)
+
+                        product = ProductCandidate(
+                            name=product_name,
+                            source=self.source_id,
+                            url=f"https://reddit.com{post.permalink}",
+                            social_mentions=post.score,
+                            social_engagement=post.num_comments,
+                            trend_score=engagement_score,
+                            category=subreddit_name,
+                            tags=["reddit", "trending", "hot"]
+                        )
+                        products.append(product)
+
+                except Exception as e:
+                    print(f"⚠️  Error fetching hot posts from r/{subreddit_name}: {e}")
+                    continue
+
+            print(f"✅ Reddit trending: Found {len(products)} hot products")
+            return products
+
+        except Exception as e:
+            print(f"❌ Reddit trending error: {e}")
+            return []
 
     async def get_subreddit_products(self, subreddit: str, time_filter: str = "week", limit: int = 25) -> List[ProductCandidate]:
         """
@@ -100,13 +228,55 @@ class RedditConnector(BaseConnector):
         Returns:
             Product candidates from subreddit
         """
-        if not self.api_key:
+        if not self.is_available():
             return []
 
-        # TODO: Implement subreddit product extraction
-        # - Fetch top posts from subreddit
-        # - Extract product URLs (Amazon, AliExpress, etc.)
-        # - Parse product names from titles
-        # - Include upvote count and comment sentiment
+        try:
+            import praw
+        except ImportError:
+            print("⚠️  praw not installed")
+            return []
 
-        return []
+        reddit = praw.Reddit(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            user_agent=self.user_agent
+        )
+
+        products = []
+
+        try:
+            sub = reddit.subreddit(subreddit)
+
+            # Get top posts from time period
+            loop = asyncio.get_event_loop()
+            top_posts = await loop.run_in_executor(
+                None,
+                lambda: list(sub.top(time_filter=time_filter, limit=limit))
+            )
+
+            for post in top_posts:
+                if post.stickied or post.removed_by_category:
+                    continue
+
+                product_name = self._extract_product_name(post.title)
+                engagement_score = self._calculate_engagement_score(post)
+
+                product = ProductCandidate(
+                    name=product_name,
+                    source=self.source_id,
+                    url=f"https://reddit.com{post.permalink}",
+                    social_mentions=post.score,
+                    social_engagement=post.num_comments,
+                    trend_score=engagement_score,
+                    category=subreddit,
+                    tags=["reddit", f"top_{time_filter}"]
+                )
+                products.append(product)
+
+            print(f"✅ r/{subreddit}: Found {len(products)} top products")
+            return products
+
+        except Exception as e:
+            print(f"❌ Error fetching from r/{subreddit}: {e}")
+            return []

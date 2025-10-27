@@ -18,3 +18,4 @@ apscheduler
 pytrends
 aiosqlite
 pytz
+praw
