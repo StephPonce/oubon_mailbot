@@ -11,12 +11,12 @@ router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
 def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOAuth:
     """Get configured OAuth client."""
     # Validate required settings
-    if not settings.aliexpress_api_key:
+    if not settings.ALIEXPRESS_API_KEY:
         raise HTTPException(
             status_code=500,
             detail="AliExpress API Key not configured. Set OUBONSHOP_ALIEXPRESS_API_KEY environment variable."
         )
-    if not settings.aliexpress_app_secret:
+    if not settings.ALIEXPRESS_APP_SECRET:
         raise HTTPException(
             status_code=500,
             detail="AliExpress App Secret not configured. Set OUBONSHOP_ALIEXPRESS_APP_SECRET environment variable."
@@ -25,8 +25,8 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
     redirect_uri = f"{settings.base_url}/aliexpress/callback"
 
     return AliExpressOAuth(
-        app_key=settings.aliexpress_api_key,
-        app_secret=settings.aliexpress_app_secret,
+        app_key=settings.ALIEXPRESS_API_KEY,
+        app_secret=settings.ALIEXPRESS_APP_SECRET,
         redirect_uri=redirect_uri,
         database_url=settings.database_url
     )
@@ -178,9 +178,9 @@ async def debug_config(settings: Settings = Depends(get_settings)):
     """Debug endpoint to check AliExpress configuration."""
     try:
         return {
-            "app_key_set": settings.aliexpress_api_key is not None,
-            "app_key_value": settings.aliexpress_api_key[:3] + "..." if settings.aliexpress_api_key else None,
-            "app_secret_set": settings.aliexpress_app_secret is not None,
+            "app_key_set": settings.ALIEXPRESS_API_KEY is not None,
+            "app_key_value": settings.ALIEXPRESS_API_KEY[:3] + "..." if settings.ALIEXPRESS_API_KEY else None,
+            "app_secret_set": settings.ALIEXPRESS_APP_SECRET is not None,
             "base_url": settings.base_url,
             "redirect_uri": f"{settings.base_url}/aliexpress/callback",
             "database_url_set": settings.database_url is not None
