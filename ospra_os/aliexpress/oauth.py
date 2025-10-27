@@ -84,7 +84,9 @@ class AliExpressOAuth:
             "client_id": self.app_key,
             "response_type": "code",
             "redirect_uri": self.redirect_uri,
-            "state": state
+            "state": state,
+            # Add scope for Dropshipping Solution API access
+            "scope": "aliexpress.dropshipping"
         }
 
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
