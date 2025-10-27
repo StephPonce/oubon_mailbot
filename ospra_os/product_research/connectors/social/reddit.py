@@ -19,6 +19,11 @@ class RedditConnector(BaseConnector):
     2. Set REDDIT_CLIENT_ID, REDDIT_SECRET in .env
     """
 
+    def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None):
+        super().__init__(api_key=client_id)
+        self.client_id = client_id
+        self.client_secret = client_secret
+
     @property
     def name(self) -> str:
         return "Reddit"
@@ -26,6 +31,10 @@ class RedditConnector(BaseConnector):
     @property
     def source_id(self) -> str:
         return "reddit"
+
+    def is_available(self) -> bool:
+        """Check if both client ID and secret are configured."""
+        return bool(self.client_id and self.client_secret)
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -39,8 +48,8 @@ class RedditConnector(BaseConnector):
         Returns:
             Product candidates with Reddit engagement data
         """
-        if not self.api_key:
-            print("⚠️  REDDIT_CLIENT_ID not configured")
+        if not self.is_available():
+            print("⚠️  Reddit API credentials not configured")
             return []
 
         subreddits = kwargs.get("subreddits", ["ProductPorn", "shutupandtakemymoney", "BuyItForLife"])
@@ -66,8 +75,8 @@ class RedditConnector(BaseConnector):
         Returns:
             Trending products from Reddit communities
         """
-        if not self.api_key:
-            print("⚠️  REDDIT_CLIENT_ID not configured")
+        if not self.is_available():
+            print("⚠️  Reddit API credentials not configured")
             return []
 
         # TODO: Implement trending product discovery

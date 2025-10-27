@@ -76,7 +76,8 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
 
     if "reddit" in request.sources:
         reddit_id = getattr(settings, "REDDIT_CLIENT_ID", None)
-        connectors.append(RedditConnector(api_key=reddit_id))
+        reddit_secret = getattr(settings, "REDDIT_SECRET", None)
+        connectors.append(RedditConnector(client_id=reddit_id, client_secret=reddit_secret))
 
     if "aliexpress" in request.sources:
         ali_key = getattr(settings, "ALIEXPRESS_API_KEY", None)
@@ -168,7 +169,10 @@ async def get_trending_products(
     elif source == "twitter":
         connector = TwitterConnector(api_key=getattr(settings, "X_API_KEY", None))
     elif source == "reddit":
-        connector = RedditConnector(api_key=getattr(settings, "REDDIT_CLIENT_ID", None))
+        connector = RedditConnector(
+            client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
+            client_secret=getattr(settings, "REDDIT_SECRET", None)
+        )
     elif source == "aliexpress":
         connector = AliExpressConnector(
             api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
@@ -269,7 +273,10 @@ async def list_sources(settings: Settings = Depends(get_settings)):
         ("google_trends", GoogleTrendsConnector(), None),
         ("meta", MetaConnector(api_key=getattr(settings, "META_ACCESS_TOKEN", None)), "META_ACCESS_TOKEN"),
         ("twitter", TwitterConnector(api_key=getattr(settings, "X_API_KEY", None)), "X_API_KEY"),
-        ("reddit", RedditConnector(api_key=getattr(settings, "REDDIT_CLIENT_ID", None)), "REDDIT_CLIENT_ID"),
+        ("reddit", RedditConnector(
+            client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
+            client_secret=getattr(settings, "REDDIT_SECRET", None)
+        ), "REDDIT_CLIENT_ID"),
         ("aliexpress", AliExpressConnector(
             api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
             app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
