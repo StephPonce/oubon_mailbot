@@ -80,7 +80,8 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
 
     if "aliexpress" in request.sources:
         ali_key = getattr(settings, "ALIEXPRESS_API_KEY", None)
-        connectors.append(AliExpressConnector(api_key=ali_key))
+        ali_secret = getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+        connectors.append(AliExpressConnector(api_key=ali_key, app_secret=ali_secret))
 
     if "dhgate" in request.sources:
         dh_key = getattr(settings, "DHGATE_API_KEY", None)
@@ -169,7 +170,10 @@ async def get_trending_products(
     elif source == "reddit":
         connector = RedditConnector(api_key=getattr(settings, "REDDIT_CLIENT_ID", None))
     elif source == "aliexpress":
-        connector = AliExpressConnector(api_key=getattr(settings, "ALIEXPRESS_API_KEY", None))
+        connector = AliExpressConnector(
+            api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
+            app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+        )
     elif source == "dhgate":
         connector = DHgateConnector(api_key=getattr(settings, "DHGATE_API_KEY", None))
     elif source == "cjdropshipping":
@@ -205,7 +209,10 @@ async def list_sources(settings: Settings = Depends(get_settings)):
         ("meta", MetaConnector(api_key=getattr(settings, "META_ACCESS_TOKEN", None)), "META_ACCESS_TOKEN"),
         ("twitter", TwitterConnector(api_key=getattr(settings, "X_API_KEY", None)), "X_API_KEY"),
         ("reddit", RedditConnector(api_key=getattr(settings, "REDDIT_CLIENT_ID", None)), "REDDIT_CLIENT_ID"),
-        ("aliexpress", AliExpressConnector(api_key=getattr(settings, "ALIEXPRESS_API_KEY", None)), "ALIEXPRESS_API_KEY"),
+        ("aliexpress", AliExpressConnector(
+            api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
+            app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+        ), "ALIEXPRESS_API_KEY"),
         ("dhgate", DHgateConnector(api_key=getattr(settings, "DHGATE_API_KEY", None)), "DHGATE_API_KEY"),
         ("cjdropshipping", CJDropshippingConnector(api_key=getattr(settings, "CJDROPSHIPPING_TOKEN", None)), "CJDROPSHIPPING_TOKEN"),
     ]

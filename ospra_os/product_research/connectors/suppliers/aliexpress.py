@@ -1,6 +1,11 @@
 """AliExpress connector for product sourcing."""
 
 from typing import List, Optional
+import hashlib
+import hmac
+import time
+import requests
+import asyncio
 from ..base import BaseConnector, ProductCandidate
 
 
@@ -22,6 +27,11 @@ class AliExpressConnector(BaseConnector):
     Note: Can also use unofficial scraping as fallback (slower, less reliable)
     """
 
+    def __init__(self, api_key: Optional[str] = None, app_secret: Optional[str] = None):
+        super().__init__(api_key)
+        self.app_secret = app_secret
+        self.api_url = "https://api-sg.aliexpress.com/sync"
+
     @property
     def name(self) -> str:
         return "AliExpress"
@@ -29,6 +39,27 @@ class AliExpressConnector(BaseConnector):
     @property
     def source_id(self) -> str:
         return "aliexpress"
+
+    def is_available(self) -> bool:
+        """Check if both API key and secret are configured."""
+        return bool(self.api_key and self.app_secret)
+
+    def _generate_signature(self, params: dict) -> str:
+        """Generate HMAC-SHA256 signature for API request."""
+        # Sort parameters alphabetically
+        sorted_params = sorted(params.items())
+
+        # Build string to sign
+        sign_string = "".join([f"{k}{v}" for k, v in sorted_params])
+
+        # Generate HMAC-SHA256 signature
+        signature = hmac.new(
+            self.app_secret.encode('utf-8'),
+            sign_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest().upper()
+
+        return signature
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -45,8 +76,8 @@ class AliExpressConnector(BaseConnector):
         Returns:
             Product candidates with pricing and supplier info
         """
-        if not self.api_key:
-            print("⚠️  ALIEXPRESS_API_KEY not configured")
+        if not self.is_available():
+            print("⚠️  AliExpress API credentials not configured")
             return []
 
         min_price = kwargs.get("min_price", 0)
@@ -54,15 +85,68 @@ class AliExpressConnector(BaseConnector):
         min_rating = kwargs.get("min_rating", 4.0)
         sort = kwargs.get("sort", "orders")
 
-        # TODO: Implement AliExpress API product search
-        # API endpoint: aliexpress.affiliate.productdetail.get
-        # - Search by keywords
-        # - Filter by price range, rating, location
-        # - Include commission rate for affiliate links
-        # - Get ePacket shipping availability
+        # Build API parameters
+        params = {
+            "app_key": self.api_key,
+            "method": "aliexpress.affiliate.productdetail.get",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "keywords": query,
+            "target_currency": "USD",
+            "target_language": "EN",
+            "page_size": "20",
+        }
 
-        print(f"📦 AliExpress API call: search('{query}', price=${min_price}-${max_price})")
-        return []
+        # Add optional filters
+        if min_price > 0:
+            params["min_price"] = str(min_price)
+        if max_price < 1000:
+            params["max_price"] = str(max_price)
+
+        # Generate signature
+        params["sign"] = self._generate_signature(params)
+
+        try:
+            # Make async request
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(self.api_url, params=params, timeout=10)
+            )
+
+            if response.status_code != 200:
+                print(f"❌ AliExpress API error: {response.status_code}")
+                return []
+
+            data = response.json()
+
+            # Parse response and convert to ProductCandidates
+            products = []
+            resp_result = data.get("aliexpress_affiliate_productdetail_get_response", {})
+            result = resp_result.get("result", {})
+            product_list = result.get("products", {}).get("product", [])
+
+            for item in product_list:
+                product = ProductCandidate(
+                    name=item.get("product_title", "Unknown"),
+                    source=self.source_id,
+                    price=float(item.get("target_sale_price", 0)),
+                    url=item.get("promotion_link", item.get("product_detail_url", "")),
+                    image_url=item.get("product_main_image_url", ""),
+                    supplier_rating=float(item.get("evaluate_rate", 0)) / 20.0,  # Convert 0-100 to 0-5
+                    search_volume=int(item.get("volume", 0)),  # Use orders as search volume proxy
+                    category=item.get("second_level_category_name", item.get("first_level_category_name")),
+                )
+                products.append(product)
+
+            print(f"✅ AliExpress search: Found {len(products)} products for '{query}'")
+            return products
+
+        except Exception as e:
+            print(f"❌ AliExpress search error: {e}")
+            return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
         """
@@ -75,18 +159,70 @@ class AliExpressConnector(BaseConnector):
         Returns:
             Trending products with high order volume
         """
-        if not self.api_key:
-            print("⚠️  ALIEXPRESS_API_KEY not configured")
+        if not self.is_available():
+            print("⚠️  AliExpress API credentials not configured")
             return []
 
-        # TODO: Implement hot products query
-        # API endpoint: aliexpress.affiliate.hotproduct.query
-        # - Get products sorted by orders (last 30 days)
-        # - Filter by category if provided
-        # - Include potential profit margin
+        # Build API parameters for hot products
+        params = {
+            "app_key": self.api_key,
+            "method": "aliexpress.affiliate.hotproduct.query",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "target_currency": "USD",
+            "target_language": "EN",
+            "page_size": str(limit),
+            "sort": "SALE_PRICE_ASC",  # Sort by sales volume
+        }
 
-        print(f"📦 AliExpress API call: get_trending(category={category})")
-        return []
+        # Add category filter if provided
+        if category:
+            params["category_ids"] = category
+
+        # Generate signature
+        params["sign"] = self._generate_signature(params)
+
+        try:
+            # Make async request
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(self.api_url, params=params, timeout=10)
+            )
+
+            if response.status_code != 200:
+                print(f"❌ AliExpress API error: {response.status_code}")
+                return []
+
+            data = response.json()
+
+            # Parse response
+            products = []
+            resp_result = data.get("aliexpress_affiliate_hotproduct_query_response", {})
+            result = resp_result.get("result", {})
+            product_list = result.get("products", {}).get("product", [])
+
+            for item in product_list:
+                product = ProductCandidate(
+                    name=item.get("product_title", "Unknown"),
+                    source=self.source_id,
+                    price=float(item.get("target_sale_price", 0)),
+                    url=item.get("promotion_link", item.get("product_detail_url", "")),
+                    image_url=item.get("product_main_image_url", ""),
+                    supplier_rating=float(item.get("evaluate_rate", 0)) / 20.0,  # Convert 0-100 to 0-5
+                    search_volume=int(item.get("volume", 0)),  # Use orders as search volume proxy
+                    category=item.get("second_level_category_name", item.get("first_level_category_name")),
+                )
+                products.append(product)
+
+            print(f"✅ AliExpress trending: Found {len(products)} hot products")
+            return products
+
+        except Exception as e:
+            print(f"❌ AliExpress trending error: {e}")
+            return []
 
     async def get_product_details(self, product_id: str) -> dict:
         """
