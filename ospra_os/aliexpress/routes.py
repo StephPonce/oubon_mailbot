@@ -43,7 +43,15 @@ async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
         auth_url = oauth.get_authorization_url()
         return RedirectResponse(url=auth_url)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start OAuth: {str(e)}")
+        import traceback
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "type": type(e).__name__,
+                "traceback": traceback.format_exc()
+            }
+        )
 
 
 @router.get("/callback")
@@ -168,11 +176,20 @@ async def disconnect_aliexpress(oauth: AliExpressOAuth = Depends(get_oauth_clien
 @router.get("/debug/config")
 async def debug_config(settings: Settings = Depends(get_settings)):
     """Debug endpoint to check AliExpress configuration."""
-    return {
-        "app_key_set": settings.aliexpress_api_key is not None,
-        "app_key_value": settings.aliexpress_api_key[:3] + "..." if settings.aliexpress_api_key else None,
-        "app_secret_set": settings.aliexpress_app_secret is not None,
-        "base_url": settings.base_url,
-        "redirect_uri": f"{settings.base_url}/aliexpress/callback",
-        "database_url_set": settings.database_url is not None
-    }
+    try:
+        return {
+            "app_key_set": settings.aliexpress_api_key is not None,
+            "app_key_value": settings.aliexpress_api_key[:3] + "..." if settings.aliexpress_api_key else None,
+            "app_secret_set": settings.aliexpress_app_secret is not None,
+            "base_url": settings.base_url,
+            "redirect_uri": f"{settings.base_url}/aliexpress/callback",
+            "database_url_set": settings.database_url is not None
+        }
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": str(e),
+                "type": type(e).__name__
+            }
+        )
