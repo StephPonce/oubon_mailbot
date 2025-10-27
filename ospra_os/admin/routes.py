@@ -131,6 +131,17 @@ async def get_dashboard_data(settings: Settings = Depends(get_settings)):
     }
 
 
+@router.get("/dashboard/v2", response_class=HTMLResponse)
+async def dashboard_v2():
+    """New comprehensive Ospra OS Dashboard with 5 tabs."""
+    from pathlib import Path
+    dashboard_path = Path(__file__).parent.parent.parent / "static" / "ospra_dashboard.html"
+    if not dashboard_path.exists():
+        return HTMLResponse("<h1>Dashboard not found</h1>", status_code=404)
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page():
     """
