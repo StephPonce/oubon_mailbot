@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     STORE_DOMAIN: Optional[str] = None
     SUPPORT_FORM_URL: Optional[str] = None
     ALLOWED_ORIGIN: Optional[str] = None
+    base_url: str = Field(default="http://localhost:8000")  # For OAuth redirects
 
     # Connectors (stubs for future phases)
     META_ACCESS_TOKEN: Optional[str] = None

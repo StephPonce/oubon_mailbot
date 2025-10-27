@@ -44,6 +44,16 @@ except Exception as e:
     admin_router = None
     _HAS_ADMIN = False
 
+# AliExpress OAuth router
+try:
+    from ospra_os.aliexpress.routes import router as aliexpress_router  # type: ignore
+    _HAS_ALIEXPRESS = True
+    print("✅ AliExpress OAuth router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AliExpress OAuth router not loaded: {e}")
+    aliexpress_router = None
+    _HAS_ALIEXPRESS = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -81,6 +91,14 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  Analytics database initialization failed: {e}")
 
+    # Initialize AliExpress OAuth database
+    try:
+        from ospra_os.aliexpress.oauth import init_aliexpress_oauth_db
+        init_aliexpress_oauth_db(settings.database_url)
+        print("✅ AliExpress OAuth database initialized")
+    except Exception as e:
+        print(f"⚠️  AliExpress OAuth database initialization failed: {e}")
+
     # Start background email checker
     try:
         from app.scheduler import start_scheduler
@@ -101,6 +119,9 @@ if _HAS_RESEARCH and research_router:
 if _HAS_ADMIN and admin_router:
     app.include_router(admin_router)  # exposes /admin/*
 
+if _HAS_ALIEXPRESS and aliexpress_router:
+    app.include_router(aliexpress_router)  # exposes /aliexpress/*
+
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
 def oauth_cb_root(code: str, settings: Settings = Depends(get_settings)):
@@ -119,7 +140,8 @@ def health_check():
         "gmail_oauth_loaded": gmail_oauth_router is not None,
         "gmail_client_loaded": GmailClient is not None,
         "tiktok_loaded": _HAS_TIKTOK,
-        "product_research_loaded": _HAS_RESEARCH
+        "product_research_loaded": _HAS_RESEARCH,
+        "aliexpress_oauth_loaded": _HAS_ALIEXPRESS
     }
 
 @app.get("/dashboard", response_class=HTMLResponse)
