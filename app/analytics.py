@@ -214,3 +214,42 @@ def init_analytics_db(database_url: str):
     engine = create_engine(sync_url, echo=False)
     Base.metadata.create_all(engine)
     print("✅ Analytics database initialized")
+
+
+def get_analytics_summary(database_url: str) -> Dict[str, Any]:
+    """
+    Get summary analytics for dashboard display.
+
+    Args:
+        database_url: SQLAlchemy database URL
+
+    Returns:
+        Dict with total_processed, total_replied, labels_applied
+    """
+    try:
+        tracker = AnalyticsTracker(database_url)
+
+        # Get all-time stats
+        metrics = tracker.session.query(EmailMetric).all()
+
+        total_processed = len(metrics)
+        total_replied = sum(1 for m in metrics if m.auto_reply_sent)
+
+        # Count labels
+        labels_applied = {}
+        for m in metrics:
+            if m.label:
+                labels_applied[m.label] = labels_applied.get(m.label, 0) + 1
+
+        return {
+            "total_processed": total_processed,
+            "total_replied": total_replied,
+            "labels_applied": labels_applied
+        }
+    except Exception as e:
+        return {
+            "total_processed": 0,
+            "total_replied": 0,
+            "labels_applied": {},
+            "error": str(e)
+        }
