@@ -6,6 +6,7 @@ from typing import List, Optional
 from ospra_os.core.settings import Settings, get_settings
 
 from .scorer import ProductScorer
+from .pipeline import ProductDiscoveryPipeline
 from .connectors.trends.google_trends import GoogleTrendsConnector
 from .connectors.social.meta import MetaConnector
 from .connectors.social.twitter import TwitterConnector
@@ -297,4 +298,133 @@ async def list_sources(settings: Settings = Depends(get_settings)):
         "sources": sources,
         "configured_count": sum(1 for s in sources if s["available"]),
         "total_count": len(sources),
+    }
+
+
+# ========================================================================
+# NEW: Product Discovery Pipeline Routes
+# ========================================================================
+
+class DiscoverRequest(BaseModel):
+    """Request for full product discovery pipeline."""
+    niche: str
+    max_results: int = 10
+    min_score: float = 5.0
+    include_reddit: bool = True
+    include_aliexpress: bool = True
+    include_trends: bool = True
+
+
+class ValidateRequest(BaseModel):
+    """Request to validate a product idea."""
+    product_name: str
+
+
+@router.post("/discover")
+async def discover_products(request: DiscoverRequest, settings: Settings = Depends(get_settings)):
+    """
+    Run full product discovery pipeline.
+
+    Combines Reddit, Google Trends, and AliExpress to find and validate
+    product opportunities in a given niche.
+
+    Example:
+        {
+            "niche": "smart home devices",
+            "max_results": 10,
+            "min_score": 5.0,
+            "include_reddit": true,
+            "include_aliexpress": true,
+            "include_trends": true
+        }
+
+    Returns:
+        List of scored products with sourcing options
+    """
+    # Initialize pipeline with credentials
+    pipeline = ProductDiscoveryPipeline(
+        reddit_client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
+        reddit_secret=getattr(settings, "REDDIT_SECRET", None),
+        aliexpress_api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
+        aliexpress_app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+    )
+
+    # Run discovery
+    results = await pipeline.discover_products(
+        niche=request.niche,
+        max_results=request.max_results,
+        min_score=request.min_score,
+        include_reddit=request.include_reddit,
+        include_aliexpress=request.include_aliexpress,
+        include_trends=request.include_trends
+    )
+
+    return {
+        "niche": request.niche,
+        "total_found": len(results),
+        "products": results
+    }
+
+
+@router.post("/validate")
+async def validate_product(request: ValidateRequest, settings: Settings = Depends(get_settings)):
+    """
+    Validate a product idea across multiple data sources.
+
+    Checks Reddit engagement, Google Trends, and AliExpress sourcing
+    to provide a validation report.
+
+    Example:
+        {
+            "product_name": "wireless charging pad"
+        }
+
+    Returns:
+        Validation report with scores and recommendation
+    """
+    pipeline = ProductDiscoveryPipeline(
+        reddit_client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
+        reddit_secret=getattr(settings, "REDDIT_SECRET", None),
+        aliexpress_api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
+        aliexpress_app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+    )
+
+    validation = await pipeline.validate_product_idea(request.product_name)
+    return validation
+
+
+@router.get("/reddit/trending")
+async def get_reddit_trending(
+    category: Optional[str] = None,
+    limit: int = 10,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get trending products from Reddit.
+
+    Args:
+        category: Optional category filter (e.g. "smart home")
+        limit: Max results
+
+    Returns:
+        Trending products from Reddit with engagement scores
+    """
+    reddit = RedditConnector(
+        client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
+        client_secret=getattr(settings, "REDDIT_SECRET", None)
+    )
+
+    if not reddit.is_available():
+        raise HTTPException(status_code=400, detail="Reddit API not configured")
+
+    products = await reddit.get_trending(category=category, limit=limit)
+
+    # Score products
+    scorer = ProductScorer()
+    ranked = scorer.rank(products, limit=limit)
+
+    return {
+        "category": category,
+        "total_found": len(ranked),
+        "products": ranked
     }
