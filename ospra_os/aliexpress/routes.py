@@ -4,8 +4,15 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
 from ospra_os.core.settings import Settings, get_settings
 from ospra_os.aliexpress.oauth import AliExpressOAuth
+import time
 
 router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
+
+# In-memory storage for testing (replace with database later)
+_oauth_state: Optional[str] = None
+_access_token: Optional[str] = None
+_refresh_token: Optional[str] = None
+_token_expires_at: float = 0
 
 
 def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOAuth:
@@ -28,20 +35,39 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
         app_key=settings.ALIEXPRESS_API_KEY,
         app_secret=settings.ALIEXPRESS_APP_SECRET,
         redirect_uri=redirect_uri,
-        database_url=settings.database_url
+        database_url=None  # Use in-memory storage for testing
     )
 
 
 @router.get("/auth/start")
 async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
     """
-    Start OAuth flow by redirecting to AliExpress authorization page.
+    Start OAuth flow.
 
-    User clicks "Connect AliExpress" button → redirects here → redirects to AliExpress
+    Returns the authorization URL for testing.
+    In production, this would redirect automatically.
     """
+    global _oauth_state
+
     try:
         auth_url = oauth.get_authorization_url()
-        return RedirectResponse(url=auth_url)
+
+        # Store state for verification
+        _oauth_state = auth_url.split("state=")[1] if "state=" in auth_url else None
+
+        return JSONResponse(
+            status_code=200,
+            content={
+                "auth_url": auth_url,
+                "instructions": [
+                    "1. Copy the auth_url above",
+                    "2. Paste it in your browser",
+                    "3. Click 'Authorize' on AliExpress page",
+                    "4. You'll be redirected back to /aliexpress/callback automatically"
+                ],
+                "state": _oauth_state
+            }
+        )
     except Exception as e:
         import traceback
         return JSONResponse(
@@ -67,6 +93,8 @@ async def oauth_callback(
 
     AliExpress redirects here after user approves → exchange code for token
     """
+    global _oauth_state, _access_token, _refresh_token, _token_expires_at
+
     # Check for errors
     if error:
         return JSONResponse(
@@ -83,7 +111,20 @@ async def oauth_callback(
             status_code=400,
             content={
                 "success": False,
-                "error": "Missing authorization code"
+                "error": "Missing authorization code",
+                "hint": "The URL should contain ?code=... parameter"
+            }
+        )
+
+    # Verify state (optional for now)
+    if state and _oauth_state and state != _oauth_state:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "error": "Invalid state parameter (CSRF protection)",
+                "expected": _oauth_state,
+                "received": state
             }
         )
 
@@ -92,14 +133,20 @@ async def oauth_callback(
         result = oauth.exchange_code_for_token(code)
 
         if result.get("success"):
-            # Success! Redirect to dashboard or success page
+            # Store token in memory
+            _access_token = result.get("access_token")
+            _refresh_token = result.get("refresh_token")
+            _token_expires_at = time.time() + result.get("expires_in", 2592000)
+
             return JSONResponse(
                 status_code=200,
                 content={
                     "success": True,
-                    "message": "AliExpress connected successfully!",
-                    "expires_at": result.get("expires_at"),
-                    "expires_in": result.get("expires_in")
+                    "message": "✅ AliExpress connected successfully!",
+                    "access_token": _access_token[:20] + "..." if _access_token else None,
+                    "expires_in": result.get("expires_in"),
+                    "expires_in_days": result.get("expires_in", 0) // 86400,
+                    "expires_at": result.get("expires_at")
                 }
             )
         else:
@@ -109,39 +156,84 @@ async def oauth_callback(
                 content={
                     "success": False,
                     "error": result.get("error"),
-                    "details": result.get("details", result.get("error_description", ""))
+                    "error_description": result.get("error_description"),
+                    "details": result.get("details", "")
                 }
             )
 
     except Exception as e:
+        import traceback
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
-                "error": f"Failed to process callback: {str(e)}"
+                "error": f"Failed to process callback: {str(e)}",
+                "traceback": traceback.format_exc()
             }
         )
 
 
 @router.get("/auth/status")
-async def check_auth_status(oauth: AliExpressOAuth = Depends(get_oauth_client)):
+async def check_auth_status():
     """
     Check if AliExpress is connected and token is valid.
 
     Returns connection status, expiry time, etc.
     """
-    try:
-        status = oauth.get_token_status()
-        return JSONResponse(status_code=200, content=status)
-    except Exception as e:
+    global _access_token, _token_expires_at
+
+    if not _access_token:
         return JSONResponse(
-            status_code=500,
+            status_code=200,
             content={
                 "connected": False,
-                "status": "Error",
-                "error": str(e)
+                "status": "Not connected",
+                "message": "Visit /aliexpress/auth/start to connect"
             }
         )
+
+    # Check if token expired
+    if time.time() > _token_expires_at:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "connected": False,
+                "status": "Token expired",
+                "message": "Re-authenticate at /aliexpress/auth/start"
+            }
+        )
+
+    time_remaining = int(_token_expires_at - time.time())
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "connected": True,
+            "status": "Connected",
+            "token": _access_token[:20] + "...",
+            "time_remaining_seconds": time_remaining,
+            "time_remaining_hours": round(time_remaining / 3600, 1),
+            "time_remaining_days": round(time_remaining / 86400, 1)
+        }
+    )
+
+
+@router.get("/auth/token")
+async def get_access_token():
+    """
+    Get the current access token (for internal use by AliExpress connector).
+
+    Returns the token if valid, otherwise raises 401.
+    """
+    global _access_token, _token_expires_at
+
+    if not _access_token or time.time() > _token_expires_at:
+        raise HTTPException(
+            status_code=401,
+            detail="No valid access token. Authenticate at /aliexpress/auth/start"
+        )
+
+    return {"access_token": _access_token}
 
 
 @router.post("/auth/disconnect")

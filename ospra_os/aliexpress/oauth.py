@@ -43,18 +43,20 @@ class AliExpressOAuth:
     6. Store token in database
     """
 
-    # Try the alternative OAuth endpoints for Dropshipping Solution API
+    # AliExpress OAuth endpoints for Dropshipping Solution API
     AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
-    TOKEN_URL = "https://oauth.aliexpress.com/token"
+    # Use the generateSecurityToken API for token exchange
+    TOKEN_URL = "https://openservice.aliexpress.com/auth/token/security/create"
 
-    def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str):
+    def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str = None):
         self.app_key = app_key
         self.app_secret = app_secret
         self.redirect_uri = redirect_uri
         self.database_url = database_url
 
-        # Initialize database
-        self._init_db()
+        # Initialize database (optional for now)
+        if database_url:
+            self._init_db()
 
     def _init_db(self):
         """Initialize token storage database."""
@@ -86,9 +88,20 @@ class AliExpressOAuth:
 
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
 
+    def _generate_signature(self, params: Dict[str, str]) -> str:
+        """Generate HMAC-SHA256 signature for API request."""
+        sorted_params = sorted(params.items())
+        sign_string = "".join([f"{k}{v}" for k, v in sorted_params])
+        signature = hmac.new(
+            self.app_secret.encode('utf-8'),
+            sign_string.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest().upper()
+        return signature
+
     def exchange_code_for_token(self, authorization_code: str) -> Dict[str, Any]:
         """
-        Exchange authorization code for access token.
+        Exchange authorization code for access token using generateSecurityToken API.
 
         Args:
             authorization_code: Code received from OAuth callback
@@ -96,16 +109,23 @@ class AliExpressOAuth:
         Returns:
             Token response with access_token, refresh_token, expires_in
         """
+        import time
+
         params = {
-            "client_id": self.app_key,
-            "client_secret": self.app_secret,
-            "grant_type": "authorization_code",
+            "app_key": self.app_key,
+            "method": "generateSecurityToken",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
             "code": authorization_code,
-            "redirect_uri": self.redirect_uri
         }
 
+        # Generate signature
+        params["sign"] = self._generate_signature(params)
+
         try:
-            response = requests.post(self.TOKEN_URL, data=params, timeout=15)
+            response = requests.post(self.TOKEN_URL, params=params, timeout=15)
 
             if response.status_code != 200:
                 return {
@@ -116,18 +136,21 @@ class AliExpressOAuth:
 
             data = response.json()
 
-            # Check for errors
-            if "error" in data:
+            # Check for API errors
+            if "error_response" in data:
+                error = data["error_response"]
                 return {
                     "success": False,
-                    "error": data.get("error"),
-                    "error_description": data.get("error_description", "")
+                    "error": error.get("code", "unknown"),
+                    "error_description": error.get("msg", "Unknown error")
                 }
 
-            # Success - extract token info
-            access_token = data.get("access_token")
-            refresh_token = data.get("refresh_token")
-            expires_in = data.get("expires_in", 3600)  # Default 1 hour
+            # Success - extract token info from generateSecurityToken_response
+            token_data = data.get("generateSecurityToken_response", {})
+
+            access_token = token_data.get("access_token")
+            refresh_token = token_data.get("refresh_token")
+            expires_in = token_data.get("expires_in", 2592000)  # Default 30 days
 
             if not access_token:
                 return {
@@ -139,8 +162,9 @@ class AliExpressOAuth:
             # Calculate expiry
             expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
 
-            # Store token
-            self._store_token(access_token, refresh_token, expires_at)
+            # Store token if database is initialized
+            if self.database_url:
+                self._store_token(access_token, refresh_token, expires_at)
 
             return {
                 "success": True,
