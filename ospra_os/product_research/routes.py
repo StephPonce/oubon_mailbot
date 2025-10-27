@@ -194,6 +194,67 @@ async def get_trending_products(
     return ranked
 
 
+@router.get("/test-aliexpress")
+async def test_aliexpress(settings: Settings = Depends(get_settings)):
+    """
+    Test AliExpress API directly and return raw response.
+
+    This is for debugging only.
+    """
+    from .connectors.suppliers.aliexpress import AliExpressConnector
+    import time
+    import hmac
+    import hashlib
+    import requests
+
+    api_key = getattr(settings, "ALIEXPRESS_API_KEY", None)
+    app_secret = getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+
+    if not api_key or not app_secret:
+        return {"error": "AliExpress credentials not configured"}
+
+    # Build test request
+    params = {
+        "app_key": api_key,
+        "method": "aliexpress.affiliate.product.query",
+        "timestamp": str(int(time.time() * 1000)),
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "sha256",
+        "keywords": "phone case",
+        "target_currency": "USD",
+        "target_language": "EN",
+        "page_size": "5",
+    }
+
+    # Generate signature
+    sorted_params = sorted(params.items())
+    sign_string = "".join([f"{k}{v}" for k, v in sorted_params])
+    signature = hmac.new(
+        app_secret.encode('utf-8'),
+        sign_string.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest().upper()
+
+    params["sign"] = signature
+
+    # Make request
+    try:
+        response = requests.get(
+            "https://api-sg.aliexpress.com/sync",
+            params=params,
+            timeout=10
+        )
+
+        return {
+            "status_code": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text,
+            "request_url": response.url[:100] + "..."  # Truncate for safety
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @router.get("/sources")
 async def list_sources(settings: Settings = Depends(get_settings)):
     """
