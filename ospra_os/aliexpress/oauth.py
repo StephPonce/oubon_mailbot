@@ -1,14 +1,17 @@
 """
 AliExpress OAuth 2.0 Implementation for Dropshipping Solution API.
 
-This module handles OAuth authentication to get access tokens for
-AliExpress Dropshipping Solution APIs.
+Complete OAuth implementation based on official AliExpress Open Platform documentation.
+Reference: https://openservice.aliexpress.com/doc/api.htm (Seller Authorization)
 """
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import secrets
 import requests
+import hmac
+import hashlib
+import time
 from urllib.parse import urlencode
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -43,11 +46,9 @@ class AliExpressOAuth:
     6. Store token in database
     """
 
-    # AliExpress OAuth endpoints for Dropshipping Solution API
-    # Try openservice endpoint which is used for API calls
-    AUTHORIZE_URL = "https://openservice.aliexpress.com/oauth/authorize"
-    # Use the generateSecurityToken API for token exchange
-    TOKEN_URL = "https://openservice.aliexpress.com/auth/token/security/create"
+    # Official AliExpress OAuth endpoints from documentation
+    AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+    TOKEN_URL = "https://api-sg.aliexpress.com/sync"  # Uses /auth/token/create method
 
     def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str = None):
         self.app_key = app_key
@@ -71,6 +72,8 @@ class AliExpressOAuth:
         """
         Generate OAuth authorization URL.
 
+        Based on official documentation - STEP 1: Concatenate authorization URL.
+
         Args:
             state: Optional state parameter for CSRF protection
 
@@ -85,8 +88,7 @@ class AliExpressOAuth:
             "response_type": "code",
             "redirect_uri": self.redirect_uri,
             "state": state,
-            # Add scope for Dropshipping Solution API access
-            "scope": "aliexpress.dropshipping"
+            "force_auth": "true"  # Refresh cookie for new session
         }
 
         return f"{self.AUTHORIZE_URL}?{urlencode(params)}"
@@ -104,19 +106,19 @@ class AliExpressOAuth:
 
     def exchange_code_for_token(self, authorization_code: str) -> Dict[str, Any]:
         """
-        Exchange authorization code for access token using generateSecurityToken API.
+        Exchange authorization code for access token.
+
+        Based on official documentation - STEP 4: Use /auth/token/create API.
 
         Args:
             authorization_code: Code received from OAuth callback
 
         Returns:
-            Token response with access_token, refresh_token, expires_in
+            Token response with access_token, refresh_token, expires_in, user_info
         """
-        import time
-
         params = {
             "app_key": self.app_key,
-            "method": "generateSecurityToken",
+            "method": "/auth/token/create",
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
@@ -145,11 +147,13 @@ class AliExpressOAuth:
                 return {
                     "success": False,
                     "error": error.get("code", "unknown"),
-                    "error_description": error.get("msg", "Unknown error")
+                    "error_description": error.get("msg", "Unknown error"),
+                    "details": data
                 }
 
-            # Success - extract token info from generateSecurityToken_response
-            token_data = data.get("generateSecurityToken_response", {})
+            # Extract token from response
+            # Response key might be aliexpress_system_oauth_access_token_response
+            token_data = data.get("aliexpress_system_oauth_access_token_response", {})
 
             access_token = token_data.get("access_token")
             refresh_token = token_data.get("refresh_token")
@@ -159,7 +163,8 @@ class AliExpressOAuth:
                 return {
                     "success": False,
                     "error": "No access_token in response",
-                    "details": data
+                    "details": data,
+                    "response_keys": list(data.keys())
                 }
 
             # Calculate expiry
@@ -174,7 +179,10 @@ class AliExpressOAuth:
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "expires_at": expires_at.isoformat(),
-                "expires_in": expires_in
+                "expires_in": expires_in,
+                "user_id": token_data.get("user_id"),
+                "seller_id": token_data.get("seller_id"),
+                "account": token_data.get("account")
             }
 
         except Exception as e:

@@ -42,32 +42,90 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
 @router.get("/auth/start")
 async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
     """
-    Start OAuth flow.
+    STEP 1 & 2: Start OAuth flow and guide user to authorize.
 
-    Returns the authorization URL for testing.
-    In production, this would redirect automatically.
+    Returns an HTML page with instructions and authorization button.
     """
     global _oauth_state
 
     try:
         auth_url = oauth.get_authorization_url()
 
-        # Store state for verification
-        _oauth_state = auth_url.split("state=")[1] if "state=" in auth_url else None
+        # Store state for CSRF protection
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(auth_url)
+        params = parse_qs(parsed.query)
+        _oauth_state = params.get("state", [None])[0]
 
-        return JSONResponse(
-            status_code=200,
-            content={
-                "auth_url": auth_url,
-                "instructions": [
-                    "1. Copy the auth_url above",
-                    "2. Paste it in your browser",
-                    "3. Click 'Authorize' on AliExpress page",
-                    "4. You'll be redirected back to /aliexpress/callback automatically"
-                ],
-                "state": _oauth_state
-            }
-        )
+        # Return HTML page with authorization button
+        from fastapi.responses import HTMLResponse
+        html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect AliExpress</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }}
+        .card {{
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }}
+        h1 {{ color: #333; margin-bottom: 10px; }}
+        p {{ color: #666; line-height: 1.6; }}
+        .btn {{
+            display: inline-block;
+            background: #FF6A00;
+            color: white;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }}
+        .btn:hover {{ background: #E65A00; }}
+        .steps {{
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }}
+        .steps li {{ margin: 8px 0; color: #666; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔗 Connect AliExpress</h1>
+        <p>Click the button below to authorize Ospra to access your AliExpress seller account.</p>
+
+        <div class="steps">
+            <strong>What happens next:</strong>
+            <ol>
+                <li>You'll be redirected to AliExpress</li>
+                <li>Log in with your seller account</li>
+                <li>Review and approve permissions</li>
+                <li>You'll be redirected back automatically</li>
+            </ol>
+        </div>
+
+        <a href="{auth_url}" class="btn">
+            Connect AliExpress Account →
+        </a>
+    </div>
+</body>
+</html>
+        """
+
+        return HTMLResponse(content=html_content)
+
     except Exception as e:
         import traceback
         return JSONResponse(
@@ -137,18 +195,78 @@ async def oauth_callback(
             _access_token = result.get("access_token")
             _refresh_token = result.get("refresh_token")
             _token_expires_at = time.time() + result.get("expires_in", 2592000)
+            _user_info = {
+                "user_id": result.get("user_id"),
+                "seller_id": result.get("seller_id"),
+                "account": result.get("account")
+            }
 
-            return JSONResponse(
-                status_code=200,
-                content={
-                    "success": True,
-                    "message": "✅ AliExpress connected successfully!",
-                    "access_token": _access_token[:20] + "..." if _access_token else None,
-                    "expires_in": result.get("expires_in"),
-                    "expires_in_days": result.get("expires_in", 0) // 86400,
-                    "expires_at": result.get("expires_at")
-                }
-            )
+            # Return success HTML page
+            from fastapi.responses import HTMLResponse
+            html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connected!</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 100px auto;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }}
+        .card {{
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            text-align: center;
+        }}
+        .success {{ font-size: 48px; margin-bottom: 20px; }}
+        h1 {{ color: #00A86B; margin-bottom: 10px; }}
+        p {{ color: #666; line-height: 1.6; }}
+        .info {{
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: left;
+        }}
+        .btn {{
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="success">✅</div>
+        <h1>Successfully Connected!</h1>
+        <p>Your AliExpress account is now connected to Ospra.</p>
+
+        <div class="info">
+            <strong>Connection Details:</strong><br>
+            Account: {_user_info.get('account', 'N/A')}<br>
+            Token expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(_token_expires_at))}<br>
+            Time remaining: {int((_token_expires_at - time.time()) / 3600)} hours ({int((_token_expires_at - time.time()) / 86400)} days)
+        </div>
+
+        <a href="/admin/dashboard/v2" class="btn">
+            → Go to Dashboard
+        </a>
+    </div>
+</body>
+</html>
+            """
+
+            return HTMLResponse(content=html_content)
         else:
             # Token exchange failed
             return JSONResponse(
