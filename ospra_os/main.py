@@ -34,6 +34,16 @@ except Exception as e:
     research_router = None
     _HAS_RESEARCH = False
 
+# Admin Dashboard router
+try:
+    from ospra_os.admin.routes import router as admin_router  # type: ignore
+    _HAS_ADMIN = True
+    print("✅ Admin Dashboard router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Admin Dashboard router not loaded: {e}")
+    admin_router = None
+    _HAS_ADMIN = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -87,6 +97,9 @@ if _HAS_TIKTOK and tiktok_router:
 
 if _HAS_RESEARCH and research_router:
     app.include_router(research_router)  # exposes /research/*
+
+if _HAS_ADMIN and admin_router:
+    app.include_router(admin_router)  # exposes /admin/*
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
