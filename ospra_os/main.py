@@ -1,10 +1,11 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Body
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
 from pathlib import Path
 from typing import Optional, List
+from pydantic import BaseModel
 
 # Gmail OAuth router (optional)
 try:
@@ -854,11 +855,14 @@ async def debug_reddit_raw(settings: Settings = Depends(get_settings)):
     return result
 
 
+class DiscoverRequest(BaseModel):
+    min_score: float = 0.0  # Changed default from 7.0 to 0.0
+    max_per_niche: int = 3
+    top_overall: int = 15
+
 @app.post("/api/discover-multi")
 async def discover_multi_niche(
-    min_score: float = 7.0,
-    max_per_niche: int = 5,
-    top_overall: int = 20,
+    request: DiscoverRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -923,16 +927,16 @@ async def discover_multi_niche(
 
         # Run discovery using Google Trends
         # Note: min_score is now 0-100 (Google Trends scale) instead of 0-10
-        trends_min_score = min_score * 10  # Convert 0-10 to 0-100
+        trends_min_score = request.min_score * 10  # Convert 0-10 to 0-100
         niche_products = await discovery.discover_all_niches(
             min_score=trends_min_score,
-            max_per_niche=max_per_niche
+            max_per_niche=request.max_per_niche
         )
 
         # Get top products overall
         top_products = discovery.get_top_products_overall(
             niche_products=niche_products,
-            limit=top_overall
+            limit=request.top_overall
         )
 
         # Get statistics
