@@ -539,35 +539,86 @@ async def validate_product_api(
 
 @app.get("/api/debug/reddit")
 async def debug_reddit(settings: Settings = Depends(get_settings)):
-    """Debug endpoint to check Reddit API configuration."""
+    """Debug endpoint to check Reddit API configuration - matches production flow exactly."""
     from ospra_os.product_research.connectors.social.reddit import RedditConnector
+    import traceback
 
     reddit = RedditConnector(
         client_id=settings.REDDIT_CLIENT_ID,
         client_secret=settings.REDDIT_SECRET
     )
 
-    try:
-        # Try to get one product from r/smarthome
-        products = await reddit.get_subreddit_products(
-            subreddit="smarthome",
-            time_filter="month",
-            limit=3
-        )
+    result = {
+        "reddit_configured": reddit.is_available(),
+        "client_id": settings.REDDIT_CLIENT_ID[:10] + "..." if settings.REDDIT_CLIENT_ID else None,
+        "client_secret_configured": bool(settings.REDDIT_SECRET),
+        "tests": []
+    }
 
-        return {
-            "reddit_configured": reddit.is_available(),
-            "client_id": settings.REDDIT_CLIENT_ID[:10] + "..." if settings.REDDIT_CLIENT_ID else None,
-            "products_found": len(products),
-            "sample_product": products[0].to_dict() if products else None
-        }
+    # Test 1: Try "week" time filter (matches production)
+    try:
+        products_week = await reddit.get_subreddit_products(
+            subreddit="smarthome",
+            time_filter="week",  # MATCHES PRODUCTION
+            limit=25  # MATCHES PRODUCTION
+        )
+        result["tests"].append({
+            "test": "smarthome (week, limit=25)",
+            "success": True,
+            "products_found": len(products_week),
+            "sample_product": products_week[0].to_dict() if products_week else None
+        })
     except Exception as e:
-        import traceback
-        return {
-            "reddit_configured": reddit.is_available(),
+        result["tests"].append({
+            "test": "smarthome (week, limit=25)",
+            "success": False,
             "error": str(e),
             "traceback": traceback.format_exc()
-        }
+        })
+
+    # Test 2: Try "month" time filter
+    try:
+        products_month = await reddit.get_subreddit_products(
+            subreddit="smarthome",
+            time_filter="month",
+            limit=25
+        )
+        result["tests"].append({
+            "test": "smarthome (month, limit=25)",
+            "success": True,
+            "products_found": len(products_month),
+            "sample_product": products_month[0].to_dict() if products_month else None
+        })
+    except Exception as e:
+        result["tests"].append({
+            "test": "smarthome (month, limit=25)",
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+    # Test 3: Try different subreddit
+    try:
+        products_shutup = await reddit.get_subreddit_products(
+            subreddit="shutupandtakemymoney",
+            time_filter="week",
+            limit=25
+        )
+        result["tests"].append({
+            "test": "shutupandtakemymoney (week, limit=25)",
+            "success": True,
+            "products_found": len(products_shutup),
+            "sample_product": products_shutup[0].to_dict() if products_shutup else None
+        })
+    except Exception as e:
+        result["tests"].append({
+            "test": "shutupandtakemymoney (week, limit=25)",
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+    return result
 
 
 @app.post("/api/discover-multi")
