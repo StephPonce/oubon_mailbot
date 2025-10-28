@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     SHOPIFY_DOMAIN: Optional[str] = None
     SHOPIFY_API_TOKEN: Optional[str] = None
     SHOPIFY_ADMIN_TOKEN: Optional[str] = None
+    SHOPIFY_ACCESS_TOKEN: Optional[str] = None  # Admin API access token
     SHOPIFY_API_KEY: Optional[str] = None
     SHOPIFY_API_SECRET: Optional[str] = None
     SHOPIFY_API_VERSION: Optional[str] = Field(default="2024-10")

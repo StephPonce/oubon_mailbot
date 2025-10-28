@@ -265,6 +265,17 @@
             background: #218838;
         }
 
+        .btn-success:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-deploying {
+            background: #17a2b8 !important;
+            cursor: wait !important;
+        }
+
         /* Loading State */
         .loading {
             text-align: center;
@@ -872,9 +883,13 @@
             const scoreClass = priority === 'HIGH' ? 'score-high' : priority === 'MEDIUM' ? 'score-medium' : 'score-low';
 
             const name = product.name || 'Unknown Product';
-            const source = product.source || 'reddit';
+            const source = product.source || 'google_trends';
             const engagement = product.social_engagement || product.social_mentions || 0;
             const niche = product.niche || '';
+            const trendScore = product.trend_score || item.trend_score || 50;
+
+            // Generate unique ID for button
+            const buttonId = `deploy-btn-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
 
             return `
                 <div class="product-card">
@@ -883,24 +898,26 @@
                         <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
                     </div>
                     <div class="product-body">
-                        ${niche ? `<div style="color: #667eea; font-size: 0.85rem; margin-bottom: 0.5rem;">🏷️ ${niche.replace('_', ' ')}</div>` : ''}
+                        ${niche ? `<div style="color: #667eea; font-size: 0.85rem; margin-bottom: 0.5rem;">🏷️ ${niche.replace(/_/g, ' ')}</div>` : ''}
                         <div class="product-meta">
                             <div class="meta-item">
                                 <span>📈</span>
                                 <span>${source}</span>
                             </div>
-                            <div class="meta-item">
-                                <span>💬</span>
-                                <span>${engagement} engagement</span>
-                            </div>
+                            ${trendScore ? `<div class="meta-item">
+                                <span>🔥</span>
+                                <span>${trendScore}/100 trend</span>
+                            </div>` : ''}
                         </div>
                         <div class="product-actions">
                             <a href="https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}"
                                target="_blank" class="btn btn-secondary" style="flex: 1;">
                                 🔍 Search AliExpress
                             </a>
-                            <button class="btn btn-success" onclick="addToShopify('${name}')" style="flex: 1;">
-                                ➕ Add to Shopify
+                            <button id="${buttonId}" class="btn btn-success"
+                                    onclick='deployToShopify(${JSON.stringify({name, niche, score, trend_score: trendScore}).replace(/'/g, "\\'")})'
+                                    style="flex: 1;">
+                                🚀 Deploy to Shopify
                             </button>
                         </div>
                     </div>
@@ -908,9 +925,95 @@
             `;
         }
 
-        // Add to Shopify
-        async function addToShopify(productName) {
-            alert(`Adding "${productName}" to Shopify...\n\nThis feature will:\n1. Search AliExpress for best match\n2. Extract product details\n3. Calculate sell price (cost × 2.5)\n4. Create Shopify product\n\nComing in next update!`);
+        // Deploy to Shopify with AI automation
+        async function deployToShopify(productData) {
+            const { name, niche, score, trend_score } = productData;
+            const buttonId = `deploy-btn-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            const button = document.getElementById(buttonId);
+
+            if (!button) return;
+
+            // Disable button and show loading state
+            button.disabled = true;
+            button.classList.add('btn-deploying');
+            const originalText = button.textContent;
+            button.textContent = '⏳ Deploying...';
+
+            try {
+                // Call deployment API
+                const response = await fetch('/api/deploy-to-shopify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        product_name: name,
+                        niche: niche || 'general',
+                        score: score || 5.0,
+                        trend_score: trend_score || 50
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Success!
+                    button.textContent = '✅ Deployed!';
+                    button.classList.remove('btn-deploying');
+                    button.style.background = '#28a745';
+
+                    // Show success message with details
+                    alert(`🎉 SUCCESS! Product deployed to Shopify!\n\n` +
+                          `Product: ${result.product_title}\n` +
+                          `Price: $${result.price} (was $${result.compare_at_price})\n` +
+                          `Profit: $${result.profit_per_sale}/sale (${result.profit_margin}% margin)\n\n` +
+                          `View in Shopify Admin:\n${result.shopify_admin_url}`);
+
+                    // Open Shopify admin in new tab
+                    window.open(result.shopify_admin_url, '_blank');
+
+                    // Reset button after 3 seconds
+                    setTimeout(() => {
+                        button.textContent = '✅ Deployed';
+                        button.disabled = false;
+                    }, 3000);
+
+                } else {
+                    // Error
+                    button.textContent = '❌ Failed';
+                    button.classList.remove('btn-deploying');
+                    button.style.background = '#dc3545';
+
+                    alert(`⚠️ Deployment failed!\n\n` +
+                          `Error: ${result.error}\n\n` +
+                          `Please check:\n` +
+                          `1. Shopify credentials are configured\n` +
+                          `2. OpenAI API key is set\n` +
+                          `3. Check logs for details`);
+
+                    // Reset button after 2 seconds
+                    setTimeout(() => {
+                        button.textContent = originalText;
+                        button.style.background = '';
+                        button.disabled = false;
+                    }, 2000);
+                }
+
+            } catch (error) {
+                console.error('Deployment error:', error);
+                button.textContent = '❌ Error';
+                button.classList.remove('btn-deploying');
+                button.style.background = '#dc3545';
+
+                alert(`⚠️ Deployment error!\n\n${error.message}\n\nCheck console for details.`);
+
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '';
+                    button.disabled = false;
+                }, 2000);
+            }
         }
 
         // Initialize

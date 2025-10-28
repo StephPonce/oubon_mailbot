@@ -1069,6 +1069,189 @@ def debug_check_inbox(settings: Settings = Depends(get_settings)):
             "traceback": traceback.format_exc()
         }
 
+
+# ---------------------------------------------------------------
+# AI Automation Endpoints (Shopify Deploy, Content, Pricing)
+# ---------------------------------------------------------------
+
+@app.post("/api/deploy-to-shopify")
+async def deploy_to_shopify(
+    product_name: str,
+    niche: str,
+    score: float,
+    trend_score: float = 50,
+    aliexpress_cost: float = None,
+    product_images: list = None,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    🚀 ONE-CLICK SHOPIFY DEPLOYMENT
+
+    Complete automated pipeline:
+    1. Generate AI-powered product content
+    2. Optimize pricing with competitor analysis
+    3. Deploy to Shopify store
+
+    Args:
+        product_name: Product name
+        niche: Product category
+        score: Discovery score (0-10)
+        trend_score: Google Trends score (0-100)
+        aliexpress_cost: Cost from supplier (optional - will be estimated)
+        product_images: List of image URLs (optional)
+
+    Returns:
+        {
+            "success": True,
+            "shopify_product_id": "8234567890",
+            "shopify_admin_url": "https://admin.shopify.com/...",
+            "price": 29.99,
+            "profit_margin": 65.5
+        }
+    """
+    try:
+        from ospra_os.integrations.shopify_auto_deploy import ShopifyAutoDeployer
+
+        deployer = ShopifyAutoDeployer()
+
+        result = await deployer.deploy_product(
+            product_name=product_name,
+            niche=niche,
+            score=score,
+            trend_score=trend_score,
+            aliexpress_cost=aliexpress_cost,
+            product_images=product_images or []
+        )
+
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@app.post("/api/generate-content")
+async def generate_product_content(
+    product_name: str,
+    niche: str,
+    trend_score: float = 50,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    📝 AI PRODUCT CONTENT GENERATOR
+
+    Generate SEO-optimized product content using AI:
+    - Product title (SEO-optimized)
+    - Product description (HTML)
+    - Bullet points (benefit-focused)
+    - Meta description
+    - Tags
+    - Marketing headline
+
+    Args:
+        product_name: Product name
+        niche: Product category
+        trend_score: Google Trends score (0-100)
+
+    Returns:
+        {
+            "title": "LED Strip Lights - Transform Any Room",
+            "description": "<p>Discover...</p>",
+            "bullet_points": ["Feature 1", ...],
+            "meta_description": "SEO description",
+            "tags": ["led", "smart-home", ...],
+            "headline": "Transform Your Home Today"
+        }
+    """
+    try:
+        from ospra_os.product_research.ai_content import AIContentGenerator
+
+        generator = AIContentGenerator()
+
+        content = await generator.generate_product_content(
+            product_name=product_name,
+            niche=niche,
+            trend_score=trend_score
+        )
+
+        return {
+            "success": True,
+            "content": content
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@app.post("/api/optimize-price")
+async def optimize_product_price(
+    product_name: str,
+    aliexpress_cost: float,
+    niche: str,
+    trend_score: float = 50,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    💰 AI PRICE OPTIMIZER
+
+    Optimize pricing with AI-powered competitor analysis:
+    - Suggested price (with .99 endings)
+    - Compare-at price (for perceived value)
+    - Profit margin calculation
+    - Profit per sale
+    - Pricing strategy (premium/competitive/value)
+
+    Args:
+        product_name: Product name
+        aliexpress_cost: Cost from supplier
+        niche: Product category
+        trend_score: Google Trends score (0-100)
+
+    Returns:
+        {
+            "suggested_price": 29.99,
+            "compare_at_price": 49.99,
+            "profit_margin": 65.5,
+            "profit_per_sale": 19.49,
+            "pricing_strategy": "competitive",
+            "reasoning": "AI explanation..."
+        }
+    """
+    try:
+        from ospra_os.product_research.price_optimizer import PriceOptimizer
+
+        optimizer = PriceOptimizer()
+
+        pricing = await optimizer.analyze_pricing(
+            product_name=product_name,
+            aliexpress_cost=aliexpress_cost,
+            niche=niche,
+            trend_score=trend_score
+        )
+
+        return {
+            "success": True,
+            "pricing": pricing
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 # Mount static files (must be last)
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
