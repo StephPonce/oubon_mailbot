@@ -950,8 +950,8 @@ async def discover_multi_niche(
             "by_niche": niche_products,
             "stats": {
                 "niches_searched": stats["niches_searched"],
-                "min_score": min_score,
-                "products_per_niche": max_per_niche,
+                "min_score": request.min_score,
+                "products_per_niche": request.max_per_niche,
                 "high_priority": stats["high_priority"],
                 "medium_priority": stats["medium_priority"],
                 "low_priority": stats["low_priority"],
