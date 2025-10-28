@@ -537,6 +537,39 @@ async def validate_product_api(
         }
 
 
+@app.get("/api/debug/reddit")
+async def debug_reddit(settings: Settings = Depends(get_settings)):
+    """Debug endpoint to check Reddit API configuration."""
+    from ospra_os.product_research.connectors.social.reddit import RedditConnector
+
+    reddit = RedditConnector(
+        client_id=settings.REDDIT_CLIENT_ID,
+        client_secret=settings.REDDIT_SECRET
+    )
+
+    try:
+        # Try to get one product from r/smarthome
+        products = await reddit.get_subreddit_products(
+            subreddit="smarthome",
+            time_filter="month",
+            limit=3
+        )
+
+        return {
+            "reddit_configured": reddit.is_available(),
+            "client_id": settings.REDDIT_CLIENT_ID[:10] + "..." if settings.REDDIT_CLIENT_ID else None,
+            "products_found": len(products),
+            "sample_product": products[0].to_dict() if products else None
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "reddit_configured": reddit.is_available(),
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 @app.post("/api/discover-multi")
 async def discover_multi_niche(
     min_score: float = 7.0,
