@@ -621,6 +621,52 @@ async def debug_reddit(settings: Settings = Depends(get_settings)):
     return result
 
 
+@app.get("/api/debug/reddit-connector-logs")
+async def debug_reddit_connector_logs(settings: Settings = Depends(get_settings)):
+    """Test Reddit connector and capture logs."""
+    import io
+    import sys
+    from ospra_os.product_research.connectors.social.reddit import RedditConnector
+
+    # Capture stdout
+    captured_output = io.StringIO()
+    old_stdout = sys.stdout
+    sys.stdout = captured_output
+
+    try:
+        reddit = RedditConnector()
+        products = await reddit.get_subreddit_products("smarthome", "week", 5)
+
+        # Restore stdout
+        sys.stdout = old_stdout
+        logs = captured_output.getvalue()
+
+        return {
+            "success": True,
+            "products_found": len(products),
+            "sample_products": [
+                {
+                    "name": p.name,
+                    "score": p.social_mentions,
+                    "comments": p.social_engagement,
+                    "url": p.url
+                }
+                for p in products[:3]
+            ],
+            "logs": logs
+        }
+    except Exception as e:
+        sys.stdout = old_stdout
+        logs = captured_output.getvalue()
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "logs": logs
+        }
+
+
 @app.get("/api/debug/reddit-json")
 async def debug_reddit_json():
     """Test Reddit JSON API directly (no credentials needed)."""
