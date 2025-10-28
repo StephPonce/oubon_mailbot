@@ -1,6 +1,6 @@
 """Product discovery from multiple sources without Reddit dependency."""
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 import asyncio
 from pytrends.request import TrendReq
 
@@ -74,6 +74,25 @@ class MultiSourceDiscovery:
     def __init__(self):
         """Initialize multi-source discovery."""
         self.pytrends = None
+        self.aliexpress = None
+
+        # Try to initialize AliExpress connector
+        try:
+            from ospra_os.core.settings import get_settings
+            from ospra_os.product_research.connectors.suppliers.aliexpress import AliExpressConnector
+
+            settings = get_settings()
+            if settings.ALIEXPRESS_API_KEY and settings.ALIEXPRESS_APP_SECRET:
+                self.aliexpress = AliExpressConnector(
+                    api_key=settings.ALIEXPRESS_API_KEY,
+                    app_secret=settings.ALIEXPRESS_APP_SECRET
+                )
+                print("✅ AliExpress API connector initialized")
+            else:
+                print("⚠️  AliExpress API credentials not configured - using estimated pricing")
+        except Exception as e:
+            print(f"⚠️  Failed to initialize AliExpress connector: {e}")
+            self.aliexpress = None
 
     async def discover_all_niches(
         self,
@@ -138,7 +157,12 @@ class MultiSourceDiscovery:
                             "search_volume": int(trend_score),  # Represents relative search volume
                             "source": "google_trends",
                             "priority": self._get_priority(trend_score / 10),
-                            "tags": ["trending", niche, "google_trends"]
+                            "tags": ["trending", niche, "google_trends"],
+                            # Placeholders for AliExpress data (enriched later)
+                            "aliexpress_price": None,
+                            "aliexpress_url": None,
+                            "aliexpress_image": None,
+                            "supplier_rating": None
                         }
                         niche_products.append(product)
                         total_found += 1
@@ -171,6 +195,13 @@ class MultiSourceDiscovery:
         print(f"Products Found: {total_found}")
         print(f"Niches with Products: {sum(1 for p in all_products.values() if len(p) > 0)}")
         print(f"{'='*70}\n")
+
+        # Enrich with AliExpress data if available
+        if self.aliexpress and self.aliexpress.is_available():
+            print(f"\n{'='*70}")
+            print(f"🛒 ENRICHING WITH ALIEXPRESS DATA")
+            print(f"{'='*70}\n")
+            await self._enrich_with_aliexpress(all_products)
 
         return all_products
 
@@ -220,6 +251,56 @@ class MultiSourceDiscovery:
             return "MEDIUM"
         else:
             return "LOW"
+
+    async def _enrich_with_aliexpress(self, niche_products: Dict[str, List[Dict]]):
+        """
+        Enrich products with real AliExpress pricing and images.
+
+        Updates products in-place with:
+        - aliexpress_price: Real product cost
+        - aliexpress_url: Direct product link
+        - aliexpress_image: Product image URL
+        - supplier_rating: Supplier rating (0-5)
+        """
+        enriched_count = 0
+        total_count = sum(len(products) for products in niche_products.values())
+
+        for niche_name, products in niche_products.items():
+            for product in products:
+                try:
+                    # Search AliExpress for this product
+                    results = await self.aliexpress.search(
+                        query=product["name"],
+                        min_rating=4.0,
+                        max_price=50,  # Reasonable upper limit for dropshipping
+                        sort="orders"  # Sort by popularity
+                    )
+
+                    if results and len(results) > 0:
+                        # Use the first (most popular) result
+                        ali_product = results[0]
+
+                        # Update product with AliExpress data
+                        product["aliexpress_price"] = ali_product.price
+                        product["aliexpress_url"] = ali_product.url
+                        product["aliexpress_image"] = ali_product.image_url
+                        product["supplier_rating"] = ali_product.supplier_rating
+
+                        enriched_count += 1
+                        print(f"   ✅ {product['name']}: ${ali_product.price:.2f} (rating: {ali_product.supplier_rating:.1f}/5)")
+                    else:
+                        print(f"   ⚠️  {product['name']}: No AliExpress matches found")
+
+                except Exception as e:
+                    print(f"   ❌ {product['name']}: AliExpress error - {e}")
+                    continue
+
+                # Small delay to avoid rate limiting
+                await asyncio.sleep(0.5)
+
+        print(f"\n✅ AliExpress enrichment complete:")
+        print(f"   Enriched: {enriched_count}/{total_count} products")
+        print(f"{'='*70}\n")
 
     def get_top_products_overall(
         self,

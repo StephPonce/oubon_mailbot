@@ -1191,8 +1191,9 @@
             const checkboxId = `checkbox-${productId}`;
             const favoriteId = `favorite-${productId}`;
 
-            // Calculate profit margins (estimated)
-            const aliExpressCost = score >= 8 ? 15.0 : score >= 6 ? 10.0 : 5.0;
+            // Calculate profit margins (use real AliExpress price if available, otherwise estimate)
+            const aliExpressCost = product.aliexpress_price || (score >= 8 ? 15.0 : score >= 6 ? 10.0 : 5.0);
+            const isRealPrice = !!product.aliexpress_price;
             const sellingPrice = Math.round(aliExpressCost * 3 * 100) / 100;
             const shopifyFees = Math.round((sellingPrice * 0.029 + 0.30) * 100) / 100;
             const netProfit = Math.round((sellingPrice - aliExpressCost - shopifyFees) * 100) / 100;
@@ -1228,7 +1229,7 @@
                         </div>
                         <div class="profit-display">
                             <div class="profit-row-small">
-                                <span>AliExpress Cost:</span>
+                                <span>AliExpress Cost ${isRealPrice ? '✓' : '(est)'}:</span>
                                 <span>$${aliExpressCost.toFixed(2)}</span>
                             </div>
                             <div class="profit-row-small">
@@ -1244,10 +1245,11 @@
                                 <span>$${netProfit.toFixed(2)} (${profitMargin}%)</span>
                             </div>
                         </div>
+                        ${product.aliexpress_image ? `<img src="${product.aliexpress_image}" alt="${name}" style="width: 100%; border-radius: 8px; margin: 0.75rem 0;">` : ''}
                         <div class="product-actions">
-                            <a href="https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}"
+                            <a href="${product.aliexpress_url || `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}`}"
                                target="_blank" class="btn btn-secondary" style="flex: 1;">
-                                🔍 AliExpress
+                                🔍 ${isRealPrice ? 'View on' : 'Search'} AliExpress
                             </a>
                             <button id="${buttonId}" class="btn btn-success"
                                     onclick='showPreviewModal(${JSON.stringify({name, niche, score, trend_score: trendScore, ali_cost: aliExpressCost}).replace(/'/g, "\\'")})'
