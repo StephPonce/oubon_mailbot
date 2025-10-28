@@ -398,6 +398,218 @@
         .empty-state p {
             color: #999;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 700px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            padding: 2rem;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .modal-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-section h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            color: #667eea;
+        }
+
+        .modal-section p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .profit-breakdown {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+        }
+
+        .profit-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .profit-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            color: #28a745;
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+        }
+
+        /* Profit Margin Display on Cards */
+        .profit-display {
+            background: #e7f3ff;
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin: 0.75rem 0;
+            font-size: 0.85rem;
+        }
+
+        .profit-row-small {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0;
+            color: #444;
+        }
+
+        .profit-row-small.highlight {
+            font-weight: 700;
+            color: #28a745;
+            font-size: 0.95rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #d0e7ff;
+        }
+
+        /* Favorite Star */
+        .favorite-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            z-index: 10;
+        }
+
+        .favorite-btn:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .favorite-btn.active {
+            color: #ffc107;
+        }
+
+        .product-card {
+            position: relative;
+        }
+
+        /* Bulk Selection */
+        .bulk-checkbox {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .bulk-toolbar {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            z-index: 100;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .bulk-toolbar.active {
+            display: flex;
+        }
+
+        .bulk-count {
+            font-weight: 700;
+            color: #667eea;
+        }
     </style>
 </head>
 <body>
@@ -566,6 +778,73 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Product Preview Modal -->
+    <div id="preview-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modal-product-name">Product Preview</h2>
+                <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <h3>AI-Generated Title</h3>
+                    <p id="modal-product-title" style="font-weight: 600; font-size: 1.1rem;">Loading...</p>
+                </div>
+                <div class="modal-section">
+                    <h3>Product Description</h3>
+                    <div id="modal-product-description" style="line-height: 1.8;">Loading...</div>
+                </div>
+                <div class="modal-section">
+                    <h3>Pricing & Profit Margins</h3>
+                    <div class="profit-breakdown">
+                        <div class="profit-row">
+                            <span>AliExpress Cost:</span>
+                            <span id="modal-ali-cost">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>Shopify Selling Price:</span>
+                            <span id="modal-sell-price">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>Shopify Fees (2.9% + $0.30):</span>
+                            <span id="modal-shopify-fees">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>💰 Net Profit:</span>
+                            <span id="modal-net-profit">$0.00</span>
+                        </div>
+                    </div>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                        Profit Margin: <strong id="modal-profit-margin">0%</strong>
+                    </p>
+                </div>
+                <div class="modal-section">
+                    <h3>Tags</h3>
+                    <p id="modal-product-tags">Loading...</p>
+                </div>
+                <div class="product-actions" style="margin-top: 2rem;">
+                    <button class="btn btn-secondary" onclick="closePreviewModal()" style="flex: 1;">
+                        Cancel
+                    </button>
+                    <button class="btn btn-success" id="modal-deploy-btn" style="flex: 2;">
+                        🚀 Deploy to Shopify
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Actions Toolbar -->
+    <div id="bulk-toolbar" class="bulk-toolbar">
+        <span class="bulk-count" id="bulk-count">0 selected</span>
+        <button class="btn btn-success" onclick="bulkDeployToShopify()">
+            🚀 Deploy All to Shopify
+        </button>
+        <button class="btn btn-secondary" onclick="clearBulkSelection()">
+            Clear Selection
+        </button>
     </div>
 
     <script>
@@ -906,11 +1185,31 @@
             const niche = product.niche || '';
             const trendScore = product.trend_score || item.trend_score || 50;
 
-            // Generate unique ID for button
-            const buttonId = `deploy-btn-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            // Generate unique ID for button and product
+            const productId = name.replace(/[^a-zA-Z0-9]/g, '-');
+            const buttonId = `deploy-btn-${productId}`;
+            const checkboxId = `checkbox-${productId}`;
+            const favoriteId = `favorite-${productId}`;
+
+            // Calculate profit margins (estimated)
+            const aliExpressCost = score >= 8 ? 15.0 : score >= 6 ? 10.0 : 5.0;
+            const sellingPrice = Math.round(aliExpressCost * 3 * 100) / 100;
+            const shopifyFees = Math.round((sellingPrice * 0.029 + 0.30) * 100) / 100;
+            const netProfit = Math.round((sellingPrice - aliExpressCost - shopifyFees) * 100) / 100;
+            const profitMargin = Math.round((netProfit / sellingPrice * 100) * 10) / 10;
+
+            // Check if favorited
+            const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            const isFavorited = favorites.includes(name);
 
             return `
-                <div class="product-card">
+                <div class="product-card" data-product-id="${productId}" data-product-name="${name}">
+                    <input type="checkbox" class="bulk-checkbox" id="${checkboxId}"
+                           onchange="updateBulkToolbar()" data-product='${JSON.stringify({name, niche, score, trend_score: trendScore}).replace(/'/g, "\\'")}'>
+                    <button class="favorite-btn ${isFavorited ? 'active' : ''}" id="${favoriteId}"
+                            onclick="toggleFavorite('${name.replace(/'/g, "\\'")}', '${favoriteId}')">
+                        ${isFavorited ? '⭐' : '☆'}
+                    </button>
                     <div class="product-header">
                         <div class="product-name">${name}</div>
                         <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
@@ -927,15 +1226,33 @@
                                 <span>${trendScore}/100 trend</span>
                             </div>` : ''}
                         </div>
+                        <div class="profit-display">
+                            <div class="profit-row-small">
+                                <span>AliExpress Cost:</span>
+                                <span>$${aliExpressCost.toFixed(2)}</span>
+                            </div>
+                            <div class="profit-row-small">
+                                <span>Your Price:</span>
+                                <span>$${sellingPrice.toFixed(2)}</span>
+                            </div>
+                            <div class="profit-row-small">
+                                <span>Shopify Fees:</span>
+                                <span>$${shopifyFees.toFixed(2)}</span>
+                            </div>
+                            <div class="profit-row-small highlight">
+                                <span>💰 Net Profit:</span>
+                                <span>$${netProfit.toFixed(2)} (${profitMargin}%)</span>
+                            </div>
+                        </div>
                         <div class="product-actions">
                             <a href="https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}"
                                target="_blank" class="btn btn-secondary" style="flex: 1;">
-                                🔍 Search AliExpress
+                                🔍 AliExpress
                             </a>
                             <button id="${buttonId}" class="btn btn-success"
-                                    onclick='deployToShopify(${JSON.stringify({name, niche, score, trend_score: trendScore}).replace(/'/g, "\\'")})'
+                                    onclick='showPreviewModal(${JSON.stringify({name, niche, score, trend_score: trendScore, ali_cost: aliExpressCost}).replace(/'/g, "\\'")})'
                                     style="flex: 1;">
-                                🚀 Deploy to Shopify
+                                👁️ Preview & Deploy
                             </button>
                         </div>
                     </div>
@@ -1032,6 +1349,164 @@
                     button.disabled = false;
                 }, 2000);
             }
+        }
+
+        // Preview Modal Functions
+        async function showPreviewModal(productData) {
+            const { name, niche, score, trend_score, ali_cost } = productData;
+
+            // Show modal
+            const modal = document.getElementById('preview-modal');
+            modal.classList.add('active');
+
+            // Set product name in header
+            document.getElementById('modal-product-name').textContent = name;
+
+            // Calculate pricing
+            const aliExpressCost = ali_cost || (score >= 8 ? 15.0 : score >= 6 ? 10.0 : 5.0);
+            const sellingPrice = Math.round(aliExpressCost * 3 * 100) / 100;
+            const shopifyFees = Math.round((sellingPrice * 0.029 + 0.30) * 100) / 100;
+            const netProfit = Math.round((sellingPrice - aliExpressCost - shopifyFees) * 100) / 100;
+            const profitMargin = Math.round((netProfit / sellingPrice * 100) * 10) / 10;
+
+            // Update pricing
+            document.getElementById('modal-ali-cost').textContent = `$${aliExpressCost.toFixed(2)}`;
+            document.getElementById('modal-sell-price').textContent = `$${sellingPrice.toFixed(2)}`;
+            document.getElementById('modal-shopify-fees').textContent = `$${shopifyFees.toFixed(2)}`;
+            document.getElementById('modal-net-profit').textContent = `$${netProfit.toFixed(2)}`;
+            document.getElementById('modal-profit-margin').textContent = `${profitMargin}%`;
+
+            // Fetch AI-generated content
+            try {
+                document.getElementById('modal-product-title').textContent = 'Generating...';
+                document.getElementById('modal-product-description').innerHTML = '<p>Generating AI content...</p>';
+                document.getElementById('modal-product-tags').textContent = 'Generating...';
+
+                const response = await fetch('/api/generate-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_name: name,
+                        niche: niche || 'general',
+                        trend_score: trend_score || 50
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    document.getElementById('modal-product-title').textContent = result.title;
+                    document.getElementById('modal-product-description').innerHTML = result.description;
+                    document.getElementById('modal-product-tags').textContent = result.tags.join(', ');
+                } else {
+                    // Fallback content
+                    document.getElementById('modal-product-title').textContent = `${name} - Premium Quality`;
+                    document.getElementById('modal-product-description').innerHTML = `<p>Discover the amazing <strong>${name}</strong>! Premium quality product with fast shipping.</p>`;
+                    document.getElementById('modal-product-tags').textContent = [name.toLowerCase(), niche, 'trending'].join(', ');
+                }
+            } catch (error) {
+                console.error('Content generation error:', error);
+                // Fallback content
+                document.getElementById('modal-product-title').textContent = `${name} - Premium Quality`;
+                document.getElementById('modal-product-description').innerHTML = `<p>Discover the amazing <strong>${name}</strong>!</p>`;
+                document.getElementById('modal-product-tags').textContent = [name.toLowerCase(), niche].join(', ');
+            }
+
+            // Set up deploy button
+            const deployBtn = document.getElementById('modal-deploy-btn');
+            deployBtn.onclick = () => {
+                closePreviewModal();
+                deployToShopify(productData);
+            };
+        }
+
+        function closePreviewModal() {
+            const modal = document.getElementById('preview-modal');
+            modal.classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        setTimeout(() => {
+            document.getElementById('preview-modal')?.addEventListener('click', (e) => {
+                if (e.target.id === 'preview-modal') {
+                    closePreviewModal();
+                }
+            });
+        }, 100);
+
+        // Favorites Functions
+        function toggleFavorite(productName, buttonId) {
+            const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            const button = document.getElementById(buttonId);
+
+            const index = favorites.indexOf(productName);
+            if (index > -1) {
+                // Remove from favorites
+                favorites.splice(index, 1);
+                button.textContent = '☆';
+                button.classList.remove('active');
+            } else {
+                // Add to favorites
+                favorites.push(productName);
+                button.textContent = '⭐';
+                button.classList.add('active');
+            }
+
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+        }
+
+        // Bulk Selection Functions
+        function updateBulkToolbar() {
+            const checkboxes = document.querySelectorAll('.bulk-checkbox:checked');
+            const toolbar = document.getElementById('bulk-toolbar');
+            const countSpan = document.getElementById('bulk-count');
+
+            if (checkboxes.length > 0) {
+                toolbar.classList.add('active');
+                countSpan.textContent = `${checkboxes.length} selected`;
+            } else {
+                toolbar.classList.remove('active');
+            }
+        }
+
+        function clearBulkSelection() {
+            document.querySelectorAll('.bulk-checkbox:checked').forEach(cb => {
+                cb.checked = false;
+            });
+            updateBulkToolbar();
+        }
+
+        async function bulkDeployToShopify() {
+            const checkboxes = document.querySelectorAll('.bulk-checkbox:checked');
+            const products = Array.from(checkboxes).map(cb => JSON.parse(cb.dataset.product));
+
+            if (products.length === 0) {
+                alert('No products selected!');
+                return;
+            }
+
+            if (!confirm(`Deploy ${products.length} products to Shopify?\n\nThis will:\n- Generate AI content for each product\n- Optimize pricing\n- Create Shopify listings\n\nThis may take several minutes.`)) {
+                return;
+            }
+
+            let successful = 0;
+            let failed = 0;
+
+            for (const product of products) {
+                try {
+                    await deployToShopify(product);
+                    successful++;
+                } catch (error) {
+                    console.error(`Failed to deploy ${product.name}:`, error);
+                    failed++;
+                }
+
+                // Small delay between deployments
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            alert(`Bulk deployment complete!\n\n✅ Successful: ${successful}\n❌ Failed: ${failed}`);
+            clearBulkSelection();
         }
 
         // Initialize

@@ -25,7 +25,7 @@ class MultiSourceDiscovery:
     - ✅ Free forever
     """
 
-    # Curated trending keywords for each niche
+    # Curated trending keywords for each niche (Smart Home Focus)
     TRENDING_KEYWORDS = {
         "smart_lighting": [
             "led strip lights",
@@ -55,47 +55,19 @@ class MultiSourceDiscovery:
             "ninja blender",
             "smart scale"
         ],
-        "fitness_gadgets": [
-            "resistance bands",
-            "yoga mat",
-            "smart watch",
-            "foam roller",
-            "jump rope"
+        "smart_home_hub": [
+            "smart speaker",
+            "google home",
+            "alexa echo",
+            "smart display",
+            "home hub"
         ],
-        "phone_accessories": [
-            "phone case",
-            "wireless charger",
-            "screen protector",
-            "pop socket",
-            "car phone mount"
-        ],
-        "car_accessories": [
-            "dash cam",
-            "phone mount",
-            "car charger",
-            "seat organizer",
-            "air freshener"
-        ],
-        "pet_products": [
-            "automatic feeder",
-            "pet camera",
-            "water fountain",
-            "laser toy",
-            "pet bed"
-        ],
-        "gaming_accessories": [
-            "gaming mouse",
-            "mechanical keyboard",
-            "headset",
-            "mouse pad",
-            "controller grip"
-        ],
-        "outdoor_gear": [
-            "camping tent",
-            "hiking backpack",
-            "water bottle",
-            "portable charger",
-            "hammock"
+        "climate_control": [
+            "smart thermostat",
+            "humidifier",
+            "dehumidifier",
+            "tower fan",
+            "air circulator"
         ]
     }
 
