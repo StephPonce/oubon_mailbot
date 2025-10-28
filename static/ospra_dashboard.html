@@ -476,10 +476,9 @@
                     <div class="filter-group">
                         <input type="text" class="filter-input" placeholder="Search products..." id="search-products">
                         <select class="filter-input" id="filter-score">
-                            <option value="">All Scores</option>
-                            <option value="high">High (8+)</option>
-                            <option value="medium">Medium (5-8)</option>
-                            <option value="low">Low (<5)</option>
+                            <option value="" selected>All Scores (Recommended)</option>
+                            <option value="medium">Medium (5+)</option>
+                            <option value="low">Low (Any Score)</option>
                         </select>
                         <button class="btn btn-primary" onclick="discoverAllNiches()">🔍 Discover New Products</button>
                         <button class="btn btn-success" onclick="discoverAllNiches()" style="background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);">🔥 Discover All Niches</button>
@@ -766,6 +765,18 @@
             const grid = document.getElementById('product-grid');
             grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1;"><div class="spinner"></div><p>🔥 Discovering products across 10 niches...</p><p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">This may take 30-60 seconds ⏱️</p></div>';
 
+            // Get selected filter (if any)
+            const filterSelect = document.getElementById('filter-score');
+            const filterValue = filterSelect ? filterSelect.value : '';
+
+            // Convert filter to min_score (0-10 scale)
+            let minScore = 0.0;  // Default: show all products
+            if (filterValue === 'medium') {
+                minScore = 5.0;  // Medium+ priority (50/100 on Trends)
+            } else {
+                minScore = 0.0;  // Show all products
+            }
+
             try {
                 // Set a timeout for the request
                 const controller = new AbortController();
@@ -775,9 +786,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        min_score: 5.0,  // 0-10 scale (becomes 50/100 for Google Trends)
-                        max_per_niche: 3,  // Reduced from 5 to 3 for faster results
-                        top_overall: 15     // Reduced from 20 to 15
+                        min_score: minScore,  // Use selected filter value
+                        max_per_niche: 3,     // Reduced from 5 to 3 for faster results
+                        top_overall: 15       // Reduced from 20 to 15
                     }),
                     signal: controller.signal
                 });
