@@ -471,6 +471,7 @@
                             <option value="low">Low (<5)</option>
                         </select>
                         <button class="btn btn-primary" onclick="discoverProducts()">🔍 Discover New Products</button>
+                        <button class="btn btn-success" onclick="discoverAllNiches()" style="background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);">🔥 Discover All Niches</button>
                     </div>
                 </div>
 
@@ -747,6 +748,164 @@
                 console.error('Discovery failed:', error);
                 grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><h3>❌ Discovery failed</h3><p>' + error.message + '</p></div>';
             }
+        }
+
+        // Discover All Niches (Multi-Niche Discovery)
+        async function discoverAllNiches() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1;"><div class="spinner"></div><p>🔥 Discovering products across 10+ niches in parallel...</p></div>';
+
+            try {
+                const response = await fetch('/api/discover-multi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        min_score: 7.0,
+                        max_per_niche: 5,
+                        top_overall: 20
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    grid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;"><h3>❌ Discovery failed</h3><p>${data.error}</p></div>`;
+                    return;
+                }
+
+                renderMultiNicheResults(data);
+
+                // Update stats
+                document.getElementById('stat-products').textContent = data.total_products || 0;
+                if (data.top_overall && data.top_overall.length > 0) {
+                    document.getElementById('stat-top-score').textContent = data.top_overall[0].score.toFixed(1);
+                }
+            } catch (error) {
+                console.error('Multi-niche discovery failed:', error);
+                grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><h3>❌ Discovery failed</h3><p>' + error.message + '</p></div>';
+            }
+        }
+
+        // Render Multi-Niche Results
+        function renderMultiNicheResults(data) {
+            const grid = document.getElementById('product-grid');
+
+            if (!data.top_overall || data.top_overall.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <h3>No high-priority products found</h3>
+                        <p>Try lowering the minimum score threshold</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Build HTML: Top Overall + By Niche sections
+            let html = '';
+
+            // Summary Stats
+            html += `
+                <div style="grid-column: 1 / -1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 12px; color: white; margin-bottom: 2rem;">
+                    <h2 style="margin: 0 0 1rem 0;">🔥 Multi-Niche Discovery Results</h2>
+                    <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                        <div><strong>${data.total_products}</strong> products found</div>
+                        <div><strong>${data.niches_discovered}</strong> niches with products</div>
+                        <div><strong>${data.stats.high_priority}</strong> high priority</div>
+                        <div><strong>${data.stats.medium_priority}</strong> medium priority</div>
+                    </div>
+                </div>
+            `;
+
+            // Top 20 Overall Section
+            html += `<div style="grid-column: 1 / -1; margin-bottom: 2rem;">
+                <h2 style="color: white; margin-bottom: 1rem;">⭐ Top 20 Products Across All Niches</h2>
+            </div>`;
+
+            data.top_overall.forEach(item => {
+                html += renderProductCard(item);
+            });
+
+            // By Niche Sections
+            html += `<div style="grid-column: 1 / -1; margin-top: 3rem; margin-bottom: 1rem;">
+                <h2 style="color: white;">📊 Products by Niche</h2>
+            </div>`;
+
+            const nicheNames = {
+                'smart_lighting': '💡 Smart Lighting',
+                'home_security': '🔒 Home Security',
+                'cleaning_gadgets': '🧹 Cleaning Gadgets',
+                'kitchen_tech': '🍳 Kitchen Tech',
+                'fitness_gadgets': '💪 Fitness Gadgets',
+                'phone_accessories': '📱 Phone Accessories',
+                'car_accessories': '🚗 Car Accessories',
+                'pet_products': '🐾 Pet Products',
+                'gaming_accessories': '🎮 Gaming Accessories',
+                'outdoor_gear': '🏕️ Outdoor Gear'
+            };
+
+            Object.entries(data.by_niche).forEach(([nicheKey, products]) => {
+                if (products.length === 0) return;
+
+                const nicheName = nicheNames[nicheKey] || nicheKey;
+
+                html += `
+                    <div style="grid-column: 1 / -1; margin-top: 2rem;">
+                        <h3 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            ${nicheName} (${products.length} products)
+                        </h3>
+                    </div>
+                `;
+
+                products.forEach(item => {
+                    html += renderProductCard(item);
+                });
+            });
+
+            grid.innerHTML = html;
+        }
+
+        // Render Single Product Card
+        function renderProductCard(item) {
+            const product = item.product || item;
+            const score = item.score || product.score || 0;
+            const priority = item.priority || 'LOW';
+            const scoreClass = priority === 'HIGH' ? 'score-high' : priority === 'MEDIUM' ? 'score-medium' : 'score-low';
+
+            const name = product.name || 'Unknown Product';
+            const source = product.source || 'reddit';
+            const engagement = product.social_engagement || product.social_mentions || 0;
+            const niche = product.niche || '';
+
+            return `
+                <div class="product-card">
+                    <div class="product-header">
+                        <div class="product-name">${name}</div>
+                        <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
+                    </div>
+                    <div class="product-body">
+                        ${niche ? `<div style="color: #667eea; font-size: 0.85rem; margin-bottom: 0.5rem;">🏷️ ${niche.replace('_', ' ')}</div>` : ''}
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <span>📈</span>
+                                <span>${source}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span>💬</span>
+                                <span>${engagement} engagement</span>
+                            </div>
+                        </div>
+                        <div class="product-actions">
+                            <a href="https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}"
+                               target="_blank" class="btn btn-secondary" style="flex: 1;">
+                                🔍 Search AliExpress
+                            </a>
+                            <button class="btn btn-success" onclick="addToShopify('${name}')" style="flex: 1;">
+                                ➕ Add to Shopify
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
         // Add to Shopify
