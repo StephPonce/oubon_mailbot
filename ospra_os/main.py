@@ -621,6 +621,46 @@ async def debug_reddit(settings: Settings = Depends(get_settings)):
     return result
 
 
+@app.get("/api/debug/trends-test")
+async def debug_trends_test():
+    """Simple test of Google Trends discovery."""
+    from ospra_os.product_research.multi_source_discovery import MultiSourceDiscovery
+
+    try:
+        discovery = MultiSourceDiscovery()
+
+        # Test single niche with low threshold
+        niche_products = await discovery.discover_all_niches(min_score=40, max_per_niche=2)
+
+        # Get stats
+        stats = discovery.get_stats(niche_products)
+        top = discovery.get_top_products_overall(niche_products, limit=5)
+
+        return {
+            "success": True,
+            "test": "Google Trends Discovery",
+            "products_found": stats["total_products"],
+            "niches_with_products": stats["niches_with_products"],
+            "top_5": [
+                {
+                    "name": p["name"],
+                    "score": p["score"],
+                    "trend_score": p["trend_score"],
+                    "priority": p["priority"]
+                }
+                for p in top
+            ],
+            "stats": stats
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 @app.get("/api/debug/reddit-connector-logs")
 async def debug_reddit_connector_logs(settings: Settings = Depends(get_settings)):
     """Test Reddit connector and capture logs."""
