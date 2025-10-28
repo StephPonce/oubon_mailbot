@@ -481,7 +481,7 @@
                             <option value="medium">Medium (5-8)</option>
                             <option value="low">Low (<5)</option>
                         </select>
-                        <button class="btn btn-primary" onclick="discoverProducts()">🔍 Discover New Products</button>
+                        <button class="btn btn-primary" onclick="discoverAllNiches()">🔍 Discover New Products</button>
                         <button class="btn btn-success" onclick="discoverAllNiches()" style="background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);">🔥 Discover All Niches</button>
                     </div>
                 </div>
@@ -771,7 +771,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        min_score: 7.0,
+                        min_score: 5.0,  // 0-10 scale (becomes 50/100 for Google Trends)
                         max_per_niche: 5,
                         top_overall: 20
                     })
