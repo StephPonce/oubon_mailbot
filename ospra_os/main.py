@@ -621,6 +621,41 @@ async def debug_reddit(settings: Settings = Depends(get_settings)):
     return result
 
 
+@app.get("/api/debug/reddit-json")
+async def debug_reddit_json():
+    """Test Reddit JSON API directly (no credentials needed)."""
+    import aiohttp
+
+    url = "https://www.reddit.com/r/smarthome/top.json"
+    params = {"t": "week", "limit": 5}
+    headers = {"User-Agent": "web:OspraOS:v1.0 (by /u/OspraBot)"}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, headers=headers) as response:
+            if response.status != 200:
+                return {"error": f"HTTP {response.status}"}
+
+            data = await response.json()
+            posts = data.get("data", {}).get("children", [])
+
+            results = []
+            for post_wrapper in posts:
+                post = post_wrapper.get("data", {})
+                results.append({
+                    "title": post.get("title", ""),
+                    "score": post.get("score", 0),
+                    "num_comments": post.get("num_comments", 0),
+                    "stickied": post.get("stickied", False),
+                    "removed_by_category": post.get("removed_by_category"),
+                    "selftext": post.get("selftext", "")[:100] if post.get("selftext") else None
+                })
+
+            return {
+                "total_posts": len(posts),
+                "posts": results
+            }
+
+
 @app.get("/api/debug/reddit-raw")
 async def debug_reddit_raw(settings: Settings = Depends(get_settings)):
     """Debug endpoint to see raw Reddit posts BEFORE filtering."""
