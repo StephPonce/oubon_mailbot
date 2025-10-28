@@ -175,7 +175,7 @@ class MultiSourceDiscovery:
                         print(f"   ⚠️  {keyword}: {trend_score}/100 (below threshold)")
 
                     # Rate limit to avoid Google Trends throttling
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(0.5)  # Reduced from 2s to 0.5s for faster results
 
                 except Exception as e:
                     print(f"   ❌ {keyword} failed: {e}")

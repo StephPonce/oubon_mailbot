@@ -764,18 +764,25 @@
         // Discover All Niches (Multi-Niche Discovery)
         async function discoverAllNiches() {
             const grid = document.getElementById('product-grid');
-            grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1;"><div class="spinner"></div><p>🔥 Discovering products across 10+ niches in parallel...</p></div>';
+            grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1;"><div class="spinner"></div><p>🔥 Discovering products across 10 niches...</p><p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">This may take 30-60 seconds ⏱️</p></div>';
 
             try {
+                // Set a timeout for the request
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
                 const response = await fetch('/api/discover-multi', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         min_score: 5.0,  // 0-10 scale (becomes 50/100 for Google Trends)
-                        max_per_niche: 5,
-                        top_overall: 20
-                    })
+                        max_per_niche: 3,  // Reduced from 5 to 3 for faster results
+                        top_overall: 15     // Reduced from 20 to 15
+                    }),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 const data = await response.json();
 
