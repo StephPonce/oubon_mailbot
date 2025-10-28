@@ -633,11 +633,14 @@ async def debug_reddit_raw(settings: Settings = Depends(get_settings)):
     if not settings.REDDIT_CLIENT_ID or not settings.REDDIT_SECRET:
         return {"error": "Reddit credentials not configured"}
 
+    # Initialize Reddit in read-only mode (no user auth needed)
     reddit = praw.Reddit(
         client_id=settings.REDDIT_CLIENT_ID,
         client_secret=settings.REDDIT_SECRET,
-        user_agent="OspraOS Product Research Bot 1.0"
+        user_agent="web:OspraOS:v1.0 (by /u/OspraBot)",
+        check_for_async=False
     )
+    reddit.read_only = True
 
     result = {
         "reddit_auth": "success",

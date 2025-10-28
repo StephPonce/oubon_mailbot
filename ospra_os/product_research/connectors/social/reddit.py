@@ -25,7 +25,8 @@ class RedditConnector(BaseConnector):
         super().__init__(api_key=client_id)
         self.client_id = client_id
         self.client_secret = client_secret
-        self.user_agent = "OspraOS Product Research Bot 1.0"
+        # Use a more descriptive user agent (Reddit requires platform:app_name:version format)
+        self.user_agent = "web:OspraOS:v1.0 (by /u/OspraBot)"
 
     @property
     def name(self) -> str:
@@ -83,12 +84,14 @@ class RedditConnector(BaseConnector):
         time_filter = kwargs.get("time_filter", "month")
         limit = kwargs.get("limit", 25)
 
-        # Initialize Reddit client
+        # Initialize Reddit client in read-only mode (no user auth needed for public subs)
         reddit = praw.Reddit(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            user_agent=self.user_agent
+            user_agent=self.user_agent,
+            check_for_async=False  # We handle async ourselves
         )
+        reddit.read_only = True  # Enable read-only mode
 
         products = []
 
@@ -158,12 +161,14 @@ class RedditConnector(BaseConnector):
             print("⚠️  praw not installed. Run: pip install praw")
             return []
 
-        # Initialize Reddit client
+        # Initialize Reddit client in read-only mode (no user auth needed for public subs)
         reddit = praw.Reddit(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            user_agent=self.user_agent
+            user_agent=self.user_agent,
+            check_for_async=False  # We handle async ourselves
         )
+        reddit.read_only = True  # Enable read-only mode
 
         # Target subreddits based on category
         if category and category.lower() in ["smart home", "home automation", "iot"]:
@@ -237,11 +242,14 @@ class RedditConnector(BaseConnector):
             print("⚠️  praw not installed")
             return []
 
+        # Initialize Reddit client in read-only mode
         reddit = praw.Reddit(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            user_agent=self.user_agent
+            user_agent=self.user_agent,
+            check_for_async=False
         )
+        reddit.read_only = True
 
         products = []
 
