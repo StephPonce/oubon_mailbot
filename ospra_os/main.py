@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
 from pathlib import Path
+from typing import Optional, List
 
 # Gmail OAuth router (optional)
 try:
@@ -1080,8 +1081,8 @@ async def deploy_to_shopify(
     niche: str,
     score: float,
     trend_score: float = 50,
-    aliexpress_cost: float = None,
-    product_images: list = None,
+    aliexpress_cost: Optional[float] = None,
+    product_images: Optional[List[str]] = None,
     settings: Settings = Depends(get_settings)
 ):
     """
