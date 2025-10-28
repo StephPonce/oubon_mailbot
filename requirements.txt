@@ -19,3 +19,4 @@ pytrends
 aiosqlite
 pytz
 praw
+aiohttp
