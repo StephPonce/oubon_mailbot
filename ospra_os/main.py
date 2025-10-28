@@ -621,6 +621,114 @@ async def debug_reddit(settings: Settings = Depends(get_settings)):
     return result
 
 
+@app.get("/api/debug/reddit-raw")
+async def debug_reddit_raw(settings: Settings = Depends(get_settings)):
+    """Debug endpoint to see raw Reddit posts BEFORE filtering."""
+    try:
+        import praw
+        import asyncio
+    except ImportError:
+        return {"error": "praw not installed"}
+
+    if not settings.REDDIT_CLIENT_ID or not settings.REDDIT_SECRET:
+        return {"error": "Reddit credentials not configured"}
+
+    reddit = praw.Reddit(
+        client_id=settings.REDDIT_CLIENT_ID,
+        client_secret=settings.REDDIT_SECRET,
+        user_agent="OspraOS Product Research Bot 1.0"
+    )
+
+    result = {
+        "reddit_auth": "success",
+        "subreddit_tests": []
+    }
+
+    # Test r/smarthome
+    try:
+        subreddit = reddit.subreddit("smarthome")
+
+        # Get raw top posts
+        loop = asyncio.get_event_loop()
+        top_posts = await loop.run_in_executor(
+            None,
+            lambda: list(subreddit.top(time_filter="week", limit=10))
+        )
+
+        raw_posts = []
+        for post in top_posts:
+            raw_posts.append({
+                "title": post.title,
+                "score": post.score,
+                "num_comments": post.num_comments,
+                "upvote_ratio": post.upvote_ratio,
+                "stickied": post.stickied,
+                "removed_by_category": post.removed_by_category,
+                "selftext_preview": post.selftext[:100] if post.selftext else None,
+                "url": f"https://reddit.com{post.permalink}"
+            })
+
+        result["subreddit_tests"].append({
+            "subreddit": "smarthome",
+            "time_filter": "week",
+            "total_posts_fetched": len(top_posts),
+            "posts": raw_posts,
+            "filtered_count": {
+                "stickied": sum(1 for p in top_posts if p.stickied),
+                "removed": sum(1 for p in top_posts if p.removed_by_category),
+                "after_filters": len([p for p in top_posts if not p.stickied and not p.removed_by_category])
+            }
+        })
+    except Exception as e:
+        import traceback
+        result["subreddit_tests"].append({
+            "subreddit": "smarthome",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+    # Test r/shutupandtakemymoney
+    try:
+        subreddit = reddit.subreddit("shutupandtakemymoney")
+
+        loop = asyncio.get_event_loop()
+        top_posts = await loop.run_in_executor(
+            None,
+            lambda: list(subreddit.top(time_filter="week", limit=10))
+        )
+
+        raw_posts = []
+        for post in top_posts:
+            raw_posts.append({
+                "title": post.title,
+                "score": post.score,
+                "num_comments": post.num_comments,
+                "stickied": post.stickied,
+                "removed_by_category": post.removed_by_category
+            })
+
+        result["subreddit_tests"].append({
+            "subreddit": "shutupandtakemymoney",
+            "time_filter": "week",
+            "total_posts_fetched": len(top_posts),
+            "posts": raw_posts,
+            "filtered_count": {
+                "stickied": sum(1 for p in top_posts if p.stickied),
+                "removed": sum(1 for p in top_posts if p.removed_by_category),
+                "after_filters": len([p for p in top_posts if not p.stickied and not p.removed_by_category])
+            }
+        })
+    except Exception as e:
+        import traceback
+        result["subreddit_tests"].append({
+            "subreddit": "shutupandtakemymoney",
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+    return result
+
+
 @app.post("/api/discover-multi")
 async def discover_multi_niche(
     min_score: float = 7.0,
