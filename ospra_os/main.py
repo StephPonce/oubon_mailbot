@@ -180,7 +180,7 @@ async def get_dashboard_overview(settings: Settings = Depends(get_settings)):
         active_apis = {
             "gmail": GmailClient is not None,
             "openai": settings.OPENAI_API_KEY is not None,
-            "anthropic": settings.ANTHROPIC_API_KEY is not None,
+            "claude": settings.CLAUDE_API_KEY is not None,
             "reddit": settings.REDDIT_CLIENT_ID is not None,
             "google_trends": True,  # No API key needed
             "shopify": settings.SHOPIFY_STORE_DOMAIN is not None,
@@ -378,12 +378,12 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
             "health": "healthy" if openai_configured else "unavailable",
         })
 
-        # Anthropic
-        anthropic_configured = settings.ANTHROPIC_API_KEY is not None
+        # Claude (Anthropic)
+        claude_configured = settings.CLAUDE_API_KEY is not None
         status_checks.append({
-            "name": "Anthropic API",
-            "status": "connected" if anthropic_configured else "not_configured",
-            "health": "healthy" if anthropic_configured else "unavailable",
+            "name": "Claude API",
+            "status": "connected" if claude_configured else "not_configured",
+            "health": "healthy" if claude_configured else "unavailable",
         })
 
         # Reddit
