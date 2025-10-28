@@ -248,24 +248,33 @@ class RedditConnector(BaseConnector):
         products = []
 
         try:
+            print(f"🔍 Fetching r/{subreddit} - URL: {url}, params: {params}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, params=params, headers=headers) as response:
+                    print(f"📡 Response status: {response.status}")
                     if response.status != 200:
+                        resp_text = await response.text()
                         print(f"❌ Reddit API error for r/{subreddit}: HTTP {response.status}")
+                        print(f"Response: {resp_text[:200]}")
                         return []
 
                     data = await response.json()
                     posts = data.get("data", {}).get("children", [])
+                    print(f"📊 Received {len(posts)} posts from r/{subreddit}")
 
+                    filtered_stickied = 0
+                    filtered_removed = 0
                     for post_wrapper in posts:
                         post = post_wrapper.get("data", {})
 
                         # Skip stickied posts
                         if post.get("stickied", False):
+                            filtered_stickied += 1
                             continue
 
                         # Skip removed/deleted posts
                         if post.get("removed_by_category") or post.get("selftext") == "[removed]":
+                            filtered_removed += 1
                             continue
 
                         # Extract product info
@@ -291,6 +300,8 @@ class RedditConnector(BaseConnector):
                             tags=["reddit", f"top_{time_filter}"]
                         )
                         products.append(product)
+
+                    print(f"🔧 Filtered: {filtered_stickied} stickied, {filtered_removed} removed")
 
             print(f"✅ r/{subreddit}: Found {len(products)} top products")
             return products
