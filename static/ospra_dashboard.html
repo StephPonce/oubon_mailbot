@@ -695,6 +695,37 @@
                         <button class="btn btn-primary" onclick="discoverAllNiches()">🔍 Discover New Products</button>
                         <button class="btn btn-success" onclick="discoverAllNiches()" style="background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);">🔥 Discover All Niches</button>
                     </div>
+
+                    <!-- Sort & Filter Controls (New!) -->
+                    <div class="filter-group" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.2);">
+                        <select class="filter-input" id="sort-by" onchange="applySortAndFilter()">
+                            <option value="score-desc">Sort: Score (High → Low) ⭐</option>
+                            <option value="score-asc">Sort: Score (Low → High)</option>
+                            <option value="profit-desc">Sort: Net Profit (High → Low) 💰</option>
+                            <option value="profit-asc">Sort: Net Profit (Low → High)</option>
+                            <option value="margin-desc">Sort: Profit % (High → Low) 📈</option>
+                            <option value="margin-asc">Sort: Profit % (Low → High)</option>
+                            <option value="name-asc">Sort: Name (A → Z)</option>
+                            <option value="name-desc">Sort: Name (Z → A)</option>
+                        </select>
+
+                        <select class="filter-input" id="filter-priority" onchange="applySortAndFilter()">
+                            <option value="all">All Priorities</option>
+                            <option value="HIGH">HIGH Priority Only 🔥</option>
+                            <option value="MEDIUM">MEDIUM Priority Only ✅</option>
+                            <option value="LOW">LOW Priority Only ⚠️</option>
+                        </select>
+
+                        <select class="filter-input" id="filter-niche" onchange="applySortAndFilter()">
+                            <option value="all">All Niches</option>
+                            <option value="smart_lighting">💡 Smart Lighting</option>
+                            <option value="home_security">📹 Home Security</option>
+                            <option value="kitchen_tech">🍳 Kitchen Tech</option>
+                            <option value="cleaning_gadgets">🧹 Cleaning Gadgets</option>
+                            <option value="smart_home_hub">🏠 Smart Home Hub</option>
+                            <option value="climate_control">🌡️ Climate Control</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="product-grid" id="product-grid">
@@ -836,6 +867,112 @@
         </div>
     </div>
 
+    <!-- Product Sourcing Modal (NEW!) -->
+    <div id="sourcing-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2 class="modal-title">🛒 Source & Deploy Product</h2>
+                <button class="modal-close" onclick="closeSourcingModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Product Info Header -->
+                <div class="modal-section" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+                    <h3 style="margin: 0; color: white;" id="sourcing-product-name">Product Name</h3>
+                    <p style="margin: 0.5rem 0 0 0; opacity: 0.9;" id="sourcing-product-details">Score: 0/10 | Priority: LOW</p>
+                </div>
+
+                <!-- Step 1: Find Product -->
+                <div class="modal-section">
+                    <h3>📍 Step 1: Find Product on AliExpress</h3>
+                    <p style="color: #666; margin-bottom: 1rem;">
+                        Click below to search for this exact product on AliExpress with quality filters applied.
+                    </p>
+                    <button class="btn btn-primary" id="sourcing-search-btn" style="width: 100%;">
+                        🔍 Search AliExpress (Opens in New Tab)
+                    </button>
+                </div>
+
+                <!-- Step 2: Import Product -->
+                <div class="modal-section">
+                    <h3>📋 Step 2: Paste AliExpress Product URL</h3>
+                    <p style="color: #666; margin-bottom: 1rem;">
+                        Copy the URL from the AliExpress product page and paste it here.
+                    </p>
+                    <input type="url" id="sourcing-url-input" class="filter-input" placeholder="https://www.aliexpress.com/item/..." style="width: 100%; margin-bottom: 0.75rem;">
+                    <button class="btn btn-secondary" onclick="importAliExpressProduct()" style="width: 100%;">
+                        ⬇️ Import Product Details
+                    </button>
+                    <div id="sourcing-import-status" style="margin-top: 0.75rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+                </div>
+
+                <!-- Step 3: Review & Customize -->
+                <div class="modal-section" id="sourcing-review-section" style="display: none;">
+                    <h3>✏️ Step 3: Review & Customize</h3>
+
+                    <!-- Imported Product Preview -->
+                    <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; color: #667eea;">Imported Product:</h4>
+                        <div style="display: grid; grid-template-columns: 100px 1fr; gap: 1rem;">
+                            <img id="sourcing-product-image" src="" alt="Product" style="width: 100px; height: 100px; object-fit: cover; border-radius: 6px;">
+                            <div>
+                                <p style="margin: 0 0 0.5rem 0; font-weight: 600;" id="sourcing-ali-title">Product Title</p>
+                                <p style="margin: 0; color: #666; font-size: 0.9rem;">
+                                    <span id="sourcing-ali-rating">★★★★☆</span> |
+                                    <span id="sourcing-ali-orders">0 orders</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Inputs -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">AliExpress Cost ($)</label>
+                            <input type="number" id="sourcing-cost-input" class="filter-input" placeholder="0.00" step="0.01" min="0" style="width: 100%;" oninput="calculateSourcingProfit()">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Shopify Selling Price ($)</label>
+                            <input type="number" id="sourcing-price-input" class="filter-input" placeholder="0.00" step="0.01" min="0" style="width: 100%;" oninput="calculateSourcingProfit()">
+                        </div>
+                    </div>
+
+                    <!-- Real-Time Profit Calculator -->
+                    <div class="profit-breakdown">
+                        <div class="profit-row">
+                            <span>AliExpress Cost:</span>
+                            <span id="sourcing-calc-cost">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>Shopify Selling Price:</span>
+                            <span id="sourcing-calc-price">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>Shopify Fees (2.9% + $0.30):</span>
+                            <span id="sourcing-calc-fees">$0.00</span>
+                        </div>
+                        <div class="profit-row">
+                            <span>💰 Net Profit:</span>
+                            <span id="sourcing-calc-profit">$0.00</span>
+                        </div>
+                    </div>
+                    <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                        Profit Margin: <strong id="sourcing-calc-margin">0%</strong>
+                    </p>
+                </div>
+
+                <!-- Actions -->
+                <div class="product-actions" style="margin-top: 2rem;">
+                    <button class="btn btn-secondary" onclick="closeSourcingModal()" style="flex: 1;">
+                        Cancel
+                    </button>
+                    <button class="btn btn-success" id="sourcing-deploy-btn" onclick="deploySourcedProduct()" style="flex: 2;" disabled>
+                        🚀 Deploy to Shopify
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bulk Actions Toolbar -->
     <div id="bulk-toolbar" class="bulk-toolbar">
         <span class="bulk-count" id="bulk-count">0 selected</span>
@@ -848,6 +985,62 @@
     </div>
 
     <script>
+        // Global product storage for sorting/filtering
+        let allProducts = [];
+
+        // Apply Sort & Filter
+        function applySortAndFilter() {
+            if (allProducts.length === 0) {
+                console.log('No products to sort/filter');
+                return;
+            }
+
+            // Get filter values
+            const sortBy = document.getElementById('sort-by').value;
+            const priorityFilter = document.getElementById('filter-priority').value;
+            const nicheFilter = document.getElementById('filter-niche').value;
+
+            // Step 1: Filter products
+            let filtered = [...allProducts];
+
+            if (priorityFilter !== 'all') {
+                filtered = filtered.filter(p => p.priority === priorityFilter);
+            }
+
+            if (nicheFilter !== 'all') {
+                filtered = filtered.filter(p => p.niche === nicheFilter);
+            }
+
+            // Step 2: Sort products
+            filtered.sort((a, b) => {
+                switch(sortBy) {
+                    case 'score-desc':
+                        return b.score - a.score;
+                    case 'score-asc':
+                        return a.score - b.score;
+                    case 'profit-desc':
+                        return (b.net_profit || 0) - (a.net_profit || 0);
+                    case 'profit-asc':
+                        return (a.net_profit || 0) - (b.net_profit || 0);
+                    case 'margin-desc':
+                        return (b.profit_margin || 0) - (a.profit_margin || 0);
+                    case 'margin-asc':
+                        return (a.profit_margin || 0) - (b.profit_margin || 0);
+                    case 'name-asc':
+                        return a.name.localeCompare(b.name);
+                    case 'name-desc':
+                        return b.name.localeCompare(a.name);
+                    default:
+                        return 0;
+                }
+            });
+
+            // Step 3: Render filtered & sorted products
+            renderProducts(filtered);
+
+            console.log(`Applied filters - Showing ${filtered.length}/${allProducts.length} products`);
+        }
+
         // Tab Navigation
         document.querySelectorAll('.nav-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -1105,8 +1298,13 @@
                         <p>Try lowering the minimum score threshold</p>
                     </div>
                 `;
+                allProducts = []; // Clear products when none found
                 return;
             }
+
+            // Store products globally for sorting/filtering
+            allProducts = data.top_overall || [];
+            console.log(`Stored ${allProducts.length} products for sorting/filtering`);
 
             // Build HTML: Top Overall + By Niche sections
             let html = '';
@@ -1250,15 +1448,10 @@
                             </div>
                         </div>
                         <div class="product-actions">
-                            <button class="btn btn-secondary"
-                                    onclick="window.open(buildAliExpressSearchUrl({name: '${name}', niche: '${niche}'}), '_blank')"
-                                    style="flex: 1;">
-                                🔍 ${isRealPrice ? 'View on' : 'Find on'} AliExpress
-                            </button>
                             <button id="${buttonId}" class="btn btn-success"
-                                    onclick='showPreviewModal(${JSON.stringify({name, niche, score, trend_score: trendScore, ali_cost: aliExpressCost}).replace(/'/g, "\\'")})'
-                                    style="flex: 1;">
-                                👁️ Preview & Deploy
+                                    onclick='openSourcingModal(${JSON.stringify({name, niche, score, priority, trend_score: trendScore, ali_cost: aliExpressCost, net_profit: netProfit, profit_margin: profitMargin}).replace(/'/g, "\\'")})'
+                                    style="width: 100%;">
+                                🛒 Source & Deploy
                             </button>
                         </div>
                     </div>
@@ -1436,6 +1629,187 @@
             document.getElementById('preview-modal')?.addEventListener('click', (e) => {
                 if (e.target.id === 'preview-modal') {
                     closePreviewModal();
+                }
+            });
+        }, 100);
+
+        // === PRODUCT SOURCING MODAL FUNCTIONS (NEW!) ===
+
+        let currentSourcingProduct = null;
+
+        function openSourcingModal(product) {
+            currentSourcingProduct = product;
+
+            // Populate product info
+            document.getElementById('sourcing-product-name').textContent = product.name;
+            document.getElementById('sourcing-product-details').textContent =
+                `Score: ${product.score}/10 | Priority: ${product.priority} | Niche: ${product.niche}`;
+
+            // Set up search button
+            const searchBtn = document.getElementById('sourcing-search-btn');
+            searchBtn.onclick = () => {
+                const searchUrl = buildAliExpressSearchUrl(product);
+                window.open(searchUrl, '_blank');
+            };
+
+            // Reset form
+            document.getElementById('sourcing-url-input').value = '';
+            document.getElementById('sourcing-import-status').style.display = 'none';
+            document.getElementById('sourcing-review-section').style.display = 'none';
+            document.getElementById('sourcing-deploy-btn').disabled = true;
+
+            // Show modal
+            document.getElementById('sourcing-modal').classList.add('active');
+        }
+
+        function closeSourcingModal() {
+            document.getElementById('sourcing-modal').classList.remove('active');
+            currentSourcingProduct = null;
+        }
+
+        async function importAliExpressProduct() {
+            const urlInput = document.getElementById('sourcing-url-input');
+            const statusDiv = document.getElementById('sourcing-import-status');
+            const reviewSection = document.getElementById('sourcing-review-section');
+
+            const url = urlInput.value.trim();
+
+            if (!url) {
+                statusDiv.style.display = 'block';
+                statusDiv.style.background = '#fff3cd';
+                statusDiv.style.color = '#856404';
+                statusDiv.textContent = '⚠️ Please enter an AliExpress product URL';
+                return;
+            }
+
+            // Show loading
+            statusDiv.style.display = 'block';
+            statusDiv.style.background = '#cfe2ff';
+            statusDiv.style.color = '#084298';
+            statusDiv.textContent = '⏳ Importing product details...';
+
+            try {
+                const response = await fetch('/api/scrape-aliexpress-product', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.product) {
+                    // Success! Show imported product
+                    statusDiv.style.background = '#d1e7dd';
+                    statusDiv.style.color = '#0f5132';
+                    statusDiv.textContent = '✅ Product imported successfully!';
+
+                    // Populate review section
+                    document.getElementById('sourcing-product-image').src = data.product.image;
+                    document.getElementById('sourcing-ali-title').textContent = data.product.title;
+                    document.getElementById('sourcing-ali-rating').textContent = '★'.repeat(Math.floor(data.product.rating)) + '☆'.repeat(5 - Math.floor(data.product.rating));
+                    document.getElementById('sourcing-ali-orders').textContent = `${data.product.orders.toLocaleString()} orders`;
+
+                    // Pre-fill pricing (cost from AliExpress, suggested 2.5x markup)
+                    document.getElementById('sourcing-cost-input').value = data.product.price.toFixed(2);
+                    document.getElementById('sourcing-price-input').value = (data.product.price * 2.5).toFixed(2);
+
+                    // Calculate profit
+                    calculateSourcingProfit();
+
+                    // Show review section
+                    reviewSection.style.display = 'block';
+
+                    // Enable deploy button
+                    document.getElementById('sourcing-deploy-btn').disabled = false;
+
+                } else {
+                    // Manual entry required (OAuth pending)
+                    statusDiv.style.background = '#fff3cd';
+                    statusDiv.style.color = '#856404';
+                    statusDiv.innerHTML = `
+                        ⚠️ ${data.error || 'Auto-import not available yet'}<br>
+                        <small style="display: block; margin-top: 0.5rem;">
+                            ${data.message || 'Please enter product details manually for now.'}
+                        </small>
+                    `;
+
+                    // Show manual entry section
+                    reviewSection.style.display = 'block';
+                    document.getElementById('sourcing-product-image').src = '';
+                    document.getElementById('sourcing-ali-title').textContent = 'Manual Entry Required';
+                    document.getElementById('sourcing-ali-rating').textContent = 'No rating';
+                    document.getElementById('sourcing-ali-orders').textContent = 'Unknown orders';
+
+                    // Enable manual pricing
+                    document.getElementById('sourcing-cost-input').value = '';
+                    document.getElementById('sourcing-price-input').value = '';
+
+                    // Require user to enter prices before deploying
+                    document.getElementById('sourcing-deploy-btn').disabled = false;
+                }
+
+            } catch (error) {
+                statusDiv.style.background = '#f8d7da';
+                statusDiv.style.color = '#842029';
+                statusDiv.textContent = `❌ Import failed: ${error.message}`;
+                console.error('Import error:', error);
+            }
+        }
+
+        function calculateSourcingProfit() {
+            const cost = parseFloat(document.getElementById('sourcing-cost-input').value) || 0;
+            const price = parseFloat(document.getElementById('sourcing-price-input').value) || 0;
+
+            const shopifyFees = price * 0.029 + 0.30; // 2.9% + $0.30
+            const netProfit = price - cost - shopifyFees;
+            const profitMargin = price > 0 ? ((netProfit / price) * 100) : 0;
+
+            // Update display
+            document.getElementById('sourcing-calc-cost').textContent = `$${cost.toFixed(2)}`;
+            document.getElementById('sourcing-calc-price').textContent = `$${price.toFixed(2)}`;
+            document.getElementById('sourcing-calc-fees').textContent = `$${shopifyFees.toFixed(2)}`;
+            document.getElementById('sourcing-calc-profit').textContent = `$${netProfit.toFixed(2)}`;
+            document.getElementById('sourcing-calc-margin').textContent = `${profitMargin.toFixed(1)}%`;
+
+            // Color code profit
+            const profitSpan = document.getElementById('sourcing-calc-profit');
+            if (netProfit > 0) {
+                profitSpan.style.color = '#28a745';
+            } else {
+                profitSpan.style.color = '#dc3545';
+            }
+        }
+
+        function deploySourcedProduct() {
+            if (!currentSourcingProduct) return;
+
+            const cost = parseFloat(document.getElementById('sourcing-cost-input').value) || 0;
+            const price = parseFloat(document.getElementById('sourcing-price-input').value) || 0;
+
+            if (cost === 0 || price === 0) {
+                alert('Please enter both cost and selling price');
+                return;
+            }
+
+            // Create product data for deployment
+            const productData = {
+                ...currentSourcingProduct,
+                aliexpress_url: document.getElementById('sourcing-url-input').value,
+                aliexpress_cost: cost,
+                selling_price: price,
+                sourced_manually: true
+            };
+
+            // Close modal and deploy
+            closeSourcingModal();
+            deployToShopify(productData);
+        }
+
+        // Close sourcing modal when clicking outside
+        setTimeout(() => {
+            document.getElementById('sourcing-modal')?.addEventListener('click', (e) => {
+                if (e.target.id === 'sourcing-modal') {
+                    closeSourcingModal();
                 }
             });
         }, 100);
