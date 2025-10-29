@@ -1,4 +1,5 @@
 {
+  "name": "Home",
   "sections": {
     "hero": {
       "type": "hero",

@@ -1,4 +1,5 @@
 {
+  "name": "Search",
   "sections": {
     "main": {
       "type": "main-search",

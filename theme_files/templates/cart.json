@@ -1,4 +1,5 @@
 {
+  "name": "Cart",
   "sections": {
     "cart-items": {
       "type": "main-cart",
