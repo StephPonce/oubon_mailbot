@@ -1376,6 +1376,94 @@ async def get_intelligence_stats():
         }
 
 
+# ---------------------------------------------------------------
+# Claude AI Chat API for Dashboard Insights
+# ---------------------------------------------------------------
+class ChatRequest(BaseModel):
+    message: str
+    dashboard_context: Optional[Dict] = None
+
+
+@app.post("/api/claude/chat")
+async def claude_chat(request: ChatRequest):
+    """
+    Chat with Claude AI about dashboard metrics and business insights
+
+    Provides:
+    - Product recommendations
+    - Market analysis
+    - Performance summaries
+    - Strategic suggestions
+    """
+    import os
+    from anthropic import Anthropic
+
+    try:
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if not api_key:
+            return {
+                'success': False,
+                'error': 'Claude AI not configured. Please add ANTHROPIC_API_KEY to environment variables.'
+            }
+
+        claude = Anthropic(api_key=api_key)
+
+        # Build context-aware prompt
+        context_str = ""
+        if request.dashboard_context:
+            ctx = request.dashboard_context
+            context_str = f"""
+Current Dashboard Data:
+- Total Products Discovered: {ctx.get('total_products', 0)}
+- HIGH Priority Products: {ctx.get('high_priority', 0)}
+- MEDIUM Priority Products: {ctx.get('medium_priority', 0)}
+- Niches Analyzed: {ctx.get('niches_searched', 0)}
+- Top Product Score: {ctx.get('top_score', 'N/A')}/10
+- Average Profit Margin: {ctx.get('avg_profit_margin', 'N/A')}%
+
+Recent Products:
+{chr(10).join(f"- {p['name']}: Score {p['score']}/10, Profit ${p.get('profit', 0)}" for p in ctx.get('products', [])[:5])}
+"""
+
+        system_prompt = f"""You are an expert e-commerce consultant for Oubon Shop, a dropshipping business.
+
+Your role:
+- Analyze product performance metrics
+- Provide actionable business insights
+- Suggest winning products to sell
+- Explain market trends and opportunities
+- Give pricing and profit optimization advice
+
+{context_str}
+
+Be concise, actionable, and data-driven. Format responses with bullet points and emojis for readability."""
+
+        # Call Claude API
+        response = claude.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1024,
+            system=system_prompt,
+            messages=[{
+                "role": "user",
+                "content": request.message
+            }]
+        )
+
+        return {
+            'success': True,
+            'message': response.content[0].text,
+            'model': 'claude-3-5-sonnet-20241022'
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+
+
 # Mount static files (must be last)
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
