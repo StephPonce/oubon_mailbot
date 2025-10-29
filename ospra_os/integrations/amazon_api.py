@@ -161,15 +161,16 @@ class AmazonAPI:
             review_variation = random.uniform(0.7, 1.3)
             rating_variation = random.uniform(-0.2, 0.1)
 
+            asin = f'B0{random.randint(10000000, 99999999)}'
             products.append({
-                'asin': f'B0{random.randint(10000000, 99999999)}',
+                'asin': asin,
                 'title': template['title'],
                 'price': round(template['base_price'] * price_variation, 2),
                 'rating': round(min(5.0, max(3.0, template['base_rating'] + rating_variation)), 1),
                 'review_count': int(template['base_reviews'] * review_variation),
                 'best_seller_rank': int(template['base_bsr'] * random.uniform(0.8, 1.2)),
                 'image_url': f"https://m.media-amazon.com/images/I/{random.choice(['71', '81', '91'])}{random.choice(['A', 'B', 'C'])}{random.randint(100000, 999999)}.jpg",
-                'url': f"https://www.amazon.com/dp/B0{random.randint(10000000, 99999999)}?tag={self.partner_tag}",
+                'url': f"https://www.amazon.com/dp/{asin}?tag={self.partner_tag}",
                 'category': category
             })
 
