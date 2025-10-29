@@ -1347,41 +1347,42 @@
                 html += renderProductCard(item);
             });
 
-            // By Niche Sections
-            html += `<div style="grid-column: 1 / -1; margin-top: 3rem; margin-bottom: 1rem;">
-                <h2 style="color: white;">📊 Products by Niche</h2>
-            </div>`;
+            // By Niche Sections (only if data exists)
+            if (data.by_niche) {
+                html += `<div style="grid-column: 1 / -1; margin-top: 3rem; margin-bottom: 1rem;">
+                    <h2 style="color: white;">📊 Products by Niche</h2>
+                </div>`;
 
-            const nicheNames = {
-                'smart_lighting': '💡 Smart Lighting',
-                'home_security': '🔒 Home Security',
-                'cleaning_gadgets': '🧹 Cleaning Gadgets',
-                'kitchen_tech': '🍳 Kitchen Tech',
-                'fitness_gadgets': '💪 Fitness Gadgets',
-                'phone_accessories': '📱 Phone Accessories',
-                'car_accessories': '🚗 Car Accessories',
-                'pet_products': '🐾 Pet Products',
-                'gaming_accessories': '🎮 Gaming Accessories',
-                'outdoor_gear': '🏕️ Outdoor Gear'
-            };
+                const nicheNames = {
+                    'smart_lighting': '💡 Smart Lighting',
+                    'home_security': '🔒 Home Security',
+                    'cleaning_gadgets': '🧹 Cleaning Gadgets',
+                    'kitchen_tech': '🍳 Kitchen Tech',
+                    'fitness_gadgets': '💪 Fitness Gadgets',
+                    'phone_accessories': '📱 Phone Accessories',
+                    'car_accessories': '🚗 Car Accessories',
+                    'pet_products': '🐾 Pet Products',
+                    'gaming_accessories': '🎮 Gaming Accessories',
+                    'outdoor_gear': '🏕️ Outdoor Gear'
+                };
+                Object.entries(data.by_niche).forEach(([nicheKey, products]) => {
+                    if (products.length === 0) return;
 
-            Object.entries(data.by_niche).forEach(([nicheKey, products]) => {
-                if (products.length === 0) return;
+                    const nicheName = nicheNames[nicheKey] || nicheKey;
 
-                const nicheName = nicheNames[nicheKey] || nicheKey;
+                    html += `
+                        <div style="grid-column: 1 / -1; margin-top: 2rem;">
+                            <h3 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                                ${nicheName} (${products.length} products)
+                            </h3>
+                        </div>
+                    `;
 
-                html += `
-                    <div style="grid-column: 1 / -1; margin-top: 2rem;">
-                        <h3 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; margin-bottom: 1rem;">
-                            ${nicheName} (${products.length} products)
-                        </h3>
-                    </div>
-                `;
-
-                products.forEach(item => {
-                    html += renderProductCard(item);
+                    products.forEach(item => {
+                        html += renderProductCard(item);
+                    });
                 });
-            });
+            }
 
             grid.innerHTML = html;
         }
