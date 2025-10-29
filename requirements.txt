@@ -22,6 +22,6 @@ praw
 aiohttp
 
 # Ospra OS Intelligence System
-pillow>=10.1.0
-imagehash>=4.3.1
+# pillow>=10.1.0  # Optional - for image processing (slow to install)
+# imagehash>=4.3.1  # Optional - for image comparison
 boto3>=1.34.0
