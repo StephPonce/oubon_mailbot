@@ -51,7 +51,7 @@ async def startup_event():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "2025-10-29-18:40", "commit": "b8fa638"}
 
 @app.get("/debug/intelligence")
 async def debug_intelligence():
