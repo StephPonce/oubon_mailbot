@@ -1291,6 +1291,82 @@ async def optimize_product_price(
         }
 
 
+# ---------------------------------------------------------------
+# Product Intelligence API Endpoints
+# ---------------------------------------------------------------
+class DiscoverRequest(BaseModel):
+    niches: Optional[List[str]] = None
+    max_per_niche: int = 5
+
+
+@app.post("/api/intelligence/discover")
+async def discover_winning_products(request: DiscoverRequest):
+    """
+    Discover winning products using multi-platform intelligence engine
+
+    Returns products with:
+    - Cross-platform data (Amazon, AliExpress, social media)
+    - Comprehensive grading (0-10 scale)
+    - AI-generated explanations
+    - Exact supplier links
+    - Profit calculations
+    """
+    try:
+        from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
+
+        engine = ProductIntelligenceEngine()
+        products = await engine.discover_winning_products(
+            niches=request.niches,
+            max_per_niche=request.max_per_niche
+        )
+
+        return {
+            'success': True,
+            'products': products,
+            'count': len(products),
+            'niches_searched': request.niches or ['smart home', 'tech gadgets', 'home & kitchen']
+        }
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+
+
+@app.get("/api/intelligence/stats")
+async def get_intelligence_stats():
+    """Get intelligence engine statistics"""
+    import os
+    try:
+        from ospra_os.scraping.proxy_manager import proxy_manager
+
+        proxy_stats = proxy_manager.get_stats()
+
+        return {
+            'success': True,
+            'stats': {
+                'proxy_manager': proxy_stats,
+                'apis_configured': {
+                    'amazon': bool(os.getenv('AMAZON_ACCESS_KEY')),
+                    'aliexpress': bool(os.getenv('ALIEXPRESS_APP_KEY')),
+                    'instagram': bool(os.getenv('INSTAGRAM_ACCESS_TOKEN')),
+                    'tiktok': bool(os.getenv('TIKTOK_API_KEY')),
+                    'twitter': bool(os.getenv('TWITTER_BEARER_TOKEN')),
+                    'claude': bool(os.getenv('ANTHROPIC_API_KEY')),
+                    'scraper_api': bool(os.getenv('SCRAPERAPI_KEY'))
+                }
+            }
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
 # Mount static files (must be last)
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
