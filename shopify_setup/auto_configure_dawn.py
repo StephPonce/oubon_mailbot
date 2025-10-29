@@ -8,7 +8,6 @@ import json
 import logging
 from typing import Dict, Optional, List
 from pathlib import Path
-import shopify
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +62,11 @@ class DawnThemeConfigurator:
 
     def _init_shopify(self):
         """Initialize Shopify API session"""
+        try:
+            import shopify
+        except ImportError:
+            raise ImportError("ShopifyAPI not installed. Run: pip install ShopifyAPI")
+
         api_version = '2024-01'
         session = shopify.Session(self.shop_url, api_version, self.access_token)
         shopify.ShopifyResource.activate_session(session)

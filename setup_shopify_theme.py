@@ -10,7 +10,6 @@ import sys
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional
-import shopify
 from dotenv import load_dotenv
 
 # Add project root to path
@@ -64,6 +63,11 @@ class ShopifyStoreSetup:
 
     def _init_shopify(self):
         """Initialize Shopify API"""
+        try:
+            import shopify
+        except ImportError:
+            raise ImportError("ShopifyAPI not installed. Run: pip install ShopifyAPI")
+
         session = shopify.Session(self.shop_url, self.api_version, self.access_token)
         shopify.ShopifyResource.activate_session(session)
         logger.info(f"✅ Connected to Shopify: {self.shop_url}")
