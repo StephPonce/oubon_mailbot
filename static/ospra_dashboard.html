@@ -1203,15 +1203,23 @@
             const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
             const isFavorited = favorites.includes(name);
 
+            // Get product image URL
+            const imageUrl = product.aliexpress_image || getProductImageUrl(name, niche);
+
             return `
-                <div class="product-card" data-product-id="${productId}" data-product-name="${name}">
+                <div class="product-card" data-product-id="${productId}" data-product-name="${name}" style="border-radius: 12px; overflow: hidden;">
                     <input type="checkbox" class="bulk-checkbox" id="${checkboxId}"
                            onchange="updateBulkToolbar()" data-product='${JSON.stringify({name, niche, score, trend_score: trendScore}).replace(/'/g, "\\'")}'>
                     <button class="favorite-btn ${isFavorited ? 'active' : ''}" id="${favoriteId}"
                             onclick="toggleFavorite('${name.replace(/'/g, "\\'")}', '${favoriteId}')">
                         ${isFavorited ? '⭐' : '☆'}
                     </button>
-                    <div class="product-header">
+                    <img src="${imageUrl}"
+                         alt="${name}"
+                         class="product-image"
+                         style="width: 100%; height: 220px; object-fit: cover; display: block;"
+                         onerror="this.src='https://via.placeholder.com/400x300/6366f1/ffffff?text=Product+Image'">
+                    <div class="product-header" style="padding: 1.5rem;">
                         <div class="product-name">${name}</div>
                         <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
                     </div>
@@ -1245,12 +1253,12 @@
                                 <span>$${netProfit.toFixed(2)} (${profitMargin}%)</span>
                             </div>
                         </div>
-                        ${product.aliexpress_image ? `<img src="${product.aliexpress_image}" alt="${name}" style="width: 100%; border-radius: 8px; margin: 0.75rem 0;">` : ''}
                         <div class="product-actions">
-                            <a href="${product.aliexpress_url || `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(name)}`}"
-                               target="_blank" class="btn btn-secondary" style="flex: 1;">
-                                🔍 ${isRealPrice ? 'View on' : 'Search'} AliExpress
-                            </a>
+                            <button class="btn btn-secondary"
+                                    onclick="window.open(buildAliExpressSearchUrl({name: '${name}', niche: '${niche}'}), '_blank')"
+                                    style="flex: 1;">
+                                🔍 ${isRealPrice ? 'View on' : 'Find on'} AliExpress
+                            </button>
                             <button id="${buttonId}" class="btn btn-success"
                                     onclick='showPreviewModal(${JSON.stringify({name, niche, score, trend_score: trendScore, ali_cost: aliExpressCost}).replace(/'/g, "\\'")})'
                                     style="flex: 1;">
@@ -1455,6 +1463,77 @@
             }
 
             localStorage.setItem('favorites', JSON.stringify(favorites));
+        }
+
+        // Product Image Generator
+        function getProductImageUrl(productName, niche) {
+            // Use Unsplash for high-quality product images
+            const searchTerms = {
+                'smart_lighting': 'led+strip+lights',
+                'home_security': 'security+camera',
+                'kitchen_tech': 'kitchen+appliance',
+                'cleaning_gadgets': 'robot+vacuum',
+                'smart_home_hub': 'smart+speaker',
+                'climate_control': 'smart+thermostat'
+            };
+
+            const searchTerm = searchTerms[niche] || productName.toLowerCase().replace(/ /g, '+');
+
+            // Use Unsplash API for real product-like images
+            return `https://source.unsplash.com/400x300/?${searchTerm},product`;
+        }
+
+        // Smart AliExpress Search URL Builder
+        function buildAliExpressSearchUrl(product) {
+            const baseUrl = 'https://www.aliexpress.us/w/wholesale-';
+
+            // Build search query with product specs
+            let searchQuery = product.name;
+
+            // Add quality keywords for better results
+            const qualityKeywords = {
+                'led': ' rgb remote control',
+                'strip lights': ' 50ft app control',
+                'smart bulbs': ' alexa compatible e26',
+                'security camera': ' 1080p night vision wifi',
+                'doorbell camera': ' wireless motion detection',
+                'smart lock': ' fingerprint keyless',
+                'robot vacuum': ' mapping app control',
+                'air fryer': ' digital large capacity',
+                'instant pot': ' 6 quart stainless steel',
+                'smart speaker': ' alexa google assistant',
+                'google home': ' voice assistant smart',
+                'alexa echo': ' smart speaker voice',
+                'smart thermostat': ' wifi programmable',
+                'humidifier': ' ultrasonic large capacity',
+                'dehumidifier': ' quiet energy efficient',
+                'tower fan': ' oscillating remote control'
+            };
+
+            // Enhance search with specifications
+            const productLower = product.name.toLowerCase();
+            for (const [key, specs] of Object.entries(qualityKeywords)) {
+                if (productLower.includes(key)) {
+                    searchQuery += specs;
+                    break;
+                }
+            }
+
+            // URL encode and build final URL
+            const encodedQuery = searchQuery.replace(/ /g, '-').toLowerCase();
+
+            // Add filters for quality products
+            const filters = [
+                'CatId=0',
+                'g=y',
+                'sortType=total_tranpro_desc',
+                'minPrice=5',
+                'maxPrice=50',
+                'shipFromCountry=CN',
+                'isrefine=y'
+            ];
+
+            return `${baseUrl}${encodedQuery}.html?${filters.join('&')}`;
         }
 
         // Bulk Selection Functions

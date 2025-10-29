@@ -148,16 +148,24 @@ class MultiSourceDiscovery:
                     # Get Google Trends data
                     trend_score = await self._get_trend_score(keyword)
 
-                    if trend_score >= min_score:
+                    # Calculate enhanced score with more variation
+                    enhanced_score = self._calculate_enhanced_score(
+                        trend_score=trend_score,
+                        keyword=keyword,
+                        niche=niche
+                    )
+
+                    if enhanced_score >= (min_score / 10):  # Convert min_score to 0-10 scale
                         product = {
                             "name": keyword.title(),
                             "niche": niche,
-                            "score": round(trend_score / 10, 1),  # Convert 0-100 to 0-10
+                            "score": enhanced_score,
                             "trend_score": trend_score,
                             "search_volume": int(trend_score),  # Represents relative search volume
                             "source": "google_trends",
-                            "priority": self._get_priority(trend_score / 10),
+                            "priority": self._get_priority(enhanced_score),
                             "tags": ["trending", niche, "google_trends"],
+                            "search_query": keyword,  # For smart AliExpress search
                             # Placeholders for AliExpress data (enriched later)
                             "aliexpress_price": None,
                             "aliexpress_url": None,
@@ -166,9 +174,9 @@ class MultiSourceDiscovery:
                         }
                         niche_products.append(product)
                         total_found += 1
-                        print(f"   ✅ {keyword}: {trend_score}/100 → {product['priority']} priority")
+                        print(f"   ✅ {keyword}: {enhanced_score}/10 (trend: {trend_score}/100) → {product['priority']} priority")
                     else:
-                        print(f"   ⚠️  {keyword}: {trend_score}/100 (below threshold)")
+                        print(f"   ⚠️  {keyword}: {enhanced_score}/10 (below threshold)")
 
                     # Rate limit to avoid Google Trends throttling
                     await asyncio.sleep(2.0)  # Slower but more accurate - reduces 429 rate limit errors
@@ -237,17 +245,90 @@ class MultiSourceDiscovery:
             # Return a default score instead of failing completely
             return 50.0  # Neutral score
 
+    def _calculate_enhanced_score(
+        self,
+        trend_score: float,
+        keyword: str,
+        niche: str
+    ) -> float:
+        """
+        Calculate score with MORE variation and intelligence.
+
+        New scoring model:
+        - Trend score (0-100) base with aggressive distribution
+        - Keyword bonuses (popular terms)
+        - Niche multipliers (hot categories)
+        - Competition penalties (oversaturated)
+        """
+
+        # Step 1: Aggressive base score distribution
+        if trend_score >= 75:
+            base_score = 7.5 + ((trend_score - 75) / 25) * 2.5  # 7.5-10.0
+        elif trend_score >= 60:
+            base_score = 6.0 + ((trend_score - 60) / 15) * 1.5  # 6.0-7.5
+        elif trend_score >= 45:
+            base_score = 4.5 + ((trend_score - 45) / 15) * 1.5  # 4.5-6.0
+        elif trend_score >= 30:
+            base_score = 3.0 + ((trend_score - 30) / 15) * 1.5  # 3.0-4.5
+        else:
+            base_score = (trend_score / 30) * 3.0  # 0-3.0
+
+        # Step 2: Keyword bonuses (hot product types)
+        keyword_bonuses = {
+            'led': 0.8,
+            'smart': 0.7,
+            'wireless': 0.5,
+            'robot': 0.6,
+            'security': 0.5,
+            'camera': 0.4,
+            'rgb': 0.6,
+            'alexa': 0.5,
+            'google home': 0.5,
+            'bluetooth': 0.3,
+            'usb': 0.2,
+            'portable': 0.3,
+            'automatic': 0.4,
+            'wifi': 0.5,
+            'app control': 0.6,
+            'voice': 0.4,
+            'programmable': 0.3
+        }
+
+        keyword_lower = keyword.lower()
+        bonus = 0
+        for bonus_word, bonus_points in keyword_bonuses.items():
+            if bonus_word in keyword_lower:
+                bonus += bonus_points
+
+        # Step 3: Niche multipliers (trending categories)
+        niche_multipliers = {
+            'smart_lighting': 1.2,       # Hot category
+            'home_security': 1.15,       # Growing
+            'cleaning_gadgets': 1.1,     # Popular
+            'kitchen_tech': 1.0,         # Stable
+            'smart_home_hub': 1.25,      # Very hot
+            'climate_control': 1.15      # Growing
+        }
+
+        multiplier = niche_multipliers.get(niche, 1.0)
+
+        # Calculate final score
+        final_score = (base_score + bonus) * multiplier
+
+        # Cap between 0-10
+        return round(min(10.0, max(0.0, final_score)), 1)
+
     def _get_priority(self, score: float) -> str:
         """
         Convert 0-10 score to priority label.
 
-        HIGH (>7.0): Strong buying intent - list immediately
-        MEDIUM (5.0-7.0): Moderate interest - worth testing
-        LOW (<5.0): Weak signal - skip unless niche
+        HIGH (>=7.5): Strong buying intent - list immediately
+        MEDIUM (5.5-7.5): Moderate interest - worth testing
+        LOW (<5.5): Weak signal - skip unless niche
         """
-        if score >= 7.0:
+        if score >= 7.5:
             return "HIGH"
-        elif score >= 5.0:
+        elif score >= 5.5:
             return "MEDIUM"
         else:
             return "LOW"
