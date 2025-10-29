@@ -1,6 +1,7 @@
 # main.py — Oubon MailBot
 from __future__ import annotations
 import base64, json, os, re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI
@@ -665,6 +666,150 @@ def gmail_watch_status(settings: Settings = Depends(get_settings)):
     """Check Gmail watch configuration status."""
     manager = GmailWatchManager(settings)
     return manager.get_watch_status()
+
+# ---------------------------------------------------------------
+# AI Intelligence Engine & Claude Advisor
+# ---------------------------------------------------------------
+
+@app.post("/api/intelligence/discover")
+async def discover_products(
+    niches: Optional[List[str]] = None,
+    max_per_niche: int = 5
+):
+    """
+    AI product discovery with comprehensive intelligence
+
+    This is the core competitive advantage - multi-source intelligence
+    with AI grading, sentiment analysis, and explanations.
+    """
+    try:
+        from ospra_os.product_research.intelligence_engine import IntelligenceEngine
+
+        engine = IntelligenceEngine()
+        products = await engine.discover_winning_products(
+            niches=niches,
+            max_products_per_niche=max_per_niche
+        )
+
+        # Convert to dict for JSON response
+        results = []
+        for p in products:
+            results.append({
+                'product_name': p.product_name,
+                'score': p.score,
+                'priority': p.priority,
+                'exact_match': p.exact_match,
+                'grading_breakdown': p.grading_breakdown,
+                'data_sources': p.data_sources,
+                'sentiment_analysis': p.sentiment_analysis,
+                'ai_explanation': p.ai_explanation,
+                'why_chosen': p.why_chosen,
+                'risk_factors': p.risk_factors,
+                'confidence': p.confidence,
+                'recommendation': p.recommendation,
+                'product_images': p.product_images,
+                'discovered_at': p.discovered_at.isoformat(),
+            })
+
+        return {
+            'success': True,
+            'products_found': len(results),
+            'products': results
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/claude/daily-briefing")
+async def get_daily_briefing(date: Optional[str] = None):
+    """Get Claude's daily business briefing"""
+    try:
+        from ospra_os.intelligence.claude_advisor import get_daily_briefing as get_briefing
+
+        briefing = await get_briefing(date)
+
+        return {
+            'success': True,
+            'briefing': briefing,
+            'date': date or datetime.now().strftime('%Y-%m-%d')
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/claude/weekly-report")
+async def get_weekly_report():
+    """Get Claude's weekly learning report"""
+    try:
+        from ospra_os.intelligence.claude_advisor import get_weekly_report as get_report
+
+        report = await get_report()
+
+        return {
+            'success': True,
+            'report': report
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+class ChatMessage(BaseModel):
+    message: str
+    context: Optional[Dict[str, Any]] = None
+
+
+@app.post("/api/claude/chat")
+async def chat_with_claude(chat: ChatMessage):
+    """Chat with Claude about your business"""
+    try:
+        from ospra_os.intelligence.claude_advisor import chat_with_claude as chat_func
+
+        response = await chat_func(chat.message, chat.context)
+
+        return {
+            'success': True,
+            'response': response
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/claude/chat/reset")
+async def reset_claude_chat():
+    """Reset Claude conversation history"""
+    try:
+        from ospra_os.intelligence.claude_advisor import ClaudeBusinessAdvisor
+
+        advisor = ClaudeBusinessAdvisor()
+        advisor.reset_conversation()
+
+        return {
+            'success': True,
+            'message': 'Conversation reset'
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 
 # ---------------------------------------------------------------
 # Mount static files (must be last)

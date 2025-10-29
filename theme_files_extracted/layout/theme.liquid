@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="{{ request.locale.iso_code }}">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    {%- if settings.favicon != blank -%}
+      <link rel="icon" type="image/png" href="{{ settings.favicon | img_url: '32x32' }}">
+    {%- endif -%}
+
+    {%- unless settings.type_header_font.system? and settings.type_body_font.system? -%}
+      <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    {%- endunless -%}
+
+    <title>
+      {{ page_title }}
+      {%- if current_tags %} &ndash; tagged "{{ current_tags | join: ', ' }}"{% endif -%}
+      {%- if current_page != 1 %} &ndash; Page {{ current_page }}{% endif -%}
+      {%- unless page_title contains shop.name %} &ndash; {{ shop.name }}{% endunless -%}
+    </title>
+
+    {% if page_description %}
+      <meta name="description" content="{{ page_description | escape }}">
+    {% endif %}
+
+    {% render 'meta-tags' %}
+
+    <link rel="canonical" href="{{ canonical_url }}">
+
+    {{ content_for_header }}
+
+    {%- liquid
+      assign body_font_bold = settings.type_body_font | font_modify: 'weight', 'bold'
+      assign body_font_italic = settings.type_body_font | font_modify: 'style', 'italic'
+      assign body_font_bold_italic = body_font_bold | font_modify: 'style', 'italic'
+    -%}
+
+    {% style %}
+      {{ settings.type_body_font | font_face: font_display: 'swap' }}
+      {{ settings.type_header_font | font_face: font_display: 'swap' }}
+      {{ body_font_bold | font_face: font_display: 'swap' }}
+      {{ body_font_italic | font_face: font_display: 'swap' }}
+      {{ body_font_bold_italic | font_face: font_display: 'swap' }}
+    {% endstyle %}
+
+    {{ 'theme.css' | asset_url | stylesheet_tag }}
+
+    <script src="{{ 'theme.js' | asset_url }}" defer="defer"></script>
+
+    {%- if request.page_type contains 'customers/' -%}
+      <script src="{{ 'shopify_common.js' | shopify_asset_url }}" defer="defer"></script>
+    {%- endif -%}
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta property="og:title" content="{{ page_title }}">
+    {% if page_description %}
+      <meta property="og:description" content="{{ page_description | escape }}">
+    {% endif %}
+    {% if page_image %}
+      <meta property="og:image" content="{{ page_image | img_url: '1200x630' }}">
+    {% endif %}
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{{ canonical_url }}">
+    <meta property="twitter:title" content="{{ page_title }}">
+    {% if page_description %}
+      <meta property="twitter:description" content="{{ page_description | escape }}">
+    {% endif %}
+    {% if page_image %}
+      <meta property="twitter:image" content="{{ page_image | img_url: '1200x630' }}">
+    {% endif %}
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "{{ shop.name }}",
+      "url": "{{ shop.url }}",
+      "logo": "{{ shop.brand.logo | img_url: 'master' }}",
+      "sameAs": [
+        "https://instagram.com/{{ settings.social_instagram_link }}",
+        "https://twitter.com/{{ settings.social_twitter_link }}",
+        "https://facebook.com/{{ settings.social_facebook_link }}"
+      ]
+    }
+    </script>
+  </head>
+
+  <body class="template-{{ template | replace: '.', ' ' | truncatewords: 1, '' | handle }}{% if customer %} customer-logged-in{% endif %}">
+    <a class="sr-only" href="#main-content" id="skip-to-main">
+      Skip to content
+    </a>
+
+    {% section 'header' %}
+
+    <main id="main-content" role="main">
+      {{ content_for_layout }}
+    </main>
+
+    {% section 'footer' %}
+
+    <!-- Cart notification template -->
+    <template id="cart-notification-template">
+      <div class="cart-notification" role="alert">
+        <div class="cart-notification-content">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16.6667 5L7.50002 14.1667L3.33335 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p><strong class="cart-notification-product"></strong> added to cart</p>
+        </div>
+        <button type="button" class="cart-notification-close" aria-label="Close notification">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </template>
+
+    <script>
+      // Cart drawer functionality
+      window.addEventListener('cart:item-added', function(event) {
+        if (window.OubonTheme && window.OubonTheme.updateCartCount) {
+          window.OubonTheme.updateCartCount();
+        }
+      });
+    </script>
+
+    {% if shop.customer_accounts_enabled %}
+      <script src="{{ 'customer.js' | asset_url }}" defer="defer"></script>
+    {% endif %}
+  </body>
+</html>
