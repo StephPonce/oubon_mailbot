@@ -1,0 +1,136 @@
+<div class="section section-lg">
+  <div class="container">
+    <div class="section-header" style="text-align: center; margin-bottom: 3rem;">
+      <h1 class="section-title">Search Results</h1>
+      {%- if search.performed -%}
+        <p class="section-subtitle">
+          {%- if search.results_count > 0 -%}
+            Found {{ search.results_count }} {% if search.results_count == 1 %}result{% else %}results{% endif %} for "{{ search.terms }}"
+          {%- else -%}
+            No results found for "{{ search.terms }}"
+          {%- endif -%}
+        </p>
+      {%- endif -%}
+    </div>
+
+    {%- comment -%} Search Form {%- endcomment -%}
+    <form action="{{ routes.search_url }}" method="get" style="max-width: 600px; margin: 0 auto 3rem auto;">
+      <div style="position: relative;">
+        <input
+          type="search"
+          name="q"
+          value="{{ search.terms | escape }}"
+          placeholder="Search products..."
+          style="width: 100%; padding: 1rem 3rem 1rem 1.5rem; font-size: var(--text-lg); border: 2px solid var(--color-gray-300); border-radius: 12px;"
+          autofocus
+        >
+        <button
+          type="submit"
+          style="position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--color-gray-600);"
+          aria-label="Search"
+        >
+          🔍
+        </button>
+      </div>
+    </form>
+
+    {%- if search.performed -%}
+      {%- if search.results_count > 0 -%}
+        <div class="grid grid-3">
+          {%- for item in search.results -%}
+            {%- if item.object_type == 'product' -%}
+              {%- assign product = item -%}
+              <div class="product-card">
+                <a href="{{ product.url }}" class="product-image">
+                  {%- if product.featured_image -%}
+                    <img
+                      src="{{ product.featured_image | img_url: '600x' }}"
+                      alt="{{ product.featured_image.alt | escape }}"
+                      loading="lazy"
+                      width="600"
+                      height="450"
+                    >
+                  {%- else -%}
+                    <div style="width: 100%; height: 100%; background: var(--color-gray-100);"></div>
+                  {%- endif -%}
+
+                  {%- assign score = product.metafields.custom.priority_score | default: 7 -%}
+                  {%- if score >= 7.5 -%}
+                    <span class="product-badge high">HIGH 🔥</span>
+                  {%- elsif score >= 5.5 -%}
+                    <span class="product-badge">MEDIUM</span>
+                  {%- endif -%}
+                </a>
+
+                <div class="product-content">
+                  {%- if product.type != blank -%}
+                    <div class="product-category">{{ product.type }}</div>
+                  {%- endif -%}
+
+                  <h3 class="product-name">
+                    <a href="{{ product.url }}">{{ product.title }}</a>
+                  </h3>
+
+                  <div class="product-price">
+                    <span class="price-current">{{ product.price | money }}</span>
+                    {%- if product.compare_at_price > product.price -%}
+                      <span class="price-compare">{{ product.compare_at_price | money }}</span>
+                    {%- endif -%}
+                  </div>
+
+                  <a href="{{ product.url }}" class="btn btn-primary product-cta">
+                    View Product →
+                  </a>
+                </div>
+              </div>
+            {%- endif -%}
+          {%- endfor -%}
+        </div>
+
+        {%- if paginate.pages > 1 -%}
+          <div style="margin-top: 4rem; text-align: center;">
+            {%- if paginate.previous -%}
+              <a href="{{ paginate.previous.url }}" class="btn btn-outline">← Previous</a>
+            {%- endif -%}
+
+            <span style="margin: 0 1rem; color: var(--color-gray-600);">
+              Page {{ paginate.current_page }} of {{ paginate.pages }}
+            </span>
+
+            {%- if paginate.next -%}
+              <a href="{{ paginate.next.url }}" class="btn btn-outline">Next →</a>
+            {%- endif -%}
+          </div>
+        {%- endif -%}
+
+      {%- else -%}
+        {%- comment -%} No Results {%- endcomment -%}
+        <div style="text-align: center; padding: 3rem 0;">
+          <p style="font-size: var(--text-lg); color: var(--color-gray-600); margin-bottom: 2rem;">
+            Try searching with different keywords or browse our collections.
+          </p>
+          <a href="/collections/all" class="btn btn-primary">
+            Browse All Products →
+          </a>
+        </div>
+      {%- endif -%}
+    {%- else -%}
+      {%- comment -%} Initial State {%- endcomment -%}
+      <div style="text-align: center; padding: 3rem 0;">
+        <p style="font-size: var(--text-lg); color: var(--color-gray-600);">
+          Search our catalog of smart home products
+        </p>
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+{%- paginate search.results by 12 -%}
+{%- endpaginate -%}
+
+{% schema %}
+{
+  "name": "Search",
+  "settings": []
+}
+{% endschema %}

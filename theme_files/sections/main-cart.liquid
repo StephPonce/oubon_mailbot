@@ -1,0 +1,190 @@
+<div class="section section-lg">
+  <div class="container">
+    <h1 class="section-title" style="text-align: center; margin-bottom: 3rem;">
+      Shopping Cart
+    </h1>
+
+    {%- if cart.item_count > 0 -%}
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 3rem; align-items: start;">
+
+        {%- comment -%} Cart Items {%- endcomment -%}
+        <div>
+          <form action="{{ routes.cart_url }}" method="post" id="cart-form">
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+              {%- for item in cart.items -%}
+                <div class="product-card" style="display: grid; grid-template-columns: 120px 1fr auto; gap: 1.5rem; padding: 1.5rem;">
+
+                  {%- comment -%} Product Image {%- endcomment -%}
+                  <a href="{{ item.url }}">
+                    {%- if item.image -%}
+                      <img
+                        src="{{ item.image | img_url: '240x' }}"
+                        alt="{{ item.image.alt | escape }}"
+                        width="120"
+                        height="120"
+                        style="border-radius: 8px; object-fit: cover;"
+                        loading="lazy"
+                      >
+                    {%- endif -%}
+                  </a>
+
+                  {%- comment -%} Product Info {%- endcomment -%}
+                  <div>
+                    <h3 style="font-size: var(--text-lg); font-weight: 600; margin-bottom: 0.5rem;">
+                      <a href="{{ item.url }}" style="color: var(--color-black); text-decoration: none;">
+                        {{ item.product.title }}
+                      </a>
+                    </h3>
+
+                    {%- unless item.variant.title == 'Default Title' -%}
+                      <p style="color: var(--color-gray-600); font-size: var(--text-sm); margin-bottom: 0.5rem;">
+                        {{ item.variant.title }}
+                      </p>
+                    {%- endunless -%}
+
+                    <p style="font-size: var(--text-lg); font-weight: 600; color: var(--color-black); margin-bottom: 1rem;">
+                      {{ item.final_price | money }}
+                      {%- if item.original_price > item.final_price -%}
+                        <span style="text-decoration: line-through; color: var(--color-gray-500); font-weight: normal; margin-left: 0.5rem;">
+                          {{ item.original_price | money }}
+                        </span>
+                      {%- endif -%}
+                    </p>
+
+                    {%- comment -%} Quantity Selector {%- endcomment -%}
+                    <div class="quantity-selector" style="display: inline-flex;">
+                      <button
+                        type="button"
+                        class="quantity-btn"
+                        data-action="decrease"
+                        data-line="{{ forloop.index }}"
+                        aria-label="Decrease quantity"
+                      >−</button>
+                      <input
+                        type="number"
+                        name="updates[]"
+                        value="{{ item.quantity }}"
+                        min="0"
+                        data-line="{{ forloop.index }}"
+                        class="quantity-input"
+                        aria-label="Quantity"
+                      >
+                      <button
+                        type="button"
+                        class="quantity-btn"
+                        data-action="increase"
+                        data-line="{{ forloop.index }}"
+                        aria-label="Increase quantity"
+                      >+</button>
+                    </div>
+                  </div>
+
+                  {%- comment -%} Line Total {%- endcomment -%}
+                  <div style="text-align: right;">
+                    <p style="font-size: var(--text-xl); font-weight: 700; margin-bottom: 1rem;">
+                      {{ item.final_line_price | money }}
+                    </p>
+                    <a
+                      href="{{ routes.cart_change_url }}?line={{ forloop.index }}&quantity=0"
+                      style="color: var(--color-gray-600); font-size: var(--text-sm); text-decoration: underline;"
+                    >
+                      Remove
+                    </a>
+                  </div>
+                </div>
+              {%- endfor -%}
+            </div>
+
+            <div style="margin-top: 2rem; text-align: right;">
+              <button type="submit" name="update" class="btn btn-outline">
+                Update Cart
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {%- comment -%} Cart Summary {%- endcomment -%}
+        <div class="product-card" style="padding: 2rem; position: sticky; top: 100px;">
+          <h2 style="font-size: var(--text-xl); font-weight: 700; margin-bottom: 1.5rem;">
+            Order Summary
+          </h2>
+
+          <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-gray-200);">
+            <span style="color: var(--color-gray-600);">Subtotal</span>
+            <span style="font-weight: 600;">{{ cart.total_price | money }}</span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-gray-200);">
+            <span style="color: var(--color-gray-600);">Shipping</span>
+            <span style="font-weight: 600;">Calculated at checkout</span>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2rem; font-size: var(--text-xl);">
+            <span style="font-weight: 700;">Total</span>
+            <span style="font-weight: 700;">{{ cart.total_price | money }}</span>
+          </div>
+
+          <button
+            type="submit"
+            name="checkout"
+            form="cart-form"
+            class="btn btn-primary"
+            style="width: 100%; justify-content: center;"
+          >
+            Proceed to Checkout →
+          </button>
+
+          <p style="text-align: center; margin-top: 1.5rem; font-size: var(--text-sm); color: var(--color-gray-600);">
+            Secure checkout • Free shipping over $50
+          </p>
+        </div>
+      </div>
+
+    {%- else -%}
+      {%- comment -%} Empty Cart {%- endcomment -%}
+      <div style="text-align: center; padding: 5rem 0;">
+        <h2 style="font-size: var(--text-3xl); margin-bottom: 1rem; font-weight: 600;">
+          Your cart is empty
+        </h2>
+        <p style="color: var(--color-gray-600); margin-bottom: 2.5rem; font-size: var(--text-lg);">
+          Discover our curated collection of smart home products.
+        </p>
+        <a href="/collections/all" class="btn btn-primary btn-large">
+          Start Shopping →
+        </a>
+      </div>
+    {%- endif -%}
+  </div>
+</div>
+
+<style>
+@media (max-width: 1024px) {
+  .section .container > div {
+    grid-template-columns: 1fr !important;
+  }
+
+  .product-card {
+    position: relative !important;
+    top: 0 !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .product-card[style*="grid-template-columns"] {
+    grid-template-columns: 80px 1fr !important;
+  }
+
+  .product-card > div:last-child {
+    grid-column: 2;
+    text-align: left !important;
+    margin-top: 1rem;
+  }
+}
+</style>
+
+{% schema %}
+{
+  "name": "Cart",
+  "settings": []
+}
+{% endschema %}
