@@ -1254,13 +1254,12 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
 
-                const response = await fetch('/api/discover-multi', {
+                const response = await fetch('/api/intelligence/discover', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        min_score: minScore,  // Use selected filter value
-                        max_per_niche: 3,     // Reduced from 5 to 3 for faster results
-                        top_overall: 15       // Reduced from 20 to 15
+                        niches: ['smart home', 'tech gadgets', 'home & kitchen'],
+                        max_per_niche: 5
                     }),
                     signal: controller.signal
                 });
@@ -1274,12 +1273,29 @@
                     return;
                 }
 
-                renderMultiNicheResults(data);
+                // Convert new API format to dashboard format
+                const dashboardData = {
+                    success: true,
+                    total_products: data.count || 0,
+                    niches_discovered: data.niches_searched ? data.niches_searched.length : 0,
+                    top_overall: data.products.map(p => ({
+                        ...p.display_data,
+                        ai_explanation: p.ai_explanation,
+                        score_breakdown: p.score_breakdown
+                    })),
+                    stats: {
+                        high_priority: data.products.filter(p => p.priority === 'HIGH').length,
+                        medium_priority: data.products.filter(p => p.priority === 'MEDIUM').length,
+                        low_priority: data.products.filter(p => p.priority === 'LOW').length
+                    }
+                };
+
+                renderMultiNicheResults(dashboardData);
 
                 // Update stats
-                document.getElementById('stat-products').textContent = data.total_products || 0;
-                if (data.top_overall && data.top_overall.length > 0) {
-                    document.getElementById('stat-top-score').textContent = data.top_overall[0].score.toFixed(1);
+                document.getElementById('stat-products').textContent = dashboardData.total_products || 0;
+                if (dashboardData.top_overall && dashboardData.top_overall.length > 0) {
+                    document.getElementById('stat-top-score').textContent = dashboardData.top_overall[0].score.toFixed(1);
                 }
             } catch (error) {
                 console.error('Multi-niche discovery failed:', error);
