@@ -53,6 +53,33 @@ async def startup_event():
 async def health():
     return {"status": "ok"}
 
+@app.get("/debug/intelligence")
+async def debug_intelligence():
+    """Debug endpoint to check intelligence module status"""
+    results = {}
+
+    # Test ProductIntelligenceEngine import
+    try:
+        from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
+        results['product_intelligence_import'] = 'SUCCESS'
+    except Exception as e:
+        results['product_intelligence_import'] = f'FAILED: {str(e)}'
+
+    # Test proxy_manager import
+    try:
+        from ospra_os.scraping.proxy_manager import proxy_manager
+        results['proxy_manager_import'] = 'SUCCESS'
+    except Exception as e:
+        results['proxy_manager_import'] = f'FAILED: {str(e)}'
+
+    # Check if routes exist
+    routes = [r.path for r in app.routes]
+    results['intelligence_discover_registered'] = '/api/intelligence/discover' in routes
+    results['intelligence_stats_registered'] = '/api/intelligence/stats' in routes
+    results['all_intelligence_routes'] = [r for r in routes if 'intelligence' in r]
+
+    return results
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard():
     """Analytics dashboard with charts and visualizations."""
