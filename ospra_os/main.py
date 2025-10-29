@@ -155,6 +155,15 @@ async def dashboard():
     with open(dashboard_path, "r") as f:
         return HTMLResponse(content=f.read())
 
+@app.get("/dashboard/ospra", response_class=HTMLResponse)
+async def ospra_dashboard():
+    """Ospra OS Product Intelligence Dashboard with multi-niche discovery."""
+    dashboard_path = Path(__file__).parent.parent / "static" / "ospra_dashboard.html"
+    if not dashboard_path.exists():
+        return HTMLResponse("<h1>Ospra Dashboard not found</h1><p>Please ensure static/ospra_dashboard.html exists</p>", status_code=404)
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
 # ---------------------------------------------------------------
 # Dashboard API Endpoints (New Unified Dashboard)
 # ---------------------------------------------------------------
