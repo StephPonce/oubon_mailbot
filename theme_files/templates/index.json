@@ -1,0 +1,50 @@
+{
+  "sections": {
+    "hero": {
+      "type": "hero",
+      "settings": {
+        "eyebrow": "Discover Smart Living",
+        "heading": "What If Your Home Could Do More?",
+        "subheading": "Curated smart home products that actually work. Tested, reviewed, and handpicked for modern living.",
+        "cta_text": "Shop Now",
+        "cta_link": "/collections/all"
+      }
+    },
+    "trust-badges": {
+      "type": "trust-badges",
+      "settings": {}
+    },
+    "featured-products": {
+      "type": "featured-products",
+      "settings": {
+        "heading": "Featured Products",
+        "subheading": "Our top picks for smart home essentials",
+        "collection": "all",
+        "products_to_show": 6
+      }
+    },
+    "category-grid": {
+      "type": "category-grid",
+      "settings": {
+        "heading": "Shop by Category",
+        "subheading": "Find the perfect smart home solution"
+      }
+    },
+    "support-cta": {
+      "type": "support-cta",
+      "settings": {
+        "heading": "Need Help Choosing?",
+        "subheading": "Our team is here to help you find the perfect smart home setup.",
+        "cta_text": "Contact Us",
+        "cta_link": "/pages/contact"
+      }
+    }
+  },
+  "order": [
+    "hero",
+    "trust-badges",
+    "featured-products",
+    "category-grid",
+    "support-cta"
+  ]
+}

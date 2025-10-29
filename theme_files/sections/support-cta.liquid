@@ -1,0 +1,83 @@
+<section class="section scroll-reveal" style="background: var(--color-gray-50);">
+  <div class="container container-narrow" style="text-align: center;">
+    <h2 class="section-title">{{ section.settings.heading }}</h2>
+    {%- if section.settings.subheading != blank -%}
+      <p class="section-subtitle" style="margin-bottom: 2rem;">{{ section.settings.subheading }}</p>
+    {%- endif -%}
+
+    {%- if section.settings.show_email -%}
+      <div style="margin-bottom: 2rem;">
+        <a href="mailto:{{ section.settings.email }}" style="color: var(--color-electric); font-size: var(--text-lg); text-decoration: none;">
+          {{ section.settings.email }}
+        </a>
+      </div>
+    {%- endif -%}
+
+    {%- if section.settings.cta_text != blank and section.settings.cta_link != blank -%}
+      <a href="{{ section.settings.cta_link }}" class="btn btn-primary btn-large">
+        {{ section.settings.cta_text }} →
+      </a>
+    {%- endif -%}
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Support CTA",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Need Help Choosing?"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Our team is here to help you find the perfect smart home setup."
+    },
+    {
+      "type": "header",
+      "content": "Email"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_email",
+      "label": "Show email address",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "email",
+      "label": "Email address",
+      "default": "hello@oubonshop.com"
+    },
+    {
+      "type": "header",
+      "content": "Call to Action"
+    },
+    {
+      "type": "text",
+      "id": "cta_text",
+      "label": "Button text",
+      "default": "Contact Us"
+    },
+    {
+      "type": "url",
+      "id": "cta_link",
+      "label": "Button link",
+      "default": "/pages/contact"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Support CTA"
+    }
+  ]
+}
+{% endschema %}
