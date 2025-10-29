@@ -671,57 +671,7 @@ def gmail_watch_status(settings: Settings = Depends(get_settings)):
 # AI Intelligence Engine & Claude Advisor
 # ---------------------------------------------------------------
 
-@app.post("/api/intelligence/discover")
-async def discover_products(
-    niches: Optional[List[str]] = None,
-    max_per_niche: int = 5
-):
-    """
-    AI product discovery with comprehensive intelligence
-
-    This is the core competitive advantage - multi-source intelligence
-    with AI grading, sentiment analysis, and explanations.
-    """
-    try:
-        from ospra_os.product_research.intelligence_engine import IntelligenceEngine
-
-        engine = IntelligenceEngine()
-        products = await engine.discover_winning_products(
-            niches=niches,
-            max_products_per_niche=max_per_niche
-        )
-
-        # Convert to dict for JSON response
-        results = []
-        for p in products:
-            results.append({
-                'product_name': p.product_name,
-                'score': p.score,
-                'priority': p.priority,
-                'exact_match': p.exact_match,
-                'grading_breakdown': p.grading_breakdown,
-                'data_sources': p.data_sources,
-                'sentiment_analysis': p.sentiment_analysis,
-                'ai_explanation': p.ai_explanation,
-                'why_chosen': p.why_chosen,
-                'risk_factors': p.risk_factors,
-                'confidence': p.confidence,
-                'recommendation': p.recommendation,
-                'product_images': p.product_images,
-                'discovered_at': p.discovered_at.isoformat(),
-            })
-
-        return {
-            'success': True,
-            'products_found': len(results),
-            'products': results
-        }
-
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        }
+# REMOVED DUPLICATE - See line 822 for correct /api/intelligence/discover endpoint
 
 
 @app.get("/api/claude/daily-briefing")
