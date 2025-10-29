@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oubon Shop - AI Intelligence Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-black: #0a0a0a;
+            --secondary-black: #1a1a1a;
+            --electric-blue: #00d4ff;
+            --electric-blue-dark: #0099cc;
+            --electric-blue-glow: rgba(0, 212, 255, 0.4);
+            --text-white: #ffffff;
+            --text-gray: #a0a0a0;
+            --success-green: #00ff88;
+            --warning-yellow: #ffcc00;
+            --danger-red: #ff3366;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--primary-black);
+            color: var(--text-white);
+            min-height: 100vh;
+        }
+
+        .dashboard {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--secondary-black);
+            border-right: 1px solid rgba(0, 212, 255, 0.2);
+            padding: 2rem 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 3rem;
+            color: var(--electric-blue);
+            text-shadow: 0 0 20px var(--electric-blue-glow);
+        }
+
+        .nav-item {
+            padding: 1.2rem 2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-left: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--text-gray);
+        }
+
+        .nav-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-left-color: var(--electric-blue);
+            color: var(--text-white);
+        }
+
+        .nav-item.active {
+            background: rgba(0, 212, 255, 0.15);
+            border-left-color: var(--electric-blue);
+            color: var(--text-white);
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 1.4rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, var(--text-white) 0%, var(--electric-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-gray);
+            font-size: 1.1rem;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--secondary-black);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px var(--electric-blue-glow);
+            border-color: var(--electric-blue);
+        }
+
+        .card-title {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .card-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--electric-blue);
+            text-shadow: 0 0 20px var(--electric-blue-glow);
+        }
+
+        .card-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-gray);
+            margin-top: 0.5rem;
+        }
+
+        /* Product Grid */
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: var(--secondary-black);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px var(--electric-blue-glow);
+            border-color: var(--electric-blue);
+        }
+
+        .product-image {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
+        }
+
+        .product-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+        }
+
+        .product-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-white);
+        }
+
+        .product-score {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .score-high {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--success-green);
+            border: 1px solid var(--success-green);
+        }
+
+        .score-medium {
+            background: rgba(255, 204, 0, 0.2);
+            color: var(--warning-yellow);
+            border: 1px solid var(--warning-yellow);
+        }
+
+        .score-low {
+            background: rgba(255, 51, 102, 0.2);
+            color: var(--danger-red);
+            border: 1px solid var(--danger-red);
+        }
+
+        .product-body {
+            padding: 1.5rem;
+        }
+
+        .product-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .profit-display {
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .profit-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            color: var(--text-gray);
+            font-size: 0.9rem;
+        }
+
+        .profit-row.highlight {
+            font-weight: 700;
+            color: var(--electric-blue);
+            font-size: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid rgba(0, 212, 255, 0.2);
+            margin-top: 0.5rem;
+        }
+
+        .product-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--electric-blue);
+            color: var(--primary-black);
+        }
+
+        .btn-primary:hover {
+            background: var(--electric-blue-dark);
+            box-shadow: 0 4px 20px var(--electric-blue-glow);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-white);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Filters */
+        .filters {
+            background: var(--secondary-black);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-input {
+            padding: 0.75rem 1rem;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            background: var(--primary-black);
+            color: var(--text-white);
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--electric-blue);
+            box-shadow: 0 0 10px var(--electric-blue-glow);
+        }
+
+        select.filter-input {
+            cursor: pointer;
+        }
+
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner {
+            border: 4px solid rgba(0, 212, 255, 0.2);
+            border-radius: 50%;
+            border-top: 4px solid var(--electric-blue);
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: var(--secondary-black);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 16px;
+        }
+
+        .empty-state h3 {
+            color: var(--text-white);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state p {
+            color: var(--text-gray);
+        }
+
+        /* Niche Badge */
+        .niche-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            color: var(--electric-blue);
+            font-size: 0.8rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo">OUBON SHOP</div>
+            <div class="nav-item active" data-tab="overview">
+                <span class="nav-icon">📊</span>
+                <span>Overview</span>
+            </div>
+            <div class="nav-item" data-tab="products">
+                <span class="nav-icon">🎯</span>
+                <span>AI Intelligence</span>
+            </div>
+            <div class="nav-item" data-tab="analytics">
+                <span class="nav-icon">📈</span>
+                <span>Analytics</span>
+            </div>
+            <div class="nav-item" data-tab="settings">
+                <span class="nav-icon">⚙️</span>
+                <span>Settings</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Overview Tab -->
+            <div id="overview" class="tab-content active">
+                <div class="header">
+                    <h1>AI Intelligence Dashboard</h1>
+                    <p>Powered by Claude AI + Real AliExpress Data</p>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-title">Products Discovered</div>
+                        <div class="card-value" id="stat-products">--</div>
+                        <div class="card-subtitle">Real AliExpress products</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">High Priority</div>
+                        <div class="card-value" id="stat-high">--</div>
+                        <div class="card-subtitle">Score 7.5+ / Ready to sell</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Avg Profit Margin</div>
+                        <div class="card-value" id="stat-margin">--</div>
+                        <div class="card-subtitle">Per product sold</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">System Status</div>
+                        <div class="card-value" style="font-size: 1.5rem;" id="stat-status">🟢 Active</div>
+                        <div class="card-subtitle">Claude AI + AliExpress</div>
+                    </div>
+                </div>
+
+                <div class="loading" id="overview-loading">
+                    <div class="spinner"></div>
+                    <p>Loading intelligence data...</p>
+                </div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="products" class="tab-content">
+                <div class="header">
+                    <h1>AI Product Intelligence</h1>
+                    <p>Claude AI-powered product discovery from real AliExpress data</p>
+                </div>
+
+                <div class="filters">
+                    <div class="filter-group">
+                        <button class="btn btn-primary" onclick="discoverProducts()">
+                            🔍 Discover Winning Products
+                        </button>
+                        <select class="filter-input" id="filter-priority">
+                            <option value="all">All Priorities</option>
+                            <option value="HIGH">HIGH Only (7.5+)</option>
+                            <option value="MEDIUM">MEDIUM (5.5-7.5)</option>
+                            <option value="LOW">LOW (<5.5)</option>
+                        </select>
+                        <select class="filter-input" id="sort-by">
+                            <option value="score-desc">Sort: Score (High → Low)</option>
+                            <option value="profit-desc">Sort: Profit (High → Low)</option>
+                            <option value="orders-desc">Sort: Orders (High → Low)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="product-grid" id="product-grid">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Click "Discover" to find winning products...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics" class="tab-content">
+                <div class="header">
+                    <h1>Analytics</h1>
+                    <p>Coming soon...</p>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content">
+                <div class="header">
+                    <h1>Settings</h1>
+                    <p>API Configuration</p>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <div class="card-title">Claude AI</div>
+                        <div class="card-value" style="font-size: 1.5rem;">✅</div>
+                        <div class="card-subtitle">Connected</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">AliExpress API</div>
+                        <div class="card-value" style="font-size: 1.5rem;">✅</div>
+                        <div class="card-subtitle">Connected</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Shopify</div>
+                        <div class="card-value" style="font-size: 1.5rem;">✅</div>
+                        <div class="card-subtitle">oubonshop.myshopify.com</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allProducts = [];
+
+        // Tab Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                const tabId = item.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Discover Products
+        async function discoverProducts() {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = '<div class="loading" style="grid-column: 1 / -1;"><div class="spinner"></div><p>🤖 Claude AI is analyzing products...</p></div>';
+
+            try {
+                const response = await fetch('/api/intelligence/discover', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        niches: ['smart home', 'tech gadgets', 'home & kitchen'],
+                        max_per_niche: 5
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    grid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;"><h3>❌ Discovery Failed</h3><p>${data.error}</p></div>`;
+                    return;
+                }
+
+                allProducts = data.products || [];
+                renderProducts(allProducts);
+
+                // Update stats
+                updateStats(allProducts);
+
+            } catch (error) {
+                console.error('Discovery failed:', error);
+                grid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><h3>❌ Error</h3><p>' + error.message + '</p></div>';
+            }
+        }
+
+        // Render Products
+        function renderProducts(products) {
+            const grid = document.getElementById('product-grid');
+
+            if (!products || products.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <h3>No Products Found</h3>
+                        <p>Try adjusting your filters or discovering new products</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = products.map(product => {
+                const display = product.display_data || {};
+                const score = display.score || 0;
+                const priority = product.priority || 'LOW';
+                const scoreClass = priority === 'HIGH' ? 'score-high' : priority === 'MEDIUM' ? 'score-medium' : 'score-low';
+
+                return `
+                    <div class="product-card">
+                        ${display.image_url ? 
+                            `<img src="${display.image_url}" class="product-image" alt="${display.name}">` :
+                            `<div class="product-image" style="display: flex; align-items: center; justify-content: center; font-size: 4rem;">📦</div>`
+                        }
+                        <div class="product-header">
+                            ${display.niche ? `<div class="niche-badge">${display.niche.replace(/_/g, ' ')}</div>` : ''}
+                            <div class="product-name">${display.name || 'Unknown Product'}</div>
+                            <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
+                        </div>
+                        <div class="product-body">
+                            <div class="product-meta">
+                                <div class="meta-item">
+                                    <span>📦</span>
+                                    <span>${display.supplier_orders?.toLocaleString() || 0} orders</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span>⭐</span>
+                                    <span>${display.supplier_rating || 0}★</span>
+                                </div>
+                            </div>
+                            <div class="profit-display">
+                                <div class="profit-row">
+                                    <span>Cost:</span>
+                                    <span>$${display.supplier_cost?.toFixed(2) || '0.00'}</span>
+                                </div>
+                                <div class="profit-row">
+                                    <span>Your Price:</span>
+                                    <span>$${display.market_price?.toFixed(2) || '0.00'}</span>
+                                </div>
+                                <div class="profit-row highlight">
+                                    <span>💰 Net Profit:</span>
+                                    <span>$${display.estimated_profit?.toFixed(2) || '0.00'} (${display.profit_margin?.toFixed(1) || '0'}%)</span>
+                                </div>
+                            </div>
+                            ${product.ai_explanation ? 
+                                `<div style="margin-top: 1rem; padding: 0.75rem; background: rgba(0, 212, 255, 0.05); border-radius: 8px; font-size: 0.85rem; color: var(--text-gray);">
+                                    <strong style="color: var(--electric-blue);">🤖 Claude AI:</strong><br>
+                                    ${product.ai_explanation.slice(0, 150)}...
+                                </div>` : ''
+                            }
+                            <div class="product-actions">
+                                <a href="${display.supplier_url || '#'}" target="_blank" class="btn btn-secondary" style="flex: 1;">
+                                    🔗 View on AliExpress
+                                </a>
+                                <button class="btn btn-primary" onclick="deployToShopify('${display.name?.replace(/'/g, "\\'")}');" style="flex: 1;">
+                                    🚀 Deploy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update Stats
+        function updateStats(products) {
+            if (!products || products.length === 0) return;
+
+            document.getElementById('stat-products').textContent = products.length;
+            document.getElementById('stat-high').textContent = products.filter(p => p.priority === 'HIGH').length;
+
+            const avgMargin = products.reduce((sum, p) => sum + (p.display_data?.profit_margin || 0), 0) / products.length;
+            document.getElementById('stat-margin').textContent = avgMargin.toFixed(1) + '%';
+
+            document.getElementById('overview-loading').style.display = 'none';
+        }
+
+        // Deploy to Shopify (placeholder)
+        async function deployToShopify(productName) {
+            alert(`🚀 Deploying "${productName}" to Shopify...\n\nThis feature is coming soon!`);
+        }
+
+        // Apply filters
+        document.getElementById('filter-priority')?.addEventListener('change', applyFilters);
+        document.getElementById('sort-by')?.addEventListener('change', applyFilters);
+
+        function applyFilters() {
+            const priority = document.getElementById('filter-priority').value;
+            const sortBy = document.getElementById('sort-by').value;
+
+            let filtered = [...allProducts];
+
+            // Filter by priority
+            if (priority !== 'all') {
+                filtered = filtered.filter(p => p.priority === priority);
+            }
+
+            // Sort
+            filtered.sort((a, b) => {
+                if (sortBy === 'score-desc') return (b.display_data?.score || 0) - (a.display_data?.score || 0);
+                if (sortBy === 'profit-desc') return (b.display_data?.estimated_profit || 0) - (a.display_data?.estimated_profit || 0);
+                if (sortBy === 'orders-desc') return (b.display_data?.supplier_orders || 0) - (a.display_data?.supplier_orders || 0);
+                return 0;
+            });
+
+            renderProducts(filtered);
+        }
+
+        // Initialize
+        document.getElementById('overview-loading').style.display = 'none';
+    </script>
+</body>
+</html>

@@ -164,6 +164,21 @@ async def ospra_dashboard():
     with open(dashboard_path, "r") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/premium", response_class=HTMLResponse)
+async def premium_dashboard():
+    """Premium AI Intelligence Dashboard - Black/Electric Blue Theme"""
+    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard.html"
+    if not dashboard_path.exists():
+        return HTMLResponse(
+            "<h1>Premium Dashboard Not Found</h1>"
+            "<p>Please ensure static/premium_dashboard.html exists</p>",
+            status_code=404
+        )
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
+
 # ---------------------------------------------------------------
 # Dashboard API Endpoints (New Unified Dashboard)
 # ---------------------------------------------------------------
