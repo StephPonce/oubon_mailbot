@@ -1311,17 +1311,17 @@ class DiscoverRequest(BaseModel):
 @app.post("/api/intelligence/discover")
 async def discover_winning_products(request: DiscoverRequest):
     """
-    Discover winning products using multi-platform intelligence engine
+    Discover winning products using REAL AliExpress data + Claude AI analysis
 
     Returns products with:
-    - Cross-platform data (Amazon, AliExpress, social media)
-    - Comprehensive grading (0-10 scale)
-    - AI-generated explanations
-    - Exact supplier links
-    - Profit calculations
+    - Real AliExpress supplier data (no mock data)
+    - AI-generated analysis from Claude
+    - Unique scores for each product
+    - Exact supplier links with SKUs
+    - Real profit calculations
     """
     try:
-        from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
+        from ospra_os.intelligence.product_intelligence_v2 import ProductIntelligenceEngine  # NEW - Uses real data!
 
         engine = ProductIntelligenceEngine()
         products = await engine.discover_winning_products(
@@ -1333,10 +1333,14 @@ async def discover_winning_products(request: DiscoverRequest):
             'success': True,
             'products': products,
             'count': len(products),
-            'niches_searched': request.niches or ['smart home', 'tech gadgets', 'home & kitchen']
+            'niches_searched': request.niches or engine.trending_niches[:3]
         }
+
     except Exception as e:
         import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Intelligence discovery failed: {e}\n{traceback.format_exc()}")
         return {
             'success': False,
             'error': str(e),
