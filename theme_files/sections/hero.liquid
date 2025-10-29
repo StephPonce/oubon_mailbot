@@ -1,0 +1,59 @@
+<section class="hero scroll-reveal">
+  <div class="hero-content">
+    <span class="hero-eyebrow">{{ section.settings.eyebrow }}</span>
+    <h1 class="hero-title">{{ section.settings.heading }}</h1>
+    <p class="hero-subtitle">{{ section.settings.subheading }}</p>
+    <div class="hero-cta">
+      <a href="{{ section.settings.cta_link }}" class="btn btn-primary btn-large">
+        {{ section.settings.cta_text }} →
+      </a>
+    </div>
+  </div>
+
+  <div class="scroll-indicator" aria-hidden="true">
+    ↓
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Hero",
+  "settings": [
+    {
+      "type": "text",
+      "id": "eyebrow",
+      "default": "Discover Smart Living",
+      "label": "Eyebrow Text"
+    },
+    {
+      "type": "text",
+      "id": "heading",
+      "default": "What If Your Home Could Do More?",
+      "label": "Heading"
+    },
+    {
+      "type": "textarea",
+      "id": "subheading",
+      "default": "Explore smart lighting, security, kitchen tech, and gadgets that upgrade your everyday.",
+      "label": "Subheading"
+    },
+    {
+      "type": "text",
+      "id": "cta_text",
+      "default": "Explore Products",
+      "label": "CTA Button Text"
+    },
+    {
+      "type": "url",
+      "id": "cta_link",
+      "default": "/collections/all",
+      "label": "CTA Button Link"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Hero"
+    }
+  ]
+}
+{% endschema %}

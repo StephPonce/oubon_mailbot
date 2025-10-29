@@ -1,0 +1,60 @@
+<div class="section">
+  <div class="container container-narrow">
+    <div style="padding: 3.75rem 0;">
+      <h1 style="font-size: var(--text-5xl); font-weight: 700; margin-bottom: 1rem; text-align: center;">
+        {{ page.title }}
+      </h1>
+
+      {%- if page.content != blank -%}
+        <div class="page-content" style="line-height: 1.8; color: var(--color-gray-700); margin-top: 2rem;">
+          {{ page.content }}
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
+
+<style>
+  .page-content h2 {
+    font-size: var(--text-2xl);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .page-content h3 {
+    font-size: var(--text-xl);
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .page-content p {
+    margin-bottom: 1.5rem;
+  }
+
+  .page-content ul,
+  .page-content ol {
+    margin-bottom: 1.5rem;
+    padding-left: 2rem;
+  }
+
+  .page-content ul {
+    list-style: disc;
+  }
+
+  .page-content ol {
+    list-style: decimal;
+  }
+
+  .page-content li {
+    margin-bottom: 0.5rem;
+  }
+
+  .page-content a {
+    color: var(--color-electric);
+    text-decoration: underline;
+  }
+
+  .page-content a:hover {
+    color: var(--color-electric-dark);
+  }
+</style>

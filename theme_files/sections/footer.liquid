@@ -1,0 +1,107 @@
+<footer class="site-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-content">
+      {%- comment -%} Column 1: Brand {%- endcomment -%}
+      <div class="footer-column">
+        <div class="footer-logo">OUBON SHOP</div>
+        <p class="footer-tagline">Smarter living, simplified.</p>
+
+        <div class="footer-social">
+          {%- if section.settings.social_instagram_link != blank -%}
+            <a href="{{ section.settings.social_instagram_link }}" class="social-icon" aria-label="Instagram" target="_blank" rel="noopener">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" fill="currentColor"/>
+              </svg>
+            </a>
+          {%- endif -%}
+
+          {%- if section.settings.social_twitter_link != blank -%}
+            <a href="{{ section.settings.social_twitter_link }}" class="social-icon" aria-label="Twitter" target="_blank" rel="noopener">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          {%- endif -%}
+
+          {%- if section.settings.social_facebook_link != blank -%}
+            <a href="{{ section.settings.social_facebook_link }}" class="social-icon" aria-label="Facebook" target="_blank" rel="noopener">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- comment -%} Column 2: Shop {%- endcomment -%}
+      <div class="footer-column">
+        <h4>Shop</h4>
+        <div class="footer-links">
+          <a href="/collections/smart-lighting" class="footer-link">Smart Lighting</a>
+          <a href="/collections/home-security" class="footer-link">Home Security</a>
+          <a href="/collections/kitchen-tech" class="footer-link">Kitchen Tech</a>
+          <a href="/collections/cleaning-gadgets" class="footer-link">Cleaning Gadgets</a>
+          <a href="/collections/all" class="footer-link">All Products</a>
+        </div>
+      </div>
+
+      {%- comment -%} Column 3: Support {%- endcomment -%}
+      <div class="footer-column">
+        <h4>Support</h4>
+        <div class="footer-links">
+          <a href="/pages/contact" class="footer-link">Contact Us</a>
+          <a href="/pages/shipping" class="footer-link">Shipping</a>
+          <a href="/pages/returns" class="footer-link">Returns</a>
+          <a href="/pages/faq" class="footer-link">FAQ</a>
+          <a href="/account" class="footer-link">Track Order</a>
+        </div>
+      </div>
+
+      {%- comment -%} Column 4: Legal {%- endcomment -%}
+      <div class="footer-column">
+        <h4>Legal</h4>
+        <div class="footer-links">
+          <a href="/policies/privacy-policy" class="footer-link">Privacy</a>
+          <a href="/policies/terms-of-service" class="footer-link">Terms</a>
+          <a href="/policies/refund-policy" class="footer-link">Refunds</a>
+        </div>
+      </div>
+    </div>
+
+    {%- comment -%} Footer Bottom {%- endcomment -%}
+    <div class="footer-bottom">
+      <p class="footer-copyright">
+        &copy; {{ 'now' | date: '%Y' }} Oubon Shop. All rights reserved.
+        <br>
+        Made with care in Houston, TX
+      </p>
+    </div>
+  </div>
+</footer>
+
+{% schema %}
+{
+  "name": "Footer",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Social Media"
+    },
+    {
+      "type": "url",
+      "id": "social_instagram_link",
+      "label": "Instagram URL"
+    },
+    {
+      "type": "url",
+      "id": "social_twitter_link",
+      "label": "Twitter URL"
+    },
+    {
+      "type": "url",
+      "id": "social_facebook_link",
+      "label": "Facebook URL"
+    }
+  ]
+}
+{% endschema %}

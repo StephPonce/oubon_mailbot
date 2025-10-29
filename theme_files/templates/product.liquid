@@ -1,0 +1,201 @@
+<div class="product-page">
+  <div class="container">
+    <div class="product-layout">
+      {%- comment -%} LEFT COLUMN: Product Gallery {%- endcomment -%}
+      <div class="product-gallery">
+        <div class="product-main-image">
+          {%- if product.featured_image -%}
+            <img
+              src="{{ product.featured_image | img_url: '800x' }}"
+              alt="{{ product.featured_image.alt | escape }}"
+              width="800"
+              height="800"
+            >
+          {%- else -%}
+            <div style="width: 100%; height: 100%; background: var(--color-gray-100); display: flex; align-items: center; justify-content: center;">
+              <p style="color: var(--color-gray-500);">No image available</p>
+            </div>
+          {%- endif -%}
+        </div>
+
+        {%- if product.images.size > 1 -%}
+          <div class="product-thumbnails" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+            {%- for image in product.images limit: 4 -%}
+              <div style="aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-md); border: 2px solid var(--color-gray-200); cursor: pointer;">
+                <img
+                  src="{{ image | img_url: '200x' }}"
+                  alt="{{ image.alt | escape }}"
+                  width="200"
+                  height="200"
+                  style="width: 100%; height: 100%; object-fit: cover;"
+                >
+              </div>
+            {%- endfor -%}
+          </div>
+        {%- endif -%}
+      </div>
+
+      {%- comment -%} RIGHT COLUMN: Product Info {%- endcomment -%}
+      <div class="product-info">
+        {%- comment -%} Priority Badge {%- endcomment -%}
+        {%- assign score = product.metafields.custom.priority_score | default: 7 -%}
+        {%- if score >= 7.5 -%}
+          <span class="product-badge high">HIGH PRIORITY 🔥</span>
+        {%- elsif score >= 5.5 -%}
+          <span class="product-badge">MEDIUM PRIORITY</span>
+        {%- endif -%}
+
+        {%- comment -%} Product Title {%- endcomment -%}
+        <h1 class="product-name">{{ product.title }}</h1>
+
+        {%- comment -%} Category {%- endcomment -%}
+        {%- if product.type != blank -%}
+          <a href="/collections/{{ product.type | handleize }}" class="product-category">
+            {{ product.type }}
+          </a>
+        {%- endif -%}
+
+        {%- comment -%} Price {%- endcomment -%}
+        <div class="product-price">
+          <span class="price-current" id="product-price">
+            {{ product.selected_or_first_available_variant.price | money }}
+          </span>
+          {%- if product.selected_or_first_available_variant.compare_at_price > product.selected_or_first_available_variant.price -%}
+            <span class="price-compare">
+              {{ product.selected_or_first_available_variant.compare_at_price | money }}
+            </span>
+          {%- endif -%}
+        </div>
+
+        {%- comment -%} Savings Badge {%- endcomment -%}
+        {%- if product.selected_or_first_available_variant.compare_at_price > product.selected_or_first_available_variant.price -%}
+          {%- assign savings = product.selected_or_first_available_variant.compare_at_price | minus: product.selected_or_first_available_variant.price -%}
+          {%- assign savings_percent = savings | times: 100.0 | divided_by: product.selected_or_first_available_variant.compare_at_price | round -%}
+          <div class="product-savings">
+            Save {{ savings | money }} ({{ savings_percent }}%)
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Description {%- endcomment -%}
+        {%- if product.description != blank -%}
+          <div class="product-description">
+            {{ product.description }}
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Product Features {%- endcomment -%}
+        {%- if product.metafields.custom.features != blank -%}
+          <div class="product-features">
+            <h4>Key Features</h4>
+            <div class="feature-list">
+              {%- assign features = product.metafields.custom.features | split: '|' -%}
+              {%- for feature in features -%}
+                <div class="feature-item">
+                  <svg class="feature-check" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M16.6667 5L7.50002 14.1667L3.33335 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  <span>{{ feature }}</span>
+                </div>
+              {%- endfor -%}
+            </div>
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Add to Cart Form {%- endcomment -%}
+        <form method="post" action="/cart/add" id="add-to-cart-form" class="product-form">
+          {%- if product.variants.size > 1 -%}
+            <div class="product-variants" style="margin-bottom: 1.5rem;">
+              <label for="variant-selector" style="display: block; font-weight: 600; margin-bottom: 0.5rem;">
+                Select Option
+              </label>
+              <select
+                name="id"
+                id="variant-selector"
+                class="quantity-value"
+                style="width: 100%; padding: 0.75rem; border: 1px solid var(--color-gray-300); border-radius: var(--radius-md);"
+              >
+                {%- for variant in product.variants -%}
+                  <option
+                    value="{{ variant.id }}"
+                    {% if variant == product.selected_or_first_available_variant %}selected="selected"{% endif %}
+                    {% unless variant.available %}disabled{% endunless %}
+                  >
+                    {{ variant.title }} - {{ variant.price | money }}
+                    {% unless variant.available %} (Sold Out){% endunless %}
+                  </option>
+                {%- endfor -%}
+              </select>
+            </div>
+          {%- else -%}
+            <input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">
+          {%- endif -%}
+
+          <div class="quantity-selector">
+            <label class="quantity-label">Quantity</label>
+            <div class="quantity-input">
+              <button type="button" class="quantity-btn" data-action="decrease" aria-label="Decrease quantity">−</button>
+              <input
+                type="number"
+                name="quantity"
+                value="1"
+                min="1"
+                max="99"
+                class="quantity-value"
+                aria-label="Quantity"
+              >
+              <button type="button" class="quantity-btn" data-action="increase" aria-label="Increase quantity">+</button>
+            </div>
+          </div>
+
+          <div class="product-actions">
+            <button
+              type="submit"
+              class="btn btn-primary btn-large btn-full"
+              {% unless product.selected_or_first_available_variant.available %}disabled{% endunless %}
+            >
+              {% if product.selected_or_first_available_variant.available %}
+                Add to Cart
+              {% else %}
+                Sold Out
+              {% endif %}
+            </button>
+
+            <button type="button" class="btn btn-outline btn-large btn-full">
+              Buy It Now
+            </button>
+          </div>
+        </form>
+
+        {%- comment -%} Trust Badges {%- endcomment -%}
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--color-gray-200);">
+          <div style="text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🚚</div>
+            <div style="font-size: var(--text-xs); color: var(--color-gray-600);">Fast Shipping</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">↩️</div>
+            <div style="font-size: var(--text-xs); color: var(--color-gray-600);">Easy Returns</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🔒</div>
+            <div style="font-size: var(--text-xs); color: var(--color-gray-600);">Secure Payment</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Update price when variant changes
+  const variantSelector = document.getElementById('variant-selector');
+  if (variantSelector) {
+    variantSelector.addEventListener('change', function() {
+      const selectedOption = this.options[this.selectedIndex];
+      const priceElement = document.getElementById('product-price');
+      if (priceElement && selectedOption.dataset.price) {
+        priceElement.textContent = selectedOption.dataset.price;
+      }
+    });
+  }
+</script>

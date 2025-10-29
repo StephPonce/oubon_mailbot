@@ -1,0 +1,135 @@
+{%- comment -%}
+  OUBON SHOP HOMEPAGE
+  Premium smart home e-commerce
+{%- endcomment -%}
+
+{% section 'hero' %}
+
+<section class="trust-badges scroll-reveal">
+  <div class="container">
+    <div class="trust-grid">
+      <div class="trust-badge">
+        <div class="trust-icon">🚚</div>
+        <div class="trust-title">Fast Shipping</div>
+        <div class="trust-subtitle">7-15 Days</div>
+      </div>
+
+      <div class="trust-badge">
+        <div class="trust-icon">↩️</div>
+        <div class="trust-title">Easy Returns</div>
+        <div class="trust-subtitle">30-Day Guarantee</div>
+      </div>
+
+      <div class="trust-badge">
+        <div class="trust-icon">💬</div>
+        <div class="trust-title">24/7 Support</div>
+        <div class="trust-subtitle">Always Here For You</div>
+      </div>
+
+      <div class="trust-badge">
+        <div class="trust-icon">🔒</div>
+        <div class="trust-title">Secure Payment</div>
+        <div class="trust-subtitle">Protected Checkout</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% section 'featured-products' %}
+
+<section class="section section-lg scroll-reveal" style="background: var(--color-gray-50);">
+  <div class="container">
+    <div class="section-header">
+      <span class="section-eyebrow">Explore</span>
+      <h2 class="section-title">Shop By Category</h2>
+      <p class="section-subtitle">Find exactly what you need</p>
+    </div>
+
+    <div class="grid grid-4">
+      <a href="/collections/smart-lighting" class="category-card">
+        <div class="category-icon">💡</div>
+        <div class="category-name">Smart Lighting</div>
+        <div class="category-count">LED strips, bulbs & more</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/home-security" class="category-card">
+        <div class="category-icon">📹</div>
+        <div class="category-name">Home Security</div>
+        <div class="category-count">Cameras & smart locks</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/kitchen-tech" class="category-card">
+        <div class="category-icon">🍳</div>
+        <div class="category-name">Kitchen Tech</div>
+        <div class="category-count">Smart appliances</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/cleaning-gadgets" class="category-card">
+        <div class="category-icon">🧹</div>
+        <div class="category-name">Cleaning Gadgets</div>
+        <div class="category-count">Vacuums & more</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/smart-home-hub" class="category-card">
+        <div class="category-icon">🏠</div>
+        <div class="category-name">Smart Home Hub</div>
+        <div class="category-count">Speakers & displays</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/climate-control" class="category-card">
+        <div class="category-icon">🌡️</div>
+        <div class="category-name">Climate Control</div>
+        <div class="category-count">Thermostats & fans</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/fitness-gadgets" class="category-card">
+        <div class="category-icon">💪</div>
+        <div class="category-name">Fitness Gear</div>
+        <div class="category-count">Trackers & equipment</div>
+        <div class="category-arrow">→</div>
+      </a>
+
+      <a href="/collections/all" class="category-card">
+        <div class="category-icon">✨</div>
+        <div class="category-name">All Products</div>
+        <div class="category-count">Explore everything</div>
+        <div class="category-arrow">→</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section scroll-reveal">
+  <div class="container">
+    <div class="cta-icon">💬</div>
+    <h2 class="cta-title">Questions? We're Here to Help</h2>
+    <p class="cta-subtitle">Get instant support from our team via email or chat</p>
+    <a href="mailto:hello@oubonshop.com" class="btn btn-primary btn-large">
+      Contact Support →
+    </a>
+  </div>
+</section>
+
+{% schema %}
+{
+  "name": "Homepage",
+  "sections": {
+    "hero": {
+      "type": "hero"
+    },
+    "featured-products": {
+      "type": "featured-products"
+    }
+  },
+  "order": [
+    "hero",
+    "featured-products"
+  ]
+}
+{% endschema %}
