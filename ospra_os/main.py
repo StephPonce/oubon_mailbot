@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 
 # Gmail OAuth router (optional)
