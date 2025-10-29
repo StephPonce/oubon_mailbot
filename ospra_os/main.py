@@ -1197,6 +1197,40 @@ async def generate_product_content(
         }
 
 
+@app.post("/api/scrape-aliexpress-product")
+async def scrape_aliexpress_product(url: str):
+    """
+    Scrape product details from AliExpress URL.
+
+    Temporary solution until OAuth is approved.
+    Currently returns error asking for manual entry.
+
+    Args:
+        url: AliExpress product URL
+
+    Returns:
+        {
+            "success": False,
+            "error": "Manual entry required",
+            "message": "Auto-import coming when AliExpress OAuth approved"
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress_scraper import AliExpressScraper
+
+        scraper = AliExpressScraper()
+        result = scraper.scrape_product(url)
+        return result
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
 @app.post("/api/optimize-price")
 async def optimize_product_price(
     product_name: str,

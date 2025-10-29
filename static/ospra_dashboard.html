@@ -1203,9 +1203,6 @@
             const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
             const isFavorited = favorites.includes(name);
 
-            // Get product image URL
-            const imageUrl = product.aliexpress_image || getProductImageUrl(name, niche);
-
             return `
                 <div class="product-card" data-product-id="${productId}" data-product-name="${name}" style="border-radius: 12px; overflow: hidden;">
                     <input type="checkbox" class="bulk-checkbox" id="${checkboxId}"
@@ -1214,11 +1211,10 @@
                             onclick="toggleFavorite('${name.replace(/'/g, "\\'")}', '${favoriteId}')">
                         ${isFavorited ? '⭐' : '☆'}
                     </button>
-                    <img src="${imageUrl}"
-                         alt="${name}"
-                         class="product-image"
-                         style="width: 100%; height: 220px; object-fit: cover; display: block;"
-                         onerror="this.src='https://via.placeholder.com/400x300/6366f1/ffffff?text=Product+Image'">
+                    ${product.aliexpress_image ?
+                        `<img src="${product.aliexpress_image}" alt="${name}" style="width: 100%; height: 220px; object-fit: cover; display: block;">` :
+                        getProductImageHTML(name, niche)
+                    }
                     <div class="product-header" style="padding: 1.5rem;">
                         <div class="product-name">${name}</div>
                         <span class="product-score ${scoreClass}">${priority}: ${score.toFixed(1)}/10</span>
@@ -1465,22 +1461,30 @@
             localStorage.setItem('favorites', JSON.stringify(favorites));
         }
 
-        // Product Image Generator
-        function getProductImageUrl(productName, niche) {
-            // Use Unsplash for high-quality product images
-            const searchTerms = {
-                'smart_lighting': 'led+strip+lights',
-                'home_security': 'security+camera',
-                'kitchen_tech': 'kitchen+appliance',
-                'cleaning_gadgets': 'robot+vacuum',
-                'smart_home_hub': 'smart+speaker',
-                'climate_control': 'smart+thermostat'
+        // Product Emoji Generator (GUARANTEED WORKING!)
+        function getProductEmoji(niche) {
+            const emojiMap = {
+                'smart_lighting': '💡',
+                'home_security': '📹',
+                'kitchen_tech': '🍳',
+                'cleaning_gadgets': '🧹',
+                'smart_home_hub': '🏠',
+                'climate_control': '🌡️'
             };
+            return emojiMap[niche] || '📦';
+        }
 
-            const searchTerm = searchTerms[niche] || productName.toLowerCase().replace(/ /g, '+');
-
-            // Use Unsplash API for real product-like images
-            return `https://source.unsplash.com/400x300/?${searchTerm},product`;
+        // Generate image HTML with emoji and gradient
+        function getProductImageHTML(productName, niche) {
+            const emoji = getProductEmoji(niche);
+            return `
+                <div style="width: 100%; height: 220px; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display: flex; align-items: center; justify-content: center; font-size: 80px; position: relative;">
+                    <span style="filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));">${emoji}</span>
+                    <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(255,255,255,0.9); padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; color: #6366f1;">
+                        ${productName}
+                    </div>
+                </div>
+            `;
         }
 
         // Smart AliExpress Search URL Builder
