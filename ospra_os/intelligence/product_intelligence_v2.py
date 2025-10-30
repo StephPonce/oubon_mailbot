@@ -302,7 +302,7 @@ Keep it concise, actionable, and honest."""
 
         try:
             response = self.claude.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-3-5-sonnet-20240620",  # Fixed: Use valid model name
                 max_tokens=400,
                 messages=[{"role": "user", "content": prompt}]
             )

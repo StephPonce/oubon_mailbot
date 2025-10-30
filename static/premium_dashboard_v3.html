@@ -1499,7 +1499,12 @@
                     })
                 });
 
+                // Log response for debugging
+                console.log('Response status:', response.status);
+                console.log('Response OK:', response.ok);
+
                 const data = await response.json();
+                console.log('Parsed data:', data);
 
                 // Check for specific error messages
                 if (!response.ok) {

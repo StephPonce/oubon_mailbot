@@ -1644,7 +1644,7 @@ Be concise, actionable, and data-driven. Format responses with bullet points and
 
         # Call Claude API
         response = claude.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-5-sonnet-20240620",  # Fixed: Use valid model name
             max_tokens=1024,
             system=system_prompt,
             messages=[{
