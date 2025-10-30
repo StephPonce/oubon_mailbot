@@ -193,6 +193,31 @@ async def premium_dashboard_v2():
         return HTMLResponse(content=f.read())
 
 
+@app.get("/premium/v3", response_class=HTMLResponse)
+async def premium_dashboard_v3():
+    """Premium AI Intelligence Dashboard V3 - Complete Enhancement Package
+
+    Features:
+    - Tabbed navigation (Products, Emails, Business, Settings)
+    - Enhanced product cards with expandable analysis
+    - Score breakdown visualizations
+    - Email dashboard with recent emails
+    - Business analytics with Shopify integration
+    - Settings panel with API connection status
+    - Non-blocking loading states
+    - Claude AI chat integration
+    """
+    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard_v3.html"
+    if not dashboard_path.exists():
+        return HTMLResponse(
+            "<h1>Premium Dashboard V3 Not Found</h1>"
+            "<p>Please ensure static/premium_dashboard_v3.html exists</p>",
+            status_code=404
+        )
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
+
 # ---------------------------------------------------------------
 # Dashboard API Endpoints (New Unified Dashboard)
 # ---------------------------------------------------------------
@@ -302,6 +327,64 @@ async def get_dashboard_emails(settings: Settings = Depends(get_settings)):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/api/emails/recent")
+async def get_recent_emails(limit: int = 20, settings: Settings = Depends(get_settings)):
+    """
+    Get recent processed emails for the email dashboard tab.
+
+    Returns list of recent emails with:
+    - From address
+    - Subject
+    - Category/label
+    - Date processed
+    - Auto-reply status
+    - Preview text
+    """
+    try:
+        from app.analytics import Analytics
+        from datetime import datetime
+
+        analytics = Analytics(settings.database_url)
+
+        # Query recent email metrics from database
+        from app.analytics import EmailMetric
+
+        recent = analytics.session.query(EmailMetric)\
+            .order_by(EmailMetric.timestamp.desc())\
+            .limit(limit)\
+            .all()
+
+        emails = []
+        for email in recent:
+            emails.append({
+                "from": email.customer_email,
+                "subject": email.subject,
+                "category": email.label,
+                "date": email.timestamp.isoformat() if email.timestamp else None,
+                "auto_replied": email.auto_reply_sent,
+                "ai_provider": email.ai_provider,
+                "response_mode": email.response_mode,
+                "processing_time_ms": email.processing_time_ms,
+                "success": email.success,
+                "error": email.error_message if not email.success else None
+            })
+
+        return {
+            "success": True,
+            "emails": emails,
+            "total": len(emails)
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "emails": []
+        }
 
 
 @app.get("/api/dashboard/shopify")
@@ -1418,13 +1501,26 @@ async def discover_winning_products(request: DiscoverRequest):
     - Real profit calculations
     """
     try:
+        import asyncio
         from ospra_os.intelligence.product_intelligence_v2 import ProductIntelligenceEngine  # NEW - Uses real data!
 
         engine = ProductIntelligenceEngine()
-        products = await engine.discover_winning_products(
-            niches=request.niches,
-            max_per_niche=request.max_per_niche
-        )
+
+        # Add timeout protection (120 seconds max)
+        try:
+            products = await asyncio.wait_for(
+                engine.discover_winning_products(
+                    niches=request.niches,
+                    max_per_niche=request.max_per_niche
+                ),
+                timeout=120.0
+            )
+        except asyncio.TimeoutError:
+            return {
+                'success': False,
+                'error': 'Discovery timeout after 120 seconds. Try reducing max_per_niche or fewer niches.',
+                'timeout': True
+            }
 
         return {
             'success': True,
