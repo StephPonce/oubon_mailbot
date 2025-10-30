@@ -38,9 +38,9 @@ class DawnThemeConfigurator:
         # Brand settings for Oubon Shop
         self.brand_config = {
             'colors': {
-                'primary': '#667eea',  # Purple
-                'secondary': '#764ba2',  # Dark purple
-                'accent': '#f093fb',  # Light purple/pink
+                'primary': '#3b82f6',  # Electric Blue
+                'secondary': '#000000',  # Black
+                'accent': '#60a5fa',  # Light Blue
                 'background': '#ffffff',
                 'text': '#1a1a1a',
                 'border': '#e5e5e5',

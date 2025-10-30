@@ -179,6 +179,20 @@ async def premium_dashboard():
         return HTMLResponse(content=f.read())
 
 
+@app.get("/premium/v2", response_class=HTMLResponse)
+async def premium_dashboard_v2():
+    """Premium AI Intelligence Dashboard V2 - Enhanced with Real Data Integration"""
+    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard_v2.html"
+    if not dashboard_path.exists():
+        return HTMLResponse(
+            "<h1>Premium Dashboard V2 Not Found</h1>"
+            "<p>Please ensure static/premium_dashboard_v2.html exists</p>",
+            status_code=404
+        )
+    with open(dashboard_path, "r") as f:
+        return HTMLResponse(content=f.read())
+
+
 # ---------------------------------------------------------------
 # Dashboard API Endpoints (New Unified Dashboard)
 # ---------------------------------------------------------------
@@ -455,6 +469,74 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
         }
     except Exception as e:
         return {"error": str(e), "overall_health": "error"}
+
+
+@app.get("/admin/dashboard/data")
+async def get_admin_dashboard_data(settings: Settings = Depends(get_settings)):
+    """
+    Unified endpoint for the premium dashboard v2.
+
+    Returns complete dashboard data including:
+    - Overview stats (products, emails, API connections)
+    - Email analytics
+    - Product discoveries
+    - System health
+    """
+    try:
+        from app.analytics import Analytics
+
+        analytics = Analytics(settings.database_url)
+
+        # Get email stats
+        daily_stats = analytics.get_daily_stats()
+        weekly_stats = analytics.get_weekly_stats()
+
+        # Count active API connections
+        active_apis = {
+            "gmail": GmailClient is not None,
+            "anthropic": settings.ANTHROPIC_API_KEY is not None,
+            "aliexpress": settings.ALIEXPRESS_APP_KEY is not None,
+            "shopify": settings.SHOPIFY_STORE is not None,
+        }
+
+        active_count = sum(1 for v in active_apis.values() if v)
+
+        # Calculate system health
+        system_health = "healthy" if active_count >= 2 else "degraded"
+
+        return {
+            "success": True,
+            "overview": {
+                "total_products": 0,  # Will be updated when products are discovered
+                "avg_score": 0.0,
+                "avg_profit": 0.0,
+                "high_priority": 0,
+                "emails_processed_today": daily_stats.get("total_processed", 0),
+                "emails_processed_week": weekly_stats.get("total_processed", 0),
+                "active_apis": active_count,
+                "total_apis": len(active_apis),
+                "system_health": system_health,
+            },
+            "email_stats": {
+                "processed_today": daily_stats.get("total_processed", 0),
+                "processed_week": weekly_stats.get("total_processed", 0),
+                "auto_replied_today": daily_stats.get("auto_replied", 0),
+                "auto_replied_week": weekly_stats.get("auto_replied", 0),
+                "response_rate": daily_stats.get("auto_reply_rate", 0),
+            },
+            "products": [],  # Products will come from /api/intelligence/discover
+            "api_status": active_apis,
+            "timestamp": "2025-10-29",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "overview": {
+                "total_products": 0,
+                "system_health": "error"
+            }
+        }
 
 
 @app.post("/api/discover")

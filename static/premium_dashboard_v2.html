@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OUBON SHOP - AI Intelligence Dashboard</title>
+    <style>
+        /* ============================================================
+           RESET & BASE STYLES
+           ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Color Palette - Black/Electric Blue/White */
+            --color-bg-primary: #000000;
+            --color-bg-secondary: #1a1a2e;
+            --color-bg-tertiary: #0f0f1e;
+            --color-accent-blue: #3b82f6;
+            --color-accent-blue-light: #60a5fa;
+            --color-accent-blue-dark: #2563eb;
+            --color-text-primary: #ffffff;
+            --color-text-secondary: #e5e7eb;
+            --color-text-muted: #9ca3af;
+            --color-border: #1f2937;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-error: #ef4444;
+
+            /* Spacing */
+            --spacing-xs: 0.25rem;
+            --spacing-sm: 0.5rem;
+            --spacing-md: 1rem;
+            --spacing-lg: 1.5rem;
+            --spacing-xl: 2rem;
+            --spacing-2xl: 3rem;
+
+            /* Border Radius */
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 0.75rem;
+            --radius-xl: 1rem;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+
+            /* Transitions */
+            --transition-fast: 150ms ease-in-out;
+            --transition-normal: 250ms ease-in-out;
+            --transition-slow: 350ms ease-in-out;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #000000 0%, #1a1a2e 100%);
+            background-attachment: fixed;
+            color: var(--color-text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ============================================================
+           LAYOUT STRUCTURE
+           ============================================================ */
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: var(--spacing-xl);
+        }
+
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: var(--spacing-2xl);
+            padding: var(--spacing-xl) 0;
+            position: relative;
+        }
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 4px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                var(--color-accent-blue) 50%,
+                transparent 100%);
+            border-radius: 2px;
+        }
+
+        .dashboard-title {
+            font-size: 3rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-blue-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: var(--spacing-sm);
+            letter-spacing: -0.02em;
+        }
+
+        .dashboard-subtitle {
+            color: var(--color-text-muted);
+            font-size: 1.125rem;
+            font-weight: 400;
+        }
+
+        /* ============================================================
+           STATS GRID
+           ============================================================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .stat-card {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            transition: all var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg,
+                var(--color-accent-blue) 0%,
+                var(--color-accent-blue-light) 100%);
+            transform: scaleX(0);
+            transition: transform var(--transition-normal);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--color-accent-blue);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--color-accent-blue);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .stat-change {
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .stat-change.positive {
+            color: var(--color-success);
+        }
+
+        .stat-change.negative {
+            color: var(--color-error);
+        }
+
+        /* ============================================================
+           CONTROL PANEL
+           ============================================================ */
+        .control-panel {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .control-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .control-header::before {
+            content: '🎯';
+            font-size: 1.75rem;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .control-label {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .control-input,
+        .control-select {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            color: var(--color-text-primary);
+            font-size: 1rem;
+            transition: all var(--transition-fast);
+        }
+
+        .control-input:focus,
+        .control-select:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .control-input::placeholder {
+            color: var(--color-text-muted);
+        }
+
+        /* ============================================================
+           BUTTONS
+           ============================================================ */
+        .btn {
+            padding: var(--spacing-md) var(--spacing-xl);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-normal);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            transform: translate(-50%, -50%);
+            transition: width var(--transition-slow), height var(--transition-slow);
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-blue-dark) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--color-accent-blue);
+            background: var(--color-bg-tertiary);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: var(--spacing-md);
+            flex-wrap: wrap;
+        }
+
+        /* ============================================================
+           LOADING STATES
+           ============================================================ */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+            padding: var(--spacing-2xl);
+        }
+
+        .loading-spinner {
+            width: 64px;
+            height: 64px;
+            border: 4px solid var(--color-border);
+            border-top-color: var(--color-accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--spacing-lg);
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.125rem;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .loading-subtext {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+        }
+
+        /* ============================================================
+           PRODUCTS GRID
+           ============================================================ */
+        .products-section {
+            margin-bottom: var(--spacing-2xl);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: var(--spacing-lg);
+            flex-wrap: wrap;
+            gap: var(--spacing-md);
+        }
+
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .section-title::before {
+            content: '🏆';
+            font-size: 2rem;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: var(--spacing-xl);
+        }
+
+        .product-card {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            transition: all var(--transition-normal);
+            position: relative;
+        }
+
+        .product-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--color-accent-blue);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .product-priority-badge {
+            position: absolute;
+            top: var(--spacing-md);
+            left: var(--spacing-md);
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            z-index: 10;
+            backdrop-filter: blur(8px);
+        }
+
+        .product-priority-badge.high {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .product-priority-badge.medium {
+            background: rgba(245, 158, 11, 0.9);
+            color: white;
+        }
+
+        .product-priority-badge.low {
+            background: rgba(59, 130, 246, 0.9);
+            color: white;
+        }
+
+        .product-image-container {
+            position: relative;
+            width: 100%;
+            padding-top: 75%;
+            background: var(--color-bg-secondary);
+            overflow: hidden;
+        }
+
+        .product-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform var(--transition-slow);
+        }
+
+        .product-card:hover .product-image {
+            transform: scale(1.1);
+        }
+
+        .product-score-badge {
+            position: absolute;
+            top: var(--spacing-md);
+            right: var(--spacing-md);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid var(--color-accent-blue);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            text-align: center;
+            backdrop-filter: blur(8px);
+        }
+
+        .product-score-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-accent-blue);
+            line-height: 1;
+        }
+
+        .product-score-label {
+            font-size: 0.625rem;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .product-content {
+            padding: var(--spacing-lg);
+        }
+
+        .product-header {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .product-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--color-text-primary);
+            margin-bottom: var(--spacing-sm);
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .product-category {
+            display: inline-block;
+            padding: var(--spacing-xs) var(--spacing-md);
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            color: var(--color-accent-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+        }
+
+        .product-pricing {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            padding: var(--spacing-md);
+            background: var(--color-bg-secondary);
+            border-radius: var(--radius-md);
+        }
+
+        .price-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .price-label {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .price-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .price-value.cost {
+            color: var(--color-error);
+        }
+
+        .price-value.sell {
+            color: var(--color-success);
+        }
+
+        .product-profit {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-md);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(16, 185, 129, 0.05) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .profit-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-success);
+        }
+
+        .profit-margin {
+            font-size: 0.875rem;
+            color: var(--color-success);
+            font-weight: 600;
+        }
+
+        .product-metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .metric-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-size: 0.875rem;
+        }
+
+        .metric-icon {
+            font-size: 1rem;
+        }
+
+        .metric-label {
+            color: var(--color-text-muted);
+        }
+
+        .metric-value {
+            color: var(--color-text-primary);
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .product-ai-analysis {
+            background: var(--color-bg-secondary);
+            border-left: 3px solid var(--color-accent-blue);
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-md);
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-sm);
+            color: var(--color-accent-blue);
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .ai-content {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+            line-height: 1.6;
+        }
+
+        .product-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: var(--spacing-md);
+            border: none;
+            border-radius: var(--radius-md);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-align: center;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-xs);
+        }
+
+        .btn-view-source {
+            background: var(--color-accent-blue);
+            color: white;
+        }
+
+        .btn-view-source:hover {
+            background: var(--color-accent-blue-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-add-shopify {
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+        }
+
+        .btn-add-shopify:hover {
+            border-color: var(--color-accent-blue);
+            background: var(--color-bg-tertiary);
+        }
+
+        /* ============================================================
+           EMPTY STATE
+           ============================================================ */
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-2xl);
+            background: var(--color-bg-tertiary);
+            border: 2px dashed var(--color-border);
+            border-radius: var(--radius-lg);
+        }
+
+        .empty-icon {
+            font-size: 4rem;
+            margin-bottom: var(--spacing-lg);
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .empty-text {
+            font-size: 1rem;
+            color: var(--color-text-muted);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        /* ============================================================
+           CLAUDE AI CHATBOX
+           ============================================================ */
+        .ai-chatbox {
+            position: fixed;
+            bottom: var(--spacing-xl);
+            right: var(--spacing-xl);
+            z-index: 1000;
+        }
+
+        .ai-chatbox-toggle {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-blue-dark) 100%);
+            border: none;
+            cursor: pointer;
+            box-shadow: var(--shadow-glow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            transition: all var(--transition-normal);
+            position: relative;
+        }
+
+        .ai-chatbox-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .ai-chatbox-toggle::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-blue-dark) 100%);
+            border-radius: 50%;
+            z-index: -1;
+            opacity: 0;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+        }
+
+        .ai-chatbox-panel {
+            position: absolute;
+            bottom: 80px;
+            right: 0;
+            width: 400px;
+            max-height: 600px;
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .ai-chatbox-panel.active {
+            display: flex;
+        }
+
+        .ai-chatbox-header {
+            padding: var(--spacing-lg);
+            background: linear-gradient(135deg, var(--color-accent-blue) 0%, var(--color-accent-blue-dark) 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .ai-chatbox-title {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .ai-chatbox-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            transition: background var(--transition-fast);
+        }
+
+        .ai-chatbox-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .ai-chatbox-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .ai-message {
+            padding: var(--spacing-md);
+            border-radius: var(--radius-md);
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .ai-message.user {
+            background: var(--color-accent-blue);
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: var(--spacing-xs);
+        }
+
+        .ai-message.assistant {
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+            align-self: flex-start;
+            border-bottom-left-radius: var(--spacing-xs);
+        }
+
+        .ai-message-time {
+            font-size: 0.75rem;
+            color: var(--color-text-muted);
+            margin-top: var(--spacing-xs);
+        }
+
+        .ai-chatbox-input-container {
+            padding: var(--spacing-lg);
+            border-top: 1px solid var(--color-border);
+            background: var(--color-bg-secondary);
+        }
+
+        .ai-chatbox-input-wrapper {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .ai-chatbox-input {
+            flex: 1;
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            color: var(--color-text-primary);
+            font-size: 0.875rem;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+        }
+
+        .ai-chatbox-input:focus {
+            outline: none;
+            border-color: var(--color-accent-blue);
+        }
+
+        .ai-chatbox-send {
+            background: var(--color-accent-blue);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            padding: 0 var(--spacing-lg);
+            cursor: pointer;
+            font-size: 1.25rem;
+            transition: background var(--transition-fast);
+        }
+
+        .ai-chatbox-send:hover:not(:disabled) {
+            background: var(--color-accent-blue-dark);
+        }
+
+        .ai-chatbox-send:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .ai-typing-indicator {
+            display: none;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: var(--spacing-md);
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            max-width: 85%;
+            align-self: flex-start;
+        }
+
+        .ai-typing-indicator.active {
+            display: flex;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-accent-blue);
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            30% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+
+        /* ============================================================
+           NOTIFICATIONS
+           ============================================================ */
+        .notification-container {
+            position: fixed;
+            top: var(--spacing-xl);
+            right: var(--spacing-xl);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-md);
+        }
+
+        .notification {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+            min-width: 320px;
+            box-shadow: var(--shadow-xl);
+            display: flex;
+            align-items: start;
+            gap: var(--spacing-md);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            border-left: 4px solid var(--color-success);
+        }
+
+        .notification.error {
+            border-left: 4px solid var(--color-error);
+        }
+
+        .notification.warning {
+            border-left: 4px solid var(--color-warning);
+        }
+
+        .notification.info {
+            border-left: 4px solid var(--color-accent-blue);
+        }
+
+        .notification-icon {
+            font-size: 1.5rem;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .notification-message {
+            font-size: 0.875rem;
+            color: var(--color-text-muted);
+        }
+
+        .notification-close {
+            background: none;
+            border: none;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .notification-close:hover {
+            background: var(--color-bg-secondary);
+            color: var(--color-text-primary);
+        }
+
+        /* ============================================================
+           FILTERS & SORTING
+           ============================================================ */
+        .filters-bar {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: var(--spacing-md);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--color-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* ============================================================
+           RESPONSIVE DESIGN
+           ============================================================ */
+        @media (max-width: 768px) {
+            .dashboard-container {
+                padding: var(--spacing-md);
+            }
+
+            .dashboard-title {
+                font-size: 2rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .control-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .ai-chatbox-panel {
+                width: calc(100vw - 2 * var(--spacing-xl));
+                bottom: 80px;
+                right: var(--spacing-xl);
+                left: var(--spacing-xl);
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn-group .btn {
+                width: 100%;
+            }
+        }
+
+        /* ============================================================
+           SCROLLBAR STYLING
+           ============================================================ */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-border);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-accent-blue);
+        }
+
+        /* ============================================================
+           UTILITIES
+           ============================================================ */
+        .hidden {
+            display: none !important;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-lg {
+            margin-top: var(--spacing-lg);
+        }
+
+        .mb-lg {
+            margin-bottom: var(--spacing-lg);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Discovering Winning Products...</div>
+            <div class="loading-subtext">AI is analyzing thousands of products from AliExpress</div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <h1 class="dashboard-title">OUBON SHOP</h1>
+            <p class="dashboard-subtitle">AI-Powered Product Intelligence Dashboard</p>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-label">Total Products</div>
+                <div class="stat-value" id="statTotalProducts">0</div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    <span>Ready to import</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">Avg. Score</div>
+                <div class="stat-value" id="statAvgScore">0.0</div>
+                <div class="stat-change positive">
+                    <span>★</span>
+                    <span>AI-rated quality</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">Avg. Profit</div>
+                <div class="stat-value" id="statAvgProfit">$0.00</div>
+                <div class="stat-change positive">
+                    <span>↑</span>
+                    <span>Per product</span>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">High Priority</div>
+                <div class="stat-value" id="statHighPriority">0</div>
+                <div class="stat-change positive">
+                    <span>🔥</span>
+                    <span>Urgent imports</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2 class="control-header">Discovery Controls</h2>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label class="control-label" for="nichesInput">Niches (comma-separated)</label>
+                    <input
+                        type="text"
+                        id="nichesInput"
+                        class="control-input"
+                        placeholder="e.g., smart home, fitness, pet supplies"
+                        value="smart home, fitness, pet supplies, kitchen gadgets, beauty tech"
+                    >
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="maxPerNiche">Products per Niche</label>
+                    <input
+                        type="number"
+                        id="maxPerNiche"
+                        class="control-input"
+                        min="1"
+                        max="20"
+                        value="10"
+                    >
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="sortBy">Sort By</label>
+                    <select id="sortBy" class="control-select">
+                        <option value="score">Highest Score</option>
+                        <option value="profit">Highest Profit</option>
+                        <option value="orders">Most Orders</option>
+                        <option value="rating">Best Rating</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label class="control-label" for="filterPriority">Filter Priority</label>
+                    <select id="filterPriority" class="control-select">
+                        <option value="all">All Products</option>
+                        <option value="high">High Priority Only</option>
+                        <option value="medium">Medium Priority Only</option>
+                        <option value="low">Low Priority Only</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group mt-lg">
+                <button class="btn btn-primary" id="discoverBtn" onclick="discoverProducts()">
+                    <span>🔍</span>
+                    <span>Discover Winning Products</span>
+                </button>
+                <button class="btn btn-secondary" onclick="clearResults()">
+                    <span>🗑️</span>
+                    <span>Clear Results</span>
+                </button>
+                <button class="btn btn-secondary" onclick="exportProducts()">
+                    <span>📥</span>
+                    <span>Export to CSV</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Products Section -->
+        <div class="products-section">
+            <div class="section-header">
+                <h2 class="section-title">Winning Products</h2>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="sortProducts('score')">
+                        Sort by Score
+                    </button>
+                    <button class="btn btn-secondary" onclick="sortProducts('profit')">
+                        Sort by Profit
+                    </button>
+                </div>
+            </div>
+
+            <div class="products-grid" id="productsGrid">
+                <!-- Products will be inserted here dynamically -->
+                <div class="empty-state">
+                    <div class="empty-icon">📦</div>
+                    <h3 class="empty-title">No Products Yet</h3>
+                    <p class="empty-text">Click "Discover Winning Products" to find trending items with AI analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Claude AI Chatbox -->
+    <div class="ai-chatbox">
+        <button class="ai-chatbox-toggle" onclick="toggleChatbox()">
+            🤖
+        </button>
+
+        <div class="ai-chatbox-panel" id="chatboxPanel">
+            <div class="ai-chatbox-header">
+                <div class="ai-chatbox-title">
+                    <span>🤖</span>
+                    <span>Claude AI Assistant</span>
+                </div>
+                <button class="ai-chatbox-close" onclick="toggleChatbox()">×</button>
+            </div>
+
+            <div class="ai-chatbox-messages" id="chatboxMessages">
+                <div class="ai-message assistant">
+                    <div>Hi! I'm Claude, your AI assistant. I can help you understand your dashboard metrics, suggest product strategies, and answer questions about your data.</div>
+                    <div class="ai-message-time">Just now</div>
+                </div>
+            </div>
+
+            <div class="ai-typing-indicator" id="typingIndicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
+
+            <div class="ai-chatbox-input-container">
+                <div class="ai-chatbox-input-wrapper">
+                    <textarea
+                        class="ai-chatbox-input"
+                        id="chatboxInput"
+                        placeholder="Ask me anything about your products..."
+                        rows="1"
+                        onkeypress="handleChatInputKeypress(event)"
+                    ></textarea>
+                    <button class="ai-chatbox-send" onclick="sendChatMessage()">
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // GLOBAL STATE
+        // ============================================================
+        let allProducts = [];
+        let currentFilters = {
+            priority: 'all',
+            sortBy: 'score'
+        };
+
+        // ============================================================
+        // MAIN PRODUCT DISCOVERY FUNCTION
+        // ============================================================
+        async function discoverProducts() {
+            const nichesInput = document.getElementById('nichesInput').value;
+            const maxPerNiche = parseInt(document.getElementById('maxPerNiche').value);
+            const discoverBtn = document.getElementById('discoverBtn');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+
+            if (!nichesInput.trim()) {
+                showNotification('error', 'Error', 'Please enter at least one niche');
+                return;
+            }
+
+            const niches = nichesInput.split(',').map(n => n.trim()).filter(n => n);
+
+            // Disable button and show loading
+            discoverBtn.disabled = true;
+            loadingOverlay.classList.add('active');
+
+            try {
+                const response = await fetch('/api/intelligence/discover', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        niches: niches,
+                        max_per_niche: maxPerNiche
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to discover products');
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.products && data.products.length > 0) {
+                    allProducts = data.products;
+                    displayProducts(allProducts);
+                    updateStats(allProducts);
+                    showNotification('success', 'Success', `Discovered ${data.products.length} winning products!`);
+                } else {
+                    showNotification('warning', 'No Results', 'No products found. Try different niches or settings.');
+                }
+
+            } catch (error) {
+                console.error('Discovery error:', error);
+                showNotification('error', 'Error', error.message || 'Failed to discover products. Check console for details.');
+            } finally {
+                discoverBtn.disabled = false;
+                loadingOverlay.classList.remove('active');
+            }
+        }
+
+        // ============================================================
+        // DISPLAY FUNCTIONS
+        // ============================================================
+        function displayProducts(products) {
+            const grid = document.getElementById('productsGrid');
+
+            if (!products || products.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📦</div>
+                        <h3 class="empty-title">No Products Found</h3>
+                        <p class="empty-text">Try adjusting your filters or discovering new products</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = products.map(product => createProductCard(product)).join('');
+        }
+
+        function createProductCard(product) {
+            const display = product.display_data || {};
+            const score = product.score || 0;
+            const priority = product.priority || 'low';
+
+            // Extract pricing information
+            const cost = display.supplier_cost || 0;
+            const sell = display.market_price || 0;
+            const profit = display.estimated_profit || 0;
+            const margin = display.profit_margin || 0;
+
+            // Metrics
+            const orders = display.supplier_orders || 0;
+            const rating = display.supplier_rating || 0;
+            const stock = display.supplier_stock || 0;
+
+            // AI explanation
+            const aiExplanation = product.ai_explanation || 'AI analysis not available';
+
+            // Image handling
+            const imageUrl = display.image_url || display.supplier_image || '';
+            const imageSrc = imageUrl || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="400" height="300"%3E%3Crect fill="%231a1a2e" width="400" height="300"/%3E%3Ctext fill="%239ca3af" x="50%25" y="50%25" text-anchor="middle" dominant-baseline="middle" font-family="system-ui" font-size="18"%3ENo Image%3C/text%3E%3C/svg%3E';
+
+            // Supplier URL
+            const supplierUrl = display.supplier_url || '#';
+
+            return `
+                <div class="product-card" data-priority="${priority}">
+                    <div class="product-priority-badge ${priority}">${priority.toUpperCase()}</div>
+
+                    <div class="product-image-container">
+                        <img src="${imageSrc}" alt="${display.name || 'Product'}" class="product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22300%22%3E%3Crect fill=%22%231a1a2e%22 width=%22400%22 height=%22300%22/%3E%3Ctext fill=%22%239ca3af%22 x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dominant-baseline=%22middle%22 font-family=%22system-ui%22 font-size=%2218%22%3ENo Image%3C/text%3E%3C/svg%3E'">
+                        <div class="product-score-badge">
+                            <div class="product-score-value">${score.toFixed(1)}</div>
+                            <div class="product-score-label">Score</div>
+                        </div>
+                    </div>
+
+                    <div class="product-content">
+                        <div class="product-header">
+                            <h3 class="product-name">${display.name || 'Unnamed Product'}</h3>
+                            <span class="product-category">${display.category || 'General'}</span>
+                        </div>
+
+                        <div class="product-pricing">
+                            <div class="price-item">
+                                <div class="price-label">Cost</div>
+                                <div class="price-value cost">$${cost.toFixed(2)}</div>
+                            </div>
+                            <div class="price-item">
+                                <div class="price-label">Sell Price</div>
+                                <div class="price-value sell">$${sell.toFixed(2)}</div>
+                            </div>
+                        </div>
+
+                        <div class="product-profit">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 0.25rem;">PROFIT</div>
+                                <div class="profit-amount">$${profit.toFixed(2)}</div>
+                            </div>
+                            <div class="profit-margin">${margin.toFixed(1)}% margin</div>
+                        </div>
+
+                        <div class="product-metrics">
+                            <div class="metric-item">
+                                <span class="metric-icon">📦</span>
+                                <span class="metric-label">Orders:</span>
+                                <span class="metric-value">${orders.toLocaleString()}</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-icon">⭐</span>
+                                <span class="metric-label">Rating:</span>
+                                <span class="metric-value">${rating.toFixed(1)}</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-icon">📊</span>
+                                <span class="metric-label">Stock:</span>
+                                <span class="metric-value">${stock.toLocaleString()}</span>
+                            </div>
+                            <div class="metric-item">
+                                <span class="metric-icon">💰</span>
+                                <span class="metric-label">Price:</span>
+                                <span class="metric-value">$${cost.toFixed(2)}</span>
+                            </div>
+                        </div>
+
+                        <div class="product-ai-analysis">
+                            <div class="ai-header">
+                                <span>🤖</span>
+                                <span>Claude AI Analysis</span>
+                            </div>
+                            <div class="ai-content">${aiExplanation}</div>
+                        </div>
+
+                        <div class="product-actions">
+                            <a href="${supplierUrl}" target="_blank" class="btn-action btn-view-source">
+                                <span>🔗</span>
+                                <span>View on AliExpress</span>
+                            </a>
+                            <button class="btn-action btn-add-shopify" onclick="addToShopify('${display.name}')">
+                                <span>🛍️</span>
+                                <span>Add to Shopify</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateStats(products) {
+            if (!products || products.length === 0) {
+                document.getElementById('statTotalProducts').textContent = '0';
+                document.getElementById('statAvgScore').textContent = '0.0';
+                document.getElementById('statAvgProfit').textContent = '$0.00';
+                document.getElementById('statHighPriority').textContent = '0';
+                return;
+            }
+
+            const totalProducts = products.length;
+            const avgScore = products.reduce((sum, p) => sum + (p.score || 0), 0) / totalProducts;
+            const avgProfit = products.reduce((sum, p) => sum + (p.display_data?.estimated_profit || 0), 0) / totalProducts;
+            const highPriority = products.filter(p => p.priority === 'high').length;
+
+            document.getElementById('statTotalProducts').textContent = totalProducts;
+            document.getElementById('statAvgScore').textContent = avgScore.toFixed(1);
+            document.getElementById('statAvgProfit').textContent = `$${avgProfit.toFixed(2)}`;
+            document.getElementById('statHighPriority').textContent = highPriority;
+        }
+
+        // ============================================================
+        // FILTER & SORT FUNCTIONS
+        // ============================================================
+        function applyFilters() {
+            const priorityFilter = document.getElementById('filterPriority').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            let filtered = [...allProducts];
+
+            // Apply priority filter
+            if (priorityFilter !== 'all') {
+                filtered = filtered.filter(p => p.priority === priorityFilter);
+            }
+
+            // Apply sorting
+            filtered = sortProducts(filtered, sortBy);
+
+            displayProducts(filtered);
+        }
+
+        function sortProducts(products, sortBy) {
+            const sorted = [...(Array.isArray(products) ? products : allProducts)];
+
+            switch(sortBy || document.getElementById('sortBy').value) {
+                case 'score':
+                    sorted.sort((a, b) => (b.score || 0) - (a.score || 0));
+                    break;
+                case 'profit':
+                    sorted.sort((a, b) => (b.display_data?.estimated_profit || 0) - (a.display_data?.estimated_profit || 0));
+                    break;
+                case 'orders':
+                    sorted.sort((a, b) => (b.display_data?.supplier_orders || 0) - (a.display_data?.supplier_orders || 0));
+                    break;
+                case 'rating':
+                    sorted.sort((a, b) => (b.display_data?.supplier_rating || 0) - (a.display_data?.supplier_rating || 0));
+                    break;
+            }
+
+            if (typeof products === 'string') {
+                // Called from button with sort type
+                allProducts = sorted;
+                displayProducts(sorted);
+                return sorted;
+            }
+
+            return sorted;
+        }
+
+        // ============================================================
+        // UTILITY FUNCTIONS
+        // ============================================================
+        function clearResults() {
+            allProducts = [];
+            displayProducts([]);
+            updateStats([]);
+            showNotification('info', 'Cleared', 'All results have been cleared');
+        }
+
+        function exportProducts() {
+            if (allProducts.length === 0) {
+                showNotification('warning', 'No Data', 'No products to export');
+                return;
+            }
+
+            const csv = convertToCSV(allProducts);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `oubon-products-${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+
+            showNotification('success', 'Exported', 'Products exported to CSV successfully');
+        }
+
+        function convertToCSV(products) {
+            const headers = ['Name', 'Category', 'Score', 'Priority', 'Cost', 'Sell Price', 'Profit', 'Margin %', 'Orders', 'Rating', 'Stock', 'URL'];
+            const rows = products.map(p => {
+                const d = p.display_data || {};
+                return [
+                    d.name || '',
+                    d.category || '',
+                    p.score || 0,
+                    p.priority || '',
+                    d.supplier_cost || 0,
+                    d.market_price || 0,
+                    d.estimated_profit || 0,
+                    d.profit_margin || 0,
+                    d.supplier_orders || 0,
+                    d.supplier_rating || 0,
+                    d.supplier_stock || 0,
+                    d.supplier_url || ''
+                ].map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',');
+            });
+
+            return [headers.join(','), ...rows].join('\n');
+        }
+
+        async function addToShopify(productName) {
+            showNotification('info', 'Coming Soon', 'Shopify integration will be available soon!');
+            // TODO: Implement Shopify API integration
+        }
+
+        // ============================================================
+        // NOTIFICATION SYSTEM
+        // ============================================================
+        function showNotification(type, title, message) {
+            const container = document.getElementById('notificationContainer');
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-icon">${icons[type]}</div>
+                <div class="notification-content">
+                    <div class="notification-title">${title}</div>
+                    <div class="notification-message">${message}</div>
+                </div>
+                <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+            `;
+
+            container.appendChild(notification);
+
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
+        // ============================================================
+        // CLAUDE AI CHATBOX
+        // ============================================================
+        function toggleChatbox() {
+            const panel = document.getElementById('chatboxPanel');
+            panel.classList.toggle('active');
+
+            if (panel.classList.contains('active')) {
+                document.getElementById('chatboxInput').focus();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatboxInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // Add user message
+            addChatMessage('user', message);
+            input.value = '';
+
+            // Show typing indicator
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.classList.add('active');
+
+            try {
+                // Get dashboard context
+                const context = getDashboardContext();
+
+                // Simulate AI response (replace with actual Claude API call)
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                const response = await getAIResponse(message, context);
+
+                typingIndicator.classList.remove('active');
+                addChatMessage('assistant', response);
+
+            } catch (error) {
+                typingIndicator.classList.remove('active');
+                addChatMessage('assistant', 'Sorry, I encountered an error. Please try again.');
+                console.error('Chat error:', error);
+            }
+        }
+
+        function addChatMessage(type, content) {
+            const messagesContainer = document.getElementById('chatboxMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `ai-message ${type}`;
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            messageDiv.innerHTML = `
+                <div>${content}</div>
+                <div class="ai-message-time">${now}</div>
+            `;
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function getDashboardContext() {
+            return {
+                totalProducts: allProducts.length,
+                avgScore: allProducts.length > 0 ? (allProducts.reduce((sum, p) => sum + (p.score || 0), 0) / allProducts.length).toFixed(1) : 0,
+                avgProfit: allProducts.length > 0 ? (allProducts.reduce((sum, p) => sum + (p.display_data?.estimated_profit || 0), 0) / allProducts.length).toFixed(2) : 0,
+                highPriority: allProducts.filter(p => p.priority === 'high').length,
+                products: allProducts.slice(0, 3).map(p => ({
+                    name: p.display_data?.name,
+                    score: p.score,
+                    profit: p.display_data?.estimated_profit
+                }))
+            };
+        }
+
+        async function getAIResponse(message, context) {
+            // Simple rule-based responses (replace with actual Claude API integration)
+            const lowerMessage = message.toLowerCase();
+
+            if (lowerMessage.includes('how many') || lowerMessage.includes('total')) {
+                return `You currently have ${context.totalProducts} products in your dashboard with an average score of ${context.avgScore}/10.`;
+            }
+
+            if (lowerMessage.includes('profit') || lowerMessage.includes('money')) {
+                return `Your average profit per product is $${context.avgProfit}. ${context.highPriority} products are marked as high priority for immediate action.`;
+            }
+
+            if (lowerMessage.includes('recommend') || lowerMessage.includes('suggest')) {
+                if (context.products.length > 0) {
+                    const top = context.products[0];
+                    return `I recommend focusing on "${top.name}" with a score of ${top.score}/10 and estimated profit of $${top.profit?.toFixed(2)}. It shows strong market potential.`;
+                }
+                return 'Discover some products first, then I can provide personalized recommendations!';
+            }
+
+            if (lowerMessage.includes('priority') || lowerMessage.includes('urgent')) {
+                return `You have ${context.highPriority} high-priority products that need immediate attention. These are trending items with high profit potential.`;
+            }
+
+            // Default response
+            return `I can help you with insights about your ${context.totalProducts} products. Try asking about profits, recommendations, or which products to prioritize!`;
+        }
+
+        function handleChatInputKeypress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendChatMessage();
+            }
+        }
+
+        // ============================================================
+        // EVENT LISTENERS
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add event listeners for filters
+            document.getElementById('filterPriority').addEventListener('change', applyFilters);
+            document.getElementById('sortBy').addEventListener('change', applyFilters);
+
+            // Auto-resize chat input
+            const chatInput = document.getElementById('chatboxInput');
+            chatInput.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+            });
+
+            console.log('🚀 OUBON SHOP Dashboard v2 Loaded');
+            console.log('✅ Connected to: /api/intelligence/discover');
+            console.log('🎨 Theme: Black/Electric Blue');
+        });
+    </script>
+</body>
+</html>
