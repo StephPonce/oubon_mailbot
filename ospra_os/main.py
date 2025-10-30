@@ -483,6 +483,7 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
     - AliExpress
     """
     try:
+        import os
         status_checks = []
 
         # Gmail
@@ -493,16 +494,16 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
             "health": "healthy" if gmail_configured else "unavailable",
         })
 
-        # OpenAI
-        openai_configured = settings.OPENAI_API_KEY is not None
+        # OpenAI - check both settings and env
+        openai_configured = bool(settings.OPENAI_API_KEY) or bool(os.getenv('OPENAI_API_KEY'))
         status_checks.append({
             "name": "OpenAI API",
             "status": "connected" if openai_configured else "not_configured",
             "health": "healthy" if openai_configured else "unavailable",
         })
 
-        # Claude (Anthropic)
-        claude_configured = settings.CLAUDE_API_KEY is not None
+        # Claude (Anthropic) - check both CLAUDE_API_KEY and ANTHROPIC_API_KEY
+        claude_configured = bool(settings.CLAUDE_API_KEY) or bool(os.getenv('ANTHROPIC_API_KEY')) or bool(os.getenv('CLAUDE_API_KEY'))
         status_checks.append({
             "name": "Claude API",
             "status": "connected" if claude_configured else "not_configured",
@@ -510,7 +511,7 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
         })
 
         # Reddit
-        reddit_configured = settings.REDDIT_CLIENT_ID is not None and settings.REDDIT_SECRET is not None
+        reddit_configured = bool(settings.REDDIT_CLIENT_ID) and bool(settings.REDDIT_SECRET)
         status_checks.append({
             "name": "Reddit API",
             "status": "connected" if reddit_configured else "not_configured",
@@ -524,16 +525,16 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
             "health": "healthy",
         })
 
-        # Shopify
-        shopify_configured = settings.SHOPIFY_STORE_DOMAIN is not None
+        # Shopify - check multiple possible attribute names
+        shopify_configured = bool(settings.SHOPIFY_STORE_DOMAIN) or bool(settings.SHOPIFY_STORE) or bool(settings.SHOPIFY_DOMAIN)
         status_checks.append({
             "name": "Shopify API",
             "status": "connected" if shopify_configured else "not_configured",
             "health": "healthy" if shopify_configured else "unavailable",
         })
 
-        # AliExpress
-        aliexpress_configured = settings.ALIEXPRESS_API_KEY is not None
+        # AliExpress - check APP_KEY not API_KEY
+        aliexpress_configured = bool(getattr(settings, 'ALIEXPRESS_API_KEY', None)) or bool(os.getenv('ALIEXPRESS_APP_KEY'))
         status_checks.append({
             "name": "AliExpress API",
             "status": "connected" if aliexpress_configured else "not_configured",
@@ -551,7 +552,12 @@ async def get_api_status(settings: Settings = Depends(get_settings)):
             "apis": status_checks,
         }
     except Exception as e:
-        return {"error": str(e), "overall_health": "error"}
+        import traceback
+        return {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "overall_health": "error"
+        }
 
 
 @app.get("/admin/dashboard/data")
@@ -1596,11 +1602,12 @@ async def claude_chat(request: ChatRequest):
     from anthropic import Anthropic
 
     try:
-        api_key = os.getenv('ANTHROPIC_API_KEY')
+        # Check multiple possible env var names
+        api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
         if not api_key:
             return {
                 'success': False,
-                'error': 'Claude AI not configured. Please add ANTHROPIC_API_KEY to environment variables.'
+                'error': 'Claude AI not configured. Please add ANTHROPIC_API_KEY or CLAUDE_API_KEY to environment variables.'
             }
 
         claude = Anthropic(api_key=api_key)

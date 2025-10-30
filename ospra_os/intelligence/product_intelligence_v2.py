@@ -26,12 +26,19 @@ class ProductIntelligenceEngine:
 
     def __init__(self):
         self.aliexpress = AliExpressAPI()
-        
-        # Claude AI for intelligent analysis
-        api_key = os.getenv('ANTHROPIC_API_KEY')
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found in environment")
-        self.claude = Anthropic(api_key=api_key)
+
+        # Claude AI for intelligent analysis (optional - will use fallback if not available)
+        api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
+        if api_key:
+            try:
+                self.claude = Anthropic(api_key=api_key)
+                logger.info("✅ Claude AI initialized successfully")
+            except Exception as e:
+                logger.warning(f"⚠️  Claude AI initialization failed: {e}. Will use fallback explanations.")
+                self.claude = None
+        else:
+            logger.warning("⚠️  No ANTHROPIC_API_KEY or CLAUDE_API_KEY found. Will use fallback explanations.")
+            self.claude = None
 
         # Trending product categories (regularly updated)
         self.trending_niches = [

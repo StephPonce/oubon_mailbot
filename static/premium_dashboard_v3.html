@@ -1499,12 +1499,25 @@
                     })
                 });
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to discover products');
-                }
-
                 const data = await response.json();
+
+                // Check for specific error messages
+                if (!response.ok) {
+                    let errorMsg = data.error || 'Failed to discover products';
+
+                    // Provide helpful error messages
+                    if (errorMsg.includes('ANTHROPIC') || errorMsg.includes('API key')) {
+                        errorMsg = 'Claude AI API not configured. Products will be discovered but with basic analysis. Check Settings tab for API configuration.';
+                        showNotification('warning', 'Limited Functionality', errorMsg);
+                        // Don't throw - allow discovery to continue with fallback
+                    } else if (errorMsg.includes('timeout') || errorMsg.includes('120')) {
+                        errorMsg = 'Discovery took longer than 120 seconds. Try fewer products per niche or fewer niches.';
+                        showNotification('error', 'Timeout', errorMsg);
+                        throw new Error(errorMsg);
+                    } else {
+                        throw new Error(errorMsg);
+                    }
+                }
 
                 if (data.success && data.products && data.products.length > 0) {
                     allProducts = data.products;
@@ -1513,13 +1526,30 @@
                     showNotification('success', 'Success', `Discovered ${data.products.length} winning products!`);
                 } else if (data.timeout) {
                     showNotification('warning', 'Timeout', data.error || 'Discovery took too long. Try reducing the number of products per niche.');
+                } else if (data.error) {
+                    // Show error but don't fail completely
+                    showNotification('warning', 'Issue Detected', data.error);
+                    if (data.products && data.products.length > 0) {
+                        allProducts = data.products;
+                        displayProducts(allProducts);
+                        updateStats(allProducts);
+                    }
                 } else {
                     showNotification('warning', 'No Results', 'No products found. Try different niches or settings.');
                 }
 
             } catch (error) {
                 console.error('Discovery error:', error);
-                showNotification('error', 'Error', error.message || 'Failed to discover products. Check console for details.');
+                let errorMsg = error.message || 'Failed to discover products';
+
+                // Make error messages more user-friendly
+                if (errorMsg.includes('Failed to fetch') || errorMsg.includes('NetworkError')) {
+                    errorMsg = 'Network error. Please check your internet connection and try again.';
+                } else if (errorMsg.includes('string') && errorMsg.includes('match')) {
+                    errorMsg = 'Data parsing error. This might be due to API configuration issues. Check the Settings tab to ensure all APIs are properly connected.';
+                }
+
+                showNotification('error', 'Error', errorMsg);
             } finally {
                 discoverBtn.disabled = false;
                 productsLoading.classList.remove('active');
@@ -1911,9 +1941,32 @@
                         <div class="connect-cta">
                             <h3>Connect Shopify</h3>
                             <p>Link your Shopify store to see revenue, orders, and products data</p>
-                            <button class="btn btn-primary" onclick="showNotification('info', 'Coming Soon', 'Shopify OAuth integration coming soon!')">
-                                Connect Shopify Store
-                            </button>
+                            <div style="text-align: left; max-width: 600px; margin: 0 auto var(--spacing-xl);">
+                                <h4 style="margin-bottom: var(--spacing-md);">Setup Instructions:</h4>
+                                <ol style="color: var(--color-text-secondary); line-height: 1.8;">
+                                    <li>Go to your Shopify admin panel</li>
+                                    <li>Navigate to Apps → Develop apps</li>
+                                    <li>Create a private app with Admin API access</li>
+                                    <li>Copy your Admin API access token</li>
+                                    <li>Add these environment variables to Render:
+                                        <ul style="margin-top: var(--spacing-sm); font-family: monospace; font-size: 0.875rem;">
+                                            <li>SHOPIFY_STORE_DOMAIN=yourstore.myshopify.com</li>
+                                            <li>SHOPIFY_ADMIN_TOKEN=shpat_xxxxx</li>
+                                            <li>SHOPIFY_API_VERSION=2024-10</li>
+                                        </ul>
+                                    </li>
+                                    <li>Redeploy your application</li>
+                                    <li>Refresh this page to see your store data</li>
+                                </ol>
+                            </div>
+                            <div class="btn-group" style="justify-content: center;">
+                                <a href="https://admin.shopify.com" target="_blank" class="btn btn-primary">
+                                    Open Shopify Admin
+                                </a>
+                                <a href="https://dashboard.render.com" target="_blank" class="btn btn-secondary">
+                                    Open Render Dashboard
+                                </a>
+                            </div>
                         </div>
                     `;
                 }
