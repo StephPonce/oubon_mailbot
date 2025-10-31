@@ -799,3 +799,18 @@
 2025-10-30 22:36:36,585 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
 2025-10-30 22:36:36,585 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
 2025-10-30 22:36:38,156 - __main__ - INFO - [92m✅ Created product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m[0m
+2025-10-31 14:08:44,671 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-31 14:08:44,677 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-31 14:08:44,677 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-31 14:08:44,677 - __main__ - INFO - Fetching products for niches: ['smart home']
+2025-10-31 14:10:44,682 - __main__ - ERROR - Intelligence API timeout after 120 seconds
+2025-10-31 14:22:03,787 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-31 14:22:03,794 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-31 14:22:03,794 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-31 14:22:03,794 - __main__ - INFO - Fetching products for niches: ['smart home']
+2025-10-31 14:27:03,799 - __main__ - ERROR - Intelligence API timeout after 120 seconds
+2025-10-31 14:28:30,569 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-31 14:28:30,573 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-31 14:28:30,573 - __main__ - INFO - Intelligence API: https://oubon-mailbot.onrender.com/api/intelligence/discover
+2025-10-31 14:28:30,573 - __main__ - INFO - Fetching products for niches: ['smart home']
+2025-10-31 14:29:50,353 - __main__ - ERROR - Intelligence API request failed: 502 Server Error: Bad Gateway for url: https://oubon-mailbot.onrender.com/api/intelligence/discover

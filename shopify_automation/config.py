@@ -386,7 +386,7 @@ class APIConfig:
     ALIEXPRESS_APP_SECRET = os.getenv('ALIEXPRESS_APP_SECRET')
 
     # Request timeouts
-    API_TIMEOUT = 120  # seconds (for product discovery)
+    API_TIMEOUT = 300  # seconds (for product discovery - increased for AI analysis)
     IMAGE_DOWNLOAD_TIMEOUT = 30  # seconds
 
 

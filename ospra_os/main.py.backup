@@ -1512,7 +1512,7 @@ async def discover_winning_products(request: DiscoverRequest):
     """
     try:
         import asyncio
-        from ospra_os.intelligence.product_intelligence_v3 import ProductIntelligenceEngine  # NEW - Uses real data!
+        from ospra_os.intelligence.product_intelligence_v2 import ProductIntelligenceEngine  # NEW - Uses real data!
 
         engine = ProductIntelligenceEngine()
 

@@ -11,3 +11,4 @@ __pycache__/
 # OAuth credentials
 client_secret_*.json
 *.txt
+.env.backup*
