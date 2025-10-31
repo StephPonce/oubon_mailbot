@@ -1656,7 +1656,7 @@ Be concise, actionable, and data-driven. Format responses with bullet points and
         return {
             'success': True,
             'message': response.content[0].text,
-            'model': 'claude-3-5-sonnet-20241022'
+            'model': 'claude-3-5-sonnet-20240620'
         }
 
     except Exception as e:

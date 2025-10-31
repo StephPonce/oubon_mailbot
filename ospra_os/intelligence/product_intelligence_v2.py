@@ -1,6 +1,9 @@
 """
-WORKING Product Intelligence System - Uses ONLY Available APIs
-No mock data - Real AliExpress products with Claude AI analysis
+ENHANCED Product Intelligence System V3
+- Real AliExpress products
+- Google Trends integration
+- Instagram/TikTok data (when available)
+- UNIQUE AI analysis per product (no templates)
 """
 
 import asyncio
@@ -11,6 +14,8 @@ import logging
 from anthropic import Anthropic
 
 from ospra_os.integrations.aliexpress_api import AliExpressAPI
+from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
+from ospra_os.intelligence.ai_analyst import AIProductAnalyst
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +32,27 @@ class ProductIntelligenceEngine:
     def __init__(self):
         self.aliexpress = AliExpressAPI()
 
-        # Claude AI for intelligent analysis (optional - will use fallback if not available)
+        # Initialize enhanced intelligence modules
+        try:
+            self.trend_analyzer = TrendAnalyzer()
+            logger.info("✅ Trend Analyzer initialized (Google Trends, Instagram, TikTok)")
+        except Exception as e:
+            logger.warning(f"⚠️  Trend Analyzer init failed: {e}")
+            self.trend_analyzer = None
+
+        try:
+            self.ai_analyst = AIProductAnalyst()
+            logger.info("✅ AI Analyst initialized (Unique product analysis)")
+        except Exception as e:
+            logger.warning(f"⚠️  AI Analyst init failed: {e}")
+            self.ai_analyst = None
+
+        # Fallback Claude client for old method
         api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
         if api_key:
             try:
                 self.claude = Anthropic(api_key=api_key)
-                logger.info("✅ Claude AI initialized successfully")
+                logger.info("✅ Claude AI (fallback) initialized successfully")
             except Exception as e:
                 logger.warning(f"⚠️  Claude AI initialization failed: {e}. Will use fallback explanations.")
                 self.claude = None
@@ -232,16 +252,34 @@ class ProductIntelligenceEngine:
 
     async def _analyze_with_claude(self, products: List[Dict], niche: str) -> List[Dict]:
         """
-        Get AI analysis from Claude for each product
+        ENHANCED: Get AI analysis with trend data for each product
+        Uses TrendAnalyzer + AIProductAnalyst for unique, detailed analysis
         """
-        logger.info(f"🤖 Getting Claude AI analysis for {len(products)} products...")
+        logger.info(f"🤖 Getting ENHANCED AI analysis for {len(products)} products...")
 
         for product in products:
             try:
-                analysis = await self._get_claude_analysis(product, niche)
-                product['ai_explanation'] = analysis
+                # Step 1: Get trend data (Google Trends, Instagram, etc.)
+                if self.trend_analyzer:
+                    trend_data = await self.trend_analyzer.analyze_product_trends(product)
+                else:
+                    trend_data = {'google_trends': {'available': False}}
+
+                # Step 2: Generate unique AI analysis
+                if self.ai_analyst:
+                    analysis = await self.ai_analyst.generate_unique_analysis(
+                        product=product,
+                        trend_data=trend_data,
+                        niche=niche
+                    )
+                    product['ai_explanation'] = analysis
+                else:
+                    # Fallback to old method
+                    analysis = await self._get_claude_analysis(product, niche)
+                    product['ai_explanation'] = analysis
+
             except Exception as e:
-                logger.error(f"Claude analysis error: {e}")
+                logger.error(f"Enhanced analysis error: {e}")
                 product['ai_explanation'] = self._generate_fallback_analysis(product)
 
             # Add display data for dashboard

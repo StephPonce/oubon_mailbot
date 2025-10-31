@@ -1,0 +1,801 @@
+2025-10-30 19:33:20,258 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 19:33:20,262 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 19:33:20,262 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 19:33:20,262 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 19:33:25,538 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 19:33:25,813 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:25,814 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTEMCnamM6Wm8HxfpM'}
+2025-10-30 19:33:26,154 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:26,154 - openai._base_client - INFO - Retrying request to /chat/completions in 0.418301 seconds
+2025-10-30 19:33:26,723 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:26,723 - openai._base_client - INFO - Retrying request to /chat/completions in 0.831157 seconds
+2025-10-30 19:33:27,712 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:27,713 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:27,713 - __main__ - INFO - [DRY RUN] Would create product: Video Doorbell WiFi Wireless Smart Door Bell Camera
+2025-10-30 19:33:27,829 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:27,830 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTP55RBsGXg3DjvTt1'}
+2025-10-30 19:33:27,934 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:27,934 - openai._base_client - INFO - Retrying request to /chat/completions in 0.398600 seconds
+2025-10-30 19:33:28,464 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:28,464 - openai._base_client - INFO - Retrying request to /chat/completions in 0.797087 seconds
+2025-10-30 19:33:29,363 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:29,363 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:29,363 - __main__ - INFO - [DRY RUN] Would create product: Video Doorbell WiFi Wireless Smart Door Bell Camera
+2025-10-30 19:33:29,466 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:29,466 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTW7EoHuY34h7h3DxQ'}
+2025-10-30 19:33:29,557 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:29,557 - openai._base_client - INFO - Retrying request to /chat/completions in 0.382027 seconds
+2025-10-30 19:33:30,067 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:30,067 - openai._base_client - INFO - Retrying request to /chat/completions in 0.938292 seconds
+2025-10-30 19:33:31,132 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:31,133 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:31,133 - __main__ - INFO - [DRY RUN] Would create product: WiFi Security Camera 1080P Indoor Pet Baby Monitor
+2025-10-30 19:33:31,257 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:31,257 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTdhPqnTvEJVen4hhD'}
+2025-10-30 19:33:31,357 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:31,357 - openai._base_client - INFO - Retrying request to /chat/completions in 0.464413 seconds
+2025-10-30 19:33:31,927 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:31,928 - openai._base_client - INFO - Retrying request to /chat/completions in 0.776231 seconds
+2025-10-30 19:33:32,808 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:32,809 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:32,809 - __main__ - INFO - [DRY RUN] Would create product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m
+2025-10-30 19:33:32,987 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:32,988 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTkuELqdAYAZpz2qvU'}
+2025-10-30 19:33:33,104 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:33,104 - openai._base_client - INFO - Retrying request to /chat/completions in 0.475772 seconds
+2025-10-30 19:33:33,689 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:33,690 - openai._base_client - INFO - Retrying request to /chat/completions in 0.936793 seconds
+2025-10-30 19:33:34,790 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:34,791 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:34,791 - __main__ - INFO - [DRY RUN] Would create product: Smart Air Purifier HEPA Filter Desktop Air Cleaner for Home
+2025-10-30 19:33:34,913 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:34,917 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLTuKzV3G3XK1CZh3Gk'}
+2025-10-30 19:33:35,026 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:35,026 - openai._base_client - INFO - Retrying request to /chat/completions in 0.491283 seconds
+2025-10-30 19:33:35,628 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:35,629 - openai._base_client - INFO - Retrying request to /chat/completions in 0.819348 seconds
+2025-10-30 19:33:36,584 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:36,585 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:36,585 - __main__ - INFO - [DRY RUN] Would create product: WiFi Smart Thermostat Temperature Controller Touchscreen
+2025-10-30 19:33:36,697 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:36,697 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLU31bw3ojvjUc2FoHd'}
+2025-10-30 19:33:36,870 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:36,870 - openai._base_client - INFO - Retrying request to /chat/completions in 0.473726 seconds
+2025-10-30 19:33:37,433 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:37,433 - openai._base_client - INFO - Retrying request to /chat/completions in 0.826361 seconds
+2025-10-30 19:33:38,353 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:38,354 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:38,354 - __main__ - INFO - [DRY RUN] Would create product: WiFi Smart Thermostat Temperature Controller Touchscreen
+2025-10-30 19:33:38,605 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:38,606 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLUAdFJhtqJxuKj9kjp'}
+2025-10-30 19:33:38,703 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:38,703 - openai._base_client - INFO - Retrying request to /chat/completions in 0.403721 seconds
+2025-10-30 19:33:39,199 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:39,200 - openai._base_client - INFO - Retrying request to /chat/completions in 0.884286 seconds
+2025-10-30 19:33:40,245 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:40,245 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:40,245 - __main__ - INFO - [DRY RUN] Would create product: WiFi Security Camera 1080P Indoor Pet Baby Monitor
+2025-10-30 19:33:40,404 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:40,404 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLUJgRxRyF7EQZGXXMB'}
+2025-10-30 19:33:40,519 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:40,519 - openai._base_client - INFO - Retrying request to /chat/completions in 0.466365 seconds
+2025-10-30 19:33:41,075 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:41,076 - openai._base_client - INFO - Retrying request to /chat/completions in 0.796558 seconds
+2025-10-30 19:33:41,954 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:41,954 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:41,954 - __main__ - INFO - [DRY RUN] Would create product: Robot Vacuum Cleaner Automatic Sweeping Machine 2000Pa
+2025-10-30 19:33:42,182 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:42,183 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLUSLZ7HgQHEKZVj6yR'}
+2025-10-30 19:33:42,265 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:42,266 - openai._base_client - INFO - Retrying request to /chat/completions in 0.400127 seconds
+2025-10-30 19:33:42,771 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:42,771 - openai._base_client - INFO - Retrying request to /chat/completions in 0.946973 seconds
+2025-10-30 19:33:43,800 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:33:43,801 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:33:43,801 - __main__ - INFO - [DRY RUN] Would create product: Air Purifier HEPA Filter Desktop Air Cleaner for Home
+2025-10-30 19:33:55,186 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 19:33:55,190 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 19:33:55,190 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 19:33:55,190 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 19:33:59,657 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 19:33:59,945 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:33:59,947 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLVkPHPV9XdKRCtp9eL'}
+2025-10-30 19:34:00,448 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:00,449 - openai._base_client - INFO - Retrying request to /chat/completions in 0.455924 seconds
+2025-10-30 19:34:01,022 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:01,023 - openai._base_client - INFO - Retrying request to /chat/completions in 0.796648 seconds
+2025-10-30 19:34:02,273 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:02,274 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:02,964 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:03,111 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:03,112 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLVypfaJ89RgdhTU9bL'}
+2025-10-30 19:34:03,211 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:03,212 - openai._base_client - INFO - Retrying request to /chat/completions in 0.482992 seconds
+2025-10-30 19:34:03,805 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:03,806 - openai._base_client - INFO - Retrying request to /chat/completions in 0.798048 seconds
+2025-10-30 19:34:04,677 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:04,677 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:05,403 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:05,542 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:05,543 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLWAEEmzZCT9oNVsP4Z'}
+2025-10-30 19:34:05,632 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:05,633 - openai._base_client - INFO - Retrying request to /chat/completions in 0.459409 seconds
+2025-10-30 19:34:06,223 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:06,224 - openai._base_client - INFO - Retrying request to /chat/completions in 0.898574 seconds
+2025-10-30 19:34:07,224 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:07,224 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:07,914 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:08,026 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:08,027 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLWLxfECVzjoqC63FX6'}
+2025-10-30 19:34:08,114 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:08,114 - openai._base_client - INFO - Retrying request to /chat/completions in 0.417736 seconds
+2025-10-30 19:34:08,625 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:08,625 - openai._base_client - INFO - Retrying request to /chat/completions in 0.800650 seconds
+2025-10-30 19:34:09,555 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:09,556 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:10,244 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:10,377 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:10,378 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLWWxBE92MHFNeQvX6R'}
+2025-10-30 19:34:10,498 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:10,498 - openai._base_client - INFO - Retrying request to /chat/completions in 0.455740 seconds
+2025-10-30 19:34:11,047 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:11,047 - openai._base_client - INFO - Retrying request to /chat/completions in 0.856432 seconds
+2025-10-30 19:34:11,989 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:11,990 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:12,669 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:12,829 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:12,830 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLWhShtNijtc9EnBw2q'}
+2025-10-30 19:34:12,924 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:12,925 - openai._base_client - INFO - Retrying request to /chat/completions in 0.470094 seconds
+2025-10-30 19:34:13,480 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:13,481 - openai._base_client - INFO - Retrying request to /chat/completions in 0.880626 seconds
+2025-10-30 19:34:14,437 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:14,437 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:15,142 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:15,306 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:15,307 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLWt4BY6Wp16KngHU7g'}
+2025-10-30 19:34:15,403 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:15,404 - openai._base_client - INFO - Retrying request to /chat/completions in 0.424843 seconds
+2025-10-30 19:34:15,925 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:15,925 - openai._base_client - INFO - Retrying request to /chat/completions in 0.846223 seconds
+2025-10-30 19:34:16,874 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:16,874 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:17,562 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:17,680 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:17,680 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLX4BdiuWovCeyprb4n'}
+2025-10-30 19:34:17,794 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:17,795 - openai._base_client - INFO - Retrying request to /chat/completions in 0.497227 seconds
+2025-10-30 19:34:18,392 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:18,393 - openai._base_client - INFO - Retrying request to /chat/completions in 0.839835 seconds
+2025-10-30 19:34:19,333 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:19,333 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:20,043 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:20,160 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:20,161 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLXEp6P3Z3Bu5J67Eux'}
+2025-10-30 19:34:20,250 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:20,250 - openai._base_client - INFO - Retrying request to /chat/completions in 0.422708 seconds
+2025-10-30 19:34:20,772 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:20,773 - openai._base_client - INFO - Retrying request to /chat/completions in 0.842766 seconds
+2025-10-30 19:34:21,740 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:21,740 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:22,420 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:22,710 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:22,710 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLXR3VpHuYeSbK1RQW2'}
+2025-10-30 19:34:22,820 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:22,820 - openai._base_client - INFO - Retrying request to /chat/completions in 0.476973 seconds
+2025-10-30 19:34:23,395 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:23,395 - openai._base_client - INFO - Retrying request to /chat/completions in 0.876628 seconds
+2025-10-30 19:34:24,376 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:24,376 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:25,123 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:25,268 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:25,268 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLXcaYJGYHuonGyZR4N'}
+2025-10-30 19:34:25,354 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:25,354 - openai._base_client - INFO - Retrying request to /chat/completions in 0.424257 seconds
+2025-10-30 19:34:25,897 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:25,898 - openai._base_client - INFO - Retrying request to /chat/completions in 0.771359 seconds
+2025-10-30 19:34:26,757 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:26,757 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:27,452 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:27,568 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:27,569 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLXnWLUcuCBycts8cDD'}
+2025-10-30 19:34:27,652 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:27,652 - openai._base_client - INFO - Retrying request to /chat/completions in 0.431294 seconds
+2025-10-30 19:34:28,168 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:28,169 - openai._base_client - INFO - Retrying request to /chat/completions in 0.950279 seconds
+2025-10-30 19:34:29,234 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:29,234 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:29,921 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:30,080 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:30,080 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLXy74izspF2AkddiR5'}
+2025-10-30 19:34:30,195 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:30,196 - openai._base_client - INFO - Retrying request to /chat/completions in 0.480934 seconds
+2025-10-30 19:34:30,798 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:30,798 - openai._base_client - INFO - Retrying request to /chat/completions in 0.955295 seconds
+2025-10-30 19:34:31,861 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:31,862 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:32,543 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:32,648 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:32,653 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLYAF35JRBJFdp3xVTw'}
+2025-10-30 19:34:32,737 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:32,738 - openai._base_client - INFO - Retrying request to /chat/completions in 0.417373 seconds
+2025-10-30 19:34:33,236 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:33,236 - openai._base_client - INFO - Retrying request to /chat/completions in 0.797025 seconds
+2025-10-30 19:34:34,143 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:34,143 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:34,861 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 19:34:34,977 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 19:34:34,978 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeLYL8rQyBpWU8L1NDiJ'}
+2025-10-30 19:34:35,077 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:35,077 - openai._base_client - INFO - Retrying request to /chat/completions in 0.387329 seconds
+2025-10-30 19:34:35,575 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:35,576 - openai._base_client - INFO - Retrying request to /chat/completions in 0.966396 seconds
+2025-10-30 19:34:36,629 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 19:34:36,629 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 19:34:37,351 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:34:42,170 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 21:34:42,175 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 21:34:42,175 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 21:34:42,175 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 21:34:46,499 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 21:34:46,993 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:34:46,994 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVhwpzfsWQd1Qfzj4o7'}
+2025-10-30 21:34:47,911 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:47,911 - openai._base_client - INFO - Retrying request to /chat/completions in 0.431627 seconds
+2025-10-30 21:34:48,677 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:48,677 - openai._base_client - INFO - Retrying request to /chat/completions in 0.773946 seconds
+2025-10-30 21:34:49,769 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:49,769 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:34:50,458 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:34:50,574 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:34:50,574 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeViE15rdfJdJvKYkYFn'}
+2025-10-30 21:34:50,718 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:50,719 - openai._base_client - INFO - Retrying request to /chat/completions in 0.379237 seconds
+2025-10-30 21:34:51,413 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:51,414 - openai._base_client - INFO - Retrying request to /chat/completions in 0.766822 seconds
+2025-10-30 21:34:52,296 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:52,297 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:34:52,993 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:34:53,113 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:34:53,114 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeViQswCUvPJB5uWPPEe'}
+2025-10-30 21:34:53,543 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:53,543 - openai._base_client - INFO - Retrying request to /chat/completions in 0.480976 seconds
+2025-10-30 21:34:54,621 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:54,621 - openai._base_client - INFO - Retrying request to /chat/completions in 0.889740 seconds
+2025-10-30 21:34:55,634 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:55,634 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:34:56,346 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:34:56,506 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:34:56,507 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVifDe32kY1kPjjeHHH'}
+2025-10-30 21:34:56,865 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:56,865 - openai._base_client - INFO - Retrying request to /chat/completions in 0.474466 seconds
+2025-10-30 21:34:57,447 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:57,448 - openai._base_client - INFO - Retrying request to /chat/completions in 0.985721 seconds
+2025-10-30 21:34:58,562 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:58,563 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:34:59,250 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:34:59,483 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:34:59,483 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVisb2oZ9uv3LPDidiH'}
+2025-10-30 21:34:59,571 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:34:59,571 - openai._base_client - INFO - Retrying request to /chat/completions in 0.400823 seconds
+2025-10-30 21:35:00,080 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:00,080 - openai._base_client - INFO - Retrying request to /chat/completions in 0.803158 seconds
+2025-10-30 21:35:01,017 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:01,018 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:01,718 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:01,837 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:01,837 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVj492y7UVouHVBmdva'}
+2025-10-30 21:35:01,938 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:01,939 - openai._base_client - INFO - Retrying request to /chat/completions in 0.461618 seconds
+2025-10-30 21:35:02,512 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:02,513 - openai._base_client - INFO - Retrying request to /chat/completions in 0.837439 seconds
+2025-10-30 21:35:03,446 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:03,447 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:04,127 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:04,246 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:04,246 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVjESQZYoVhasEYHucU'}
+2025-10-30 21:35:04,340 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:04,341 - openai._base_client - INFO - Retrying request to /chat/completions in 0.440711 seconds
+2025-10-30 21:35:04,868 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:04,868 - openai._base_client - INFO - Retrying request to /chat/completions in 0.955507 seconds
+2025-10-30 21:35:05,927 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:05,928 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:06,611 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:06,742 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:06,742 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVjR2tgx7PSZnV8PfHx'}
+2025-10-30 21:35:06,860 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:06,861 - openai._base_client - INFO - Retrying request to /chat/completions in 0.427762 seconds
+2025-10-30 21:35:07,389 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:07,389 - openai._base_client - INFO - Retrying request to /chat/completions in 0.961275 seconds
+2025-10-30 21:35:08,451 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:08,452 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:09,137 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:09,271 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:09,271 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVjbtFFvgdob7EeMQdS'}
+2025-10-30 21:35:09,379 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:09,379 - openai._base_client - INFO - Retrying request to /chat/completions in 0.490688 seconds
+2025-10-30 21:35:10,009 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:10,009 - openai._base_client - INFO - Retrying request to /chat/completions in 0.763006 seconds
+2025-10-30 21:35:10,871 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:10,871 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:11,587 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:11,702 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:11,703 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVjnN2tKauAQ9poLG7S'}
+2025-10-30 21:35:11,806 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:11,806 - openai._base_client - INFO - Retrying request to /chat/completions in 0.431845 seconds
+2025-10-30 21:35:12,327 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:12,328 - openai._base_client - INFO - Retrying request to /chat/completions in 0.851975 seconds
+2025-10-30 21:35:13,274 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:13,275 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:13,970 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:14,111 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:14,112 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVjxWixKCs9m9VpqR9P'}
+2025-10-30 21:35:14,214 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:14,214 - openai._base_client - INFO - Retrying request to /chat/completions in 0.407254 seconds
+2025-10-30 21:35:14,725 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:14,725 - openai._base_client - INFO - Retrying request to /chat/completions in 0.807039 seconds
+2025-10-30 21:35:15,634 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:15,635 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:16,334 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:16,476 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:16,477 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVk8fvFkswNncHBYKc2'}
+2025-10-30 21:35:16,577 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:16,578 - openai._base_client - INFO - Retrying request to /chat/completions in 0.403666 seconds
+2025-10-30 21:35:17,096 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:17,096 - openai._base_client - INFO - Retrying request to /chat/completions in 0.776724 seconds
+2025-10-30 21:35:17,984 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:17,984 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:18,678 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:18,838 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:18,843 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVkJfRyoFXwwundhdvU'}
+2025-10-30 21:35:18,948 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:18,949 - openai._base_client - INFO - Retrying request to /chat/completions in 0.493706 seconds
+2025-10-30 21:35:19,535 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:19,535 - openai._base_client - INFO - Retrying request to /chat/completions in 0.976891 seconds
+2025-10-30 21:35:20,666 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:20,666 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:21,360 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:21,474 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:21,474 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVkW71teaSYeaER89yS'}
+2025-10-30 21:35:21,577 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:21,577 - openai._base_client - INFO - Retrying request to /chat/completions in 0.384070 seconds
+2025-10-30 21:35:22,137 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:22,137 - openai._base_client - INFO - Retrying request to /chat/completions in 0.852083 seconds
+2025-10-30 21:35:23,097 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:23,098 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:23,806 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:35:23,914 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:35:23,915 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20240620'}, 'request_id': 'req_011CUeVkgYpKMkLFkPC1nSDu'}
+2025-10-30 21:35:24,031 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:24,032 - openai._base_client - INFO - Retrying request to /chat/completions in 0.399006 seconds
+2025-10-30 21:35:24,543 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:24,544 - openai._base_client - INFO - Retrying request to /chat/completions in 0.932255 seconds
+2025-10-30 21:35:25,561 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:35:25,562 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:35:26,286 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:24,855 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 21:38:24,860 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 21:38:24,860 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 21:38:24,860 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 21:38:29,221 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 21:38:29,492 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:29,493 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeVzMyFfKwbzmwPrAodF'}
+2025-10-30 21:38:30,854 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:30,855 - openai._base_client - INFO - Retrying request to /chat/completions in 0.462095 seconds
+2025-10-30 21:38:31,430 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:31,430 - openai._base_client - INFO - Retrying request to /chat/completions in 0.878230 seconds
+2025-10-30 21:38:32,472 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:32,473 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:33,179 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:33,311 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:33,311 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeVzeHH5SAZzR8qzuhTq'}
+2025-10-30 21:38:33,418 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:33,418 - openai._base_client - INFO - Retrying request to /chat/completions in 0.407777 seconds
+2025-10-30 21:38:33,937 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:33,938 - openai._base_client - INFO - Retrying request to /chat/completions in 0.812105 seconds
+2025-10-30 21:38:34,860 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:34,861 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:35,544 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:35,656 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:35,656 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeVzpMG92LDQPod1Yy4M'}
+2025-10-30 21:38:35,751 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:35,752 - openai._base_client - INFO - Retrying request to /chat/completions in 0.380764 seconds
+2025-10-30 21:38:36,283 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:36,284 - openai._base_client - INFO - Retrying request to /chat/completions in 0.835306 seconds
+2025-10-30 21:38:37,239 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:37,240 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:37,933 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:38,067 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:38,067 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeVzzdPsVCnmr3RzBnNU'}
+2025-10-30 21:38:38,172 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:38,172 - openai._base_client - INFO - Retrying request to /chat/completions in 0.410945 seconds
+2025-10-30 21:38:38,705 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:38,706 - openai._base_client - INFO - Retrying request to /chat/completions in 0.817916 seconds
+2025-10-30 21:38:39,620 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:39,621 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:40,314 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:40,424 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:40,424 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW1AhsfYMrr7DX6jhXF'}
+2025-10-30 21:38:40,524 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:40,524 - openai._base_client - INFO - Retrying request to /chat/completions in 0.477796 seconds
+2025-10-30 21:38:41,126 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:41,126 - openai._base_client - INFO - Retrying request to /chat/completions in 0.797482 seconds
+2025-10-30 21:38:42,074 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:42,075 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:42,770 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:42,941 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:42,941 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW1MP4iBPPFrEUKscbC'}
+2025-10-30 21:38:43,050 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:43,050 - openai._base_client - INFO - Retrying request to /chat/completions in 0.422161 seconds
+2025-10-30 21:38:43,579 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:43,580 - openai._base_client - INFO - Retrying request to /chat/completions in 0.881842 seconds
+2025-10-30 21:38:44,599 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:44,599 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:45,299 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:45,445 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:45,445 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW1Y6z6apgGan64deXP'}
+2025-10-30 21:38:45,532 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:45,532 - openai._base_client - INFO - Retrying request to /chat/completions in 0.444811 seconds
+2025-10-30 21:38:46,135 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:46,136 - openai._base_client - INFO - Retrying request to /chat/completions in 0.937322 seconds
+2025-10-30 21:38:47,184 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:47,185 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:47,877 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:48,007 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:48,008 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW1j7GqzGLSRnyoGWYb'}
+2025-10-30 21:38:48,098 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:48,099 - openai._base_client - INFO - Retrying request to /chat/completions in 0.431675 seconds
+2025-10-30 21:38:48,648 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:48,648 - openai._base_client - INFO - Retrying request to /chat/completions in 0.881201 seconds
+2025-10-30 21:38:49,638 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:49,638 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:50,355 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:50,540 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:50,540 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW1uhG2JAs9Qogto39W'}
+2025-10-30 21:38:50,654 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:50,654 - openai._base_client - INFO - Retrying request to /chat/completions in 0.428368 seconds
+2025-10-30 21:38:51,191 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:51,192 - openai._base_client - INFO - Retrying request to /chat/completions in 0.812628 seconds
+2025-10-30 21:38:52,157 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:52,158 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:52,862 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:38:52,986 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:38:52,987 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeW26NCgHjRZKHD8x9V6'}
+2025-10-30 21:38:53,105 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:53,105 - openai._base_client - INFO - Retrying request to /chat/completions in 0.463121 seconds
+2025-10-30 21:38:53,654 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:53,654 - openai._base_client - INFO - Retrying request to /chat/completions in 0.986928 seconds
+2025-10-30 21:38:54,757 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:38:54,758 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:38:55,444 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:50:24,289 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 21:50:24,294 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 21:50:24,294 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 21:50:24,294 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 21:50:29,437 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 21:50:29,683 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:50:29,683 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeWuT45BTvKKD7gjBLRt'}
+2025-10-30 21:50:30,166 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 500 Internal Server Error"
+2025-10-30 21:50:30,166 - openai._base_client - INFO - Retrying request to /chat/completions in 0.450992 seconds
+2025-10-30 21:50:30,774 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:30,775 - openai._base_client - INFO - Retrying request to /chat/completions in 0.940164 seconds
+2025-10-30 21:50:31,845 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:31,845 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:50:32,562 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:50:32,680 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:50:32,680 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeWufqGuWv5VEoQVM4pd'}
+2025-10-30 21:50:32,772 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:32,772 - openai._base_client - INFO - Retrying request to /chat/completions in 0.377468 seconds
+2025-10-30 21:50:33,271 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:33,272 - openai._base_client - INFO - Retrying request to /chat/completions in 0.766453 seconds
+2025-10-30 21:50:34,135 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:34,136 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:50:34,864 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:50:34,981 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:50:34,989 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeWuqiqWdWpVkg12Dz5G'}
+2025-10-30 21:50:35,091 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:35,091 - openai._base_client - INFO - Retrying request to /chat/completions in 0.419383 seconds
+2025-10-30 21:50:35,688 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:35,688 - openai._base_client - INFO - Retrying request to /chat/completions in 0.906571 seconds
+2025-10-30 21:50:36,683 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:36,684 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:50:37,413 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:50:37,542 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:50:37,542 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeWv2awedjcDNNLvSiVn'}
+2025-10-30 21:50:37,720 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:37,721 - openai._base_client - INFO - Retrying request to /chat/completions in 0.425311 seconds
+2025-10-30 21:50:38,276 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:38,276 - openai._base_client - INFO - Retrying request to /chat/completions in 0.887854 seconds
+2025-10-30 21:50:39,249 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:39,250 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:50:39,926 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:50:40,042 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:50:40,043 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeWvDM6mwqJLabLgYFhL'}
+2025-10-30 21:50:40,126 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:40,126 - openai._base_client - INFO - Retrying request to /chat/completions in 0.393028 seconds
+2025-10-30 21:50:40,644 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:40,644 - openai._base_client - INFO - Retrying request to /chat/completions in 0.958489 seconds
+2025-10-30 21:50:41,684 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:50:41,684 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:50:42,364 - __main__ - ERROR - Shopify API error: 404 - {"errors":"Not Found"}
+2025-10-30 21:55:06,769 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 21:55:06,773 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 21:55:06,774 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 21:55:06,774 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 21:55:13,857 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 21:55:14,133 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:14,134 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXGRD2yfG5Can3D17CY'}
+2025-10-30 21:55:14,453 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:14,453 - openai._base_client - INFO - Retrying request to /chat/completions in 0.426268 seconds
+2025-10-30 21:55:14,989 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:14,989 - openai._base_client - INFO - Retrying request to /chat/completions in 0.923046 seconds
+2025-10-30 21:55:16,070 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:16,071 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:17,488 - __main__ - INFO - [92m✅ Created product: WiFi Smart Thermostat Temperature Controller Touchscreen[0m
+2025-10-30 21:55:17,748 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:17,753 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXGg5VPhveERivoGnuB'}
+2025-10-30 21:55:17,852 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:17,852 - openai._base_client - INFO - Retrying request to /chat/completions in 0.415340 seconds
+2025-10-30 21:55:18,366 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:18,366 - openai._base_client - INFO - Retrying request to /chat/completions in 0.993125 seconds
+2025-10-30 21:55:19,802 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:19,803 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:21,565 - __main__ - INFO - [92m✅ Created product: Video Doorbell WiFi Wireless Smart Door Bell Camera[0m
+2025-10-30 21:55:21,746 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:21,747 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXGyZhyoFgUwvozViyU'}
+2025-10-30 21:55:21,851 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:21,851 - openai._base_client - INFO - Retrying request to /chat/completions in 0.376224 seconds
+2025-10-30 21:55:22,341 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:22,342 - openai._base_client - INFO - Retrying request to /chat/completions in 0.814683 seconds
+2025-10-30 21:55:23,247 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:23,248 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:24,915 - __main__ - INFO - [92m✅ Created product: Smart WiFi Security Camera 1080P Indoor Pet Baby Monitor[0m
+2025-10-30 21:55:25,118 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:25,118 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXHDoTny8oRCk1XntLN'}
+2025-10-30 21:55:25,223 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:25,223 - openai._base_client - INFO - Retrying request to /chat/completions in 0.499766 seconds
+2025-10-30 21:55:25,822 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:25,822 - openai._base_client - INFO - Retrying request to /chat/completions in 0.912196 seconds
+2025-10-30 21:55:26,830 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:26,831 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:28,191 - __main__ - INFO - [92m✅ Created product: Smart Air Purifier HEPA Filter Desktop Air Cleaner for Home[0m
+2025-10-30 21:55:28,332 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:28,333 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXHTsZ4tGowcoex38Wv'}
+2025-10-30 21:55:28,445 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:28,445 - openai._base_client - INFO - Retrying request to /chat/completions in 0.477930 seconds
+2025-10-30 21:55:29,015 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:29,015 - openai._base_client - INFO - Retrying request to /chat/completions in 0.826159 seconds
+2025-10-30 21:55:29,947 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:29,947 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:31,258 - __main__ - INFO - [92m✅ Created product: WiFi Security Camera 1080P Indoor Pet Baby Monitor[0m
+2025-10-30 21:55:42,947 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 21:55:42,955 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 21:55:42,955 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 21:55:42,955 - __main__ - INFO - Fetching products for niches: ['smart lighting led strip', 'wireless security camera', 'robot vacuum cleaner']
+2025-10-30 21:55:48,367 - __main__ - INFO - [92m✅ Fetched 15 products from intelligence API[0m
+2025-10-30 21:55:48,606 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:48,606 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXJxcU4G6MyxesgQic2'}
+2025-10-30 21:55:48,870 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:48,870 - openai._base_client - INFO - Retrying request to /chat/completions in 0.431922 seconds
+2025-10-30 21:55:49,396 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:49,396 - openai._base_client - INFO - Retrying request to /chat/completions in 0.956478 seconds
+2025-10-30 21:55:50,441 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:50,443 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:51,771 - __main__ - INFO - [92m✅ Created product: WiFi Smart Thermostat Temperature Controller Touchscreen[0m
+2025-10-30 21:55:51,917 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:51,917 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXKCh3sZ8yfqsHXSHNq'}
+2025-10-30 21:55:52,014 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:52,015 - openai._base_client - INFO - Retrying request to /chat/completions in 0.450836 seconds
+2025-10-30 21:55:52,551 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:52,551 - openai._base_client - INFO - Retrying request to /chat/completions in 0.771318 seconds
+2025-10-30 21:55:53,408 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:53,409 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:54,815 - __main__ - INFO - [92m✅ Created product: WiFi Smart Thermostat Temperature Controller Touchscreen[0m
+2025-10-30 21:55:54,974 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:54,974 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXKRg9hogZ6Td5bKoaP'}
+2025-10-30 21:55:55,065 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:55,065 - openai._base_client - INFO - Retrying request to /chat/completions in 0.422166 seconds
+2025-10-30 21:55:55,584 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:55,584 - openai._base_client - INFO - Retrying request to /chat/completions in 0.916863 seconds
+2025-10-30 21:55:56,607 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:56,607 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:55:58,100 - __main__ - INFO - [92m✅ Created product: Video Doorbell WiFi Wireless Smart Door Bell Camera[0m
+2025-10-30 21:55:58,239 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:55:58,239 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXKfikEdaJoAU2TjR7Q'}
+2025-10-30 21:55:58,320 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:58,320 - openai._base_client - INFO - Retrying request to /chat/completions in 0.398052 seconds
+2025-10-30 21:55:58,798 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:58,798 - openai._base_client - INFO - Retrying request to /chat/completions in 0.907192 seconds
+2025-10-30 21:55:59,816 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:55:59,816 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:01,425 - __main__ - INFO - [92m✅ Created product: WiFi Smart Thermostat Temperature Controller Touchscreen[0m
+2025-10-30 21:56:01,547 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:01,547 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXKuv2PTdhnwXzAWtpS'}
+2025-10-30 21:56:01,624 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:01,624 - openai._base_client - INFO - Retrying request to /chat/completions in 0.447807 seconds
+2025-10-30 21:56:02,174 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:02,175 - openai._base_client - INFO - Retrying request to /chat/completions in 0.952769 seconds
+2025-10-30 21:56:03,236 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:03,237 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:05,158 - __main__ - INFO - [92m✅ Created product: Video Doorbell WiFi Wireless Smart Door Bell Camera[0m
+2025-10-30 21:56:05,279 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:05,279 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXLBrUB5ks7voXtUp8b'}
+2025-10-30 21:56:05,370 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:05,370 - openai._base_client - INFO - Retrying request to /chat/completions in 0.420028 seconds
+2025-10-30 21:56:05,890 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:05,890 - openai._base_client - INFO - Retrying request to /chat/completions in 0.858734 seconds
+2025-10-30 21:56:06,858 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:06,858 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:08,360 - __main__ - INFO - [92m✅ Created product: WiFi Security Camera 1080P Indoor Pet Baby Monitor[0m
+2025-10-30 21:56:08,573 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:08,574 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXLRw49XUo2Q73hN5YM'}
+2025-10-30 21:56:08,665 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:08,665 - openai._base_client - INFO - Retrying request to /chat/completions in 0.411003 seconds
+2025-10-30 21:56:09,212 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:09,213 - openai._base_client - INFO - Retrying request to /chat/completions in 0.815849 seconds
+2025-10-30 21:56:10,108 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:10,109 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:11,713 - __main__ - INFO - [92m✅ Created product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m[0m
+2025-10-30 21:56:11,877 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:11,878 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXLg6MHjXcj5WgcFCtX'}
+2025-10-30 21:56:11,958 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:11,958 - openai._base_client - INFO - Retrying request to /chat/completions in 0.375764 seconds
+2025-10-30 21:56:12,435 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:12,436 - openai._base_client - INFO - Retrying request to /chat/completions in 0.990704 seconds
+2025-10-30 21:56:13,528 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:13,529 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:15,256 - __main__ - INFO - [92m✅ Created product: Air Purifier HEPA Filter Desktop Air Cleaner for Home[0m
+2025-10-30 21:56:15,371 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:15,372 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXLw3GfJ1YZogyqprJc'}
+2025-10-30 21:56:15,486 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:15,487 - openai._base_client - INFO - Retrying request to /chat/completions in 0.426474 seconds
+2025-10-30 21:56:16,022 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:16,023 - openai._base_client - INFO - Retrying request to /chat/completions in 0.989559 seconds
+2025-10-30 21:56:17,099 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:17,099 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:18,573 - __main__ - INFO - [92m✅ Created product: Smart WiFi Security Camera 1080P Indoor Pet Baby Monitor[0m
+2025-10-30 21:56:18,697 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:18,698 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXMBD4PyRfmhDon792n'}
+2025-10-30 21:56:18,782 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:18,783 - openai._base_client - INFO - Retrying request to /chat/completions in 0.451754 seconds
+2025-10-30 21:56:19,328 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:19,329 - openai._base_client - INFO - Retrying request to /chat/completions in 0.761900 seconds
+2025-10-30 21:56:20,183 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:20,184 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:21,743 - __main__ - INFO - [92m✅ Created product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m[0m
+2025-10-30 21:56:21,871 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:21,872 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXMQndEJozVib6VGX49'}
+2025-10-30 21:56:21,969 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:21,970 - openai._base_client - INFO - Retrying request to /chat/completions in 0.475232 seconds
+2025-10-30 21:56:22,534 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:22,535 - openai._base_client - INFO - Retrying request to /chat/completions in 0.978797 seconds
+2025-10-30 21:56:23,606 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:23,607 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:25,055 - __main__ - INFO - [92m✅ Created product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m[0m
+2025-10-30 21:56:25,739 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:25,747 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXMfzRLQijyS1W9gkQh'}
+2025-10-30 21:56:25,841 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:25,841 - openai._base_client - INFO - Retrying request to /chat/completions in 0.398100 seconds
+2025-10-30 21:56:26,382 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:26,382 - openai._base_client - INFO - Retrying request to /chat/completions in 0.815973 seconds
+2025-10-30 21:56:27,299 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:27,299 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:28,830 - __main__ - INFO - [92m✅ Created product: Video Doorbell WiFi Wireless Smart Door Bell Camera[0m
+2025-10-30 21:56:28,959 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:28,960 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXMw4nY714p2TKoLdnD'}
+2025-10-30 21:56:29,107 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:29,107 - openai._base_client - INFO - Retrying request to /chat/completions in 0.450678 seconds
+2025-10-30 21:56:29,657 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:29,657 - openai._base_client - INFO - Retrying request to /chat/completions in 0.814564 seconds
+2025-10-30 21:56:30,569 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:30,570 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:31,987 - __main__ - INFO - [92m✅ Created product: Air Purifier HEPA Filter Desktop Air Cleaner for Home[0m
+2025-10-30 21:56:32,108 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:32,108 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXNAZdwpr5ntcHm5meh'}
+2025-10-30 21:56:32,201 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:32,201 - openai._base_client - INFO - Retrying request to /chat/completions in 0.387316 seconds
+2025-10-30 21:56:32,681 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:32,682 - openai._base_client - INFO - Retrying request to /chat/completions in 0.766545 seconds
+2025-10-30 21:56:33,539 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:33,539 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:34,957 - __main__ - INFO - [92m✅ Created product: Smart Air Purifier HEPA Filter Desktop Air Cleaner for Home[0m
+2025-10-30 21:56:35,088 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 21:56:35,089 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXNPLqPwJoWMYgmfVsU'}
+2025-10-30 21:56:35,166 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:35,167 - openai._base_client - INFO - Retrying request to /chat/completions in 0.398090 seconds
+2025-10-30 21:56:35,649 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:35,650 - openai._base_client - INFO - Retrying request to /chat/completions in 0.954275 seconds
+2025-10-30 21:56:36,712 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 21:56:36,712 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 21:56:38,198 - __main__ - INFO - [92m✅ Created product: Smart Light Bulb E27 RGB WiFi LED Color Changing[0m
+2025-10-30 22:02:49,641 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 22:02:49,645 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 22:02:49,645 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 22:02:49,646 - __main__ - INFO - Fetching products for niches: ['fitness tracker', 'yoga mat']
+2025-10-30 22:02:53,236 - __main__ - INFO - [92m✅ Fetched 10 products from intelligence API[0m
+2025-10-30 22:02:53,504 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:02:53,505 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXrHEWbRbup42ZRbz1J'}
+2025-10-30 22:02:53,833 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:53,833 - openai._base_client - INFO - Retrying request to /chat/completions in 0.487895 seconds
+2025-10-30 22:02:54,427 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:54,427 - openai._base_client - INFO - Retrying request to /chat/completions in 0.824289 seconds
+2025-10-30 22:02:55,339 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:55,339 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:02:55,339 - __main__ - INFO - [DRY RUN] Would create product: WiFi Smart Thermostat Temperature Controller Touchscreen
+2025-10-30 22:02:55,473 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:02:55,474 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXrRYa4cWSP67R6EWg7'}
+2025-10-30 22:02:55,577 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:55,577 - openai._base_client - INFO - Retrying request to /chat/completions in 0.464480 seconds
+2025-10-30 22:02:56,136 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:56,136 - openai._base_client - INFO - Retrying request to /chat/completions in 0.806492 seconds
+2025-10-30 22:02:57,037 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:57,037 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:02:57,037 - __main__ - INFO - [DRY RUN] Would create product: WiFi Smart Thermostat Temperature Controller Touchscreen
+2025-10-30 22:02:57,149 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:02:57,159 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXrYrrw9gXg6xts4jaK'}
+2025-10-30 22:02:57,261 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:57,261 - openai._base_client - INFO - Retrying request to /chat/completions in 0.396474 seconds
+2025-10-30 22:02:57,761 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:57,761 - openai._base_client - INFO - Retrying request to /chat/completions in 0.761694 seconds
+2025-10-30 22:02:58,622 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:58,623 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:02:58,623 - __main__ - INFO - [DRY RUN] Would create product: WiFi Security Camera 1080P Indoor Pet Baby Monitor
+2025-10-30 22:02:58,718 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:02:58,718 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeXrfZvtDkXKWjtvSDiw'}
+2025-10-30 22:02:58,804 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:58,805 - openai._base_client - INFO - Retrying request to /chat/completions in 0.394358 seconds
+2025-10-30 22:02:59,292 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:02:59,292 - openai._base_client - INFO - Retrying request to /chat/completions in 0.963494 seconds
+2025-10-30 22:03:00,360 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:03:00,361 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:03:00,361 - __main__ - INFO - [DRY RUN] Would create product: Smart Door Lock Fingerprint Password Keyless Entry
+2025-10-30 22:35:59,405 - __main__ - INFO - [92m✅ Claude AI initialized[0m
+2025-10-30 22:35:59,410 - __main__ - INFO - [92m✅ OpenAI initialized[0m
+2025-10-30 22:35:59,410 - __main__ - INFO - Intelligence API: http://localhost:8001/api/intelligence/discover
+2025-10-30 22:35:59,410 - __main__ - INFO - Fetching products for niches: ['gaming headset', 'mechanical keyboard']
+2025-10-30 22:36:20,049 - __main__ - INFO - [92m✅ Fetched 10 products from intelligence API[0m
+2025-10-30 22:36:20,336 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:36:20,337 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeaQDPhzoSA1MX9qNjZa'}
+2025-10-30 22:36:20,784 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:20,784 - openai._base_client - INFO - Retrying request to /chat/completions in 0.422193 seconds
+2025-10-30 22:36:21,370 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:21,371 - openai._base_client - INFO - Retrying request to /chat/completions in 0.964193 seconds
+2025-10-30 22:36:22,502 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:22,503 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:36:24,248 - __main__ - INFO - [92m✅ Created product: Video Doorbell WiFi Wireless Smart Door Bell Camera[0m
+2025-10-30 22:36:24,364 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:36:24,365 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeaQWf2gXUhAGQtcJH7S'}
+2025-10-30 22:36:24,449 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:24,449 - openai._base_client - INFO - Retrying request to /chat/completions in 0.472462 seconds
+2025-10-30 22:36:25,069 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:25,069 - openai._base_client - INFO - Retrying request to /chat/completions in 0.910459 seconds
+2025-10-30 22:36:26,142 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:26,142 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:36:27,906 - __main__ - INFO - [92m✅ Created product: WiFi Smart Thermostat Temperature Controller Touchscreen[0m
+2025-10-30 22:36:28,020 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:36:28,020 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeaQnJ7qhKvh2b5hY3zm'}
+2025-10-30 22:36:28,126 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:28,126 - openai._base_client - INFO - Retrying request to /chat/completions in 0.476714 seconds
+2025-10-30 22:36:28,715 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:28,715 - openai._base_client - INFO - Retrying request to /chat/completions in 0.864037 seconds
+2025-10-30 22:36:29,681 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:29,682 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:36:31,380 - __main__ - INFO - [92m✅ Created product: Air Purifier HEPA Filter Desktop Air Cleaner for Home[0m
+2025-10-30 22:36:31,544 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:36:31,544 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeaR3CK8q5f82tqxXyoz'}
+2025-10-30 22:36:31,641 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:31,641 - openai._base_client - INFO - Retrying request to /chat/completions in 0.480480 seconds
+2025-10-30 22:36:32,224 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:32,224 - openai._base_client - INFO - Retrying request to /chat/completions in 0.956943 seconds
+2025-10-30 22:36:33,334 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:33,335 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:36:34,835 - __main__ - INFO - [92m✅ Created product: WiFi Security Camera 1080P Indoor Pet Baby Monitor[0m
+2025-10-30 22:36:34,951 - httpx - INFO - HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 404 Not Found"
+2025-10-30 22:36:34,954 - __main__ - ERROR - Claude generation failed: Error code: 404 - {'type': 'error', 'error': {'type': 'not_found_error', 'message': 'model: claude-3-5-sonnet-20241022'}, 'request_id': 'req_011CUeaRHxpZKUocH7RjX4uM'}
+2025-10-30 22:36:35,052 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:35,052 - openai._base_client - INFO - Retrying request to /chat/completions in 0.444408 seconds
+2025-10-30 22:36:35,627 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:35,628 - openai._base_client - INFO - Retrying request to /chat/completions in 0.866530 seconds
+2025-10-30 22:36:36,585 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 429 Too Many Requests"
+2025-10-30 22:36:36,585 - __main__ - ERROR - OpenAI generation failed: Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}
+2025-10-30 22:36:38,156 - __main__ - INFO - [92m✅ Created product: Smart LED Strip Lights RGB 5050 WiFi App Control 5m-20m[0m

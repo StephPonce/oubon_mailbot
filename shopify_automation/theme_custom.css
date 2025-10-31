@@ -1,0 +1,688 @@
+/**
+ * OUBON SHOP - PREMIUM THEME CUSTOMIZATION
+ * Theme: Dawn (Shopify Free Theme)
+ * Brand Colors: Black (#000000), Electric Blue (#3B82F6), White (#FFFFFF)
+ *
+ * This CSS file provides complete theme customization for the Oubon Shop.
+ * Copy and paste this into: Shopify Admin → Themes → Customize → Theme Settings → Custom CSS
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   ROOT VARIABLES - Brand Colors
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --color-black: #000000;
+  --color-electric-blue: #3B82F6;
+  --color-electric-blue-dark: #2563EB;
+  --color-white: #FFFFFF;
+  --color-gray-dark: #0A0A0A;
+  --color-gray-medium: #333333;
+  --color-gray-light: #F5F5F5;
+
+  /* Shadows */
+  --shadow-button: 0 4px 12px rgba(59, 130, 246, 0.3);
+  --shadow-button-hover: 0 6px 20px rgba(59, 130, 246, 0.4);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 4px 16px rgba(59, 130, 246, 0.2);
+
+  /* Transitions */
+  --transition-standard: 0.3s ease;
+  --transition-fast: 0.15s ease;
+
+  /* Border Radius */
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-small: 4px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PREMIUM BUTTON STYLING
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Primary Buttons - Electric Blue Gradient */
+.button,
+.shopify-payment-button__button,
+.product-form__submit,
+button[type="submit"],
+.cart__submit,
+.btn,
+input[type="submit"] {
+  background: linear-gradient(135deg, var(--color-electric-blue) 0%, var(--color-electric-blue-dark) 100%) !important;
+  color: var(--color-white) !important;
+  border: none !important;
+  border-radius: var(--radius-button) !important;
+  padding: 14px 32px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: var(--shadow-button) !important;
+  transition: all var(--transition-standard) !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+}
+
+.button:hover,
+.shopify-payment-button__button:hover,
+.product-form__submit:hover,
+button[type="submit"]:hover,
+.cart__submit:hover,
+.btn:hover,
+input[type="submit"]:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-button-hover) !important;
+  background: linear-gradient(135deg, var(--color-electric-blue-dark) 0%, var(--color-electric-blue) 100%) !important;
+}
+
+.button:active,
+.product-form__submit:active {
+  transform: translateY(0px) !important;
+}
+
+/* Secondary Buttons - Outline Style */
+.button--secondary,
+.cart__continue {
+  background: transparent !important;
+  color: var(--color-electric-blue) !important;
+  border: 2px solid var(--color-electric-blue) !important;
+  box-shadow: none !important;
+}
+
+.button--secondary:hover,
+.cart__continue:hover {
+  background: var(--color-electric-blue) !important;
+  color: var(--color-white) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   HEADER CUSTOMIZATION
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Header Background & Border */
+.header,
+.header-wrapper,
+.shopify-section-header {
+  background-color: var(--color-black) !important;
+  border-bottom: 1px solid var(--color-electric-blue) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Logo */
+.header__heading-logo,
+.header__heading-link {
+  color: var(--color-white) !important;
+  font-weight: 700 !important;
+  font-size: 24px !important;
+}
+
+/* Navigation Menu Items */
+.header__menu-item,
+.list-menu__item a,
+.header__inline-menu a {
+  color: var(--color-white) !important;
+  font-weight: 500 !important;
+  transition: color var(--transition-standard) !important;
+}
+
+.header__menu-item:hover,
+.list-menu__item a:hover,
+.header__inline-menu a:hover {
+  color: var(--color-electric-blue) !important;
+}
+
+/* Cart Icon */
+.header__icon,
+.header__icon svg {
+  color: var(--color-white) !important;
+  fill: var(--color-white) !important;
+}
+
+.header__icon:hover,
+.header__icon:hover svg {
+  color: var(--color-electric-blue) !important;
+  fill: var(--color-electric-blue) !important;
+}
+
+/* Mobile Menu */
+.header__icon--menu,
+.mobile-nav-toggle {
+  color: var(--color-white) !important;
+}
+
+/* Search Bar in Header */
+.search__input {
+  border: 1px solid var(--color-electric-blue) !important;
+  border-radius: var(--radius-small) !important;
+}
+
+.search__input:focus {
+  border-color: var(--color-electric-blue) !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   FOOTER STYLING
+   ═══════════════════════════════════════════════════════════════════ */
+
+.footer,
+.shopify-section-group-footer-group {
+  background-color: var(--color-gray-dark) !important;
+  border-top: 2px solid var(--color-electric-blue) !important;
+  color: var(--color-white) !important;
+  padding: 48px 0 24px !important;
+}
+
+/* Footer Headings */
+.footer__heading,
+.footer h2,
+.footer h3 {
+  color: var(--color-electric-blue) !important;
+  font-weight: 700 !important;
+  margin-bottom: 16px !important;
+}
+
+/* Footer Links */
+.footer__list-item a,
+.footer a {
+  color: var(--color-white) !important;
+  transition: color var(--transition-standard) !important;
+}
+
+.footer__list-item a:hover,
+.footer a:hover {
+  color: var(--color-electric-blue) !important;
+}
+
+/* Social Media Icons */
+.footer__list-social svg,
+.social-icons svg {
+  fill: var(--color-white) !important;
+  transition: fill var(--transition-standard) !important;
+}
+
+.footer__list-social a:hover svg,
+.social-icons a:hover svg {
+  fill: var(--color-electric-blue) !important;
+}
+
+/* Footer Bottom - Copyright */
+.footer__copyright {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 14px !important;
+  margin-top: 24px !important;
+  padding-top: 24px !important;
+  border-top: 1px solid rgba(59, 130, 246, 0.2) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   HERO SECTION
+   ═══════════════════════════════════════════════════════════════════ */
+
+.banner,
+.hero,
+.image-with-text {
+  position: relative !important;
+}
+
+/* Hero Background Gradient */
+.banner__box,
+.hero__inner,
+.image-with-text__content {
+  background: linear-gradient(135deg, var(--color-black) 0%, #1a1a2e 100%) !important;
+  padding: 80px 20px !important;
+}
+
+/* Hero Text */
+.banner__heading,
+.hero__title {
+  color: var(--color-white) !important;
+  font-size: 48px !important;
+  font-weight: 700 !important;
+  margin-bottom: 24px !important;
+  line-height: 1.2 !important;
+}
+
+.banner__text,
+.hero__description {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 18px !important;
+  margin-bottom: 32px !important;
+}
+
+/* Hero CTA Buttons */
+.banner__buttons .button {
+  margin: 8px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRODUCT CARDS
+   ═══════════════════════════════════════════════════════════════════ */
+
+.card-wrapper,
+.card,
+.product-card-wrapper {
+  border-radius: var(--radius-card) !important;
+  overflow: hidden !important;
+  transition: all var(--transition-standard) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.card-wrapper:hover,
+.card:hover,
+.product-card-wrapper:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+}
+
+/* Product Card Image */
+.card__media,
+.product-card__image {
+  overflow: hidden !important;
+  border-radius: var(--radius-card) var(--radius-card) 0 0 !important;
+}
+
+/* Product Title */
+.card__heading,
+.card-information__text,
+.product-card__title {
+  color: var(--color-black) !important;
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+}
+
+.card__heading:hover,
+.product-card__title:hover {
+  color: var(--color-electric-blue) !important;
+}
+
+/* Product Price */
+.price,
+.price__regular {
+  color: var(--color-electric-blue) !important;
+  font-weight: 700 !important;
+  font-size: 20px !important;
+}
+
+.price--on-sale .price__regular {
+  color: var(--color-gray-medium) !important;
+  text-decoration: line-through !important;
+  font-size: 16px !important;
+}
+
+.price__sale {
+  color: #EF4444 !important;
+  font-weight: 700 !important;
+}
+
+/* Quick Add Button */
+.quick-add__submit {
+  background: var(--color-electric-blue) !important;
+  color: var(--color-white) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRODUCT PAGE
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Product Title */
+.product__title {
+  color: var(--color-black) !important;
+  font-weight: 700 !important;
+  font-size: 36px !important;
+  margin-bottom: 16px !important;
+}
+
+/* Product Description */
+.product__description {
+  color: var(--color-gray-medium) !important;
+  line-height: 1.8 !important;
+  margin-bottom: 24px !important;
+}
+
+/* Product Meta (SKU, Vendor, etc.) */
+.product__text {
+  color: var(--color-gray-medium) !important;
+  font-size: 14px !important;
+}
+
+/* Variant Picker */
+.product-form__input label {
+  color: var(--color-black) !important;
+  font-weight: 600 !important;
+}
+
+.product-form__input input[type="radio"] + label {
+  border: 2px solid var(--color-gray-light) !important;
+  border-radius: var(--radius-small) !important;
+  transition: all var(--transition-fast) !important;
+}
+
+.product-form__input input[type="radio"]:checked + label {
+  border-color: var(--color-electric-blue) !important;
+  background-color: rgba(59, 130, 246, 0.1) !important;
+  color: var(--color-electric-blue) !important;
+}
+
+/* Trust Badges */
+.product__trust-badges {
+  display: flex !important;
+  gap: 16px !important;
+  margin-top: 24px !important;
+}
+
+.trust-badge {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: var(--color-gray-medium) !important;
+  font-size: 14px !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   COLLECTION PAGE
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Collection Header */
+.collection-hero__title,
+.collection__title {
+  color: var(--color-black) !important;
+  font-weight: 700 !important;
+  font-size: 42px !important;
+  margin-bottom: 16px !important;
+}
+
+.collection__description {
+  color: var(--color-gray-medium) !important;
+  line-height: 1.8 !important;
+  max-width: 800px !important;
+  margin: 0 auto 40px !important;
+}
+
+/* Filter & Sort */
+.facets__form {
+  border: 1px solid var(--color-gray-light) !important;
+  border-radius: var(--radius-small) !important;
+  padding: 16px !important;
+}
+
+.facets__button {
+  color: var(--color-electric-blue) !important;
+  border: 1px solid var(--color-electric-blue) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   CART PAGE
+   ═══════════════════════════════════════════════════════════════════ */
+
+.cart__items {
+  border-radius: var(--radius-card) !important;
+  padding: 24px !important;
+}
+
+.cart-item {
+  border-bottom: 1px solid var(--color-gray-light) !important;
+  padding: 20px 0 !important;
+}
+
+.cart-item__name {
+  color: var(--color-black) !important;
+  font-weight: 600 !important;
+}
+
+/* Cart Total */
+.cart__footer {
+  background-color: var(--color-gray-light) !important;
+  border-radius: var(--radius-card) !important;
+  padding: 24px !important;
+}
+
+.totals__total {
+  color: var(--color-black) !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+}
+
+.totals__total-value {
+  color: var(--color-electric-blue) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORM INPUTS
+   ═══════════════════════════════════════════════════════════════════ */
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+textarea,
+select {
+  border: 1px solid var(--color-gray-light) !important;
+  border-radius: var(--radius-small) !important;
+  padding: 12px 16px !important;
+  transition: border-color var(--transition-fast) !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-electric-blue) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   BADGES & LABELS
+   ═══════════════════════════════════════════════════════════════════ */
+
+.badge,
+.card__badge {
+  background-color: var(--color-electric-blue) !important;
+  color: var(--color-white) !important;
+  border-radius: var(--radius-small) !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.badge--sale {
+  background-color: #EF4444 !important;
+}
+
+.badge--new {
+  background-color: #10B981 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACCESSIBILITY & WCAG COMPLIANCE
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Focus States for Keyboard Navigation */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 3px solid var(--color-electric-blue) !important;
+  outline-offset: 2px !important;
+}
+
+/* Skip to Content Link */
+.skip-to-content-link:focus {
+  clip: auto !important;
+  height: auto !important;
+  width: auto !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  background: var(--color-electric-blue) !important;
+  color: var(--color-white) !important;
+  padding: 16px !important;
+  z-index: 9999 !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE OPTIMIZATIONS (Responsive Design)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media screen and (max-width: 749px) {
+
+  /* Touch-Friendly Buttons (Minimum 44px) */
+  .button,
+  .shopify-payment-button__button,
+  .product-form__submit {
+    padding: 16px 24px !important;
+    min-height: 44px !important;
+    width: 100% !important;
+    font-size: 16px !important;
+  }
+
+  /* Hero Section - Mobile */
+  .banner__heading,
+  .hero__title {
+    font-size: 32px !important;
+  }
+
+  .banner__text,
+  .hero__description {
+    font-size: 16px !important;
+  }
+
+  /* Product Cards - Stack Vertically */
+  .collection .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Header - Mobile */
+  .header {
+    padding: 12px 16px !important;
+  }
+
+  /* Footer - Mobile Padding */
+  .footer {
+    padding: 32px 16px 16px !important;
+  }
+
+  /* Product Page - Mobile */
+  .product__title {
+    font-size: 28px !important;
+  }
+
+  .product__media-wrapper {
+    margin-bottom: 24px !important;
+  }
+
+  /* Cart - Mobile */
+  .cart__footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 100 !important;
+  }
+}
+
+@media screen and (min-width: 750px) and (max-width: 989px) {
+
+  /* Tablet - 2 Column Grid */
+  .collection .grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 24px !important;
+  }
+
+  .banner__heading {
+    font-size: 40px !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATIONS & MICRO-INTERACTIONS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth !important;
+}
+
+/* Image Loading - Fade In */
+img {
+  transition: opacity 0.3s ease !important;
+}
+
+img[loading="lazy"] {
+  opacity: 0 !important;
+}
+
+img[loading="lazy"].loaded {
+  opacity: 1 !important;
+}
+
+/* Product Quick View - Slide Up */
+.quick-view {
+  animation: slideUp 0.3s ease !important;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   PRINT STYLES (For Order Confirmations)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media print {
+  .header,
+  .footer,
+  .newsletter,
+  .breadcrumbs {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   END OF CUSTOM CSS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/**
+ * INSTALLATION INSTRUCTIONS:
+ *
+ * 1. Copy this entire file contents
+ * 2. Go to Shopify Admin → Online Store → Themes
+ * 3. Click "Customize" on your Dawn theme
+ * 4. Click "Theme Settings" (bottom left)
+ * 5. Scroll to "Custom CSS" section
+ * 6. Paste this code
+ * 7. Click "Save"
+ *
+ * IMPORTANT: Clear your browser cache after saving to see changes.
+ *
+ * For support, contact: support@oubonshop.com
+ */
