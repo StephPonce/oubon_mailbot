@@ -25,7 +25,7 @@ class AIProductAnalyst:
             raise ValueError("ANTHROPIC_API_KEY or CLAUDE_API_KEY required for AI analysis")
 
         self.claude = Anthropic(api_key=api_key)
-        self.model = "claude-3-5-sonnet-20240620"  # Sonnet 3.5
+        self.model = "claude-sonnet-4-20250514"  # Latest Sonnet 4
 
         logger.info(f"✅ AI Analyst initialized with model: {self.model}")
 

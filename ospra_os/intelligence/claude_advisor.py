@@ -33,7 +33,7 @@ class ClaudeBusinessAdvisor:
 
         # Model to use - Claude 3.5 Sonnet (best balance of speed/quality)
         # Note: Requires credits in Anthropic account
-        self.model = "claude-3-5-sonnet-20240620"
+        self.model = "claude-sonnet-4-20250514"
 
     async def daily_briefing(self, date: Optional[str] = None) -> str:
         """
