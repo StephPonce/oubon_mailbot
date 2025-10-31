@@ -418,7 +418,11 @@ async def get_dashboard_shopify(settings: Settings = Depends(get_settings)):
                 "message": "Shopify API token not configured"
             }
 
-        client = ShopifyClient(settings)
+        client = ShopifyClient(
+            store_domain=settings.SHOPIFY_STORE_DOMAIN,
+            api_token=api_token,
+            api_version=settings.SHOPIFY_API_VERSION
+        )
 
         # Get store info
         store_url = f"https://{settings.SHOPIFY_STORE_DOMAIN}/admin/api/{settings.SHOPIFY_API_VERSION}/shop.json"
