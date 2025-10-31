@@ -1644,7 +1644,7 @@ Be concise, actionable, and data-driven. Format responses with bullet points and
 
         # Call Claude API
         response = claude.messages.create(
-            model="claude-3-5-sonnet-20240620",  # Fixed: Use valid model name
+            model="claude-sonnet-4-20250514",  # Latest Sonnet 4 model
             max_tokens=1024,
             system=system_prompt,
             messages=[{
@@ -1656,7 +1656,7 @@ Be concise, actionable, and data-driven. Format responses with bullet points and
         return {
             'success': True,
             'message': response.content[0].text,
-            'model': 'claude-3-5-sonnet-20240620'
+            'model': 'claude-sonnet-4-20250514'
         }
 
     except Exception as e:
