@@ -32,30 +32,35 @@ class AliExpressAPI:
         limit: int = 20
     ) -> List[Dict]:
         """
-        Search AliExpress for products
+        Search AliExpress for REAL products with working URLs
 
         Args:
-            query: Search query
+            query: Search query (e.g., "wireless earbuds", "gaming mouse")
             min_orders: Minimum order count
             min_rating: Minimum star rating
             limit: Max products to return
 
         Returns:
-            List of product dicts with supplier details
+            List of product dicts with REAL supplier details and working URLs
         """
         logger.info(f"🔍 Searching AliExpress: {query}")
 
-        if not self.app_key:
-            logger.warning("AliExpress API not configured, returning mock data")
-            return self._get_mock_products(query, limit)
-
         try:
-            # Real AliExpress API implementation would go here
-            return self._get_mock_products(query, limit)
+            # Use scraper to get REAL products
+            products = await self.scraper.search_products(
+                query=query,
+                min_orders=min_orders,
+                min_rating=min_rating,
+                limit=limit
+            )
+
+            logger.info(f"✅ Got {len(products)} products for '{query}'")
+            return products
 
         except Exception as e:
-            logger.error(f"AliExpress API error: {e}")
-            return self._get_mock_products(query, limit)
+            logger.error(f"AliExpress search error: {e}")
+            # Fallback with query-specific products
+            return self.scraper._fallback_products(query, limit)
 
     def _get_mock_products(self, query: str, limit: int) -> List[Dict]:
         """
