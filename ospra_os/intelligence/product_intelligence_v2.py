@@ -16,6 +16,7 @@ from anthropic import Anthropic
 from ospra_os.integrations.aliexpress_api import AliExpressAPI
 from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
 from ospra_os.intelligence.ai_analyst import AIProductAnalyst
+from ospra_os.services.image_processor import ImageProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,20 @@ class ProductIntelligenceEngine:
         except Exception as e:
             logger.warning(f"⚠️  AI Analyst init failed: {e}")
             self.ai_analyst = None
+
+        # Initialize Image Processor (DALL-E + optimization)
+        try:
+            self.image_processor = ImageProcessor()
+            # Check if DALL-E image generation should be enabled (cost control)
+            self.enable_image_generation = os.getenv('ENABLE_DALLE_IMAGES', 'false').lower() == 'true'
+            if self.enable_image_generation and self.image_processor.openai:
+                logger.info("✅ Image Processor initialized with DALL-E (lifestyle images enabled)")
+            else:
+                logger.info("✅ Image Processor initialized (DALL-E disabled - set ENABLE_DALLE_IMAGES=true to enable)")
+        except Exception as e:
+            logger.warning(f"⚠️  Image Processor init failed: {e}")
+            self.image_processor = None
+            self.enable_image_generation = False
 
         # Fallback Claude client for old method
         api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
@@ -304,6 +319,11 @@ class ProductIntelligenceEngine:
                 'image_url': product.get('image_url', ''),
             }
 
+        # Step 3: Generate lifestyle images (optional, controlled by env var)
+        if self.image_processor and self.enable_image_generation:
+            logger.info("🎨 Generating AI lifestyle images for products...")
+            await self._enhance_product_images(products, niche)
+
         return products
 
     async def _get_claude_analysis(self, product: Dict, niche: str) -> str:
@@ -393,3 +413,30 @@ Keep it concise, actionable, and honest."""
 3. Lower profit potential
 
 **Risk:** Unproven demand - focus on higher-scoring products first."""
+
+    async def _enhance_product_images(self, products: List[Dict], niche: str) -> None:
+        """
+        Generate AI lifestyle images for products using DALL-E.
+        Cost: $0.04 per image (controlled by ENABLE_DALLE_IMAGES env var)
+        """
+        for product in products:
+            try:
+                logger.info(f"🎨 Generating lifestyle image: {product['name'][:50]}...")
+
+                # Generate lifestyle image with DALL-E
+                lifestyle_url = await self.image_processor.generate_lifestyle_image(
+                    product_name=product['name'],
+                    product_category=niche
+                )
+
+                if lifestyle_url:
+                    # Add to product data
+                    product['lifestyle_image_url'] = lifestyle_url
+                    product['display_data']['lifestyle_image_url'] = lifestyle_url
+                    logger.info(f"✅ Generated lifestyle image")
+                else:
+                    logger.warning(f"⚠️  Failed to generate lifestyle image")
+
+            except Exception as e:
+                logger.error(f"Image generation error for {product['name'][:50]}: {e}")
+                continue
