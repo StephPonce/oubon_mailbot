@@ -9,6 +9,7 @@ import random
 from typing import List, Dict, Optional
 import logging
 from ospra_os.integrations.aliexpress_scraper import AliExpressScraper
+from ospra_os.integrations.aliexpress_api_client import AliExpressAPIClient
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,21 @@ logger = logging.getLogger(__name__)
 class AliExpressAPI:
     """
     AliExpress API wrapper
-    Searches products and finds exact supplier matches
+    Searches products using official API when credentials available, falls back to scraper
     """
 
     def __init__(self):
         self.app_key = os.getenv('ALIEXPRESS_APP_KEY')
         self.app_secret = os.getenv('ALIEXPRESS_APP_SECRET')
+
+        # Initialize official API client if credentials available
+        if self.app_key and self.app_secret:
+            self.api_client = AliExpressAPIClient()
+            logger.info("✅ Using official AliExpress API")
+        else:
+            self.api_client = None
+            logger.warning("⚠️  AliExpress API credentials not found, will use scraper fallback")
+
         self.scraper = AliExpressScraper()
 
     async def search_products(
@@ -45,8 +55,28 @@ class AliExpressAPI:
         """
         logger.info(f"🔍 Searching AliExpress: {query}")
 
+        # Try official API first
+        if self.api_client:
+            try:
+                logger.info("📡 Using official AliExpress API...")
+                products = await self.api_client.search_products(
+                    query=query,
+                    min_orders=min_orders,
+                    min_rating=min_rating,
+                    limit=limit
+                )
+
+                if products:
+                    logger.info(f"✅ Got {len(products)} products from official API")
+                    return products
+                else:
+                    logger.warning("⚠️  Official API returned no products, falling back to scraper")
+            except Exception as e:
+                logger.warning(f"⚠️  Official API failed: {e}, falling back to scraper")
+
+        # Fallback to scraper
         try:
-            # Use scraper to get REAL products
+            logger.info("🕷️  Using scraper fallback...")
             products = await self.scraper.search_products(
                 query=query,
                 min_orders=min_orders,
@@ -54,12 +84,12 @@ class AliExpressAPI:
                 limit=limit
             )
 
-            logger.info(f"✅ Got {len(products)} products for '{query}'")
+            logger.info(f"✅ Got {len(products)} products from scraper")
             return products
 
         except Exception as e:
-            logger.error(f"AliExpress search error: {e}")
-            # Fallback with query-specific products
+            logger.error(f"❌ Scraper also failed: {e}")
+            # Last resort: use fallback data
             return self.scraper._fallback_products(query, limit)
 
     def _get_mock_products(self, query: str, limit: int) -> List[Dict]:
