@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     SHOPIFY_ACCESS_TOKEN: Optional[str] = None  # Admin API access token
     SHOPIFY_API_KEY: Optional[str] = None
     SHOPIFY_API_SECRET: Optional[str] = None
-    SHOPIFY_API_VERSION: Optional[str] = Field(default="2024-10")
+    SHOPIFY_API_VERSION: Optional[str] = Field(default="2025-01")
 
     # AliExpress
     ALIEXPRESS_API_KEY: Optional[str] = None  # App Key

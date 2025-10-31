@@ -39,7 +39,7 @@ class ShopifyConfig:
     # API credentials (loaded from environment)
     STORE_DOMAIN = os.getenv('SHOPIFY_STORE_DOMAIN', 'rxxj7d-1i.myshopify.com')
     ACCESS_TOKEN = os.getenv('SHOPIFY_ADMIN_ACCESS_TOKEN') or os.getenv('SHOPIFY_API_TOKEN')
-    API_VERSION = os.getenv('SHOPIFY_API_VERSION', '2024-10')
+    API_VERSION = os.getenv('SHOPIFY_API_VERSION', '2025-01')
 
     # API endpoints
     BASE_URL = f"https://{STORE_DOMAIN}/admin/api/{API_VERSION}"

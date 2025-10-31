@@ -7,14 +7,14 @@ from datetime import datetime
 class ShopifyClient:
     """Enhanced Shopify Admin API client."""
 
-    def __init__(self, store_domain: str, api_token: str, api_version: str = "2024-10"):
+    def __init__(self, store_domain: str, api_token: str, api_version: str = "2025-01"):
         """
         Initialize Shopify client.
 
         Args:
             store_domain: e.g., "oubonshop.myshopify.com"
             api_token: Shopify Admin API access token
-            api_version: API version (default: 2024-10)
+            api_version: API version (default: 2025-01)
         """
         self.store_domain = store_domain
         self.api_token = api_token

@@ -6,8 +6,11 @@ Configures Dawn theme with Oubon Shop branding and optimized settings
 import os
 import json
 import logging
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, TYPE_CHECKING
 from pathlib import Path
+
+if TYPE_CHECKING:
+    import shopify
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +154,7 @@ class DawnThemeConfigurator:
 
         return results
 
-    def _get_main_theme(self) -> shopify.Theme:
+    def _get_main_theme(self) -> "shopify.Theme":
         """Get the main/published theme"""
         themes = shopify.Theme.find()
         main_theme = next((t for t in themes if t.role == 'main'), None)

@@ -1,0 +1,993 @@
+/**
+ * ============================================
+ * OUBON SHOP - PREMIUM THEME CUSTOMIZATIONS
+ * Version: 1.0.0
+ * Theme: Dawn by Shopify
+ * Brand: Oubon Shop - Smart Home & Tech
+ * Colors: Black (#000000), Electric Blue (#3B82F6), White (#FFFFFF)
+ * ============================================
+ *
+ * INSTALLATION: Add this file to your Dawn theme:
+ * 1. Go to Shopify Admin → Online Store → Themes
+ * 2. Click "Actions" → "Edit code" on Dawn theme
+ * 3. In "Assets" folder, click "Add a new asset"
+ * 4. Upload this file OR create new file named "oubon-custom.css"
+ * 5. Copy/paste this entire CSS into the new file
+ * 6. Save the file
+ * 7. Open "Layout/theme.liquid"
+ * 8. Before </head> tag, add: {{ 'oubon-custom.css' | asset_url | stylesheet_tag }}
+ * 9. Save theme.liquid
+ * 10. Your theme is now customized!
+ */
+
+/* ============================================
+   ROOT VARIABLES - BRAND COLORS
+   ============================================ */
+:root {
+  /* Brand Colors */
+  --oubon-black: #000000;
+  --oubon-blue: #3B82F6;
+  --oubon-blue-dark: #2563EB;
+  --oubon-blue-darker: #1D4ED8;
+  --oubon-white: #FFFFFF;
+  --oubon-gray-dark: #0A0A0A;
+  --oubon-gray-medium: #1F2937;
+  --oubon-gray-light: #E5E7EB;
+  --oubon-gray-lighter: #F9FAFB;
+
+  /* Shadows */
+  --oubon-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --oubon-shadow-md: 0 4px 6px rgba(59, 130, 246, 0.2);
+  --oubon-shadow-lg: 0 6px 12px rgba(59, 130, 246, 0.4);
+  --oubon-shadow-xl: 0 8px 16px rgba(59, 130, 246, 0.15);
+
+  /* Transitions */
+  --oubon-transition-fast: 0.15s ease;
+  --oubon-transition-normal: 0.3s ease;
+  --oubon-transition-slow: 0.5s ease;
+
+  /* Border Radius */
+  --oubon-radius-sm: 4px;
+  --oubon-radius-md: 8px;
+  --oubon-radius-lg: 12px;
+
+  /* Spacing */
+  --oubon-space-xs: 8px;
+  --oubon-space-sm: 12px;
+  --oubon-space-md: 16px;
+  --oubon-space-lg: 24px;
+  --oubon-space-xl: 32px;
+}
+
+/* ============================================
+   GLOBAL STYLES
+   ============================================ */
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Global Link Colors */
+a {
+  color: var(--oubon-blue);
+  transition: color var(--oubon-transition-normal);
+}
+
+a:hover {
+  color: var(--oubon-blue-dark);
+}
+
+/* ============================================
+   HEADER CUSTOMIZATION
+   ============================================ */
+
+/* Header Background - Black with Blue Border */
+.header-wrapper,
+.header,
+.shopify-section-header {
+  background-color: var(--oubon-black) !important;
+  border-bottom: 2px solid var(--oubon-blue);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Logo - White Text */
+.header__heading,
+.header__heading-link {
+  color: var(--oubon-white) !important;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+}
+
+.header__heading-link:hover {
+  color: var(--oubon-blue) !important;
+}
+
+/* Navigation Menu Items - White Text */
+.header__menu-item,
+.header__menu-item link,
+.list-menu__item a,
+.header__inline-menu a,
+.menu-drawer__menu-item {
+  color: var(--oubon-white) !important;
+  font-weight: 500;
+  font-size: 15px;
+  transition: color var(--oubon-transition-normal);
+}
+
+.header__menu-item:hover,
+.list-menu__item a:hover,
+.header__inline-menu a:hover,
+.menu-drawer__menu-item:hover {
+  color: var(--oubon-blue) !important;
+}
+
+/* Header Icons (Cart, Search, Menu) - White */
+.header__icon,
+.header__icon svg,
+.header__icon--cart,
+.header__icon--menu {
+  color: var(--oubon-white) !important;
+  fill: var(--oubon-white) !important;
+}
+
+.header__icon:hover,
+.header__icon:hover svg {
+  color: var(--oubon-blue) !important;
+  fill: var(--oubon-blue) !important;
+}
+
+/* Cart Count Badge */
+.cart-count-bubble {
+  background-color: var(--oubon-blue) !important;
+  color: var(--oubon-white) !important;
+  font-weight: 600;
+}
+
+/* Search Bar in Header */
+.header__search .search__input {
+  border: 1px solid var(--oubon-blue);
+  border-radius: var(--oubon-radius-sm);
+}
+
+.header__search .search__input:focus {
+  border-color: var(--oubon-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* Mobile Menu Drawer */
+.menu-drawer {
+  background-color: var(--oubon-black) !important;
+}
+
+.menu-drawer__navigation-link,
+.menu-drawer__menu-item {
+  color: var(--oubon-white) !important;
+}
+
+.menu-drawer__navigation-link:hover {
+  color: var(--oubon-blue) !important;
+}
+
+/* ============================================
+   ANNOUNCEMENT BAR
+   ============================================ */
+
+.announcement-bar,
+.shopify-section-group-header-group .announcement-bar {
+  background-color: var(--oubon-black) !important;
+  color: var(--oubon-blue) !important;
+  border-bottom: 1px solid var(--oubon-blue);
+  font-weight: 500;
+  font-size: 14px;
+  padding: 12px;
+  text-align: center;
+}
+
+.announcement-bar__link {
+  color: var(--oubon-blue) !important;
+}
+
+.announcement-bar__link:hover {
+  color: var(--oubon-white) !important;
+}
+
+/* ============================================
+   BUTTONS - PREMIUM STYLING
+   ============================================ */
+
+/* Primary Buttons - Electric Blue Gradient */
+.button,
+.button--primary,
+.product-form__submit,
+.shopify-payment-button__button--unbranded,
+.shopify-challenge__button,
+.customer button[type="submit"],
+button[type="submit"],
+.cart__submit,
+.cart__checkout-button,
+input[type="submit"] {
+  background: linear-gradient(90deg, var(--oubon-blue) 0%, var(--oubon-blue-dark) 100%) !important;
+  color: var(--oubon-white) !important;
+  border: none !important;
+  padding: 16px 32px;
+  font-weight: 600;
+  font-size: 16px;
+  border-radius: var(--oubon-radius-md);
+  transition: all var(--oubon-transition-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: var(--oubon-shadow-md);
+  cursor: pointer;
+}
+
+.button:hover,
+.button--primary:hover,
+.product-form__submit:hover,
+.shopify-payment-button__button--unbranded:hover,
+button[type="submit"]:hover,
+.cart__submit:hover,
+input[type="submit"]:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--oubon-shadow-lg);
+  background: linear-gradient(90deg, var(--oubon-blue-dark) 0%, var(--oubon-blue-darker) 100%) !important;
+}
+
+.button:active,
+.product-form__submit:active {
+  transform: translateY(0);
+}
+
+/* Secondary Buttons - Outline Style */
+.button--secondary {
+  background: transparent !important;
+  color: var(--oubon-black) !important;
+  border: 2px solid var(--oubon-black) !important;
+  box-shadow: none !important;
+}
+
+.button--secondary:hover {
+  background-color: var(--oubon-black) !important;
+  color: var(--oubon-white) !important;
+}
+
+/* Tertiary Buttons - Blue Outline */
+.button--tertiary {
+  background: transparent !important;
+  color: var(--oubon-blue) !important;
+  border: 2px solid var(--oubon-blue) !important;
+}
+
+.button--tertiary:hover {
+  background-color: var(--oubon-blue) !important;
+  color: var(--oubon-white) !important;
+}
+
+/* ============================================
+   HERO / BANNER SECTIONS
+   ============================================ */
+
+.banner,
+.hero,
+.slideshow {
+  position: relative;
+  overflow: hidden;
+}
+
+.banner__box,
+.hero__inner {
+  background: linear-gradient(135deg, var(--oubon-black) 0%, #002e5d 50%, #003366 100%);
+  padding: 80px 20px;
+}
+
+.banner__heading,
+.hero__title,
+.banner h2 {
+  color: var(--oubon-white) !important;
+  font-size: 48px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.banner__text,
+.hero__description,
+.banner p {
+  color: var(--oubon-gray-light) !important;
+  font-size: 18px;
+  margin-bottom: 30px;
+  line-height: 1.6;
+}
+
+.banner__buttons {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ============================================
+   PRODUCT CARDS
+   ============================================ */
+
+.card-wrapper,
+.card,
+.product-card-wrapper {
+  border-radius: var(--oubon-radius-lg);
+  overflow: hidden;
+  transition: all var(--oubon-transition-normal);
+  box-shadow: var(--oubon-shadow-sm);
+  background: var(--oubon-white);
+}
+
+.card-wrapper:hover,
+.card:hover,
+.product-card-wrapper:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--oubon-shadow-xl);
+}
+
+/* Product Card Image */
+.card__media,
+.card__inner,
+.product-card__image {
+  overflow: hidden;
+  border-radius: var(--oubon-radius-lg) var(--oubon-radius-lg) 0 0;
+}
+
+.card__media img,
+.card__inner img {
+  transition: transform var(--oubon-transition-slow);
+}
+
+.card-wrapper:hover .card__media img,
+.card:hover .card__inner img {
+  transform: scale(1.05);
+}
+
+/* Product Card Title */
+.card__heading,
+.card-information__text h3,
+.card__information .card__heading {
+  color: var(--oubon-black);
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 8px;
+  transition: color var(--oubon-transition-normal);
+}
+
+.card__heading a {
+  color: var(--oubon-black);
+}
+
+.card__heading a:hover {
+  color: var(--oubon-blue);
+}
+
+/* Product Price */
+.price,
+.price__regular {
+  color: var(--oubon-blue) !important;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+.price--on-sale .price__regular {
+  color: var(--oubon-gray-medium) !important;
+  text-decoration: line-through;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.price__sale,
+.price--on-sale .price-item--sale {
+  color: #EF4444 !important;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+/* Quick Add Button */
+.quick-add__submit,
+.card__badge {
+  transition: all var(--oubon-transition-normal);
+}
+
+/* Product Badges */
+.badge,
+.card__badge {
+  background-color: var(--oubon-blue) !important;
+  color: var(--oubon-white) !important;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: var(--oubon-radius-sm);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge--sale {
+  background-color: #EF4444 !important;
+}
+
+.badge--new {
+  background-color: #10B981 !important;
+}
+
+/* ============================================
+   PRODUCT PAGE
+   ============================================ */
+
+/* Product Title */
+.product__title {
+  color: var(--oubon-black);
+  font-weight: 700;
+  font-size: 36px;
+  margin-bottom: 16px;
+  line-height: 1.2;
+}
+
+/* Product Vendor */
+.product__text.caption-with-letter-spacing {
+  color: var(--oubon-gray-medium);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Product Description */
+.product__description,
+.product__description-text {
+  color: var(--oubon-gray-medium);
+  line-height: 1.8;
+  font-size: 16px;
+  margin-bottom: 24px;
+}
+
+/* Variant Picker */
+.product-form__input label {
+  color: var(--oubon-black);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.product-form__input input[type="radio"] + label {
+  border: 2px solid var(--oubon-gray-light);
+  border-radius: var(--oubon-radius-sm);
+  padding: 10px 20px;
+  transition: all var(--oubon-transition-fast);
+  cursor: pointer;
+}
+
+.product-form__input input[type="radio"]:checked + label {
+  border-color: var(--oubon-blue);
+  background-color: rgba(59, 130, 246, 0.1);
+  color: var(--oubon-blue);
+  font-weight: 600;
+}
+
+/* Quantity Selector */
+.quantity__button {
+  border: 1px solid var(--oubon-gray-light);
+  color: var(--oubon-black);
+  background: var(--oubon-white);
+}
+
+.quantity__button:hover {
+  border-color: var(--oubon-blue);
+  color: var(--oubon-blue);
+}
+
+/* Product Info Accordion */
+.accordion {
+  border-top: 1px solid var(--oubon-gray-light);
+}
+
+.accordion__title {
+  color: var(--oubon-black);
+  font-weight: 600;
+}
+
+/* ============================================
+   COLLECTION PAGE
+   ============================================ */
+
+/* Collection Header */
+.collection-hero,
+.collection-hero__inner {
+  background: linear-gradient(135deg, var(--oubon-black) 0%, #002e5d 100%);
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.collection-hero__title,
+.collection__title {
+  color: var(--oubon-white) !important;
+  font-weight: 700;
+  font-size: 42px;
+  margin-bottom: 16px;
+}
+
+.collection-hero__description,
+.collection__description {
+  color: var(--oubon-gray-light) !important;
+  font-size: 18px;
+  line-height: 1.6;
+  max-width: 800px;
+  margin: 0 auto 30px;
+}
+
+/* Filtering and Sorting */
+.facets,
+.facet-filters {
+  border: 1px solid var(--oubon-gray-light);
+  border-radius: var(--oubon-radius-md);
+  padding: 16px;
+  background: var(--oubon-gray-lighter);
+}
+
+.facets__heading,
+.facet-filters__heading {
+  color: var(--oubon-black);
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.facets__button,
+.facet-checkbox {
+  color: var(--oubon-blue);
+  border: 1px solid var(--oubon-blue);
+  transition: all var(--oubon-transition-normal);
+}
+
+.facets__button:hover {
+  background-color: var(--oubon-blue);
+  color: var(--oubon-white);
+}
+
+/* Active Filters */
+.active-facets__button {
+  background-color: var(--oubon-blue);
+  color: var(--oubon-white);
+  border-radius: var(--oubon-radius-sm);
+}
+
+/* ============================================
+   CART PAGE & DRAWER
+   ============================================ */
+
+/* Cart Drawer/Page Background */
+.cart-drawer,
+.cart,
+.cart__items {
+  background-color: var(--oubon-white);
+}
+
+/* Cart Item */
+.cart-item {
+  border-bottom: 1px solid var(--oubon-gray-light);
+  padding: 20px 0;
+}
+
+.cart-item__name {
+  color: var(--oubon-black);
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.cart-item__name:hover {
+  color: var(--oubon-blue);
+}
+
+.cart-item__price {
+  color: var(--oubon-blue);
+  font-weight: 700;
+}
+
+/* Cart Totals */
+.cart__footer,
+.cart-drawer__footer {
+  background-color: var(--oubon-gray-lighter);
+  border-top: 2px solid var(--oubon-blue);
+  padding: 24px;
+  border-radius: var(--oubon-radius-md) var(--oubon-radius-md) 0 0;
+}
+
+.totals,
+.cart-drawer__footer .totals {
+  font-size: 16px;
+}
+
+.totals__subtotal,
+.totals__total {
+  color: var(--oubon-black);
+  font-weight: 600;
+}
+
+.totals__subtotal-value,
+.totals__total-value {
+  color: var(--oubon-blue);
+  font-weight: 700;
+  font-size: 24px;
+}
+
+/* Cart Notification (Added to Cart popup) */
+.cart-notification {
+  border: 2px solid var(--oubon-blue);
+  border-radius: var(--oubon-radius-md);
+  box-shadow: var(--oubon-shadow-lg);
+}
+
+.cart-notification__heading {
+  color: var(--oubon-blue);
+  font-weight: 700;
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.footer,
+.shopify-section-group-footer-group {
+  background-color: var(--oubon-gray-dark) !important;
+  border-top: 3px solid var(--oubon-blue);
+  color: var(--oubon-white) !important;
+  padding: 48px 0 24px;
+}
+
+/* Footer Headings */
+.footer__heading,
+.footer h2,
+.footer .h4 {
+  color: var(--oubon-blue) !important;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+/* Footer Links */
+.footer__list-item,
+.footer__list-item a,
+.footer a,
+.footer-block__details-content a {
+  color: var(--oubon-gray-light) !important;
+  transition: color var(--oubon-transition-normal);
+  font-size: 14px;
+}
+
+.footer__list-item a:hover,
+.footer a:hover {
+  color: var(--oubon-blue) !important;
+}
+
+/* Footer Social Icons */
+.footer__list-social .list-social__link,
+.footer .social-icons a {
+  transition: all var(--oubon-transition-normal);
+}
+
+.footer__list-social svg,
+.footer .social-icons svg {
+  fill: var(--oubon-white);
+  transition: fill var(--oubon-transition-normal);
+}
+
+.footer__list-social .list-social__link:hover svg,
+.footer .social-icons a:hover svg {
+  fill: var(--oubon-blue);
+}
+
+/* Footer Bottom (Copyright) */
+.footer__copyright,
+.footer-block--newsletter + .footer-block {
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 13px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(59, 130, 246, 0.3);
+  text-align: center;
+}
+
+/* Footer Newsletter Signup */
+.footer__newsletter .newsletter-form__field-wrapper {
+  border: 1px solid var(--oubon-blue);
+  border-radius: var(--oubon-radius-md);
+}
+
+.footer__newsletter .newsletter-form__button {
+  background-color: var(--oubon-blue);
+  color: var(--oubon-white);
+}
+
+/* ============================================
+   FORMS & INPUTS
+   ============================================ */
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="number"],
+textarea,
+select,
+.field__input {
+  border: 1px solid var(--oubon-gray-light);
+  border-radius: var(--oubon-radius-sm);
+  padding: 12px 16px;
+  transition: border-color var(--oubon-transition-normal);
+  font-size: 15px;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="tel"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus,
+.field__input:focus {
+  border-color: var(--oubon-blue);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.field__label {
+  color: var(--oubon-black);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* ============================================
+   LOADING & ANIMATIONS
+   ============================================ */
+
+/* Loading Spinner */
+.loading-overlay__spinner,
+.spinner {
+  border-color: var(--oubon-blue) !important;
+  border-top-color: transparent !important;
+}
+
+/* Fade In Animation for Images */
+.media img {
+  transition: opacity 0.3s ease;
+}
+
+.media img[loading="lazy"] {
+  opacity: 0;
+}
+
+.media img.loaded,
+.media img[loading="lazy"].loaded {
+  opacity: 1;
+}
+
+/* ============================================
+   BREADCRUMBS
+   ============================================ */
+
+.breadcrumbs {
+  font-size: 14px;
+  color: var(--oubon-gray-medium);
+}
+
+.breadcrumbs a {
+  color: var(--oubon-blue);
+}
+
+.breadcrumbs a:hover {
+  color: var(--oubon-blue-dark);
+  text-decoration: underline;
+}
+
+/* ============================================
+   PAGINATION
+   ============================================ */
+
+.pagination {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 40px 0;
+}
+
+.pagination__item {
+  border: 1px solid var(--oubon-gray-light);
+  border-radius: var(--oubon-radius-sm);
+  padding: 10px 16px;
+  transition: all var(--oubon-transition-normal);
+}
+
+.pagination__item:hover {
+  border-color: var(--oubon-blue);
+  background-color: var(--oubon-blue);
+  color: var(--oubon-white);
+}
+
+.pagination__item--current {
+  background-color: var(--oubon-blue);
+  color: var(--oubon-white);
+  border-color: var(--oubon-blue);
+}
+
+/* ============================================
+   MOBILE RESPONSIVE (Tablet & Phone)
+   ============================================ */
+
+@media screen and (max-width: 989px) {
+  /* Tablet adjustments */
+
+  .banner__heading,
+  .hero__title {
+    font-size: 40px;
+  }
+
+  .collection-hero__title,
+  .collection__title {
+    font-size: 36px;
+  }
+}
+
+@media screen and (max-width: 749px) {
+  /* Mobile adjustments */
+
+  /* Touch-Friendly Buttons */
+  .button,
+  .button--primary,
+  .product-form__submit,
+  button[type="submit"] {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: 14px;
+    min-height: 44px; /* WCAG touch target size */
+  }
+
+  /* Header Mobile */
+  .header-wrapper,
+  .header {
+    padding: 15px 10px;
+  }
+
+  .header__heading,
+  .header__heading-link {
+    font-size: 20px;
+  }
+
+  /* Hero Mobile */
+  .banner__heading,
+  .hero__title {
+    font-size: 32px;
+  }
+
+  .banner__text,
+  .hero__description {
+    font-size: 16px;
+  }
+
+  .banner__box,
+  .hero__inner {
+    padding: 60px 16px;
+  }
+
+  /* Product Page Mobile */
+  .product__title {
+    font-size: 28px;
+  }
+
+  /* Collection Header Mobile */
+  .collection-hero__title,
+  .collection__title {
+    font-size: 32px;
+  }
+
+  .collection-hero__description,
+  .collection__description {
+    font-size: 16px;
+  }
+
+  /* Product Grid Mobile - Single Column */
+  .collection .grid--2-col-tablet-down,
+  .featured-collection .grid--2-col-tablet-down {
+    grid-template-columns: 1fr;
+  }
+
+  /* Footer Mobile */
+  .footer {
+    padding: 32px 16px 16px;
+  }
+
+  /* Cart Drawer Mobile */
+  .cart-drawer {
+    width: 100% !important;
+  }
+
+  /* Announcement Bar Mobile */
+  .announcement-bar {
+    font-size: 13px;
+    padding: 10px;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================ */
+
+/* Focus States for Keyboard Navigation */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--oubon-blue);
+  outline-offset: 2px;
+}
+
+/* Skip to Content Link */
+.skip-to-content-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--oubon-blue);
+  color: var(--oubon-white);
+  padding: 16px;
+  z-index: 9999;
+  transform: translateY(-100%);
+  transition: transform 0.3s;
+}
+
+.skip-to-content-link:focus {
+  transform: translateY(0);
+}
+
+/* Reduced Motion for Users with Vestibular Disorders */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .header,
+  .footer,
+  .announcement-bar,
+  .cart-notification,
+  .newsletter {
+    display: none !important;
+  }
+
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .button {
+    border: 1px solid black !important;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* ============================================
+   END OF OUBON CUSTOM CSS
+   ============================================ *
+ *
+ * Thank you for using Oubon Shop theme customizations!
+ * For support: support@oubonshop.com
+ *
+ * ============================================ */

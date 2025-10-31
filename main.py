@@ -305,7 +305,7 @@ def lookup_order(order_id: str, settings: Settings = None) -> Optional[dict]:
         return None
 
     import requests
-    url = f"https://{settings.SHOPIFY_STORE}/admin/api/2024-10/orders.json?name={order_id}"
+    url = f"https://{settings.SHOPIFY_STORE}/admin/api/2025-01/orders.json?name={order_id}"
     headers = {"X-Shopify-Access-Token": settings.SHOPIFY_API_TOKEN}
     res = requests.get(url, headers=headers)
     data = res.json()
