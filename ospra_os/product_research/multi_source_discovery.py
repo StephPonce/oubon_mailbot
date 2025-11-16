@@ -3,8 +3,22 @@
 from typing import List, Dict, Optional
 import asyncio
 from pytrends.request import TrendReq
-from ospra_os.product_research.connectors.amazon import AmazonPAAPIConnector
-from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
+
+# Optional imports - system works without these
+try:
+    from ospra_os.product_research.connectors.amazon import AmazonPAAPIConnector
+    HAS_AMAZON = True
+except ImportError:
+    AmazonPAAPIConnector = None
+    HAS_AMAZON = False
+
+try:
+    from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
+    HAS_APIFY = True
+except ImportError:
+    TikTokShopScraper = None
+    AmazonBestsellersScraper = None
+    HAS_APIFY = False
 
 
 class MultiSourceDiscovery:
