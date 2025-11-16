@@ -8,10 +8,21 @@ from typing import Optional, List, Dict
 from ospra_os.core.settings import Settings, get_settings
 import os
 
-# Import platform connectors
-from ospra_os.platforms.shopify.product_deployer import ShopifyProductDeployer
-from ospra_os.platforms.amazon.seller_api import AmazonSellerAPI
-from ospra_os.platforms.woocommerce.woo_connector import WooCommerceConnector
+# Import platform adapters (using unified adapter pattern)
+try:
+    from ospra_os.platforms.shopify import ShopifyAdapter
+except ImportError:
+    ShopifyAdapter = None
+
+try:
+    from ospra_os.platforms.amazon import AmazonAdapter
+except ImportError:
+    AmazonAdapter = None
+
+try:
+    from ospra_os.platforms.woocommerce import WooCommerceAdapter
+except ImportError:
+    WooCommerceAdapter = None
 
 router = APIRouter(prefix="/api/deploy", tags=["Product Deployment"])
 

@@ -1,11 +1,16 @@
 import logging
 import os
-import schedule
 import time
 import threading
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from collections import deque
+
+try:
+    import schedule
+except ImportError:
+    schedule = None
+    logging.warning("schedule module not available - background jobs will be limited")
 
 from ospra_os.intelligence.ai_research_agent import AIResearchAgent
 

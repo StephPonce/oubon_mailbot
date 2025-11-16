@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from typing import List, Dict
 from ospra_os.database.product_history import ProductHistoryDB
-from ospra_os.intelligence.product_discovery_REALTIME import RealTimeProductDiscovery
+from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
 from ospra_os.notifications.email_notifier import EmailNotifier
 from ospra_os.notifications.slack_notifier import SlackNotifier
 
@@ -20,7 +20,7 @@ class ProductMonitor:
 
     def __init__(self):
         self.db = ProductHistoryDB()
-        self.discovery = RealTimeProductDiscovery()
+        self.discovery = ProductIntelligenceEngine()
         self.email_notifier = EmailNotifier()
         self.slack_notifier = SlackNotifier()
         logger.info("✅ Product monitor initialized with notifications")
@@ -47,8 +47,7 @@ class ProductMonitor:
 
             try:
                 # Get current products
-                result = self.discovery.discover_products(niche=niche, per_page=20)
-                products = result.get("products", [])
+                products = self.discovery.discover_products_by_niche(niche=niche, count=20)
 
                 for product in products:
                     changes = self.check_product(product)

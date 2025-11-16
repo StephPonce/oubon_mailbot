@@ -5,7 +5,7 @@ Fetch products from discovery service and store in database
 
 import logging
 from ospra_os.database.product_history import ProductHistoryDB
-from ospra_os.intelligence.product_discovery_REALTIME import RealTimeProductDiscovery
+from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
 from ospra_os.intelligence.product_enrichment import enrich_product
 
 logging.basicConfig(
@@ -29,7 +29,7 @@ def seed_products(niches=None, per_page=20):
         niches = ['smart_home', 'fitness', 'kitchen', 'beauty', 'pet']
 
     db = ProductHistoryDB()
-    discovery = RealTimeProductDiscovery()
+    discovery = ProductIntelligenceEngine()
 
     print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print("🌱 SEEDING PRODUCTS DATABASE")
@@ -41,8 +41,7 @@ def seed_products(niches=None, per_page=20):
         print(f"📦 Fetching {niche} products...")
 
         try:
-            result = discovery.discover_products(niche=niche, per_page=per_page)
-            products = result.get('products', [])
+            products = discovery.discover_products_by_niche(niche=niche, count=per_page)
 
             print(f"   Found {len(products)} products")
 
