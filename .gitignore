@@ -1,14 +1,46 @@
+# Environment variables
 .env
+.env.local
+.env.backup*
 .secrets/
+
+# Python
 __pycache__/
-.venv/
-.vscode/
 *.pyc
 *.pyo
+*.py[cod]
+*$py.class
+.venv/
+.vscode/
+*.egg-info/
+.pytest_cache/
+dist/
+build/
+
+# Databases
 *.db
 *.sqlite
+*.sqlite3
 
 # OAuth credentials
 client_secret_*.json
+google-ads.yaml
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Backup files
+*.backup
+*.bak
+*backup*/
+*.old
 *.txt
-.env.backup*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

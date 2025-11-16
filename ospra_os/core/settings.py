@@ -72,8 +72,27 @@ class Settings(BaseSettings):
     base_url: str = Field(default="http://localhost:8000")  # For OAuth redirects
 
     # Connectors (stubs for future phases)
+    META_APP_ID: Optional[str] = None
+    META_APP_SECRET: Optional[str] = None
     META_ACCESS_TOKEN: Optional[str] = None
+    META_AD_ACCOUNT_ID: Optional[str] = None
+    META_PAGE_ID: Optional[str] = None
+
+    TIKTOK_APP_ID: Optional[str] = None
+    TIKTOK_SECRET: Optional[str] = None
     TIKTOK_ACCESS_TOKEN: Optional[str] = None
+    TIKTOK_CLIENT_KEY: Optional[str] = None
+    TIKTOK_CLIENT_SECRET: Optional[str] = None
+    TIKTOK_ADVERTISER_ID: Optional[str] = None
+    TIKTOK_REDIRECT_URI: Optional[str] = Field(default="http://localhost:8001/api/tiktok/auth/callback")
+
+    # Google Ads Platform
+    GOOGLE_ADS_CUSTOMER_ID: Optional[str] = None
+    GOOGLE_ADS_DEVELOPER_TOKEN: Optional[str] = None
+    GOOGLE_ADS_CLIENT_ID: Optional[str] = None
+    GOOGLE_ADS_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_ADS_REFRESH_TOKEN: Optional[str] = None
+
     GOOGLE_API_KEY: Optional[str] = None
     REDDIT_CLIENT_ID: Optional[str] = None
     REDDIT_SECRET: Optional[str] = None
@@ -92,6 +111,15 @@ class Settings(BaseSettings):
     # AliExpress
     ALIEXPRESS_API_KEY: Optional[str] = None  # App Key
     ALIEXPRESS_APP_SECRET: Optional[str] = None  # App Secret
+
+    # Amazon Product Advertising API (PA-API 5.0)
+    AMAZON_ACCESS_KEY: Optional[str] = None  # PA-API Access Key
+    AMAZON_SECRET_KEY: Optional[str] = None  # PA-API Secret Key
+    AMAZON_PARTNER_TAG: Optional[str] = None  # Amazon Associate Tracking ID
+    AMAZON_COUNTRY: str = Field(default="US")  # Amazon marketplace country code
+
+    # Apify (Web Scraping Infrastructure)
+    APIFY_API_TOKEN: Optional[str] = None  # Apify API token for running actors
 
     # Gmail canonical label names
     LABEL_SUPPORT: str = Field(default="Support")

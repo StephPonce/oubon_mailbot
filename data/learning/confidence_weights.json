@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-11-04T14:00:36.296113",
+  "total_learning_cycles": 1,
+  "scoring_weights": {
+    "google_trends_weight": 0.25,
+    "reddit_mentions_weight": 0.15,
+    "aliexpress_orders_weight": 0.35,
+    "price_competitiveness_weight": 0.15,
+    "trend_velocity_weight": 0.1
+  },
+  "niche_confidence": {
+    "smart_home": 0.49,
+    "fitness": 0.49,
+    "tech_accessories": 0.49,
+    "home_office": 0.5
+  },
+  "price_point_confidence": {
+    "under_20": 0.48,
+    "20_to_50": 0.58,
+    "50_to_100": 0.41,
+    "over_100": 0.41
+  },
+  "trend_velocity": {
+    "early_spike_threshold": 50,
+    "sustained_growth_days": 7,
+    "decay_threshold": -20
+  },
+  "accuracy_tracking": {
+    "predictions_made": 3,
+    "predictions_correct": 2,
+    "accuracy_rate": 0.6666666666666666
+  }
+}
