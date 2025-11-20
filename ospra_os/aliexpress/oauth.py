@@ -47,7 +47,7 @@ class AliExpressOAuth:
     """
 
     # Official AliExpress OAuth endpoints from documentation
-    AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+    AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
     TOKEN_URL = "https://api-sg.aliexpress.com/sync"  # Uses /auth/token/create method
 
     def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str = None):
@@ -86,6 +86,7 @@ class AliExpressOAuth:
         params = {
             "client_id": self.app_key,
             "response_type": "code",
+            "sp": "ae",  # REQUIRED: Must be 'ae' for AliExpress accounts
             "redirect_uri": self.redirect_uri,
             "state": state,
             "force_auth": "true"  # Refresh cookie for new session
