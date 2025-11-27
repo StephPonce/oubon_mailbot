@@ -29,13 +29,13 @@ class ClaudeProvider(AIProvider):
     """
     Claude AI Provider implementation using Anthropic's API.
 
-    Uses claude-sonnet-4-20250514 model for high-quality product analysis,
+    Uses claude-sonnet-4-5-20250929 model for high-quality product analysis,
     description generation, pricing optimization, and conversational AI.
 
     Attributes:
         client (Anthropic): Anthropic API client
         provider_name (str): "claude"
-        model_name (str): "claude-sonnet-4-20250514"
+        model_name (str): "claude-sonnet-4-5-20250929"
         cost_per_1k (float): 0.003 (USD per 1K tokens)
     """
 
@@ -53,7 +53,7 @@ class ClaudeProvider(AIProvider):
 
         # Set provider details
         self.provider_name = "claude"
-        self.model_name = "claude-sonnet-4-20250514"
+        self.model_name = "claude-sonnet-4-5-20250929"  # Latest Sonnet 4.5
         self.cost_per_1k = 0.003
 
         # Initialize Anthropic client

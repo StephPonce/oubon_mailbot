@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Send, Sparkles, X, Minimize2, Maximize2, Trash2 } from 'lucide-react';
 
 interface Message {
@@ -7,11 +7,7 @@ interface Message {
   timestamp: Date;
 }
 
-interface AIChatProps {
-  // We gather context ourselves instead of relying on props
-}
-
-export default function AIChat(props: AIChatProps) {
+export default function AIChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,7 +29,7 @@ export default function AIChat(props: AIChatProps) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        setMessages(parsed.map((m: any) => ({
+        setMessages(parsed.map((m: Message) => ({
           ...m,
           timestamp: new Date(m.timestamp)
         })));
@@ -58,11 +54,46 @@ export default function AIChat(props: AIChatProps) {
     scrollToBottom();
   }, [messages]);
 
+interface PortfolioData {
+  total_revenue?: number;
+  monthly_revenue?: number;
+  active_stores?: number;
+  // Add other portfolio properties if needed
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface RankingsData {}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface ProductsData {
+  count: number;
+  samples: any[]; // Ideally, define a Product interface
+  data_source: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface EmailsData {}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+interface TierData {}
+
+interface DashboardContext {
+  timestamp: string;
+  current_page: string;
+  data: {
+    portfolio?: PortfolioData;
+    rankings?: RankingsData;
+    products?: ProductsData;
+    emails?: EmailsData;
+    tier?: TierData;
+  };
+}
+
   const gatherDashboardContext = async () => {
     /**
      * Gather comprehensive dashboard data for Claude
      */
-    const context: any = {
+    const context: DashboardContext = {
       timestamp: new Date().toISOString(),
       current_page: window.location.pathname,
       data: {}
@@ -71,28 +102,30 @@ export default function AIChat(props: AIChatProps) {
     try {
       // Get portfolio overview
       try {
-        const overviewRes = await fetch('http://localhost:8000/api/portfolio/overview');
+        const overviewRes = await fetch('http://localhost:8001/api/portfolio/overview');
         if (overviewRes.ok) {
           context.data.portfolio = await overviewRes.json();
         }
-      } catch (e) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
         console.log('Portfolio data not available');
       }
 
       // Get store rankings
       try {
-        const rankingsRes = await fetch('http://localhost:8000/api/portfolio/rankings');
+        const rankingsRes = await fetch('http://localhost:8001/api/portfolio/rankings');
         if (rankingsRes.ok) {
           context.data.rankings = await rankingsRes.json();
         }
-      } catch (e) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
         console.log('Rankings data not available');
       }
 
       // Get products based on current page
       if (window.location.pathname.includes('products')) {
         try {
-          const productsRes = await fetch('http://localhost:8000/api/dashboard/v2/products?niche=smart_home&per_page=10');
+          const productsRes = await fetch('http://localhost:8001/api/dashboard/v2/products?niche=smart_home&per_page=10');
           if (productsRes.ok) {
             const productsData = await productsRes.json();
             context.data.products = {
@@ -101,32 +134,35 @@ export default function AIChat(props: AIChatProps) {
               data_source: productsData.data_source
             };
           }
-        } catch (e) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_e) {
           console.log('Products data not available');
         }
       }
 
       // Get email stats if available
       try {
-        const emailRes = await fetch('http://localhost:8000/api/dashboard/emails');
+        const emailRes = await fetch('http://localhost:8001/api/dashboard/emails');
         if (emailRes.ok) {
           context.data.emails = await emailRes.json();
         }
-      } catch (e) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
         console.log('Email data not available');
       }
 
       // Get user tier info
       try {
-        const tierRes = await fetch('http://localhost:8000/api/user/tier?user_id=1');
+        const tierRes = await fetch('http://localhost:8001/api/user/tier?user_id=1');
         if (tierRes.ok) {
           context.data.tier = await tierRes.json();
         }
-      } catch (e) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
         console.log('Tier info not available');
       }
 
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error gathering context:', e);
     }
 
@@ -150,7 +186,7 @@ export default function AIChat(props: AIChatProps) {
       // Gather comprehensive dashboard context
       const dashboardContext = await gatherDashboardContext();
 
-      const res = await fetch('http://localhost:8000/api/claude/chat', {
+      const res = await fetch('http://localhost:8001/api/claude/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -178,11 +214,17 @@ export default function AIChat(props: AIChatProps) {
       } else {
         throw new Error(data.error || 'Unknown error');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Chat error:', err);
+      let errorMessageContent: string;
+      if (err instanceof Error) {
+        errorMessageContent = `❌ Error: ${err.message}\n\nTip: Make sure the backend is running and ANTHROPIC_API_KEY is set.`;
+      } else {
+        errorMessageContent = `❌ An unknown error occurred.\n\nTip: Make sure the backend is running and ANTHROPIC_API_KEY is set.`;
+      }
       const errorMessage: Message = {
         role: 'assistant',
-        content: `❌ Error: ${err.message}\n\nTip: Make sure the backend is running and ANTHROPIC_API_KEY is set.`,
+        content: errorMessageContent,
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -203,15 +245,7 @@ export default function AIChat(props: AIChatProps) {
   };
 
   if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-full p-4 shadow-lg transition-all z-50 flex items-center gap-2"
-      >
-        <Sparkles className="w-6 h-6" />
-        <span className="font-semibold">Ask Claude AI</span>
-      </button>
-    );
+    return null; // Don't render the button if it's not open, GlobalAIChat handles the button
   }
 
   return (
@@ -318,7 +352,7 @@ export default function AIChat(props: AIChatProps) {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask Claude anything..."
+                  placeholder="Ask anything..."
                   className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                   disabled={loading}
                 />

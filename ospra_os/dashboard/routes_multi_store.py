@@ -167,9 +167,29 @@ class DeployProductResponse(BaseModel):
 # DEPENDENCIES
 # ============================================================================
 
-def get_db(settings: Settings = Depends(get_settings)) -> Session:
+# Create engine and session factory once at module level
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+_engine = None
+_SessionLocal = None
+
+def get_session_factory(database_url: str):
+    """Get or create session factory"""
+    global _engine, _SessionLocal
+    if _SessionLocal is None:
+        _engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False} if "sqlite" in database_url else {},
+            pool_pre_ping=True
+        )
+        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    return _SessionLocal
+
+def get_db(settings: Settings = Depends(get_settings)):
     """Get database session"""
-    session = get_multi_store_session(settings.database_url)
+    SessionLocal = get_session_factory(settings.database_url)
+    session = SessionLocal()
     try:
         yield session
     finally:
@@ -232,11 +252,16 @@ def update_store_rankings(db: Session, user_id: int):
         .all()
 
     for idx, store in enumerate(stores, start=1):
-        previous_rank = store.rank_position or idx
-        new_rank = idx
+        # Store the previous rank before updating
+        # On first run (None), set rank_change to 0 (no change)
+        if store.rank_position is None:
+            previous_rank = idx
+            store.rank_change = 0
+        else:
+            previous_rank = store.rank_position
+            store.rank_change = previous_rank - idx  # Positive = moved up
 
-        store.rank_change = previous_rank - new_rank  # Positive = moved up
-        store.rank_position = new_rank
+        store.rank_position = idx
 
     db.commit()
 
@@ -302,7 +327,7 @@ def convert_store_credentials_to_adapter_format(platform: str, credentials: dict
 # ============================================================================
 
 @router.get("/overview", response_model=PortfolioOverviewResponse)
-async def get_portfolio_overview(
+def get_portfolio_overview(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -367,7 +392,7 @@ async def get_portfolio_overview(
 
 
 @router.get("/rankings", response_model=List[RankedStoreResponse])
-async def get_store_rankings(
+def get_store_rankings(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

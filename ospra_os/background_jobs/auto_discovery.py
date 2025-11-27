@@ -30,11 +30,11 @@ from sqlalchemy.orm import sessionmaker
 
 # Discovery systems
 try:
-    from ospra_os.product_research.multi_source_discovery import MultiSourceProductDiscovery
+    from ospra_os.product_research.multi_source_discovery import MultiSourceDiscovery
     MULTI_SOURCE_AVAILABLE = True
 except ImportError:
     MULTI_SOURCE_AVAILABLE = False
-    logging.warning("MultiSourceProductDiscovery not available")
+    logging.warning("MultiSourceDiscovery not available")
 
 try:
     from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
@@ -529,11 +529,11 @@ class AutoDiscoveryJob:
         # Use multi-source discovery if available
         if MULTI_SOURCE_AVAILABLE:
             try:
-                discovery = MultiSourceProductDiscovery()
+                discovery = MultiSourceDiscovery()
                 results = await discovery.discover_products(
                     query=niche,
                     max_results=user_settings.get('max_products_per_niche', 10),
-                    sources=['google_trends', 'reddit']
+                    sources=['google_trends']  # Reddit removed per user request
                 )
 
                 products.extend(results.get('products', []))

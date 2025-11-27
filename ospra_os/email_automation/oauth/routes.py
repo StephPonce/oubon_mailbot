@@ -5,14 +5,16 @@ FastAPI endpoints for multi-provider email OAuth flow and account management.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel
 import secrets
 from datetime import datetime
 
 from .gmail_oauth import GmailOAuthHandler
 from .outlook_oauth import OutlookOAuthHandler
-from ospra_os.database.multi_store_models import UserEmailAccount, get_multi_store_session
+from .icloud_oauth import iCloudOAuthHandler
+from .imap_smtp_handler import IMAPSMTPHandler
+from ospra_os.database.multi_store_models import UserEmailAccount, Email, get_multi_store_session
 
 
 router = APIRouter(prefix="/api/email-oauth", tags=["Email OAuth"])
@@ -40,6 +42,17 @@ class OAuthUrlResponse(BaseModel):
     state: str
 
 
+class IMAPSMTPCredentials(BaseModel):
+    """IMAP/SMTP credentials for direct email access"""
+    email: str
+    password: str  # App-specific password recommended
+    preset: str = "custom"  # icloud, yahoo, zoho, protonmail, custom
+    imap_host: Optional[str] = None
+    imap_port: Optional[int] = 993
+    smtp_host: Optional[str] = None
+    smtp_port: Optional[int] = 587
+
+
 # ============================================================================
 # OAUTH HANDLERS
 # ============================================================================
@@ -49,7 +62,7 @@ def get_oauth_handler(provider: str):
     Get OAuth handler for specified provider.
 
     Args:
-        provider: Email provider ('gmail', 'outlook', 'yahoo')
+        provider: Email provider ('gmail', 'outlook', 'icloud', 'yahoo', 'zoho', 'protonmail', 'custom')
 
     Returns:
         EmailOAuthHandler instance
@@ -60,7 +73,11 @@ def get_oauth_handler(provider: str):
     handlers = {
         'gmail': GmailOAuthHandler,
         'outlook': OutlookOAuthHandler,
-        # 'yahoo': YahooOAuthHandler,  # TODO: Implement Yahoo OAuth
+        'icloud': IMAPSMTPHandler,  # iCloud uses IMAP/SMTP with app password
+        'yahoo': IMAPSMTPHandler,   # Yahoo uses IMAP/SMTP
+        'zoho': IMAPSMTPHandler,    # Zoho uses IMAP/SMTP
+        'protonmail': IMAPSMTPHandler,  # ProtonMail Bridge
+        'custom': IMAPSMTPHandler,  # Custom IMAP/SMTP server
     }
 
     handler_class = handlers.get(provider.lower())
@@ -109,7 +126,7 @@ async def connect_email_provider(
     state_with_user = f"{user_id}:{state}"
 
     # OAuth redirect URI (must match configured redirect URI)
-    redirect_uri = f"http://localhost:8000/api/email-oauth/{provider}/callback"
+    redirect_uri = f"http://localhost:8001/api/email-oauth/{provider}/callback"
 
     try:
         authorization_url = await handler.get_authorization_url(state_with_user, redirect_uri)
@@ -122,6 +139,118 @@ async def connect_email_provider(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate authorization URL: {str(e)}"
+        )
+
+
+@router.post("/{provider}/connect-imap")
+async def connect_imap_smtp_provider(
+    provider: str,
+    credentials: IMAPSMTPCredentials,
+    user_id: int = Query(..., description="User ID connecting email account")
+):
+    """
+    Connect IMAP/SMTP email provider (iCloud, Yahoo, Zoho, custom).
+
+    Use this for providers that don't support OAuth or where IMAP/SMTP is simpler.
+
+    Example:
+        POST /api/email-oauth/icloud/connect-imap?user_id=1
+        {
+            "email": "user@icloud.com",
+            "password": "app-specific-password",
+            "preset": "icloud"
+        }
+
+    Returns:
+        Success message and email account details
+    """
+    handler = IMAPSMTPHandler()
+
+    # Get preset configuration if using preset
+    if credentials.preset != "custom":
+        preset = IMAPSMTPHandler.get_preset(credentials.preset)
+        credentials.imap_host = preset["imap_host"]
+        credentials.imap_port = preset["imap_port"]
+        credentials.smtp_host = preset["smtp_host"]
+        credentials.smtp_port = preset["smtp_port"]
+
+    # Build credentials dict
+    creds_dict = {
+        "email": credentials.email,
+        "password": credentials.password,
+        "imap_host": credentials.imap_host,
+        "imap_port": credentials.imap_port,
+        "smtp_host": credentials.smtp_host,
+        "smtp_port": credentials.smtp_port
+    }
+
+    try:
+        # Exchange (test connection and get tokens)
+        import json
+        tokens = await handler.exchange_code_for_token(json.dumps(creds_dict), "")
+
+        # Encrypt credentials
+        encrypted_credentials = handler.encrypt_credentials(tokens)
+
+        # Save to database
+        session = get_multi_store_session()
+
+        try:
+            # Check if account already exists
+            existing = session.query(UserEmailAccount).filter(
+                UserEmailAccount.user_id == user_id,
+                UserEmailAccount.provider == provider,
+                UserEmailAccount.email_address == credentials.email
+            ).first()
+
+            if existing:
+                # Update existing account
+                existing.encrypted_credentials = encrypted_credentials
+                existing.is_active = True
+                existing.sync_status = 'active'
+                existing.updated_at = datetime.utcnow()
+                email_account = existing
+            else:
+                # Check if this is user's first email account (make it primary)
+                account_count = session.query(UserEmailAccount).filter(
+                    UserEmailAccount.user_id == user_id
+                ).count()
+
+                is_primary = (account_count == 0)
+
+                # Create new account
+                email_account = UserEmailAccount(
+                    user_id=user_id,
+                    provider=provider,
+                    email_address=credentials.email,
+                    encrypted_credentials=encrypted_credentials,
+                    is_active=True,
+                    is_primary=is_primary,
+                    sync_status='active'
+                )
+                session.add(email_account)
+
+            session.commit()
+            session.refresh(email_account)
+
+            return {
+                'success': True,
+                'message': f'Successfully connected {provider} account: {credentials.email}',
+                'account': {
+                    'id': email_account.id,
+                    'provider': email_account.provider,
+                    'email': email_account.email_address,
+                    'is_primary': email_account.is_primary
+                }
+            }
+
+        finally:
+            session.close()
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to connect email account: {str(e)}"
         )
 
 
@@ -153,7 +282,7 @@ async def email_oauth_callback(
         raise HTTPException(status_code=400, detail="Invalid state parameter")
 
     # OAuth redirect URI (must match the one used in connect)
-    redirect_uri = f"http://localhost:8000/api/email-oauth/{provider}/callback"
+    redirect_uri = f"http://localhost:8001/api/email-oauth/{provider}/callback"
 
     try:
         # Exchange code for tokens
@@ -267,12 +396,12 @@ async def get_user_email_accounts(
 
 
 @router.delete("/accounts/{account_id}")
-async def disconnect_email_account(
+async def delete_email_account(
     account_id: int,
     user_id: int = Query(..., description="User ID (for authorization)")
 ):
     """
-    Disconnect/deactivate an email account.
+    Permanently delete an email account.
 
     Example:
         DELETE /api/email-oauth/accounts/123?user_id=1
@@ -291,30 +420,31 @@ async def disconnect_email_account(
         if not account:
             raise HTTPException(status_code=404, detail="Email account not found")
 
-        # Deactivate account (don't delete for audit trail)
-        account.is_active = False
-        account.sync_status = 'disconnected'
-        account.updated_at = datetime.utcnow()
+        # Store account info for response message
+        provider = account.provider
+        email_address = account.email_address
 
-        # If this was primary, assign another account as primary
+        # If this was primary, assign another account as primary before deleting
         if account.is_primary:
-            account.is_primary = False
-
             # Find another active account to make primary
             other_account = session.query(UserEmailAccount).filter(
                 UserEmailAccount.user_id == user_id,
-                UserEmailAccount.is_active == True,
                 UserEmailAccount.id != account_id
             ).first()
 
             if other_account:
                 other_account.is_primary = True
 
+        # Delete all associated emails first to avoid foreign key constraint error
+        session.query(Email).filter(Email.email_account_id == account_id).delete(synchronize_session=False)
+
+        # Permanently delete the account using raw SQL to avoid ORM cascade issues
+        session.query(UserEmailAccount).filter(UserEmailAccount.id == account_id).delete(synchronize_session=False)
         session.commit()
 
         return {
             'success': True,
-            'message': f'Disconnected {account.provider} account: {account.email_address}'
+            'message': f'Permanently deleted {provider} account: {email_address}'
         }
 
     finally:
@@ -366,3 +496,14 @@ async def set_primary_email(
 
     finally:
         session.close()
+
+
+@router.get("/providers/presets")
+async def get_imap_smtp_presets():
+    """
+    Get preset IMAP/SMTP configurations for common email providers.
+
+    Returns:
+        Dict of provider presets with server settings
+    """
+    return IMAPSMTPHandler.PRESETS

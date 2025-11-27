@@ -8,7 +8,7 @@ pkill -f "uvicorn ospra_os.main" || true
 sleep 2
 
 # Start backend
-cd "/Users/stephenponce/Documents/Ospra OS/Bots/oubon_mailbot"
+cd "/Users/stephenponce/Documents/Ospra OS/Bots/Ospra OS"
 source .venv/bin/activate
 python -m uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001 --reload > logs/backend.log 2>&1 &
 

@@ -15,9 +15,9 @@ class AmazonBestsellersScraper(ApifyConnector):
     """Scrape Amazon bestseller lists for products with proven demand"""
 
     # Apify actors for Amazon scraping
-    # Note: Update with actual actor IDs from Apify Store
-    ACTOR_ID = "junglee/amazon-bestseller-scraper"
-    AMAZON_SCRAPER_ACTOR = "apify/amazon-scraper"
+    # Updated 2025: Using FREE actor (no monthly rental required)
+    ACTOR_ID = "junglee/free-amazon-product-scraper"
+    AMAZON_SCRAPER_ACTOR = "junglee/free-amazon-product-scraper"
 
     async def scrape_bestsellers(
         self,
@@ -42,13 +42,13 @@ class AmazonBestsellersScraper(ApifyConnector):
 
         logger.info(f"📊 Scraping Amazon bestsellers: category={category}, country={country}")
 
+        # Build category URL for bestsellers
+        category_url = f"https://www.amazon.com/Best-Sellers-{category.replace(' ', '-')}/zgbs"
+
         run_input = {
-            "category": category,
+            "categoryUrls": [category_url],  # Changed from startUrls to categoryUrls
             "maxItems": max_products,
-            "country": country,
-            "includeReviews": True,
-            "includePrice": True,
-            "includeBSR": True  # Best Seller Rank
+            "country": country
         }
 
         try:

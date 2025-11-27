@@ -242,18 +242,12 @@ class IntelligenceScheduler:
                         if self.ai_agent.enabled:
                             import asyncio
 
-                            # Run async analysis in sync context
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-
-                            analysis = loop.run_until_complete(
+                            analysis = asyncio.run(
                                 self.ai_agent.analyze_product_failure(
                                     product,
                                     performance
                                 )
                             )
-
-                            loop.close()
 
                             self.add_alert(
                                 'warning',
@@ -297,28 +291,107 @@ class IntelligenceScheduler:
     def monitor_competitors(self):
         """
         Monitor competitor products and market changes
+        Track pricing, new products, and generate alerts
         """
 
         logger.info("🔍 Monitoring competitors...")
 
         try:
-            # In production, this would:
-            # 1. Track competitor pricing changes
-            # 2. Identify new trending products in your niches
-            # 3. Alert on market shifts
+            import asyncio
+            from ospra_os.intelligence.competitor_engine import CompetitorIntelligenceEngine
+            from ospra_os.database.multi_store_models import get_multi_store_session
 
-            # For now, just log
-            logger.info("Competitor monitoring completed (placeholder)")
+            async def run_monitoring():
+                async with get_multi_store_session() as session:
+                    engine = CompetitorIntelligenceEngine(session)
 
-            self.add_alert(
-                'info',
-                'Competitor Monitoring',
-                'Competitor scan completed - no significant changes detected',
-                {'scanned_categories': ['smart_home', 'fitness', 'beauty']}
-            )
+                    # Get all active competitors
+                    competitors = await engine.list_competitors(status='ACTIVE')
+
+                    if not competitors:
+                        logger.info("No competitors to monitor")
+                        return {
+                            'scanned': 0,
+                            'price_changes': 0,
+                            'new_products': 0
+                        }
+
+                    total_price_changes = 0
+                    total_new_products = 0
+
+                    # Monitor each competitor
+                    for competitor in competitors:
+                        try:
+                            logger.info(f"  Monitoring {competitor['name']}...")
+
+                            # Update competitor data
+                            await engine.update_competitor(competitor['competitor_id'])
+
+                            # Check for price changes in last 24 hours
+                            activities = await engine.get_recent_activity(
+                                days=1,
+                                competitor_id=competitor['competitor_id'],
+                                activity_type='PRICE_CHANGE'
+                            )
+
+                            price_changes = len(activities)
+                            total_price_changes += price_changes
+
+                            # Check for new products
+                            new_product_activities = await engine.get_recent_activity(
+                                days=1,
+                                competitor_id=competitor['competitor_id'],
+                                activity_type='NEW_PRODUCT'
+                            )
+
+                            new_products = len(new_product_activities)
+                            total_new_products += new_products
+
+                            logger.info(f"    ✅ {price_changes} price changes, {new_products} new products")
+
+                        except Exception as e:
+                            logger.error(f"    ❌ Error monitoring {competitor['name']}: {e}")
+                            continue
+
+                    return {
+                        'scanned': len(competitors),
+                        'price_changes': total_price_changes,
+                        'new_products': total_new_products
+                    }
+
+            # Run async monitoring
+            results = asyncio.run(run_monitoring())
+
+            # Generate alert based on findings
+            if results['price_changes'] > 0 or results['new_products'] > 0:
+                self.add_alert(
+                    'warning' if results['price_changes'] >= 5 else 'info',
+                    'Competitor Monitoring Complete',
+                    f"Scanned {results['scanned']} competitors: {results['price_changes']} price changes, {results['new_products']} new products",
+                    {
+                        'scanned_competitors': results['scanned'],
+                        'price_changes': results['price_changes'],
+                        'new_products': results['new_products']
+                    }
+                )
+            else:
+                self.add_alert(
+                    'info',
+                    'Competitor Monitoring Complete',
+                    f"Scanned {results['scanned']} competitors - no significant changes detected",
+                    {'scanned_competitors': results['scanned']}
+                )
+
+            logger.info(f"✅ Competitor monitoring complete: {results}")
 
         except Exception as e:
             logger.error(f"Competitor monitoring failed: {e}")
+            self.add_alert(
+                'critical',
+                'Competitor Monitoring Failed',
+                f'Error during competitor monitoring: {str(e)}',
+                {'error': str(e)}
+            )
             raise
 
     def track_trends(self):
@@ -407,10 +480,7 @@ class IntelligenceScheduler:
                 return niche_products
 
             # Run async discovery
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            niche_products = loop.run_until_complete(run_discovery())
-            loop.close()
+            niche_products = asyncio.run(run_discovery())
 
             total_discovered = 0
 

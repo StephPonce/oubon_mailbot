@@ -12,7 +12,7 @@ from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
 from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
 from ospra_os.intelligence.product_enrichment import enrich_product
 from ospra_os.intelligence.self_learning import SelfLearningEngine
-from ospra_os.integrations.shopify_client import ShopifyClient
+from ospra_os.integrations.shopify.client import ShopifyClient
 
 # Optional background jobs import
 try:
@@ -36,9 +36,8 @@ except Exception as e:
 
 try:
     shopify_client = ShopifyClient()
-    if shopify_client.enabled:
-        logger.info("✅ Shopify client initialized")
-except Exception as e:
+    logger.info("✅ Shopify client initialized")
+except (ValueError, Exception) as e:
     logger.warning(f"Shopify client not available: {e}")
     shopify_client = None
 
@@ -123,12 +122,13 @@ async def get_products(
 
 
 @router.post("/products/{product_id}/analyze")
-async def analyze_product(product_id: str):
+async def analyze_product(product_id: str, request_body: dict = {}):
     """
-    Analyze a product using REAL Claude AI - from DATABASE
+    Analyze a product using REAL Claude AI - from DATABASE or provided data
 
     Args:
         product_id: Product ID from /products endpoint
+        product_data: Optional product data (for demo/discovered products not in DB)
 
     Returns:
         {
@@ -149,16 +149,20 @@ async def analyze_product(product_id: str):
         )
 
     try:
-        # Get product from database (SAME data as card shows)
+        # Try to get product from database first
         from ospra_os.database.product_history import ProductHistoryDB
         db = ProductHistoryDB()
 
         product = db.get_product_by_id(product_id)
 
-        if not product:
+        # If not in database, use provided product_data from request body
+        product_data = request_body.get('product_data') if request_body else None
+        if not product and product_data:
+            product = product_data
+        elif not product:
             raise HTTPException(
                 status_code=404,
-                detail=f"Product {product_id} not found in database"
+                detail=f"Product {product_id} not found in database. Send product_data in request body."
             )
 
         # Product is already enriched in database, no need to re-enrich
@@ -355,16 +359,11 @@ async def get_analytics_summary():
         }
     """
     
-    if not product_discovery:
-        raise HTTPException(
-            status_code=503,
-            detail="Analytics unavailable"
-        )
-    
     try:
-        # Get all products
-        result = product_discovery.discover_products(per_page=100)
-        products = result.get("products", [])
+        # Get all products from database
+        from ospra_os.database.product_history import ProductHistoryDB
+        db = ProductHistoryDB()
+        products = db.get_all_products()
         
         # Calculate stats
         high_velocity = [p for p in products if p.get("velocity_score", 0) >= 70]
@@ -377,7 +376,7 @@ async def get_analytics_summary():
             "medium_velocity_products": len(medium_velocity),
             "low_velocity_products": len(low_velocity),
             "average_velocity": sum(p.get("velocity_score", 0) for p in products) / len(products) if products else 0,
-            "data_freshness": result.get("cache_age_seconds", 0),
+            "data_source": "DATABASE",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -505,7 +504,7 @@ async def sync_deployment_status(product_id: str):
 async def deploy_to_shopify(product_id: str):
     """Deploy product to Shopify store"""
 
-    if not shopify_client or not shopify_client.enabled:
+    if not shopify_client:
         raise HTTPException(status_code=503, detail="Shopify not configured")
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -574,7 +573,7 @@ async def deploy_to_shopify(product_id: str):
 async def bulk_deploy_products(product_ids: List[str]):
     """Deploy multiple products to Shopify at once"""
 
-    if not shopify_client or not shopify_client.enabled:
+    if not shopify_client:
         raise HTTPException(status_code=503, detail="Shopify not configured")
 
     from ospra_os.database.product_history import ProductHistoryDB

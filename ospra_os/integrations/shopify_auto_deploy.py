@@ -6,6 +6,8 @@ from ospra_os.product_research.ai_content import AIContentGenerator
 from ospra_os.product_research.price_optimizer import PriceOptimizer
 import httpx
 import json
+import re
+from datetime import datetime
 
 
 class ShopifyAutoDeployer:
@@ -15,6 +17,34 @@ class ShopifyAutoDeployer:
         self.settings = get_settings()
         self.content_generator = AIContentGenerator()
         self.price_optimizer = PriceOptimizer()
+
+    def _generate_sku(self, product_name: str, niche: str) -> str:
+        """
+        Generate a unique SKU from product name and niche.
+        Format: NICHE-KEYWORD1-KEYWORD2-TIMESTAMP
+        Example: SMART-LED-STRIP-12345
+        """
+        # Clean and extract key words
+        clean_name = re.sub(r'[^a-zA-Z0-9\s-]', '', product_name)
+        words = clean_name.upper().split()
+
+        # Take first 3 meaningful words (skip common words)
+        skip_words = {'THE', 'A', 'AN', 'AND', 'OR', 'FOR', 'WITH', 'TO'}
+        key_words = [w for w in words if w not in skip_words and len(w) > 2][:3]
+
+        # Add niche prefix
+        niche_prefix = niche.upper().replace(' ', '-')[:8]
+
+        # Add timestamp for uniqueness
+        timestamp = datetime.now().strftime('%m%d%H')
+
+        # Combine
+        if key_words:
+            sku = f"{niche_prefix}-{'-'.join(key_words)}-{timestamp}"
+        else:
+            sku = f"{niche_prefix}-PRODUCT-{timestamp}"
+
+        return sku[:40]  # Shopify SKU limit
 
     async def deploy_product(
         self,
@@ -205,6 +235,10 @@ class ShopifyAutoDeployer:
             "Content-Type": "application/json"
         }
 
+        # Generate SKU
+        sku = self._generate_sku(title, product_type)
+        print(f"📦 Generated SKU: {sku}")
+
         # Build product payload
         product_data = {
             "product": {
@@ -216,6 +250,7 @@ class ShopifyAutoDeployer:
                 "status": "active",  # Publish immediately
                 "variants": [
                     {
+                        "sku": sku,  # Auto-generated SKU
                         "price": str(price),
                         "compare_at_price": str(compare_at_price),
                         "inventory_management": None,  # Don't track inventory (dropshipping)

@@ -443,7 +443,7 @@ def get_provider_info() -> Dict[str, Dict[str, Any]]:
     return {
         "claude": {
             "name": "Claude Sonnet 4",
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "cost_per_1k": 0.003,
             "speed_rating": 5,
             "quality_rating": 5,

@@ -31,9 +31,9 @@ class ClaudeBusinessAdvisor:
         self.claude = Anthropic(api_key=self.api_key)
         self.conversation_history = []
 
-        # Model to use - Claude 3.5 Sonnet (best balance of speed/quality)
+        # Model to use - Claude Sonnet 4.5 (best intelligence and reasoning)
         # Note: Requires credits in Anthropic account
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-5-20250929"
 
     async def daily_briefing(self, date: Optional[str] = None) -> str:
         """

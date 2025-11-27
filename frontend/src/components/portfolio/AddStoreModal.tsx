@@ -34,7 +34,7 @@ export default function AddStoreModal({ onClose, onSuccess }: AddStoreModalProps
     setTestResult(null);
 
     try {
-      const res = await fetch(`http://localhost:8000/api/platforms/${platform}/test`, {
+      const res = await fetch(`http://localhost:8001/api/platforms/${platform}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData.credentials)
@@ -50,7 +50,7 @@ export default function AddStoreModal({ onClose, onSuccess }: AddStoreModalProps
 
   const handleSubmit = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/portfolio/stores/add', {
+      const res = await fetch('http://localhost:8001/api/portfolio/stores/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,7 +206,7 @@ export default function AddStoreModal({ onClose, onSuccess }: AddStoreModalProps
                           return;
                         }
                         const shopDomain = domain.includes('.myshopify.com') ? domain : `${domain}.myshopify.com`;
-                        window.location.href = `http://localhost:8000/oauth/shopify/install?shop=${shopDomain}`;
+                        window.location.href = `http://localhost:8001/oauth/shopify/install?shop=${shopDomain}`;
                       }}
                       className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg font-medium transition-all"
                     >

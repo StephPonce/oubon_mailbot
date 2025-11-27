@@ -91,7 +91,7 @@ class VelocityDetector:
         velocity = (
             (search_growth * 0.4) +
             (reddit_growth * 0.3) +
-            (recency_multiplier * 30)
+            (recency_multiplier * 0.3 * 100)  # Convert 0-1 range to 0-30 range
         )
 
         # Cap at 100, floor at 0

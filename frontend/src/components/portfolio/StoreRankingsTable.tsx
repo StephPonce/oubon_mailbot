@@ -1,143 +1,105 @@
-import React from 'react';
 import { ArrowUp, ArrowDown, Minus, Store as StoreIcon } from 'lucide-react';
 
-interface Store {
+interface StoreRanking {
   id: number;
   store_name: string;
   platform: string;
-  niche?: string;
   monthly_revenue: number;
   total_revenue: number;
-  conversion_rate: number;
   product_count: number;
   active_products: number;
+  conversion_rate: number;
   rank_position: number;
   rank_change: number;
-  rank_change_label: string;
-  isActive?: boolean;
   url?: string;
+  isActive: boolean;
 }
 
 interface StoreRankingsTableProps {
-  stores?: Store[];
+  stores: StoreRanking[];
   onStoreClick?: (storeId: number) => void;
 }
 
 export default function StoreRankingsTable({ stores, onStoreClick }: StoreRankingsTableProps) {
-  // Safety check - handle undefined or null stores
   const safeStores = stores || [];
 
-  const getPlatformColor = (platform: string) => {
+  const getPlatformTag = (platform: string) => {
+    const baseClasses = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold';
     switch (platform.toLowerCase()) {
-      case 'shopify': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-      case 'amazon': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'woocommerce': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'shopify': return `${baseClasses} bg-purple-500/10 text-purple-400`;
+      case 'amazon': return `${baseClasses} bg-orange-500/10 text-orange-400`;
+      case 'woocommerce': return `${baseClasses} bg-blue-500/10 text-blue-400`;
+      default: return `${baseClasses} bg-gray-500/10 text-gray-300`;
     }
   };
 
   const getRankChangeIcon = (change: number) => {
-    if (change > 0) return <ArrowUp className="w-4 h-4 text-green-500" />;
+    if (change > 0) return <ArrowUp className="w-4 h-4 text-success-green" />;
     if (change < 0) return <ArrowDown className="w-4 h-4 text-red-500" />;
     return <Minus className="w-4 h-4 text-gray-500" />;
   };
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-900/50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Rank
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Store
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Platform
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Revenue (30d)
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Conversion
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Products
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-700">
-            {safeStores.map((store) => (
-              <tr
-                key={store.id}
-                onClick={() => onStoreClick?.(store.id)}
-                className="hover:bg-gray-700/50 cursor-pointer transition-colors"
-              >
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-white">#{store.rank_position}</span>
-                    {getRankChangeIcon(store.rank_change)}
-                  </div>
-                </td>
+    <div>
+      {/* Table Header */}
+      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-gray-400 uppercase">
+        <div className="col-span-1">Rank</div>
+        <div className="col-span-4">Store</div>
+        <div className="col-span-2">Platform</div>
+        <div className="col-span-2 text-right">Revenue (30d)</div>
+        <div className="col-span-1 text-right">Conv.</div>
+        <div className="col-span-1 text-right">Products</div>
+        <div className="col-span-1 text-center">Status</div>
+      </div>
 
-                <td className="px-6 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-white">{store.store_name}</p>
-                    {store.niche && (
-                      <p className="text-xs text-gray-400 mt-1">{store.niche}</p>
-                    )}
-                  </div>
-                </td>
+      {/* Table Body */}
+      <div className="space-y-3">
+        {safeStores.map((store) => (
+          <div
+            key={store.id}
+            onClick={() => onStoreClick?.(store.id)}
+            className="grid grid-cols-12 gap-4 items-center p-4 rounded-lg bg-gray-900/50 backdrop-blur-md border border-gray-800 hover:bg-gray-800/60 hover:border-gray-700 cursor-pointer transition-all"
+          >
+            <div className="col-span-1 flex items-center gap-2">
+              <span className="text-xl font-bold text-gray-200">#{store.rank_position}</span>
+              {getRankChangeIcon(store.rank_change)}
+            </div>
 
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getPlatformColor(store.platform)}`}>
-                    {store.platform}
-                  </span>
-                </td>
+            <div className="col-span-4">
+              <p className="font-semibold text-gray-200">{store.store_name}</p>
+              {store.url && <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-brand-blue">{store.url}</a>}
+            </div>
 
-                <td className="px-6 py-4 text-right">
-                  <p className="text-sm font-semibold text-white">
-                    ${store.monthly_revenue.toLocaleString()}
-                  </p>
-                </td>
+            <div className="col-span-2">
+              <span className={getPlatformTag(store.platform)}>
+                {store.platform}
+              </span>
+            </div>
 
-                <td className="px-6 py-4 text-right">
-                  <p className="text-sm text-gray-300">
-                    {store.conversion_rate.toFixed(2)}%
-                  </p>
-                </td>
+            <div className="col-span-2 text-right font-semibold text-gray-200">
+              ${store.monthly_revenue.toLocaleString()}
+            </div>
 
-                <td className="px-6 py-4 text-right">
-                  <p className="text-sm text-gray-300">
-                    {store.product_count}
-                  </p>
-                </td>
+            <div className="col-span-1 text-right text-gray-300">
+              {store.conversion_rate.toFixed(2)}%
+            </div>
 
-                <td className="px-6 py-4 text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    store.isActive
-                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                      : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                  }`}>
-                    {store.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            <div className="col-span-1 text-right text-gray-300">
+              {store.active_products} / {store.product_count}
+            </div>
+
+            <div className="col-span-1 text-center">
+              <div className={`w-3 h-3 rounded-full mx-auto ${store.isActive ? 'bg-success-green' : 'bg-gray-600'}`} title={store.isActive ? 'Active' : 'Inactive'}></div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {safeStores.length === 0 && (
-        <div className="text-center py-12">
+        <div className="text-center py-20 bg-gray-900/50 border border-gray-800 rounded-lg">
           <StoreIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400 text-lg mb-2">No stores yet</p>
-          <p className="text-gray-500 text-sm">Add your first store to get started!</p>
+          <h3 className="text-lg font-semibold text-gray-400">No stores found</h3>
+          <p className="text-sm text-gray-500 mt-1">Add your first store to see its ranking here.</p>
         </div>
       )}
     </div>

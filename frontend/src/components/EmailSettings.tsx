@@ -31,21 +31,49 @@ interface EmailProvider {
   description: string;
 }
 
-// Email Provider configurations
+// Email Provider configurations with proper branding
 const EMAIL_PROVIDERS: EmailProvider[] = [
   {
     id: 'gmail',
     name: 'Gmail',
-    icon: '📧',
+    icon: 'https://cdn.simpleicons.org/gmail/EA4335',
     color: 'red',
-    description: 'Connect your Gmail account for email automation'
+    description: 'Google workspace email automation'
   },
   {
     id: 'outlook',
     name: 'Microsoft Outlook',
-    icon: '📨',
+    icon: 'https://logo.clearbit.com/outlook.com',
     color: 'blue',
-    description: 'Connect your Outlook/Office 365 account'
+    description: 'Office 365 and Outlook.com'
+  },
+  {
+    id: 'yahoo',
+    name: 'Yahoo Mail',
+    icon: 'https://logo.clearbit.com/yahoo.com',
+    color: 'purple',
+    description: 'Yahoo email integration'
+  },
+  {
+    id: 'icloud',
+    name: 'iCloud Mail',
+    icon: 'https://cdn.simpleicons.org/icloud/3693F3',
+    color: 'blue',
+    description: 'Apple iCloud email service'
+  },
+  {
+    id: 'protonmail',
+    name: 'ProtonMail',
+    icon: 'https://cdn.simpleicons.org/protonmail/6D4AFF',
+    color: 'purple',
+    description: 'Secure encrypted email'
+  },
+  {
+    id: 'zoho',
+    name: 'Zoho Mail',
+    icon: 'https://cdn.simpleicons.org/zoho/C8202E',
+    color: 'orange',
+    description: 'Zoho business email'
   }
 ];
 
@@ -66,7 +94,7 @@ const EmailSettings: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/api/email-oauth/accounts?user_id=${userId}`);
+      const response = await fetch(`http://localhost:8001/api/email-oauth/accounts?user_id=${userId}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch email accounts');
@@ -89,7 +117,7 @@ const EmailSettings: React.FC = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/email-oauth/${provider}/connect?user_id=${userId}`
+        `http://localhost:8001/api/email-oauth/${provider}/connect?user_id=${userId}`
       );
 
       if (!response.ok) {
@@ -119,26 +147,26 @@ const EmailSettings: React.FC = () => {
     }
   };
 
-  // Disconnect account
-  const handleDisconnect = async (accountId: number) => {
-    if (!confirm('Are you sure you want to disconnect this email account?')) {
+  // Delete account
+  const handleDeleteAccount = async (accountId: number) => {
+    if (!confirm('Are you sure you want to permanently delete this email account? This action cannot be undone.')) {
       return;
     }
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/email-oauth/accounts/${accountId}?user_id=${userId}`,
+        `http://localhost:8001/api/email-oauth/accounts/${accountId}?user_id=${userId}`,
         { method: 'DELETE' }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to disconnect account');
+        throw new Error('Failed to delete account');
       }
 
       await fetchAccounts();
     } catch (err) {
-      console.error('Error disconnecting account:', err);
-      setError('Failed to disconnect account. Please try again.');
+      console.error('Error deleting account:', err);
+      setError('Failed to delete account. Please try again.');
     }
   };
 
@@ -146,7 +174,7 @@ const EmailSettings: React.FC = () => {
   const handleSetPrimary = async (accountId: number) => {
     try {
       const response = await fetch(
-        `http://localhost:8000/api/email-oauth/accounts/${accountId}/set-primary?user_id=${userId}`,
+        `http://localhost:8001/api/email-oauth/accounts/${accountId}/set-primary?user_id=${userId}`,
         { method: 'POST' }
       );
 
@@ -159,15 +187,6 @@ const EmailSettings: React.FC = () => {
       console.error('Error setting primary:', err);
       setError('Failed to set primary account. Please try again.');
     }
-  };
-
-  // Get provider color class
-  const getProviderColorClass = (color: string, type: 'bg' | 'text' | 'border') => {
-    const colors: Record<string, Record<string, string>> = {
-      red: { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/50' },
-      blue: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/50' }
-    };
-    return colors[color]?.[type] || colors.blue[type];
   };
 
   // Get status badge
@@ -199,47 +218,47 @@ const EmailSettings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-8 space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <Mail className="w-8 h-8 text-blue-400" />
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold text-white mb-3 flex items-center gap-4">
+          <Mail className="w-10 h-10 text-blue-400" />
           Email Account Settings
         </h1>
-        <p className="text-gray-400">
+        <p className="text-lg text-gray-400">
           Connect and manage your email accounts for automated email processing
         </p>
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+        <div className="bg-red-500/10 border border-red-500/50 rounded-xl p-5 flex items-start gap-4">
+          <AlertCircle className="w-6 h-6 text-red-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-red-400">{error}</p>
+            <p className="text-base font-medium text-red-400">{error}</p>
           </div>
           <button
             onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-300"
+            className="text-red-400 hover:text-red-300 p-1"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
       )}
 
       {/* Connected Accounts */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <Mail className="w-5 h-5 text-blue-400" />
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-white flex items-center gap-3">
+            <Mail className="w-6 h-6 text-blue-400" />
             Connected Email Accounts
           </h2>
           <button
             onClick={fetchAccounts}
             disabled={loading}
-            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition"
+            className="p-2.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
@@ -256,19 +275,23 @@ const EmailSettings: React.FC = () => {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {accounts.map((account) => {
               const provider = EMAIL_PROVIDERS.find(p => p.id === account.provider);
 
               return (
                 <div
                   key={account.id}
-                  className="bg-gray-900/50 rounded-lg border border-gray-700 p-4 flex items-center justify-between"
+                  className="bg-gray-900/50 rounded-xl border border-gray-700 p-5 flex items-center justify-between hover:bg-gray-900/70 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     {/* Provider Icon */}
-                    <div className="text-3xl">
-                      {provider?.icon || '📧'}
+                    <div className="w-12 h-12 flex-shrink-0 bg-white rounded-lg p-2 flex items-center justify-center">
+                      {provider?.icon ? (
+                        <img src={provider.icon} alt={provider.name} className="w-full h-full object-contain" />
+                      ) : (
+                        <Mail className="w-6 h-6 text-gray-600" />
+                      )}
                     </div>
 
                     {/* Account Info */}
@@ -307,9 +330,9 @@ const EmailSettings: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handleDisconnect(account.id)}
+                      onClick={() => handleDeleteAccount(account.id)}
                       className="p-2 text-red-400 hover:bg-red-500/10 rounded transition"
-                      title="Disconnect"
+                      title="Delete Account"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -322,42 +345,42 @@ const EmailSettings: React.FC = () => {
       </div>
 
       {/* Connect New Account */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <ExternalLink className="w-5 h-5 text-blue-400" />
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
+        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+          <ExternalLink className="w-6 h-6 text-blue-400" />
           Connect New Email Account
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {EMAIL_PROVIDERS.map((provider) => (
             <button
               key={provider.id}
               onClick={() => handleConnect(provider.id)}
               disabled={connecting === provider.id}
-              className={`relative p-5 rounded-lg border-2 text-left transition-all ${
+              className={`group relative p-6 rounded-xl border-2 text-left transition-all ${
                 connecting === provider.id
                   ? 'border-blue-500/50 bg-blue-500/10'
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600 hover:bg-gray-800/50'
               } disabled:cursor-not-allowed`}
             >
               {/* Provider Icon & Name */}
-              <div className="flex items-start gap-3 mb-3">
-                <div className="text-3xl">{provider.icon}</div>
-                <div>
-                  <h3 className="font-bold text-white text-lg">{provider.name}</h3>
-                  <p className="text-sm text-gray-400 mt-1">{provider.description}</p>
+              <div className="flex flex-col items-center text-center mb-4">
+                <div className="w-16 h-16 mb-4 bg-white rounded-xl p-3 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                  <img src={provider.icon} alt={provider.name} className="w-full h-full object-contain" />
                 </div>
+                <h3 className="font-bold text-white text-lg mb-1">{provider.name}</h3>
+                <p className="text-sm text-gray-400">{provider.description}</p>
               </div>
 
               {/* Connect Button */}
-              <div className="mt-4">
+              <div className="mt-4 pt-4 border-t border-gray-700">
                 {connecting === provider.id ? (
-                  <div className="flex items-center gap-2 text-blue-400">
+                  <div className="flex items-center justify-center gap-2 text-blue-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm font-medium">Connecting...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-gray-400">
+                  <div className="flex items-center justify-center gap-2 text-gray-300 group-hover:text-blue-400 transition-colors">
                     <ExternalLink className="w-4 h-4" />
                     <span className="text-sm font-medium">Connect Account</span>
                   </div>
@@ -368,11 +391,11 @@ const EmailSettings: React.FC = () => {
         </div>
 
         {/* OAuth Instructions */}
-        <div className="mt-4 bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+        <div className="mt-6 bg-blue-500/10 border border-blue-500/50 rounded-xl p-5 flex items-start gap-4">
+          <AlertCircle className="w-6 h-6 text-blue-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm font-medium text-blue-400 mb-1">Secure OAuth Connection</p>
-            <p className="text-xs text-gray-400">
+            <p className="text-base font-semibold text-blue-400 mb-2">Secure OAuth Connection</p>
+            <p className="text-sm text-gray-400">
               You'll be redirected to your email provider to grant access. Your credentials are never stored by us - we only receive secure OAuth tokens.
             </p>
           </div>
@@ -380,9 +403,9 @@ const EmailSettings: React.FC = () => {
       </div>
 
       {/* Feature Info */}
-      <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-bold text-white mb-4">What you can do with connected accounts:</h2>
-        <ul className="space-y-2 text-gray-300">
+      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
+        <h2 className="text-xl font-bold text-white mb-6">What you can do with connected accounts:</h2>
+        <ul className="space-y-3 text-gray-300">
           <li className="flex items-center gap-2">
             <Check className="w-4 h-4 text-green-400" />
             Automated email classification and routing

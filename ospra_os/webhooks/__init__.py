@@ -1,3 +1,1 @@
-"""
-Webhooks module for handling external service notifications
-"""
+"""Webhook handlers for external services."""

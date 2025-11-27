@@ -218,7 +218,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
     setTestMessage('');
 
     try {
-      const response = await fetch('http://localhost:8000/api/portfolio/stores/test-connection', {
+      const response = await fetch('http://localhost:8001/api/portfolio/stores/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -249,7 +249,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/portfolio/stores/add', {
+      const response = await fetch('http://localhost:8001/api/portfolio/stores/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
@@ -490,7 +490,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
                       const domain = formData.shopify_domain.includes('.myshopify.com')
                         ? formData.shopify_domain
                         : `${formData.shopify_domain}.myshopify.com`;
-                      window.location.href = `http://localhost:8000/oauth/shopify/install?shop=${domain}`;
+                      window.location.href = `http://localhost:8001/oauth/shopify/install?shop=${domain}`;
                     }}
                     className="w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center gap-2"
                   >

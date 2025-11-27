@@ -69,7 +69,7 @@ class AIResearchAgent:
 
             # Call Claude for deep analysis
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=2000,
                 messages=[
                     {
@@ -129,7 +129,7 @@ Identify:
 Be specific and actionable."""
 
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -183,7 +183,7 @@ Based on your knowledge of e-commerce and product trends:
 Format as a structured analysis."""
 
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -232,7 +232,7 @@ Create a specific, step-by-step action plan:
 Be tactical and specific."""
 
             message = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}]
             )

@@ -243,92 +243,88 @@ class ProductIntelligenceEngine:
         return products
 
     async def discover_winning_products(self, niches: List[str] = None, max_per_niche: int = 20) -> List[Dict[str, Any]]:
-        """Async wrapper - now with ACCURATE profit calculations!"""
+        """Async wrapper - now with ACCURATE profit calculations and more efficient processing!"""
         if not niches:
             niches = ['smart_home']  # Default
 
-        all_products = []
+        result = []
 
-        # Generate products for each niche
+        # Generate and process products in a single loop
         for niche in niches:
             niche_products = self.discover_products_by_niche(niche, max_per_niche)
-            all_products.extend(niche_products)
+            for product in niche_products:
+                # Extract supplier metrics
+                supplier_orders = int(product['features'][0].split(':')[1].strip().split()[0].replace(',', ''))
+                supplier_rating = float(product['features'][1].split(':')[1].strip().rstrip('★'))
 
-        # Transform to expected format with comprehensive market analysis
-        result = []
-        for product in all_products:
-            # Extract supplier metrics
-            supplier_orders = int(product['features'][0].split(':')[1].strip().split()[0].replace(',', ''))
-            supplier_rating = float(product['features'][1].split(':')[1].strip().rstrip('★'))
-
-            # Create product data for comprehensive analyzer
-            analyzer_product = {
-                'name': product['name'],
-                'niche': product['niche'],
-                'orders': supplier_orders,
-                'rating': supplier_rating,
-                'price': product['price'],
-                'score': product['score']
-            }
-
-            # Generate comprehensive market intelligence
-            market_intel = self.market_analyzer.generate_comprehensive_analysis(analyzer_product)
-
-            # Generate simulated Google Trends data
-            trend_interest = random.randint(45, 95)
-
-            result.append({
-                'id': product['id'],
-                'name': product['name'],
-                'niche': product['niche'],
-                'score': product['score'],
-                'ai_explanation': product['description'],
-                'price': product['price'],
-                'supplier_cost': product['cost'],
-                'shipping_cost': product['shipping_cost'],
-                'shopify_fee': product['shopify_fee'],
-                'total_costs': product['total_costs'],
-                'estimated_profit': product['net_profit'],  # ACCURATE net profit
-                'profit_margin': product['profit_margin'],  # ACCURATE margin
-                'supplier_orders': supplier_orders,
-                'supplier_rating': supplier_rating,
-                'supplier_url': product['supplier_url'],
-                'aliexpress_url': product['aliexpress_url'],  # Frontend compatibility
-                'image_url': product['image_url'],
-                'features': product['features'],
-                'created_at': product['created_at'],
-                'description': product['description'],
-                # COMPREHENSIVE MARKET INTELLIGENCE
-                'market_intelligence': {
-                    'ai_analysis': market_intel['full_analysis'],
-                    'summary': market_intel['summary'],
-                    'google_trends': {
-                        'average_interest': trend_interest,
-                        'current_interest': trend_interest + random.randint(-10, 15),
-                        'trend_direction': market_intel['trends_data']['trend_direction'],
-                        'data_source': 'MARKET_RESEARCH_ENGINE'
-                    },
-                    'demand_level': market_intel['trends_data']['demand_level'],
-                    'market_saturation': market_intel['trends_data']['market_saturation'],
-                    'growth_potential': market_intel['trends_data']['growth_potential'],
-                    'velocity_score': random.randint(60, 95),  # Trend velocity (higher = faster growth)
-                    'sources': market_intel['sources'],
-                    'data_source': 'COMPREHENSIVE_INTELLIGENCE_V3'
-                },
-                'display_data': {
+                # Create product data for comprehensive analyzer
+                analyzer_product = {
                     'name': product['name'],
-                    'market_price': product['price'],
+                    'niche': product['niche'],
+                    'orders': supplier_orders,
+                    'rating': supplier_rating,
+                    'price': product['price'],
+                    'score': product['score']
+                }
+
+                # Generate comprehensive market intelligence
+                market_intel = self.market_analyzer.generate_comprehensive_analysis(analyzer_product)
+
+                # Generate simulated Google Trends data
+                trend_interest = random.randint(45, 95)
+
+                result.append({
+                    'id': product['id'],
+                    'name': product['name'],
+                    'niche': product['niche'],
+                    'score': product['score'],
+                    'ai_explanation': product['description'],
+                    'price': product['price'],
                     'supplier_cost': product['cost'],
                     'shipping_cost': product['shipping_cost'],
                     'shopify_fee': product['shopify_fee'],
-                    'profit_margin': product['profit_margin'],
-                    'net_profit': product['net_profit'],
+                    'total_costs': product['total_costs'],
+                    'estimated_profit': product['net_profit'],  # ACCURATE net profit
+                    'profit_margin': product['profit_margin'],  # ACCURATE margin
                     'supplier_orders': supplier_orders,
                     'supplier_rating': supplier_rating,
                     'supplier_url': product['supplier_url'],
-                    'aliexpress_url': product['aliexpress_url']
-                }
-            })
+                    'aliexpress_url': product['aliexpress_url'],  # Frontend compatibility
+                    'image_url': product['image_url'],
+                    'features': product['features'],
+                    'created_at': product['created_at'],
+                    'description': product['description'],
+                    # COMPREHENSIVE MARKET INTELLIGENCE
+                    'market_intelligence': {
+                        'ai_analysis': market_intel['full_analysis'],
+                        'summary': market_intel['summary'],
+                        'google_trends': {
+                            'average_interest': trend_interest,
+                            'current_interest': trend_interest + random.randint(-10, 15),
+                            'trend_direction': market_intel['trends_data']['trend_direction'],
+                            'data_source': 'MARKET_RESEARCH_ENGINE'
+                        },
+                        'demand_level': market_intel['trends_data']['demand_level'],
+                        'market_saturation': market_intel['trends_data']['market_saturation'],
+                        'growth_potential': market_intel['trends_data']['growth_potential'],
+                        'velocity_score': random.randint(60, 95),  # Trend velocity (higher = faster growth)
+                        'sources': market_intel['sources'],
+                        'data_source': 'COMPREHENSIVE_INTELLIGENCE_V3'
+                    },
+                    'display_data': {
+                        'name': product['name'],
+                        'market_price': product['price'],
+                        'supplier_cost': product['cost'],
+                        'shipping_cost': product['shipping_cost'],
+                        'shopify_fee': product['shopify_fee'],
+                        'profit_margin': product['profit_margin'],
+                        'net_profit': product['net_profit'],
+                        'supplier_orders': supplier_orders,
+                        'supplier_rating': supplier_rating,
+                        'supplier_url': product['supplier_url'],
+                        'aliexpress_url': product['aliexpress_url']
+                    }
+                })
 
         # SATURATION TRACKING: Filter out products that are already saturated
         if self.saturation_tracker:

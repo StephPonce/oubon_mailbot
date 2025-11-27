@@ -21,13 +21,15 @@ from typing import Optional
 from fastapi import FastAPI
 
 from ospra_os.background_jobs.auto_discovery import AutoDiscoveryJob
+from ospra_os.background_jobs.daily_ranking_job import DailyRankingJob
 from ospra_os.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
 
-# Global scheduler instance
+# Global scheduler instances
 _auto_discovery_job: Optional[AutoDiscoveryJob] = None
+_daily_ranking_job: Optional[DailyRankingJob] = None
 
 
 async def setup_background_jobs(app: FastAPI):
@@ -72,6 +74,22 @@ async def setup_background_jobs(app: FastAPI):
         # Store in app state for access in routes
         app.state.auto_discovery_job = _auto_discovery_job
 
+        # === Setup Daily Ranking Job ===
+        logger.info("Setting up daily ranking job...")
+
+        global _daily_ranking_job
+        _daily_ranking_job = DailyRankingJob(database_url=database_url)
+
+        # Get ranking schedule settings (default 3 AM)
+        ranking_hour = getattr(settings, 'RANKING_HOUR', 3)
+        ranking_minute = getattr(settings, 'RANKING_MINUTE', 0)
+
+        # Schedule the ranking job
+        _daily_ranking_job.schedule_rankings(hour=ranking_hour, minute=ranking_minute)
+
+        # Store in app state
+        app.state.daily_ranking_job = _daily_ranking_job
+
         logger.info("✅ Background jobs setup complete")
 
     except Exception as e:
@@ -87,7 +105,7 @@ async def shutdown_background_jobs(app: FastAPI):
     Args:
         app: FastAPI application instance
     """
-    global _auto_discovery_job
+    global _auto_discovery_job, _daily_ranking_job
 
     try:
         logger.info("Shutting down background jobs...")
@@ -101,6 +119,16 @@ async def shutdown_background_jobs(app: FastAPI):
                 _auto_discovery_job.scheduler.shutdown(wait=True)
 
             _auto_discovery_job = None
+
+        if _daily_ranking_job:
+            # Unschedule ranking job
+            _daily_ranking_job.unschedule_rankings()
+
+            # Shutdown scheduler
+            if _daily_ranking_job.scheduler.running:
+                _daily_ranking_job.scheduler.shutdown(wait=True)
+
+            _daily_ranking_job = None
 
         logger.info("✅ Background jobs shutdown complete")
 
@@ -116,6 +144,16 @@ def get_auto_discovery_job() -> Optional[AutoDiscoveryJob]:
         AutoDiscoveryJob instance or None if not initialized
     """
     return _auto_discovery_job
+
+
+def get_daily_ranking_job() -> Optional[DailyRankingJob]:
+    """
+    Get the global daily ranking job instance.
+
+    Returns:
+        DailyRankingJob instance or None if not initialized
+    """
+    return _daily_ranking_job
 
 
 # FastAPI integration example

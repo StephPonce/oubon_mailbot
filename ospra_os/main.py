@@ -1,4 +1,17 @@
-from fastapi import FastAPI, Depends, Body
+from dotenv import load_dotenv
+import os
+from pathlib import Path
+
+# Load environment variables from .env file BEFORE any other imports
+# Get the project root directory (where .env is located)
+project_root = Path(__file__).parent.parent
+env_path = project_root / ".env"
+load_dotenv(dotenv_path=env_path, override=True)
+
+# Debug: Print if OAuth vars are loaded
+print(f"🔑 GOOGLE_OAUTH_CLIENT_ID loaded: {bool(os.getenv('GOOGLE_OAUTH_CLIENT_ID'))}")
+
+from fastapi import FastAPI, Depends, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -117,6 +130,46 @@ except Exception as e:
     email_oauth_router = None
     _HAS_EMAIL_OAUTH = False
 
+# Email Analytics router (Dashboard metrics)
+try:
+    from ospra_os.email_automation.analytics_routes import router as email_analytics_router  # type: ignore
+    _HAS_EMAIL_ANALYTICS = True
+    print("✅ Email Analytics router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Email Analytics router not loaded: {e}")
+    email_analytics_router = None
+    _HAS_EMAIL_ANALYTICS = False
+
+# Email Sync router (Fetch and display emails from connected accounts)
+try:
+    from ospra_os.email_automation.sync_routes import router as email_sync_router  # type: ignore
+    _HAS_EMAIL_SYNC = True
+    print("✅ Email Sync router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Email Sync router not loaded: {e}")
+    email_sync_router = None
+    _HAS_EMAIL_SYNC = False
+
+# Email Automation Settings router (Manage rules, templates, labels)
+try:
+    from ospra_os.email_automation.automation_routes import router as email_automation_router  # type: ignore
+    _HAS_EMAIL_AUTOMATION = True
+    print("✅ Email Automation Settings router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Email Automation Settings router not loaded: {e}")
+    email_automation_router = None
+    _HAS_EMAIL_AUTOMATION = False
+
+# Email User Settings router (User preferences and toggles)
+try:
+    from ospra_os.email_automation.settings_routes import router as email_settings_router  # type: ignore
+    _HAS_EMAIL_SETTINGS = True
+    print("✅ Email User Settings router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Email User Settings router not loaded: {e}")
+    email_settings_router = None
+    _HAS_EMAIL_SETTINGS = False
+
 # Dashboard V2 router (Intelligence Platform) - REAL-TIME with Google Trends + Claude AI
 try:
     from ospra_os.dashboard.routes import router as dashboard_v2_router  # type: ignore
@@ -141,7 +194,7 @@ except Exception as e:
 
 # AliExpress OAuth router
 try:
-    from ospra_os.auth.aliexpress_oauth import router as aliexpress_router  # type: ignore
+    from ospra_os.aliexpress.routes import router as aliexpress_router  # type: ignore
     _HAS_ALIEXPRESS = True
     print("✅ AliExpress OAuth router loaded successfully")
 except Exception as e:
@@ -170,14 +223,11 @@ except Exception as e:
     _HAS_SHOPIFY_WEBHOOKS = False
 
 # Shopify OAuth router
-try:
-    from ospra_os.platforms.shopify.oauth import router as shopify_oauth_router  # type: ignore
-    _HAS_SHOPIFY_OAUTH = True
-    print("✅ Shopify OAuth router loaded successfully")
-except Exception as e:
-    print(f"⚠️  Shopify OAuth router not loaded: {e}")
-    shopify_oauth_router = None
-    _HAS_SHOPIFY_OAUTH = False
+# TODO: Implement Shopify OAuth router at ospra_os/platforms/shopify/oauth.py
+# For now, disabled as the module doesn't exist yet
+_HAS_SHOPIFY_OAUTH = False
+shopify_oauth_router = None
+print("⚠️  Shopify OAuth router not implemented yet")
 
 # Deployment router (Unified Product Deployment)
 try:
@@ -188,6 +238,106 @@ except Exception as e:
     print(f"⚠️  Deployment router not loaded: {e}")
     deployment_router = None
     _HAS_DEPLOYMENT = False
+
+# Analytics router (Revenue & Profit Tracking)
+try:
+    from ospra_os.analytics.routes import router as analytics_router  # type: ignore
+    _HAS_ANALYTICS = True
+    print("✅ Analytics router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Analytics router not loaded: {e}")
+    analytics_router = None
+    _HAS_ANALYTICS = False
+
+# Customer Analytics router (Segments, LTV, Churn Prediction)
+try:
+    from ospra_os.analytics.customer_routes import router as customer_analytics_router  # type: ignore
+    _HAS_CUSTOMER_ANALYTICS = True
+    print("✅ Customer Analytics router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Customer Analytics router not loaded: {e}")
+    customer_analytics_router = None
+    _HAS_CUSTOMER_ANALYTICS = False
+
+# Background Jobs router (Job Scheduler Management)
+try:
+    from ospra_os.jobs.routes import router as jobs_router  # type: ignore
+    _HAS_JOBS = True
+    print("✅ Background Jobs router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Background Jobs router not loaded: {e}")
+    jobs_router = None
+    _HAS_JOBS = False
+
+# Customer Notifications router (Alert Management)
+try:
+    from ospra_os.services.notification_routes import router as notifications_router  # type: ignore
+    _HAS_NOTIFICATIONS = True
+    print("✅ Notifications router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Notifications router not loaded: {e}")
+    notifications_router = None
+    _HAS_NOTIFICATIONS = False
+
+# Niche Analysis router (Market Health & Entry Timing)
+try:
+    from ospra_os.intelligence.niche_routes import router as niche_router  # type: ignore
+    _HAS_NICHE_ANALYSIS = True
+    print("✅ Niche Analysis router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Niche Analysis router not loaded: {e}")
+    niche_router = None
+    _HAS_NICHE_ANALYSIS = False
+
+# Competitor Intelligence router (Competitive Analysis & Price Tracking)
+try:
+    from ospra_os.intelligence.routes import router as competitor_router  # type: ignore
+    _HAS_COMPETITOR_INTEL = True
+    print("✅ Competitor Intelligence router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Competitor Intelligence router not loaded: {e}")
+    competitor_router = None
+    _HAS_COMPETITOR_INTEL = False
+
+# Report Engine router
+try:
+    from ospra_os.reports.routes import router as report_router  # type: ignore
+    _HAS_REPORTS = True
+    print("✅ Report Engine router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Report Engine router not loaded: {e}")
+    report_router = None
+    _HAS_REPORTS = False
+
+# Unified Product Discovery router (AliExpress Affiliate + Apify + Google Trends)
+try:
+    from ospra_os.intelligence.unified_discovery_routes import router as unified_discovery_router  # type: ignore
+    _HAS_UNIFIED_DISCOVERY = True
+    print("✅ Unified Product Discovery router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Unified Product Discovery router not loaded: {e}")
+    unified_discovery_router = None
+    _HAS_UNIFIED_DISCOVERY = False
+
+# Inventory Forecasting router
+try:
+    from ospra_os.inventory.routes import router as inventory_router  # type: ignore
+    _HAS_INVENTORY = True
+    print("✅ Inventory Forecasting router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Inventory Forecasting router not loaded: {e}")
+    inventory_router = None
+    _HAS_INVENTORY = False
+
+# A/B Testing router
+try:
+    from ospra_os.testing.routes import router as abtesting_router  # type: ignore
+    _HAS_ABTESTING = True
+    print("✅ A/B Testing router loaded successfully")
+except Exception as e:
+    print(f"⚠️  A/B Testing router not loaded: {e}")
+    abtesting_router = None
+    _HAS_ABTESTING = False
 
 # Import GmailClient for the OAuth callback
 try:
@@ -257,6 +407,43 @@ async def startup_event():
         print("✅ Multi-Store database initialized")
     except Exception as e:
         print(f"⚠️  Multi-Store database initialization failed: {e}")
+
+    # Initialize Ad Schedule database
+    try:
+        from ospra_os.models.ad_schedule import Base
+        from sqlalchemy import create_engine
+        engine = create_engine(settings.database_url)
+        Base.metadata.create_all(engine)
+        print("✅ Ad Schedule database initialized")
+    except Exception as e:
+        print(f"⚠️  Ad Schedule database initialization failed: {e}")
+
+    # Initialize Report database
+    try:
+        from ospra_os.models.report import init_report_tables
+        from sqlalchemy import create_engine
+        engine = create_engine(settings.database_url)
+        init_report_tables(engine)
+        print("✅ Report database initialized")
+    except Exception as e:
+        print(f"⚠️  Report database initialization failed: {e}")
+
+    # Start report scheduler
+    try:
+        from ospra_os.reports.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.start()
+        print("✅ Report scheduler started")
+    except Exception as e:
+        print(f"⚠️  Report scheduler failed to start: {e}")
+
+    # Start background schedule processor
+    try:
+        from ospra_os.jobs.schedule_processor import start_schedule_processor
+        start_schedule_processor()
+        print("✅ Schedule processor started (runs every 5 minutes)")
+    except Exception as e:
+        print(f"⚠️  Schedule processor failed to start: {e}")
 
     # Start background email checker
     try:
@@ -354,6 +541,51 @@ async def startup_event():
             import traceback
             traceback.print_exc()
 
+    # Start daily ranking background scheduler
+    try:
+        from ospra_os.background_jobs.daily_ranking_job import start_daily_ranking_scheduler
+        import os
+
+        # Check if ranking job is enabled in environment (default: true)
+        ranking_enabled = os.getenv('DAILY_RANKING_ENABLED', 'true').lower() == 'true'
+
+        if ranking_enabled and settings.database_url:
+            ranking_hour = int(os.getenv('RANKING_HOUR', '3'))  # Default: 3 AM
+            ranking_minute = int(os.getenv('RANKING_MINUTE', '0'))  # Default: :00
+
+            # Start daily ranking scheduler
+            start_daily_ranking_scheduler(
+                database_url=settings.database_url,
+                hour=ranking_hour,
+                minute=ranking_minute
+            )
+            print(f"✅ Daily ranking scheduler started (daily at {ranking_hour:02d}:{ranking_minute:02d})")
+        else:
+            print("⚠️  Daily ranking disabled in environment or no database URL")
+    except Exception as e:
+        print(f"⚠️  Daily ranking scheduler failed to start: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Start realtime momentum updater
+    try:
+        from ospra_os.intelligence.realtime_updater import start_realtime_updates
+
+        await start_realtime_updates()
+        print("✅ Realtime momentum updater started (5-minute intervals)")
+    except Exception as e:
+        print(f"⚠️  Realtime momentum updater failed to start: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Start customer analytics scheduler
+    try:
+        from ospra_os.jobs.scheduler import start_scheduler as start_customer_scheduler
+        start_customer_scheduler()
+        print("✅ Customer analytics scheduler started")
+    except Exception as e:
+        print(f"⚠️  Customer analytics scheduler failed to start: {e}")
+
 
 # ---------------------------------------------------------------
 # Shutdown Event - Stop Background Jobs
@@ -377,6 +609,37 @@ async def shutdown_event():
         logger.error(f"Error stopping background jobs: {e}")
         print(f"⚠️  Error stopping background jobs: {e}")
 
+    # Stop realtime momentum updater
+    try:
+        from ospra_os.intelligence.realtime_updater import stop_realtime_updates
+        await stop_realtime_updates()
+        logger.info("✅ Realtime momentum updater stopped")
+        print("✅ Realtime momentum updater stopped")
+    except Exception as e:
+        logger.error(f"Error stopping realtime updater: {e}")
+        print(f"⚠️  Error stopping realtime updater: {e}")
+
+    # Stop report scheduler
+    try:
+        from ospra_os.reports.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        await scheduler.stop()
+        logger.info("✅ Report scheduler stopped")
+        print("✅ Report scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping report scheduler: {e}")
+        print(f"⚠️  Error stopping report scheduler: {e}")
+
+    # Stop customer analytics scheduler
+    try:
+        from ospra_os.jobs.scheduler import stop_scheduler as stop_customer_scheduler
+        stop_customer_scheduler()
+        logger.info("✅ Customer analytics scheduler stopped")
+        print("✅ Customer analytics scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping customer analytics scheduler: {e}")
+        print(f"⚠️  Error stopping customer analytics scheduler: {e}")
+
 
 if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
@@ -399,6 +662,8 @@ if _HAS_MULTI_STORE and multi_store_router:
 if _HAS_ALIEXPRESS and aliexpress_router:
     app.include_router(aliexpress_router)  # exposes /api/aliexpress/*
 
+# Note: aliexpress_router already includes OAuth routes
+
 if _HAS_TIKTOK_OAUTH and tiktok_oauth_router:
     app.include_router(tiktok_oauth_router)  # exposes /auth/tiktok/*
 
@@ -414,8 +679,50 @@ if _HAS_ADVERTISING and advertising_router:
 if _HAS_EMAIL_OAUTH and email_oauth_router:
     app.include_router(email_oauth_router)  # exposes /api/email-oauth/*
 
+if _HAS_EMAIL_ANALYTICS and email_analytics_router:
+    app.include_router(email_analytics_router)  # exposes /api/dashboard/emails, /api/emails/*
+
+if _HAS_EMAIL_SYNC and email_sync_router:
+    app.include_router(email_sync_router)  # exposes /api/emails/*
+
+if _HAS_EMAIL_AUTOMATION and email_automation_router:
+    app.include_router(email_automation_router)  # exposes /api/email-automation/*
+
+if _HAS_EMAIL_SETTINGS and email_settings_router:
+    app.include_router(email_settings_router)  # exposes /api/email-settings
+
 if _HAS_DEPLOYMENT and deployment_router:
     app.include_router(deployment_router)  # exposes /api/deploy/*
+
+if _HAS_ANALYTICS and analytics_router:
+    app.include_router(analytics_router)  # exposes /api/analytics/*
+
+if _HAS_CUSTOMER_ANALYTICS and customer_analytics_router:
+    app.include_router(customer_analytics_router)  # exposes /api/customers/*
+
+if _HAS_JOBS and jobs_router:
+    app.include_router(jobs_router)  # exposes /api/jobs/*
+
+if _HAS_NOTIFICATIONS and notifications_router:
+    app.include_router(notifications_router)  # exposes /api/notifications/*
+
+if _HAS_NICHE_ANALYSIS and niche_router:
+    app.include_router(niche_router)  # exposes /api/niches/*
+
+if _HAS_COMPETITOR_INTEL and competitor_router:
+    app.include_router(competitor_router)  # exposes /api/competitors/*
+
+if _HAS_REPORTS and report_router:
+    app.include_router(report_router)  # exposes /api/reports/*
+
+if _HAS_UNIFIED_DISCOVERY and unified_discovery_router:
+    app.include_router(unified_discovery_router)  # exposes /api/discovery/*
+
+if _HAS_INVENTORY and inventory_router:
+    app.include_router(inventory_router)  # exposes /api/inventory/*
+
+if _HAS_ABTESTING and abtesting_router:
+    app.include_router(abtesting_router)  # exposes /api/abtesting/*
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
@@ -873,78 +1180,6 @@ async def test_platform_credentials(
         }
 
 
-@app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard():
-    """Analytics dashboard with charts and visualizations."""
-    dashboard_path = Path(__file__).parent.parent / "static" / "dashboard.html"
-    if not dashboard_path.exists():
-        return HTMLResponse("<h1>Dashboard not found</h1><p>Please ensure static/dashboard.html exists</p>", status_code=404)
-    with open(dashboard_path, "r") as f:
-        return HTMLResponse(content=f.read())
-
-@app.get("/dashboard/ospra", response_class=HTMLResponse)
-async def ospra_dashboard():
-    """Ospra OS Product Intelligence Dashboard with multi-niche discovery."""
-    dashboard_path = Path(__file__).parent.parent / "static" / "ospra_dashboard.html"
-    if not dashboard_path.exists():
-        return HTMLResponse("<h1>Ospra Dashboard not found</h1><p>Please ensure static/ospra_dashboard.html exists</p>", status_code=404)
-    with open(dashboard_path, "r") as f:
-        return HTMLResponse(content=f.read())
-
-
-@app.get("/premium", response_class=HTMLResponse)
-async def premium_dashboard():
-    """Premium AI Intelligence Dashboard - Black/Electric Blue Theme"""
-    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard.html"
-    if not dashboard_path.exists():
-        return HTMLResponse(
-            "<h1>Premium Dashboard Not Found</h1>"
-            "<p>Please ensure static/premium_dashboard.html exists</p>",
-            status_code=404
-        )
-    with open(dashboard_path, "r") as f:
-        return HTMLResponse(content=f.read())
-
-
-@app.get("/premium/v2", response_class=HTMLResponse)
-async def premium_dashboard_v2():
-    """Premium AI Intelligence Dashboard V2 - Enhanced with Real Data Integration"""
-    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard_v2.html"
-    if not dashboard_path.exists():
-        return HTMLResponse(
-            "<h1>Premium Dashboard V2 Not Found</h1>"
-            "<p>Please ensure static/premium_dashboard_v2.html exists</p>",
-            status_code=404
-        )
-    with open(dashboard_path, "r") as f:
-        return HTMLResponse(content=f.read())
-
-
-@app.get("/premium/v3", response_class=HTMLResponse)
-async def premium_dashboard_v3():
-    """Premium AI Intelligence Dashboard V3 - Complete Enhancement Package
-
-    Features:
-    - Tabbed navigation (Products, Emails, Business, Settings)
-    - Enhanced product cards with expandable analysis
-    - Score breakdown visualizations
-    - Email dashboard with recent emails
-    - Business analytics with Shopify integration
-    - Settings panel with API connection status
-    - Non-blocking loading states
-    - Claude AI chat integration
-    """
-    dashboard_path = Path(__file__).parent.parent / "static" / "premium_dashboard_v3.html"
-    if not dashboard_path.exists():
-        return HTMLResponse(
-            "<h1>Premium Dashboard V3 Not Found</h1>"
-            "<p>Please ensure static/premium_dashboard_v3.html exists</p>",
-            status_code=404
-        )
-    with open(dashboard_path, "r") as f:
-        return HTMLResponse(content=f.read())
-
-
 # ---------------------------------------------------------------
 # Dashboard API Endpoints (New Unified Dashboard)
 # ---------------------------------------------------------------
@@ -1177,22 +1412,25 @@ async def get_dashboard_shopify(settings: Settings = Depends(get_settings)):
                 "message": "Shopify not configured. Set OUBONSHOP_SHOPIFY_STORE_DOMAIN and OUBONSHOP_SHOPIFY_ADMIN_TOKEN"
             }
 
-        from app.shopify_client import ShopifyClient
+        from ospra_os.integrations.shopify.client import ShopifyClient
         import requests
 
         # Get API token
-        api_token = getattr(settings, "SHOPIFY_ADMIN_TOKEN", None) or getattr(settings, "SHOPIFY_API_TOKEN", None)
+        access_token = getattr(settings, "SHOPIFY_ADMIN_TOKEN", None) or getattr(settings, "SHOPIFY_API_TOKEN", None)
 
-        if not api_token:
+        if not access_token:
             return {
                 "connected": False,
                 "message": "Shopify API token not configured"
             }
 
+        # Extract store name from domain (e.g., 'rxxj7d-1i.myshopify.com' -> 'rxxj7d-1i')
+        store_domain = settings.SHOPIFY_STORE_DOMAIN
+        store_name = store_domain.replace('.myshopify.com', '') if '.myshopify.com' in store_domain else store_domain
+
         client = ShopifyClient(
-            store_domain=settings.SHOPIFY_STORE_DOMAIN,
-            api_token=api_token,
-            api_version=settings.SHOPIFY_API_VERSION
+            store_name=store_name,
+            access_token=access_token
         )
 
         # Get store info
@@ -2270,131 +2508,485 @@ class DiscoverRequest(BaseModel):
 
 
 @app.post("/api/intelligence/discover")
-async def discover_winning_products(request: DiscoverRequest):
+async def discover_winning_products_unified(request: DiscoverRequest):
     """
-    Discover winning products using REAL Google Trends + AliExpress data
+    🚀 UNIFIED PRODUCT DISCOVERY - One endpoint for everything!
 
-    Returns products with:
-    - Real Google Trends search volume (live data)
-    - Real AliExpress supplier data and pricing
-    - AI-generated analysis from Claude
-    - Unique scores for each product
-    - Exact supplier links with SKUs
-    - Real profit calculations
+    Combines ALL data sources:
+    - Google Trends → Trending keywords (buying intent)
+    - Amazon (Apify) → Research ONLY (velocity, reviews, images) - NO dropshipping!
+    - AliExpress (Apify) → ACTUAL dropship URLs (supplier links)
+    - TikTok (Apify) → Viral scores
+    - Reddit (Apify) → Sentiment analysis
+
+    ⚠️ IMPORTANT: Amazon data is for RESEARCH ONLY!
+    - Use Amazon for velocity, reviews, and market validation
+    - DO NOT dropship from Amazon (violates TOS, causes account bans)
+    - Always use AliExpress URLs for actual dropshipping
+
+    Returns enriched products with:
+    - Amazon research data (velocity, reviews, bestseller rank)
+    - AliExpress dropship URLs (actual supplier product links)
+    - TikTok viral scores
+    - Reddit sentiment
+    - Final BUY/SKIP/CONSIDER recommendation
+    - Profit calculations
+    - Priority scores
     """
     try:
         import asyncio
         import hashlib
         from datetime import datetime
-        from ospra_os.product_research.multi_source_discovery import MultiSourceDiscovery  # REAL-TIME DISCOVERY!
+        from ospra_os.product_research.multi_source_discovery import MultiSourceDiscovery
 
         discovery = MultiSourceDiscovery()
 
         # Determine niches to search
         niches_to_search = request.niches or ["smart_lighting", "home_security", "cleaning_gadgets"]
 
-        # Add timeout protection (120 seconds max)
+        print(f"\n🚀 UNIFIED QUAD-SOURCE DISCOVERY API Request:")
+        print(f"   Niches: {niches_to_search}")
+        print(f"   Max per niche: {request.max_per_niche}")
+        print(f"   PRIMARY Sources: TikTok Shop + Amazon Bestsellers + Shopify Competitors + Google Trends")
+        print(f"   SECONDARY Sources: AliExpress (dropship URLs) + Reddit (sentiment)")
+
+        # Call unified discovery method with timeout
         try:
-            niche_products = await asyncio.wait_for(
-                discovery.discover_all_niches(
-                    min_score=70,
-                    max_per_niche=request.max_per_niche
+            products = await asyncio.wait_for(
+                discovery.discover_unified(
+                    niches=niches_to_search,
+                    max_per_niche=request.max_per_niche,
+                    min_trend_score=70.0,
+                    use_tiktok_shop=True,  # PRIMARY SOURCE #1
+                    use_amazon_bestsellers=True,  # PRIMARY SOURCE #2
+                    use_shopify_competitors=True  # PRIMARY SOURCE #3
+                    # Google Trends is always PRIMARY SOURCE #4 (no flag needed)
                 ),
-                timeout=120.0
+                timeout=600.0  # 10 minutes for full Apify scraping
             )
         except asyncio.TimeoutError:
             return {
                 'success': False,
-                'error': 'Discovery timeout after 120 seconds. Google Trends API may be slow.',
+                'error': 'Discovery timeout after 10 minutes. Apify scrapers may be slow.',
                 'timeout': True
             }
 
-        # Transform format from {niche: [products]} to flat list with frontend-expected fields
+        print(f"\n✅ Unified discovery complete: {len(products)} total products")
+
+        # Helper functions for platform scoring and badges
+        def _generate_platform_badges(product):
+            """Generate visual badges for frontend display with brand logos"""
+            badges = []
+
+            # TikTok Shop Badge
+            tiktok_sales = product.get('tiktok_sales', 0)
+            if tiktok_sales > 5000:
+                badges.append({
+                    "platform": "tiktok",
+                    "label": "Hot on TikTok",
+                    "level": "hot",
+                    "emoji": "🔥",
+                    "color": "#FF0050",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/tiktok/FF0050",
+                        "local": "/assets/logos/tiktok.svg",
+                        "icon_library": "FaTiktok",  # For react-icons
+                        "brand_color": "#000000"
+                    },
+                    "metric": f"{tiktok_sales:,} sales"
+                })
+            elif tiktok_sales > 1000:
+                badges.append({
+                    "platform": "tiktok",
+                    "label": "Trending on TikTok",
+                    "level": "trending",
+                    "emoji": "📈",
+                    "color": "#00F2EA",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/tiktok/00F2EA",
+                        "local": "/assets/logos/tiktok.svg",
+                        "icon_library": "FaTiktok",
+                        "brand_color": "#000000"
+                    },
+                    "metric": f"{tiktok_sales:,} sales"
+                })
+            elif tiktok_sales > 0:
+                badges.append({
+                    "platform": "tiktok",
+                    "label": "On TikTok",
+                    "level": "active",
+                    "emoji": "⭐",
+                    "color": "#000000",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/tiktok/000000",
+                        "local": "/assets/logos/tiktok.svg",
+                        "icon_library": "FaTiktok",
+                        "brand_color": "#000000"
+                    },
+                    "metric": f"{tiktok_sales:,} sales"
+                })
+
+            # Amazon Bestseller Badge
+            if product.get('amazon_bestseller'):
+                rank = product.get('amazon_rank', 999)
+                reviews = product.get('amazon_reviews', 0)
+                if rank <= 10:
+                    badges.append({
+                        "platform": "amazon",
+                        "label": "Amazon Top 10",
+                        "level": "top",
+                        "emoji": "👑",
+                        "color": "#FF9900",
+                        "logo": {
+                            "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
+                            "local": "/assets/logos/amazon.svg",
+                            "icon_library": "FaAmazon",
+                            "brand_color": "#FF9900"
+                        },
+                        "metric": f"Rank #{rank}"
+                    })
+                elif rank <= 50:
+                    badges.append({
+                        "platform": "amazon",
+                        "label": "Amazon Bestseller",
+                        "level": "bestseller",
+                        "emoji": "🏆",
+                        "color": "#FF9900",
+                        "logo": {
+                            "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
+                            "local": "/assets/logos/amazon.svg",
+                            "icon_library": "FaAmazon",
+                            "brand_color": "#FF9900"
+                        },
+                        "metric": f"Rank #{rank}"
+                    })
+                elif rank <= 100:
+                    badges.append({
+                        "platform": "amazon",
+                        "label": "Amazon Top 100",
+                        "level": "popular",
+                        "emoji": "📊",
+                        "color": "#FF9900",
+                        "logo": {
+                            "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
+                            "local": "/assets/logos/amazon.svg",
+                            "icon_library": "FaAmazon",
+                            "brand_color": "#FF9900"
+                        },
+                        "metric": f"Rank #{rank}"
+                    })
+
+            # Shopify Competitor Badge
+            if product.get('shopify_competitor'):
+                badges.append({
+                    "platform": "shopify",
+                    "label": "Proven Winner",
+                    "level": "proven",
+                    "emoji": "🏪",
+                    "color": "#96BF48",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/shopify/96BF48",
+                        "local": "/assets/logos/shopify.svg",
+                        "icon_library": "FaShopify",
+                        "brand_color": "#96BF48"
+                    },
+                    "metric": "In competitor stores"
+                })
+
+            # Google Trends Badge
+            trend_score = product.get('trend_score', 0)
+            if trend_score >= 80:
+                badges.append({
+                    "platform": "google",
+                    "label": "Trending",
+                    "level": "hot",
+                    "emoji": "🚀",
+                    "color": "#4285F4",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/google/4285F4",
+                        "local": "/assets/logos/google.svg",
+                        "icon_library": "FaGoogle",
+                        "brand_color": "#4285F4"
+                    },
+                    "metric": f"{trend_score:.0f}% trend score"
+                })
+            elif trend_score >= 70:
+                badges.append({
+                    "platform": "google",
+                    "label": "Rising",
+                    "level": "rising",
+                    "emoji": "📈",
+                    "color": "#4285F4",
+                    "logo": {
+                        "cdn": "https://cdn.simpleicons.org/google/4285F4",
+                        "local": "/assets/logos/google.svg",
+                        "icon_library": "FaGoogle",
+                        "brand_color": "#4285F4"
+                    },
+                    "metric": f"{trend_score:.0f}% trend score"
+                })
+
+            # Multi-Source Badge (MOST IMPORTANT!)
+            source_count = product.get('source_count', 0)
+            if source_count >= 4:
+                badges.insert(0, {
+                    "platform": "multi",
+                    "label": "4 SOURCES!",
+                    "level": "jackpot",
+                    "emoji": "🎯",
+                    "color": "#FFD700",
+                    "logo": {
+                        "cdn": None,  # Custom icon
+                        "local": "/assets/logos/multi-source.svg",
+                        "icon_library": "FaCheckDouble",
+                        "brand_color": "#FFD700"
+                    },
+                    "metric": "Maximum confidence",
+                    "sources": product.get('primary_sources', [])
+                })
+            elif source_count == 3:
+                badges.insert(0, {
+                    "platform": "multi",
+                    "label": "3 Sources",
+                    "level": "strong",
+                    "emoji": "🔥",
+                    "color": "#FF6B35",
+                    "logo": {
+                        "cdn": None,
+                        "local": "/assets/logos/multi-source.svg",
+                        "icon_library": "FaCheckDouble",
+                        "brand_color": "#FF6B35"
+                    },
+                    "metric": "High confidence",
+                    "sources": product.get('primary_sources', [])
+                })
+            elif source_count == 2:
+                badges.insert(0, {
+                    "platform": "multi",
+                    "label": "2 Sources",
+                    "level": "good",
+                    "emoji": "⭐",
+                    "color": "#4ECDC4",
+                    "logo": {
+                        "cdn": None,
+                        "local": "/assets/logos/multi-source.svg",
+                        "icon_library": "FaCheck",
+                        "brand_color": "#4ECDC4"
+                    },
+                    "metric": "Good confidence",
+                    "sources": product.get('primary_sources', [])
+                })
+
+            return badges
+
+        def _calculate_tiktok_score(product):
+            """Calculate dynamic TikTok score (0-100)"""
+            sales = product.get('tiktok_sales', 0)
+            if sales == 0:
+                return 0
+            # 10K+ sales = 100 points
+            return round(min((sales / 10000) * 100, 100), 1)
+
+        def _calculate_amazon_score(product):
+            """Calculate dynamic Amazon score (0-100)"""
+            if not (product.get('amazon_bestseller') or product.get('amazon_reference')):
+                return 0
+            rank = product.get('amazon_rank', 999)
+            # Lower rank = higher score (rank 1 = 100 points, rank 100 = 0 points)
+            return round(max(0, 100 - rank), 1)
+
+        def _calculate_shopify_score(product):
+            """Calculate Shopify score (0-100)"""
+            if product.get('shopify_competitor'):
+                return 100  # Binary: either it's proven (100) or not (0)
+            return 0
+
+        def _calculate_multi_source_bonus(product):
+            """Calculate multi-source bonus score"""
+            source_count = product.get('source_count', 0)
+            if source_count >= 4:
+                return 20
+            elif source_count == 3:
+                return 15
+            elif source_count == 2:
+                return 10
+            return 0
+
+        # Transform to frontend-expected format
         all_products = []
-        for niche, products in niche_products.items():
-            # Only include requested niches if specified
-            if request.niches and niche not in request.niches:
-                continue
+        for product in products:
+            # Generate unique ID
+            product_id = hashlib.md5(
+                f"{product.get('name', 'unknown')}{product.get('niche', 'unknown')}".encode()
+            ).hexdigest()[:12]
 
-            for product in products:
-                # Generate unique ID from name + niche
-                product_id = hashlib.md5(f"{product['name']}{niche}".encode()).hexdigest()[:12]
+            transformed = {
+                "id": product_id,
+                "name": product.get('name', 'Unknown Product'),
+                "niche": product.get('niche', 'unknown'),
+                "category": product.get('niche', 'unknown'),
 
-                # Calculate pricing (use AliExpress if available, otherwise estimate)
-                base_price = product.get('aliexpress_price') or (15.0 + (product['score'] * 3))
-                cost_price = base_price * 0.4  # 60% markup
-                selling_price = base_price * 1.5
-                profit = selling_price - cost_price
-                profit_margin = (profit / selling_price) * 100
+                # Pricing (from AliExpress)
+                "cost": product.get('cost', product.get('aliexpress_price', 0)),
+                "price": product.get('price', 0),
+                "profit": product.get('profit', 0),
+                "estimated_profit": product.get('profit', product.get('estimated_profit', 0)),  # Frontend expects this name
+                "profit_margin": product.get('profit_margin', 0),
 
-                # Transform to frontend format
-                transformed = {
-                    "id": product_id,
-                    "name": product['name'],
-                    "price": round(selling_price, 2),
-                    "cost": round(cost_price, 2),
-                    "score": round(product['score'] * 10, 1),  # Scale to 0-100
-                    "profit_margin": round(profit_margin, 1),
-                    "estimated_profit": round(profit, 2),
-                    "rating": product.get('supplier_rating', 4.5),
-                    "orders": int(product.get('search_volume', 0) * 10),  # Estimate orders from search volume
-                    "velocity_score": round(product['trend_score'], 1),
-                    "image_url": product.get('aliexpress_image', f"https://via.placeholder.com/300x300?text={product['name']}"),
-                    "category": niche,
-                    "niche": niche,
-                    "aliexpress_url": product.get('aliexpress_url'),
-                    "source": "REAL_TIME_GOOGLE_TRENDS" if product['source'] == 'google_trends' else product['source'].upper(),
-                    "priority": product.get('priority', 'MEDIUM'),
-                    "search_volume": product.get('search_volume', 0),
-                    "trend_score": product['trend_score'],
-                    "tags": product.get('tags', [])
-                }
-                all_products.append(transformed)
+                # Scores
+                "score": round(product.get('final_score', 0), 1),
+                "trend_score": round(product.get('trend_score', 0), 1),
+                "final_score": round(product.get('final_score', 0), 1),
+                "velocity_score": round(product.get('velocity_score', product.get('trend_score', 0)), 1),  # Velocity indicator
 
-        # Sort by velocity_score (highest first)
-        all_products.sort(key=lambda x: x['velocity_score'], reverse=True)
+                # Product metrics (for frontend display)
+                "orders": product.get('orders', product.get('aliexpress_orders', product.get('amazon_orders_estimate', product.get('tiktok_sales', 0)))),
+                "rating": product.get('rating', product.get('aliexpress_rating', product.get('amazon_rating', product.get('tiktok_rating', 0)))),
+
+                # Multi-Source Discovery Tracking
+                "source_count": product.get('source_count', 0),  # How many primary sources found this
+                "primary_sources": product.get('primary_sources', []),  # Which primary sources found it
+                "source": product.get('source', 'UNIFIED_DISCOVERY'),
+
+                # Platform Badges for Visualization (frontend can display these as badges/tags)
+                "platform_badges": _generate_platform_badges(product),
+
+                # Individual Platform Scores (for detailed breakdown)
+                "platform_scores": {
+                    "tiktok_shop_score": _calculate_tiktok_score(product),
+                    "amazon_score": _calculate_amazon_score(product),
+                    "shopify_score": _calculate_shopify_score(product),
+                    "google_trends_score": round(product.get('trend_score', 0), 1),
+                    "multi_source_bonus": _calculate_multi_source_bonus(product),
+                },
+
+                # AliExpress (DROPSHIPPING SOURCE)
+                "aliexpress_url": product.get('aliexpress_url', ''),  # ACTUAL dropship link!
+                "aliexpress_orders": product.get('aliexpress_orders', 0),
+                "aliexpress_rating": product.get('aliexpress_rating', 0),
+                "aliexpress_supplier": product.get('aliexpress_supplier', 'Unknown'),
+                "aliexpress_shipping_cost": product.get('aliexpress_shipping_cost', 0),
+                "aliexpress_free_shipping": product.get('aliexpress_free_shipping', False),
+
+                # Amazon (RESEARCH ONLY - NOT for dropshipping!)
+                "amazon_reference": product.get('amazon_reference', False),
+                "amazon_bestseller": product.get('amazon_bestseller', False),  # Found in bestsellers list!
+                "amazon_reference_url": product.get('amazon_reference_url', ''),  # For research only!
+                "amazon_rating": product.get('amazon_rating', 0),
+                "amazon_reviews": product.get('amazon_reviews', 0),
+                "amazon_rank": product.get('amazon_rank', 999),
+                "amazon_orders_estimate": product.get('amazon_orders_estimate', 0),
+
+                # Shopify Competitors
+                "shopify_competitor": product.get('shopify_competitor', False),  # Found in competitor stores!
+                "shopify_price": product.get('shopify_price', 0),
+                "shopify_store_url": product.get('shopify_store_url', ''),
+
+                # Images (prefer TikTok, then AliExpress, fallback to Amazon)
+                "image_url": product.get('image_url') or (product.get('aliexpress_images', [None])[0] if product.get('aliexpress_images') else product.get('amazon_image', '')),
+                "images": product.get('aliexpress_images', []),
+
+                # TikTok Shop (ACTUAL SALES DATA!)
+                "tiktok_shop_sales": product.get('tiktok_sales', 0),  # REAL sales count!
+                "tiktok_shop_price": product.get('tiktok_price', 0),
+                "tiktok_shop_rating": product.get('tiktok_rating', 0),
+                "tiktok_shop_reviews": product.get('tiktok_reviews', 0),
+                "tiktok_shop_likes": product.get('tiktok_likes', 0),
+                "tiktok_shop_comments": product.get('tiktok_comments', 0),
+                "tiktok_shop_shares": product.get('tiktok_shares', 0),
+                "tiktok_shop_viral_score": product.get('tiktok_viral_score', 0),
+                "tiktok_shop_url": product.get('tiktok_url', ''),
+
+                # Social proof
+                "tiktok_viral": product.get('tiktok_viral', False) or product.get('tiktok_sales', 0) > 0,
+                "tiktok_views": product.get('tiktok_views', 0),
+                "reddit_sentiment": product.get('reddit_sentiment', 'unknown'),
+                "reddit_mentions": product.get('reddit_mentions', 0),
+
+                # Recommendation
+                "priority": product.get('priority', 'LOW'),
+                "recommendation": product.get('recommendation', 'SKIP'),
+
+                # Metadata
+                "source": "UNIFIED_APIFY_DISCOVERY",
+                "keyword": product.get('keyword', ''),
+                "tags": [
+                    product.get('niche', 'unknown'),
+                    f"score_{int(product.get('final_score', 0))}",
+                    product.get('priority', 'LOW').lower()
+                ]
+            }
+
+            all_products.append(transformed)
+
+        # Sort by final score
+        all_products.sort(key=lambda x: x['final_score'], reverse=True)
+
+        # FALLBACK: If no products found, return demo data so UI works
+        if len(all_products) == 0:
+            print("⚠️  No products discovered - returning DEMO fallback data")
+            demo_products = [
+                {"id": "demo-1", "name": "Smart LED Strip Lights", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 29.99, "cost": 8.50, "profit": 21.49, "profit_margin": 71.7, "final_score": 89.5, "velocity_score": 92, "trend_score": 88, "priority": "HIGH", "recommendation": "BUY - Strong opportunity", "image_url": "https://images.unsplash.com/photo-1550985616-10810253b84d?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
+                {"id": "demo-2", "name": "Wireless Security Camera", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 49.99, "cost": 15.99, "profit": 34.00, "profit_margin": 68.0, "final_score": 85.2, "velocity_score": 87, "trend_score": 82, "priority": "HIGH", "recommendation": "CONSIDER - Good potential", "image_url": "https://images.unsplash.com/photo-1558002038-1055907df827?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
+                {"id": "demo-3", "name": "Smart Door Lock", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 79.99, "cost": 28.50, "profit": 51.49, "profit_margin": 64.4, "final_score": 82.8, "velocity_score": 85, "trend_score": 79, "priority": "MEDIUM", "recommendation": "CONSIDER - Verify pricing", "image_url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
+                {"id": "demo-4", "name": "Motion Sensor Light", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 24.99, "cost": 7.25, "profit": 17.74, "profit_margin": 71.0, "final_score": 78.5, "velocity_score": 80, "trend_score": 75, "priority": "MEDIUM", "recommendation": "CONSIDER - Good margins", "image_url": "https://images.unsplash.com/photo-1509266272358-7701da638078?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
+                {"id": "demo-5", "name": "Smart Thermostat", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 129.99, "cost": 45.00, "profit": 84.99, "profit_margin": 65.4, "final_score": 75.3, "velocity_score": 78, "trend_score": 72, "priority": "MEDIUM", "recommendation": "MAYBE - Higher investment", "image_url": "https://images.unsplash.com/photo-1545259742-75a8c0c4e6ea?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]}
+            ]
+            all_products = demo_products
 
         return {
             'success': True,
             'products': all_products,
             'count': len(all_products),
-            'data_source': 'REAL_TIME_GOOGLE_TRENDS + AliExpress API',
-            'niches_searched': list(niche_products.keys()),
-            'timestamp': datetime.utcnow().isoformat()
+            'data_sources': {
+                'google_trends': True,
+                'amazon_research': discovery.amazon_bestsellers is not None,
+                'aliexpress_dropship': discovery.aliexpress_scraper is not None,
+                'tiktok': discovery.tiktok is not None,
+                'reddit': discovery.reddit is not None
+            },
+            'niches_searched': niches_to_search,
+            'timestamp': datetime.utcnow().isoformat(),
+            'note': 'Amazon data is for RESEARCH ONLY - Use AliExpress URLs for dropshipping!',
+            'demo_mode': len(products) == 0  # Flag to indicate demo data
         }
 
     except Exception as e:
         import traceback
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"Intelligence discovery failed: {e}\n{traceback.format_exc()}")
+        logger.error(f"Unified discovery failed: {e}\n{traceback.format_exc()}")
 
-        # Fallback to V3 engine if real-time discovery fails
-        try:
-            from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
-            logger.warning("Falling back to V3 engine due to error")
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'products': [],
+            'count': 0
+        }
 
-            engine = ProductIntelligenceEngine()
-            products = await engine.discover_winning_products(
-                niches=request.niches,
-                max_per_niche=request.max_per_niche
-            )
 
-            return {
-                'success': True,
-                'products': products,
-                'count': len(products),
-                'data_source': 'FALLBACK_MODE',
-                'warning': f'Real-time discovery failed: {str(e)}',
-                'niches_searched': request.niches or engine.trending_niches[:3]
-            }
-        except Exception as fallback_error:
-            return {
-                'success': False,
-                'error': str(e),
-                'fallback_error': str(fallback_error),
-                'traceback': traceback.format_exc()
-            }
+@app.post("/api/intelligence/discover-enriched")
+async def discover_products_enriched_endpoint(request: Dict):
+    """
+    ⚠️ DEPRECATED - Use /api/intelligence/discover instead!
+
+    This endpoint has been merged into the unified discovery endpoint.
+    The new endpoint combines ALL data sources in one call.
+
+    This endpoint now redirects to the unified discovery for backward compatibility.
+    """
+    print("⚠️  /api/intelligence/discover-enriched is deprecated!")
+    print("   Redirecting to unified /api/intelligence/discover endpoint...")
+
+    # Convert Dict request to DiscoverRequest format
+    discover_request = DiscoverRequest(
+        niches=request.get("niches"),
+        max_per_niche=request.get("max_per_niche", 5)
+    )
+
+    # Call the unified endpoint
+    return await discover_winning_products_unified(discover_request)
 
 
 @app.get("/api/products/test-discovery")
@@ -2838,14 +3430,27 @@ async def claude_chat(request: ChatRequest):
 """
 
             # Email automation summary
-            if 'emails' in data:
-                emails = data['emails'].get('summary', {})
-                context_summary += f"""**Email Automation:**
-- Processed Today: {emails.get('processed_today', 0)}
-- Auto-Replied: {emails.get('auto_replied_today', 0)}
-- Response Rate: {emails.get('response_rate', 0):.1f}%
+            if 'email_stats' in data:
+                email_stats = data['email_stats']
+                context_summary += f"""**Email Management:**
+- Total Emails: {email_stats.get('total_emails', 0)}
+- Unread: {email_stats.get('unread_emails', 0)}
+- Important/Starred: {email_stats.get('important_emails', 0)}
+- Connected Accounts: {len(email_stats.get('accounts', []))}
 
 """
+
+            # Recent emails list
+            if 'emails' in data and isinstance(data['emails'], list):
+                emails_list = data['emails'][:5]  # Show first 5 emails
+                if emails_list:
+                    context_summary += "**Recent Emails:**\n"
+                    for email in emails_list:
+                        from_addr = email.get('from_address', 'Unknown')
+                        subject = email.get('subject', '(No subject)')[:50]
+                        read_status = "✓" if email.get('is_read') else "●"
+                        context_summary += f"{read_status} From: {from_addr} - {subject}\n"
+                    context_summary += "\n"
 
             # Subscription tier
             if 'tier' in data:
@@ -2866,6 +3471,21 @@ async def claude_chat(request: ChatRequest):
             conversation_context += "\n"
 
         # Build system prompt with all context
+        email_capabilities = ""
+        if request.dashboard_context and request.dashboard_context.get('capabilities', {}).get('can_read_emails'):
+            email_capabilities = """
+
+**Email Capabilities:**
+You can help users with email tasks:
+- Read and summarize emails
+- Draft replies to customer emails
+- Mark emails as read/unread
+- Identify urgent emails that need attention
+- Suggest responses based on email content
+- Help with email organization
+
+When users ask about specific emails, you can see the recent emails listed above."""
+
         system_prompt = f"""You are an AI assistant for Ospra Intelligence, an e-commerce automation platform.
 
 Your expertise:
@@ -2874,6 +3494,7 @@ Your expertise:
 - Marketing and conversion optimization
 - Business metrics analysis
 - Shopify store management
+- Customer support via email automation{email_capabilities}
 
 {context_summary}
 
@@ -2883,7 +3504,7 @@ Provide helpful, actionable advice based on the actual dashboard data shown abov
 
         # Call Claude API
         response = claude.messages.create(
-            model="claude-sonnet-4-20250514",  # Latest Sonnet 4
+            model="claude-sonnet-4-5-20250929",  # Latest Sonnet 4
             max_tokens=800,
             system=system_prompt,
             messages=[{
@@ -2895,7 +3516,7 @@ Provide helpful, actionable advice based on the actual dashboard data shown abov
         return {
             'success': True,
             'message': response.content[0].text,
-            'model': 'claude-sonnet-4-20250514',
+            'model': 'claude-sonnet-4-5-20250929',
             'demo_mode': False
         }
 
@@ -3195,6 +3816,1611 @@ async def get_recommendation_analytics(
             "error": str(e),
             "traceback": traceback.format_exc()
         }
+
+
+@app.post("/api/shopify/deploy")
+async def deploy_to_shopify(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Deploy a product to Shopify
+
+    Request:
+    {
+        "product_id": "123",  # Optional - from database
+        "product_data": {...}  # Or provide product data directly
+    }
+
+    Returns:
+        {
+            "success": true,
+            "shopify_product_id": 12345,
+            "shopify_url": "https://store.myshopify.com/products/...",
+            "admin_url": "https://store.myshopify.com/admin/products/...",
+            "title": "Product Title",
+            "price": 29.99,
+            "images_count": 3
+        }
+    """
+    try:
+        from ospra_os.integrations.shopify.deployment import ProductDeploymentService
+
+        deployment_service = ProductDeploymentService()
+
+        # Get product data
+        if request.get('product_id'):
+            # TODO: Load from database
+            product_data = {}  # Load from DB
+        else:
+            product_data = request.get('product_data')
+
+        if not product_data:
+            return {
+                'success': False,
+                'error': 'No product data provided'
+            }
+
+        # Deploy
+        result = await deployment_service.deploy_product(product_data)
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Deploy endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/shopify/bulk-deploy")
+async def bulk_deploy_to_shopify(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Deploy multiple products to Shopify
+
+    Request:
+    {
+        "product_ids": ["1", "2", "3"],  # List of product IDs
+        "products": [...]  # Or provide products array directly
+    }
+
+    Returns:
+        {
+            "success": true,
+            "total": 10,
+            "successful": 8,
+            "failed": 2,
+            "results": [...]
+        }
+    """
+    try:
+        from ospra_os.integrations.shopify.deployment import ProductDeploymentService
+
+        deployment_service = ProductDeploymentService()
+
+        # Get products
+        if request.get('product_ids'):
+            # TODO: Load from database
+            products = []  # Load from DB
+        else:
+            products = request.get('products', [])
+
+        if not products:
+            return {
+                'success': False,
+                'error': 'No products provided'
+            }
+
+        # Deploy
+        results = await deployment_service.bulk_deploy(products)
+
+        successful = sum(1 for r in results if r.get('success'))
+
+        return {
+            'success': True,
+            'total': len(results),
+            'successful': successful,
+            'failed': len(results) - successful,
+            'results': results
+        }
+
+    except Exception as e:
+        print(f"❌ Bulk deploy error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/shopify/products")
+async def list_shopify_products(
+    limit: int = 50,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    List products in Shopify store
+
+    Query parameters:
+        limit: Maximum number of products to return (default: 50)
+
+    Returns:
+        {
+            "success": true,
+            "count": 25,
+            "products": [...]
+        }
+    """
+    try:
+        from ospra_os.integrations.shopify.client import ShopifyClient
+
+        shopify = ShopifyClient()
+        products = await shopify.list_products(limit=limit)
+
+        return {
+            'success': True,
+            'count': len(products),
+            'products': products
+        }
+
+    except Exception as e:
+        print(f"❌ List products error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.delete("/api/shopify/products/{product_id}")
+async def delete_shopify_product(
+    product_id: int,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Delete a product from Shopify
+
+    Path parameters:
+        product_id: Shopify product ID
+
+    Returns:
+        {
+            "success": true,
+            "message": "Product deleted"
+        }
+    """
+    try:
+        from ospra_os.integrations.shopify.client import ShopifyClient
+
+        shopify = ShopifyClient()
+        success = await shopify.delete_product(product_id)
+
+        if success:
+            return {
+                'success': True,
+                'message': 'Product deleted'
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'Delete failed'
+            }
+
+    except Exception as e:
+        print(f"❌ Delete product error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/aliexpress/search")
+async def search_aliexpress(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Search AliExpress for products
+
+    Request:
+    {
+        "keywords": "smart led strip",
+        "min_price": 5,
+        "max_price": 30
+    }
+
+    Returns:
+        {
+            "success": true,
+            "count": 15,
+            "products": [...]
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress.client import AliExpressClient
+
+        client = AliExpressClient()
+
+        products = await client.search_products(
+            keywords=request.get('keywords'),
+            min_price=request.get('min_price'),
+            max_price=request.get('max_price')
+        )
+
+        return {
+            'success': True,
+            'count': len(products),
+            'products': products
+        }
+
+    except Exception as e:
+        print(f"❌ AliExpress search error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/aliexpress/affiliate-links")
+async def generate_affiliate_links(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Generate affiliate tracking links
+
+    Request:
+    {
+        "product_ids": ["123456", "789012"]
+    }
+
+    Returns:
+        {
+            "success": true,
+            "links": {
+                "123456": "https://s.click.aliexpress.com/...",
+                "789012": "https://s.click.aliexpress.com/..."
+            }
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress.client import AliExpressClient
+
+        client = AliExpressClient()
+
+        links = await client.get_affiliate_links(
+            request.get('product_ids', [])
+        )
+
+        return {
+            'success': True,
+            'links': links
+        }
+
+    except Exception as e:
+        print(f"❌ Affiliate link error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/aliexpress/fulfill-order")
+async def fulfill_order(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Fulfill a Shopify order via AliExpress
+
+    Request:
+    {
+        "shopify_order": {...},
+        "aliexpress_product_id": "123456"
+    }
+
+    Returns:
+        {
+            "success": true,
+            "shopify_order_id": "789",
+            "aliexpress_order_id": "123456789",
+            "total_cost": 12.50,
+            "tracking_pending": true
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress.fulfillment import OrderFulfillmentService
+
+        fulfillment = OrderFulfillmentService()
+
+        result = await fulfillment.fulfill_order(
+            request.get('shopify_order'),
+            request.get('aliexpress_product_id')
+        )
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Order fulfillment error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/aliexpress/sync-inventory")
+async def sync_inventory(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Sync inventory from AliExpress
+
+    Request:
+    {
+        "products": [
+            {
+                "aliexpress_id": "123456",
+                "shopify_id": "789012"
+            }
+        ]
+    }
+
+    Returns:
+        {
+            "success": true,
+            "results": [...]
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress.inventory import InventorySyncService
+
+        sync_service = InventorySyncService()
+
+        results = await sync_service.bulk_sync(
+            request.get('products', [])
+        )
+
+        return {
+            'success': True,
+            'results': results
+        }
+
+    except Exception as e:
+        print(f"❌ Inventory sync error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/aliexpress/monitor-prices")
+async def monitor_prices(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Monitor price changes on AliExpress
+
+    Request:
+    {
+        "products": [
+            {
+                "aliexpress_id": "123456",
+                "name": "LED Strip",
+                "last_known_price": 15.99
+            }
+        ],
+        "threshold_percent": 10.0
+    }
+
+    Returns:
+        {
+            "success": true,
+            "alerts": [...]
+        }
+    """
+    try:
+        from ospra_os.integrations.aliexpress.inventory import InventorySyncService
+
+        sync_service = InventorySyncService()
+
+        alerts = await sync_service.monitor_price_changes(
+            request.get('products', []),
+            request.get('threshold_percent', 10.0)
+        )
+
+        return {
+            'success': True,
+            'alerts': alerts
+        }
+
+    except Exception as e:
+        print(f"❌ Price monitoring error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+# ═══════════════════════════════════════════════════════════
+# META (FACEBOOK/INSTAGRAM) AD AUTOMATION
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/api/meta/create-campaign")
+async def create_meta_campaign(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Create complete Meta ad campaign for a product
+
+    Request:
+    {
+        "product": {
+            "name": "Smart LED Strip",
+            "price": 29.99,
+            "image_url": "https://...",
+            "shopify_url": "https://..."
+        },
+        "daily_budget": 15.0,
+        "auto_activate": false
+    }
+    """
+    try:
+        from ospra_os.integrations.meta.campaign_builder import CampaignBuilder
+
+        builder = CampaignBuilder()
+
+        result = await builder.create_complete_campaign(
+            product=request.get('product'),
+            daily_budget=request.get('daily_budget', 10.0),
+            auto_activate=request.get('auto_activate', False)
+        )
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Campaign creation error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/meta/bulk-campaigns")
+async def create_bulk_campaigns(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Create campaigns for multiple products
+
+    Request:
+    {
+        "products": [{...}, {...}],
+        "daily_budget_per_product": 10.0
+    }
+    """
+    try:
+        from ospra_os.integrations.meta.campaign_builder import CampaignBuilder
+
+        builder = CampaignBuilder()
+
+        results = await builder.bulk_create_campaigns(
+            products=request.get('products', []),
+            daily_budget_per_product=request.get('daily_budget_per_product', 10.0)
+        )
+
+        successful = sum(1 for r in results if r.get('success'))
+
+        return {
+            'success': True,
+            'total': len(results),
+            'successful': successful,
+            'failed': len(results) - successful,
+            'results': results
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/meta/campaign/{campaign_id}/insights")
+async def get_campaign_insights(
+    campaign_id: str,
+    date_preset: str = 'last_7d',
+    settings: Settings = Depends(get_settings)
+):
+    """Get campaign performance metrics"""
+    try:
+        from ospra_os.integrations.meta.client import MetaAdsClient
+
+        client = MetaAdsClient()
+
+        insights = await client.get_campaign_insights(
+            campaign_id,
+            date_preset
+        )
+
+        return {
+            'success': True,
+            'insights': insights
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/meta/campaign/{campaign_id}/status")
+async def update_campaign_status(
+    campaign_id: str,
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Update campaign status (activate/pause)
+
+    Request:
+    {
+        "status": "ACTIVE" or "PAUSED"
+    }
+    """
+    try:
+        from ospra_os.integrations.meta.client import MetaAdsClient
+
+        client = MetaAdsClient()
+
+        success = await client.update_campaign_status(
+            campaign_id,
+            request.get('status')
+        )
+
+        return {
+            'success': success
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/meta/adset/{ad_set_id}/budget")
+async def update_ad_set_budget(
+    ad_set_id: str,
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Update ad set daily budget
+
+    Request:
+    {
+        "daily_budget": 20.0
+    }
+    """
+    try:
+        from ospra_os.integrations.meta.client import MetaAdsClient
+
+        client = MetaAdsClient()
+
+        budget_cents = int(request.get('daily_budget', 10.0) * 100)
+
+        success = await client.update_ad_set_budget(
+            ad_set_id,
+            budget_cents
+        )
+
+        return {
+            'success': success
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+# ═══════════════════════════════════════════════════════════
+# AD SCHEDULING & AUTOMATION
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/api/schedule/create")
+async def create_ad_schedule(
+    request: Dict = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Schedule an ad campaign for future activation
+
+    Request:
+    {
+        "product": {...},
+        "scheduled_start": "2025-11-20T10:00:00Z",
+        "scheduled_end": "2025-11-27T10:00:00Z",
+        "daily_budget": 15.0,
+        "platform": "meta"
+    }
+    """
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+        from datetime import datetime
+
+        manager = ScheduleManager(settings.database_url)
+
+        # Parse dates
+        scheduled_start = datetime.fromisoformat(
+            request.get('scheduled_start').replace('Z', '+00:00')
+        )
+
+        scheduled_end = None
+        if request.get('scheduled_end'):
+            scheduled_end = datetime.fromisoformat(
+                request.get('scheduled_end').replace('Z', '+00:00')
+            )
+
+        result = await manager.create_schedule(
+            product=request.get('product'),
+            scheduled_start=scheduled_start,
+            daily_budget=request.get('daily_budget', 10.0),
+            scheduled_end=scheduled_end,
+            total_budget=request.get('total_budget'),
+            platform=request.get('platform', 'meta'),
+            target_audience=request.get('target_audience')
+        )
+
+        return result
+
+    except Exception as e:
+        print(f"❌ Schedule creation error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/schedule/list")
+async def list_schedules(
+    status: str = None,
+    limit: int = 50,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    List ad schedules
+
+    Query params:
+    - status: pending, active, completed, cancelled, failed
+    - limit: max results (default 50)
+    """
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+
+        manager = ScheduleManager(settings.database_url)
+
+        schedules = manager.list_schedules(status=status, limit=limit)
+
+        return {
+            'success': True,
+            'count': len(schedules),
+            'schedules': schedules
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/schedule/{schedule_id}")
+async def get_schedule(
+    schedule_id: str,
+    settings: Settings = Depends(get_settings)
+):
+    """Get schedule details"""
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+
+        manager = ScheduleManager(settings.database_url)
+
+        schedule = manager.get_schedule(schedule_id)
+
+        if not schedule:
+            return {
+                'success': False,
+                'error': 'Schedule not found'
+            }
+
+        return {
+            'success': True,
+            'schedule': schedule
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.delete("/api/schedule/{schedule_id}")
+async def cancel_schedule(
+    schedule_id: str,
+    settings: Settings = Depends(get_settings)
+):
+    """Cancel a pending schedule"""
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+
+        manager = ScheduleManager(settings.database_url)
+
+        success = await manager.cancel_schedule(schedule_id)
+
+        return {
+            'success': success
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.post("/api/schedule/process")
+async def manually_process_schedules(
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Manually trigger schedule processing
+    (normally runs automatically every 5 min)
+    """
+    try:
+        from ospra_os.jobs.schedule_processor import process_schedules
+
+        await process_schedules()
+
+        return {
+            'success': True,
+            'message': 'Schedule processing completed'
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/schedule/calendar/week")
+async def get_week_calendar(
+    settings: Settings = Depends(get_settings)
+):
+    """Get week view of scheduled ads"""
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+        from ospra_os.services.calendar_view import CalendarView
+
+        manager = ScheduleManager(settings.database_url)
+        calendar = CalendarView(manager)
+
+        week_view = calendar.get_week_view()
+
+        return {
+            'success': True,
+            'calendar': week_view
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/schedule/calendar/month")
+async def get_month_calendar(
+    year: int = None,
+    month: int = None,
+    settings: Settings = Depends(get_settings)
+):
+    """Get month view of scheduled ads"""
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+        from ospra_os.services.calendar_view import CalendarView
+
+        manager = ScheduleManager(settings.database_url)
+        calendar = CalendarView(manager)
+
+        month_view = calendar.get_month_view(year, month)
+
+        return {
+            'success': True,
+            'calendar': month_view
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/schedule/forecast")
+async def get_budget_forecast(
+    days: int = 30,
+    settings: Settings = Depends(get_settings)
+):
+    """Get daily budget forecast"""
+    try:
+        from ospra_os.services.schedule_manager import ScheduleManager
+        from ospra_os.services.calendar_view import CalendarView
+
+        manager = ScheduleManager(settings.database_url)
+        calendar = CalendarView(manager)
+
+        forecast = calendar.get_daily_budget_forecast(days)
+
+        return {
+            'success': True,
+            'forecast': forecast
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+# ═══════════════════════════════════════════════════════════
+# LIVE TRENDS DASHBOARD - REAL-TIME PRODUCT MOMENTUM
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/api/trends/live")
+async def get_live_trending_products(
+    limit: int = 20,
+    sort_by: str = 'velocity',
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get top trending products with real-time momentum indicators
+
+    Stock market-style live trends with velocity scores, momentum indicators,
+    and rank changes. Updates every 5 minutes via background jobs.
+
+    Query params:
+    - limit: Number of products to return (default: 20)
+    - sort_by: Sort criterion ('velocity', 'rank', 'breakout')
+
+    Returns: Top trending products with momentum data
+    """
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_products as get_live_products
+
+        # Get live product data from dashboard
+        response = await get_live_products(niche="smart_home", per_page=limit)
+        products_data = response.get("products", [])
+
+        # Calculate momentum for each product
+        tracker = get_momentum_tracker()
+        trending = await tracker.get_trending_products(
+            products_data=products_data,
+            limit=limit,
+            sort_by=sort_by
+        )
+
+        return {
+            'success': True,
+            'count': len(trending),
+            'products': trending,
+            'last_updated': trending[0]['last_updated'] if trending else None
+        }
+
+    except Exception as e:
+        logger.error(f"Live trends error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': str(e),
+            'products': []
+        }
+
+
+@app.get("/api/trends/movers")
+async def get_biggest_movers(
+    direction: str = 'up',
+    limit: int = 10,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get products with biggest rank changes (movers & shakers)
+
+    Query params:
+    - direction: 'up' for gainers, 'down' for losers (default: 'up')
+    - limit: Number to return (default: 10)
+
+    Returns: Products with biggest rank movements
+    """
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_products as get_live_products
+
+        # Get live products with momentum
+        response = await get_live_products(niche="smart_home", per_page=50)
+        products_data = response.get("products", [])
+        tracker = get_momentum_tracker()
+
+        trending = await tracker.get_trending_products(
+            products_data=products_data,
+            limit=50
+        )
+
+        # Get biggest movers
+        movers = tracker.get_biggest_movers(
+            products=trending,
+            limit=limit,
+            direction=direction
+        )
+
+        return {
+            'success': True,
+            'direction': direction,
+            'count': len(movers),
+            'movers': movers
+        }
+
+    except Exception as e:
+        logger.error(f"Movers error: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'movers': []
+        }
+
+
+@app.get("/api/trends/breakouts")
+async def get_breakout_products(settings: Settings = Depends(get_settings)):
+    """
+    Get products with explosive momentum (>50% velocity)
+
+    Identifies breakout products showing rapid acceleration.
+    Similar to stock market breakout detection.
+
+    Returns: Products with breakout momentum
+    """
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_products as get_live_products
+
+        # Get live products
+        response = await get_live_products(niche="smart_home", per_page=100)
+        products_data = response.get("products", [])
+        tracker = get_momentum_tracker()
+
+        trending = await tracker.get_trending_products(
+            products_data=products_data,
+            limit=100
+        )
+
+        # Filter breakouts
+        breakouts = tracker.get_breakout_products(trending)
+
+        return {
+            'success': True,
+            'count': len(breakouts),
+            'breakouts': breakouts,
+            'threshold': 50.0
+        }
+
+    except Exception as e:
+        logger.error(f"Breakouts error: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'breakouts': []
+        }
+
+
+@app.get("/api/trends/product/{product_id}")
+async def get_product_momentum(
+    product_id: str,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get detailed momentum data for a single product
+
+    Path params:
+    - product_id: Product identifier
+
+    Returns: Complete momentum breakdown with metrics
+    """
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_product_by_id
+
+        # Get product data
+        product = await get_product_by_id(product_id)
+        if not product:
+            return {
+                'success': False,
+                'error': 'Product not found'
+            }
+
+        # Calculate momentum
+        tracker = get_momentum_tracker()
+
+        current_metrics = {
+            "google_trends": product.get("trend_score", 0),
+            "velocity_score": product.get("velocity_score", 0),
+            "final_score": product.get("final_score", 0),
+        }
+
+        # Use 70% of current as baseline (TODO: fetch actual historical data)
+        baseline_metrics = {k: v * 0.7 for k, v in current_metrics.items()}
+
+        momentum = tracker.calculate_product_momentum(
+            product_id=product_id,
+            product_name=product.get("name", "Unknown"),
+            current_metrics=current_metrics,
+            baseline_metrics=baseline_metrics,
+            current_rank=product.get("rank", 0),
+            previous_rank=product.get("previous_rank")
+        )
+
+        return {
+            'success': True,
+            'product': momentum
+        }
+
+    except Exception as e:
+        logger.error(f"Product momentum error: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/trends/heatmap")
+async def get_momentum_heatmap(
+    rows: int = 10,
+    cols: int = 5,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get heat map visualization data
+
+    Query params:
+    - rows: Number of rows in grid (default: 10)
+    - cols: Number of columns in grid (default: 5)
+
+    Returns: Grid data with color-coded momentum cells
+    """
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_products as get_live_products
+
+        # Get live products
+        total_cells = rows * cols
+        response = await get_live_products(niche="smart_home", per_page=total_cells)
+        products_data = response.get("products", [])
+        products_data = response.get("products", [])
+
+        # Calculate momentum
+        tracker = get_momentum_tracker()
+        trending = await tracker.get_trending_products(
+            products_data=products_data,
+            limit=total_cells
+        )
+
+        # Generate heatmap
+        heatmap = tracker.generate_heatmap_data(
+            products=trending,
+            grid_size=(rows, cols)
+        )
+
+        return {
+            'success': True,
+            **heatmap
+        }
+
+    except Exception as e:
+        logger.error(f"Heatmap error: {e}")
+        return {
+            'success': False,
+            'error': str(e),
+            'grid': []
+        }
+
+
+# ═══════════════════════════════════════════════════════════
+# PRODUCT RANKINGS API
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/api/rankings/top")
+async def get_top_rankings(
+    limit: int = 20,
+    store_id: Optional[int] = None,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get current top ranked products
+
+    Query params:
+    - limit: Number of products to return (default: 20)
+    - store_id: Filter by store (optional)
+
+    Returns: Top products with rankings and scores
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.intelligence.ranking_engine import RankingEngine
+        from ospra_os.database.multi_store_models import get_multi_store_session
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+        engine = RankingEngine(session)
+
+        rankings = await engine.get_current_rankings(limit=limit, store_id=store_id)
+
+        return {
+            "success": True,
+            "rankings": rankings,
+            "last_updated": datetime.utcnow().isoformat(),
+            "next_update": (datetime.utcnow() + timedelta(days=1)).replace(hour=3, minute=0).isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Rankings error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "rankings": []
+        }
+
+
+@app.get("/api/rankings/movers")
+async def get_ranking_movers(
+    direction: str = 'gainers',
+    limit: int = 10,
+    timeframe: str = '24h',
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get biggest rank changes (gainers or losers)
+
+    Query params:
+    - direction: 'gainers' or 'losers' (default: 'gainers')
+    - limit: Number of products (default: 10)
+    - timeframe: '24h', '7d', or '30d' (default: '24h')
+
+    Returns: Products with biggest rank movements
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.intelligence.ranking_engine import RankingEngine
+        from ospra_os.database.multi_store_models import get_multi_store_session
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+        engine = RankingEngine(session)
+
+        if direction == 'gainers':
+            movers = await engine.get_biggest_gainers(limit=limit, timeframe=timeframe)
+        else:
+            movers = await engine.get_biggest_losers(limit=limit, timeframe=timeframe)
+
+        return {
+            "success": True,
+            "movers": movers,
+            "direction": direction,
+            "timeframe": timeframe
+        }
+
+    except Exception as e:
+        logger.error(f"Movers error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "movers": []
+        }
+
+
+@app.get("/api/rankings/product/{product_id}")
+async def get_product_ranking_details(
+    product_id: int,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get detailed ranking information for a single product
+
+    Returns: Complete ranking history and stats
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.intelligence.ranking_engine import RankingEngine
+        from ospra_os.database.multi_store_models import get_multi_store_session
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+        engine = RankingEngine(session)
+
+        details = await engine.get_product_rank_details(product_id)
+
+        if not details:
+            return {
+                "success": False,
+                "error": "Product not found"
+            }
+
+        return {
+            "success": True,
+            **details
+        }
+
+    except Exception as e:
+        logger.error(f"Product ranking details error: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@app.get("/api/rankings/history/{product_id}")
+async def get_product_rank_history(
+    product_id: int,
+    days: int = 30,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get rank history for a product over time
+
+    Query params:
+    - days: Number of days to look back (default: 30)
+
+    Returns: Historical rankings with dates
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+
+        # Get history for the past N days
+        cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+        history = session.query(RankingHistory).filter(
+            RankingHistory.product_id == product_id,
+            RankingHistory.snapshot_date >= cutoff_date
+        ).order_by(RankingHistory.snapshot_date.asc()).all()
+
+        if not history:
+            return {
+                "success": True,
+                "history": [],
+                "message": "No history available for this product"
+            }
+
+        # Format history data
+        history_data = [
+            {
+                "date": h.snapshot_date.isoformat(),
+                "rank": h.rank,
+                "composite_score": h.composite_score,
+                "rank_change": h.rank_change,
+                "rank_direction": h.rank_direction,
+                "tier_name": h.tier_name
+            }
+            for h in history
+        ]
+
+        return {
+            "success": True,
+            "product_id": product_id,
+            "history": history_data,
+            "days_tracked": days
+        }
+
+    except Exception as e:
+        logger.error(f"Rank history error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "history": []
+        }
+
+
+@app.get("/api/rankings/new-entries")
+async def get_new_entries(
+    limit: int = 10,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get products that recently entered the top 20 rankings
+
+    Returns: Products that are new to the top 20
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+        from sqlalchemy import and_
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+
+        # Get today's rankings
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        # Find products in top 20 today with rank_direction = 'new'
+        new_entries = session.query(RankingHistory).filter(
+            and_(
+                RankingHistory.snapshot_date >= today,
+                RankingHistory.rank <= 20,
+                RankingHistory.rank_direction == 'new'
+            )
+        ).order_by(RankingHistory.rank.asc()).limit(limit).all()
+
+        entries_data = [
+            {
+                "product_id": entry.product_id,
+                "rank": entry.rank,
+                "composite_score": entry.composite_score,
+                "tier_name": entry.tier_name,
+                "entered_date": entry.snapshot_date.isoformat()
+            }
+            for entry in new_entries
+        ]
+
+        return {
+            "success": True,
+            "new_entries": entries_data,
+            "count": len(entries_data)
+        }
+
+    except Exception as e:
+        logger.error(f"New entries error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "new_entries": []
+        }
+
+
+@app.get("/api/rankings/fallen")
+async def get_fallen_products(
+    limit: int = 10,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Get products that recently dropped out of the top 20 rankings
+
+    Returns: Products that were previously in top 20 but are no longer
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+
+        db_url = settings.database_url or "sqlite:///./oubon_store.db"
+        session = get_multi_store_session(db_url)
+
+        # Get yesterday's and today's dates
+        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday = today - timedelta(days=1)
+
+        # Find products that were in top 20 yesterday
+        yesterday_top_20 = session.query(RankingHistory.product_id).filter(
+            and_(
+                RankingHistory.snapshot_date >= yesterday,
+                RankingHistory.snapshot_date < today,
+                RankingHistory.rank <= 20
+            )
+        ).all()
+
+        yesterday_product_ids = {p.product_id for p in yesterday_top_20}
+
+        # Find products in top 20 today
+        today_top_20 = session.query(RankingHistory.product_id).filter(
+            and_(
+                RankingHistory.snapshot_date >= today,
+                RankingHistory.rank <= 20
+            )
+        ).all()
+
+        today_product_ids = {p.product_id for p in today_top_20}
+
+        # Products that were in top 20 yesterday but not today
+        fallen_product_ids = yesterday_product_ids - today_product_ids
+
+        # Get details for fallen products
+        fallen_products = []
+        for product_id in list(fallen_product_ids)[:limit]:
+            last_rank = session.query(RankingHistory).filter(
+                RankingHistory.product_id == product_id
+            ).order_by(RankingHistory.snapshot_date.desc()).first()
+
+            if last_rank:
+                fallen_products.append({
+                    "product_id": product_id,
+                    "previous_rank": last_rank.previous_rank or last_rank.rank,
+                    "last_score": last_rank.composite_score,
+                    "fell_on": last_rank.snapshot_date.isoformat()
+                })
+
+        return {
+            "success": True,
+            "fallen_products": fallen_products,
+            "count": len(fallen_products)
+        }
+
+    except Exception as e:
+        logger.error(f"Fallen products error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "fallen_products": []
+        }
+
+
+@app.websocket("/ws/trends")
+async def trends_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time trends updates
+
+    Broadcasts momentum updates every 5 seconds to connected clients.
+    Clients receive live product momentum data for real-time dashboard updates.
+
+    Connection lifecycle:
+    1. Client connects
+    2. Server sends initial trending data
+    3. Server broadcasts updates every 5 seconds
+    4. Client can disconnect anytime
+    """
+    import asyncio
+    import json
+    from datetime import datetime
+
+    await websocket.accept()
+    logger.info("✅ WebSocket client connected to /ws/trends")
+
+    try:
+        from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
+        from ospra_os.dashboard.routes import get_products as get_live_products
+
+        tracker = get_momentum_tracker()
+
+        while True:
+            try:
+                # Fetch latest trending products
+                response = await get_live_products(niche="smart_home", per_page=20)
+                products_data = response.get("products", [])
+
+                # Calculate momentum
+                trending = await tracker.get_trending_products(
+                    products_data=products_data,
+                    limit=20,
+                    sort_by='velocity'
+                )
+
+                # Get additional insights
+                movers_up = tracker.get_biggest_movers(trending, limit=5, direction='up')
+                breakouts = tracker.get_breakout_products(trending)
+
+                # Prepare update message
+                update = {
+                    'type': 'trends_update',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'data': {
+                        'trending': trending[:10],  # Top 10
+                        'movers': movers_up,
+                        'breakouts': breakouts[:5],  # Top 5 breakouts
+                        'total_products': len(trending)
+                    }
+                }
+
+                # Send update to client
+                await websocket.send_json(update)
+
+                # Wait 5 seconds before next update
+                await asyncio.sleep(5)
+
+            except WebSocketDisconnect:
+                logger.info("WebSocket client disconnected")
+                break
+
+            except Exception as e:
+                logger.error(f"WebSocket update error: {e}")
+                # Send error message to client
+                error_msg = {
+                    'type': 'error',
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'error': str(e)
+                }
+                await websocket.send_json(error_msg)
+                await asyncio.sleep(5)  # Continue trying
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket connection closed")
+
+    except Exception as e:
+        logger.error(f"WebSocket fatal error: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
+
+
+# ═══════════════════════════════════════════════════════════
+# SHOPIFY WEBHOOKS
+# ═══════════════════════════════════════════════════════════
+
+@app.post("/webhooks/shopify/orders/create")
+async def shopify_order_webhook(request: Request):
+    """
+    Shopify order creation webhook
+    Auto-fulfills orders via AliExpress
+
+    This endpoint receives notifications when a new order is placed
+    and automatically places the order on AliExpress for dropshipping.
+    """
+    try:
+        # Use the existing shopify_webhooks module
+        from ospra_os.webhooks.shopify_webhooks import process_new_order
+
+        order_data = await request.json()
+        result = await process_new_order(order_data)
+
+        return {'received': True, 'result': result}
+
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {'received': False, 'error': str(e)}
+
+
+@app.post("/webhooks/shopify/orders/cancelled")
+async def shopify_order_cancelled_webhook(request: Request):
+    """
+    Shopify order cancellation webhook
+    Cancels corresponding AliExpress order
+
+    TODO: Implement AliExpress order cancellation logic
+    """
+    try:
+        order_data = await request.json()
+        order_id = order_data.get('id')
+
+        print(f"📦 Order cancelled webhook received for order #{order_id}")
+        # TODO: Implement AliExpress order cancellation via API
+        # For now, just log and acknowledge receipt
+
+        return {
+            'received': True,
+            'order_id': order_id,
+            'message': 'Webhook received, cancellation logic not yet implemented'
+        }
+
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
+        return {'received': False, 'error': str(e)}
 
 
 # Mount static files (must be last)

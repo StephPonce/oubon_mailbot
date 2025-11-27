@@ -76,6 +76,49 @@ class TaskType(str, enum.Enum):
     PRICING_OPTIMIZATION = "pricing_optimization"
 
 
+class TriggerType(str, enum.Enum):
+    """Email automation trigger types"""
+    KEYWORD = "keyword"
+    SENDER = "sender"
+    SUBJECT = "subject"
+    LABEL = "label"
+
+
+class ActionType(str, enum.Enum):
+    """Email automation action types"""
+    LABEL = "label"
+    REPLY = "reply"
+    FORWARD = "forward"
+    DELETE = "delete"
+    MARK_READ = "mark_read"
+
+
+class LifecycleStage(str, enum.Enum):
+    """Niche lifecycle stages"""
+    EMERGING = "emerging"      # 🌱 New niche, low competition, growing interest
+    GROWTH = "growth"          # 🚀 Accelerating demand, increasing competition
+    PEAK = "peak"              # 📈 Maximum demand, high competition
+    DECLINE = "decline"        # 📉 Decreasing demand, oversaturated
+    DEAD = "dead"              # 💀 Minimal demand, avoid
+
+
+class EntryTiming(str, enum.Enum):
+    """Niche entry timing recommendations"""
+    EXCELLENT = "excellent"    # Score 80+: Enter immediately
+    GOOD = "good"              # Score 60-79: Good time to enter
+    FAIR = "fair"              # Score 40-59: Proceed with caution
+    POOR = "poor"              # Score 20-39: High risk
+    AVOID = "avoid"            # Score <20: Do not enter
+
+
+class RiskLevel(str, enum.Enum):
+    """Risk levels for niche entry"""
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
 # ============================================================================
 # USER MODEL
 # ============================================================================
@@ -117,6 +160,7 @@ class User(Base):
     ai_usage = relationship("AIUsage", back_populates="user", cascade="all, delete-orphan")
     product_recommendations = relationship("UserProductRecommendation", back_populates="user", cascade="all, delete-orphan")
     email_accounts = relationship("UserEmailAccount", back_populates="user", cascade="all, delete-orphan")
+    emails = relationship("Email", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier='{self.subscription_tier}')>"
@@ -662,9 +706,182 @@ class UserEmailAccount(Base):
 
     # Relationships
     user = relationship("User", back_populates="email_accounts")
+    emails = relationship("Email", back_populates="email_account", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<UserEmailAccount(id={self.id}, user_id={self.user_id}, provider='{self.provider}', email='{self.email_address}', primary={self.is_primary})>"
+
+
+class Email(Base):
+    """
+    Synced emails from connected email accounts.
+
+    Stores emails fetched via Gmail API, Outlook Graph API, or IMAP.
+    """
+    __tablename__ = "emails"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    email_account_id = Column(Integer, ForeignKey('user_email_accounts.id'), nullable=False, index=True)
+
+    # Email identifiers (provider-specific)
+    message_id = Column(String(500), nullable=False, index=True)  # Gmail: message ID, Outlook: message ID, IMAP: UID
+    external_id = Column(String(500), nullable=True, index=True)  # Provider-specific external ID (for Outlook Graph API)
+    thread_id = Column(String(500), nullable=True, index=True)  # For threading emails
+
+    # Email headers
+    from_address = Column(String(500), nullable=False, index=True)
+    from_name = Column(String(500), nullable=True)
+    to_addresses = Column(Text, nullable=True)  # JSON array
+    cc_addresses = Column(Text, nullable=True)  # JSON array
+    bcc_addresses = Column(Text, nullable=True)  # JSON array
+    subject = Column(Text, nullable=True)
+
+    # Email content
+    body_plain = Column(Text, nullable=True)  # Plain text body
+    body_html = Column(Text, nullable=True)  # HTML body
+    snippet = Column(Text, nullable=True)  # Short preview
+
+    # Email metadata
+    received_at = Column(DateTime, nullable=False, index=True)  # When email was sent/received
+    labels = Column(JSON, nullable=True)  # Gmail labels or Outlook categories
+    is_read = Column(Boolean, default=False, nullable=False)
+    is_starred = Column(Boolean, default=False, nullable=False)
+    is_important = Column(Boolean, default=False, nullable=False)
+    has_attachments = Column(Boolean, default=False, nullable=False)
+
+    # Sync metadata
+    synced_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    raw_data = Column(JSON, nullable=True)  # Full API response for debugging
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="emails")
+    email_account = relationship("UserEmailAccount", back_populates="emails")
+
+    # Unique constraint: one message per account
+    __table_args__ = (
+        UniqueConstraint('email_account_id', 'message_id', name='unique_email_per_account'),
+        Index('idx_email_user_received', 'user_id', 'received_at'),
+        Index('idx_email_account_received', 'email_account_id', 'received_at'),
+        Index('idx_email_from', 'from_address'),
+        Index('idx_email_read', 'is_read'),
+    )
+
+    def __repr__(self):
+        return f"<Email(id={self.id}, from='{self.from_address}', subject='{self.subject[:50] if self.subject else ''}', received={self.received_at})>"
+
+
+# ============================================================================
+# EMAIL AUTOMATION MODELS
+# ============================================================================
+
+class EmailAutomationRule(Base):
+    """
+    User-defined email automation rules.
+
+    Triggers: keyword in body, sender address, subject line, label
+    Actions: apply label, auto-reply with template, forward, delete, mark as read
+    """
+    __tablename__ = "email_automation_rules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+
+    # Rule Identity
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Trigger Configuration
+    trigger_type = Column(SQLEnum(TriggerType), nullable=False, index=True)
+    trigger_value = Column(Text, nullable=False)  # keyword, sender email, subject pattern, label name
+
+    # Action Configuration
+    action_type = Column(SQLEnum(ActionType), nullable=False, index=True)
+    action_value = Column(Text, nullable=False)  # label name, template ID, forward address, etc.
+
+    # Rule Settings
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    priority = Column(Integer, default=100, nullable=False)  # Lower number = higher priority
+
+    # Usage Statistics
+    times_triggered = Column(Integer, default=0)
+    last_triggered = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<EmailAutomationRule(id={self.id}, name='{self.name}', trigger='{self.trigger_type}', action='{self.action_type}')>"
+
+
+class EmailTemplate(Base):
+    """
+    Reusable email templates with variable support.
+
+    Variables use {{variable_name}} syntax and are replaced with dynamic content.
+    """
+    __tablename__ = "email_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+
+    # Template Identity
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Template Content
+    subject = Column(String(500), nullable=False)
+    body = Column(Text, nullable=False)
+
+    # Variable Configuration
+    variables = Column(JSON, default=list)  # ['name', 'order_id', 'ticket_id', etc.]
+
+    # Usage Statistics
+    times_used = Column(Integer, default=0)
+    last_used = Column(DateTime, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<EmailTemplate(id={self.id}, name='{self.name}', subject='{self.subject[:30]}...')>"
+
+
+class EmailLabel(Base):
+    """
+    User-defined custom email labels with colors.
+
+    Used to organize and categorize emails beyond provider defaults.
+    """
+    __tablename__ = "email_labels"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+
+    # Label Identity
+    name = Column(String(100), nullable=False)
+    color = Column(String(7), nullable=False)  # Hex color code (e.g., '#3B82F6')
+
+    # Usage Statistics
+    email_count = Column(Integer, default=0)  # Number of emails with this label
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Unique constraint: one label name per user
+    __table_args__ = (
+        UniqueConstraint('user_id', 'name', name='unique_label_per_user'),
+    )
+
+    def __repr__(self):
+        return f"<EmailLabel(id={self.id}, name='{self.name}', color='{self.color}', count={self.email_count})>"
 
 
 # ============================================================================
@@ -742,6 +959,10 @@ def get_multi_store_session(database_url: str = "sqlite:///./multi_store.db") ->
         database_url,
         connect_args={"check_same_thread": False} if "sqlite" in database_url else {}
     )
+
+    # Ensure all tables exist before creating session
+    Base.metadata.create_all(bind=engine)
+
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     return SessionLocal()
 
@@ -875,3 +1096,346 @@ if __name__ == "__main__":
         print(f"   • {table_name}")
 
     print("\n✅ Ready for multi-store, multi-platform e-commerce!")
+
+# ═══════════════════════════════════════════════════════
+# INTELLIGENCE LAYER - YOUR COMPETITIVE MOAT
+# ═══════════════════════════════════════════════════════
+
+class ProductSnapshot(Base):
+    """Track product metrics over time for velocity analysis"""
+    __tablename__ = "product_snapshots"
+    
+    id = Column(Integer, primary_key=True)
+    asin = Column(String, index=True)
+    name = Column(String)
+    price = Column(Float)
+    rating = Column(Float)
+    reviews_count = Column(Integer)
+    bestseller_rank = Column(Integer)
+    snapshot_date = Column(DateTime, default=datetime.utcnow, index=True)
+    niche = Column(String)
+
+class ProductIntelligence(Base):
+    """Calculated intelligence metrics"""
+    __tablename__ = "product_intelligence"
+    
+    id = Column(Integer, primary_key=True)
+    asin = Column(String, unique=True, index=True)
+    name = Column(String)
+    
+    # Velocity (YOUR MOAT)
+    momentum_score = Column(Float, default=50.0)  # 0-100
+    is_trending = Column(Boolean, default=False)
+    rank_velocity_7d = Column(Float, default=0.0)
+    review_velocity_7d = Column(Float, default=0.0)
+    
+    # Saturation (YOUR MOAT)
+    saturation_level = Column(String, default='LOW')  # LOW/MEDIUM/HIGH/EXTREME
+    opportunity_score = Column(Float, default=100.0)  # 0-100
+    competitor_count = Column(Integer, default=0)
+    
+    last_updated = Column(DateTime, default=datetime.utcnow)
+
+
+class RankingHistory(Base):
+    """Historical ranking snapshots for trend analysis"""
+    __tablename__ = "ranking_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=False, index=True)
+
+    # Ranking data
+    rank = Column(Integer, nullable=False, index=True)
+    composite_score = Column(Float, nullable=False)
+    score_breakdown = Column(JSON)  # Store component scores
+
+    # Rank changes
+    previous_rank = Column(Integer)
+    rank_change = Column(Integer, default=0)  # Positive = moved up, negative = moved down
+    rank_direction = Column(String(10))  # "up", "down", "stable"
+
+    # Tier info
+    tier_name = Column(String(20))  # ELITE, TOP, RISING, etc.
+
+    # Metadata
+    snapshot_date = Column(DateTime, default=datetime.utcnow, index=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    product = relationship("Product")
+
+    # Composite index for efficient queries
+    __table_args__ = (
+        Index('idx_product_snapshot_date', 'product_id', 'snapshot_date'),
+    )
+
+    def __repr__(self):
+        return f"<RankingHistory product_id={self.product_id} rank={self.rank} date={self.snapshot_date}>"
+
+
+class Niche(Base):
+    """Niche/category tracking for market analysis"""
+    __tablename__ = "niches"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    niche_id = Column(String, unique=True, index=True, nullable=False)  # e.g., "smart_home"
+    name = Column(String, nullable=False)  # e.g., "Smart Home Devices"
+    description = Column(Text)
+
+    # Hierarchy
+    parent_niche_id = Column(String, ForeignKey("niches.niche_id"), nullable=True)
+
+    # SEO & Keywords
+    keywords = Column(JSON)  # List of related search terms
+
+    # Tracking metadata
+    is_active = Column(Boolean, default=True, index=True)
+    tracked_since = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Current metrics (cached from latest snapshot)
+    current_health_score = Column(Float)
+    current_lifecycle_stage = Column(SQLEnum(LifecycleStage))
+    current_entry_timing = Column(SQLEnum(EntryTiming))
+
+    # Relationships
+    snapshots = relationship("NicheSnapshot", back_populates="niche", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<Niche {self.niche_id}: {self.name} ({self.current_lifecycle_stage})>"
+
+
+class NicheSnapshot(Base):
+    """Daily/weekly snapshots of niche health and metrics"""
+    __tablename__ = "niche_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    niche_id = Column(String, ForeignKey("niches.niche_id"), index=True, nullable=False)
+
+    # Core scores
+    health_score = Column(Float, nullable=False)  # 0-100 composite health score
+    lifecycle_stage = Column(SQLEnum(LifecycleStage), nullable=False)
+
+    # Metric components
+    search_volume = Column(Integer)  # Current search volume
+    search_volume_change_30d = Column(Float)  # % change in 30 days
+    search_volume_change_90d = Column(Float)  # % change in 90 days
+    trend_momentum = Column(Float)  # 0-100 score for demand growth
+
+    # Competition metrics
+    seller_count = Column(Integer)  # Number of active sellers
+    new_sellers_30d = Column(Integer)  # New sellers in last 30 days
+    saturation_score = Column(Float)  # 0-100 (100 = oversaturated)
+    saturation_level = Column(String)  # LOW/MODERATE/HIGH/CRITICAL
+
+    # Profitability metrics
+    average_margin = Column(Float)  # Average profit margin %
+    margin_trend = Column(String)  # "up", "down", "stable"
+    price_pressure = Column(String)  # LOW/MEDIUM/HIGH
+
+    # Longevity metrics
+    is_seasonal = Column(Boolean, default=False)
+    trend_stability = Column(Float)  # 0-1.0 (1.0 = very stable)
+    predicted_lifespan = Column(String)  # e.g., "18+ months"
+    longevity_score = Column(Float)  # 0-100
+
+    # Entry recommendation
+    entry_timing_score = Column(Float)  # 0-100
+    entry_timing = Column(SQLEnum(EntryTiming))
+    should_enter = Column(Boolean)
+    risk_level = Column(SQLEnum(RiskLevel))
+    estimated_roi_min = Column(Float)  # Min % ROI estimate
+    estimated_roi_max = Column(Float)  # Max % ROI estimate
+    entry_reasoning = Column(Text)  # Why this timing/recommendation
+
+    # Competitor analysis
+    top_competitors = Column(JSON)  # List of top brands/sellers
+    barrier_to_entry = Column(String)  # LOW/MEDIUM/HIGH
+    average_reviews = Column(Integer)
+
+    # Week-over-week changes
+    health_score_change = Column(Float)  # Change from previous snapshot
+    stage_changed = Column(Boolean, default=False)  # Did lifecycle stage change?
+    notable_events = Column(JSON)  # List of notable events this week
+
+    # Top products in niche
+    top_products = Column(JSON)  # Top 5 products with IDs and scores
+
+    # Strategic recommendations
+    recommendations = Column(JSON)  # List of actionable recommendations
+
+    # Full analysis JSON (for flexibility)
+    full_analysis = Column(JSON)
+
+    # Temporal
+    snapshot_date = Column(DateTime, index=True, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    niche = relationship("Niche", back_populates="snapshots")
+
+    # Composite indexes for efficient queries
+    __table_args__ = (
+        Index('idx_niche_snapshot_date', 'niche_id', 'snapshot_date'),
+        Index('idx_health_score', 'health_score'),
+        Index('idx_lifecycle_stage', 'lifecycle_stage'),
+        Index('idx_entry_timing', 'entry_timing'),
+    )
+
+    def __repr__(self):
+        return f"<NicheSnapshot {self.niche_id} health={self.health_score} stage={self.lifecycle_stage} date={self.snapshot_date}>"
+
+
+# ============================================================================
+# A/B TESTING MODELS
+# ============================================================================
+
+class ABTest(Base):
+    """A/B test for products, prices, content, or ads"""
+    __tablename__ = "ab_tests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Test Identity
+    name = Column(String(512), nullable=False)
+    test_type = Column(String(50), nullable=False, index=True)  # price, product_title, product_description, product_image, ad_creative, ad_copy
+
+    # Product/Store Association
+    product_id = Column(String(255), nullable=False, index=True)
+    store_id = Column(String(255), nullable=False, index=True)
+
+    # Test Configuration
+    status = Column(String(50), default="draft", nullable=False, index=True)  # draft, scheduled, running, paused, ended
+    scheduled_start = Column(DateTime, nullable=True)
+    scheduled_end = Column(DateTime, nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    ended_at = Column(DateTime, nullable=True)
+
+    # Statistical Settings
+    min_sample_size = Column(Integer, default=100, nullable=False)  # Minimum conversions needed
+    confidence_level = Column(Float, default=0.95, nullable=False)  # 95% confidence
+
+    # Winner
+    winner_variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=True)
+
+    # Additional Data
+    test_metadata = Column(JSON, default=dict)  # Additional test configuration
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    variants = relationship("ABTestVariant", back_populates="test", foreign_keys="ABTestVariant.test_id", cascade="all, delete-orphan")
+    events = relationship("ABTestEvent", back_populates="test", cascade="all, delete-orphan")
+    assignments = relationship("ABTestAssignment", back_populates="test", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('idx_test_product_store', 'product_id', 'store_id'),
+        Index('idx_test_status', 'status'),
+        Index('idx_test_type', 'test_type'),
+    )
+
+    def __repr__(self):
+        return f"<ABTest(id={self.id}, name='{self.name}', type='{self.test_type}', status='{self.status}')>"
+
+
+class ABTestVariant(Base):
+    """A variant in an A/B test"""
+    __tablename__ = "ab_test_variants"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
+
+    # Variant Identity
+    name = Column(String(255), nullable=False)
+    is_control = Column(Boolean, default=False, nullable=False)
+
+    # Variant Configuration (test-type specific)
+    config = Column(JSON, nullable=False)  # e.g., {"price": 29.99} or {"title": "..."}
+
+    # Traffic Allocation
+    traffic_percentage = Column(Float, default=50.0, nullable=False)  # % of traffic
+
+    # Performance Metrics
+    impressions = Column(Integer, default=0, nullable=False)
+    clicks = Column(Integer, default=0, nullable=False)
+    conversions = Column(Integer, default=0, nullable=False)
+    revenue = Column(Float, default=0.0, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    test = relationship("ABTest", back_populates="variants", foreign_keys=[test_id])
+    events = relationship("ABTestEvent", back_populates="variant", cascade="all, delete-orphan")
+    assignments = relationship("ABTestAssignment", back_populates="variant", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<ABTestVariant(id={self.id}, test_id={self.test_id}, name='{self.name}', control={self.is_control})>"
+
+
+class ABTestEvent(Base):
+    """Events (impressions, clicks, conversions) for A/B tests"""
+    __tablename__ = "ab_test_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
+    variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=False, index=True)
+
+    # Event Details
+    visitor_id = Column(String(255), nullable=False, index=True)  # Session ID, IP hash, etc.
+    event_type = Column(String(50), nullable=False, index=True)  # impression, click, add_to_cart, purchase
+
+    # Event Data
+    revenue = Column(Float, nullable=True)  # For purchase events
+    event_metadata = Column(JSON, default=dict)  # Additional event data
+
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    test = relationship("ABTest", back_populates="events")
+    variant = relationship("ABTestVariant", back_populates="events")
+
+    __table_args__ = (
+        Index('idx_event_test_variant', 'test_id', 'variant_id'),
+        Index('idx_event_visitor', 'visitor_id'),
+        Index('idx_event_type', 'event_type'),
+        Index('idx_event_created', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<ABTestEvent(id={self.id}, test_id={self.test_id}, variant_id={self.variant_id}, type='{self.event_type}')>"
+
+
+class ABTestAssignment(Base):
+    """Track which variant each visitor was assigned to"""
+    __tablename__ = "ab_test_assignments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    test_id = Column(Integer, ForeignKey("ab_tests.id"), nullable=False, index=True)
+    variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=False, index=True)
+
+    # Assignment Details
+    visitor_id = Column(String(255), nullable=False, index=True)
+    assigned_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    test = relationship("ABTest", back_populates="assignments")
+    variant = relationship("ABTestVariant", back_populates="assignments")
+
+    __table_args__ = (
+        UniqueConstraint('test_id', 'visitor_id', name='unique_test_visitor'),
+        Index('idx_assignment_test_variant', 'test_id', 'variant_id'),
+        Index('idx_assignment_visitor', 'visitor_id'),
+    )
+
+    def __repr__(self):
+        return f"<ABTestAssignment(test_id={self.test_id}, variant_id={self.variant_id}, visitor='{self.visitor_id}')>"
+
+
+print("✅ Intelligence models added")
+print("✅ A/B Testing models added")

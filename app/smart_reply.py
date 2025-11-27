@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional
 from datetime import datetime
 from app.business_hours import BusinessHours
-from app.shopify_client import ShopifyClient
+from ospra_os.integrations.shopify.client import ShopifyClient
 from app.refund_processor import RefundProcessor
 from app.ai_client import AIClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
@@ -32,9 +32,11 @@ class SmartReplySystem:
         # Initialize Shopify client if configured
         self.shopify = None
         if settings.SHOPIFY_STORE and settings.SHOPIFY_API_TOKEN:
+            # Extract store name from domain (e.g., 'rxxj7d-1i.myshopify.com' -> 'rxxj7d-1i')
+            store_name = settings.SHOPIFY_STORE.replace('.myshopify.com', '') if '.myshopify.com' in settings.SHOPIFY_STORE else settings.SHOPIFY_STORE
             self.shopify = ShopifyClient(
-                store_domain=settings.SHOPIFY_STORE,
-                api_token=settings.SHOPIFY_API_TOKEN,
+                store_name=store_name,
+                access_token=settings.SHOPIFY_API_TOKEN,
             )
 
         # Initialize refund processor with safety limits

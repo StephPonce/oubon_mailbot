@@ -1,0 +1,64 @@
+/* Aurora Background - Liquid Glass Effect */
+.aurora-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: -2;
+  pointer-events: none;
+}
+
+.aurora-orb {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform, opacity;
+  animation: drift 30s infinite alternate;
+  filter: blur(120px);
+  opacity: 0.4;
+}
+
+.orb-1 {
+  width: 500px;
+  height: 500px;
+  background-color: rgba(0, 255, 255, 0.4);
+  top: 10vh;
+  left: 5vw;
+  animation-duration: 40s;
+}
+
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background-color: rgba(138, 43, 226, 0.3);
+  top: 30vh;
+  right: 10vw;
+  animation-duration: 35s;
+  animation-delay: -10s;
+}
+
+.orb-3 {
+  width: 500px;
+  height: 500px;
+  background-color: rgba(65, 105, 225, 0.35);
+  bottom: 5vh;
+  left: 25vw;
+  animation-duration: 45s;
+  animation-delay: -20s;
+}
+
+@keyframes drift {
+  0% {
+    transform: translateX(0) translateY(0) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateX(-10vw) translateY(5vh) scale(1.2);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(5vw) translateY(-10vh) scale(1);
+    opacity: 0.4;
+  }
+}

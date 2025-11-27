@@ -1,175 +1,245 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { useState, useEffect, useCallback } from 'react';
+import KPICard from '../components/analytics/KPICard';
+import RevenueChart from '../components/analytics/RevenueChart';
+import { DollarSign, ShoppingCart, TrendingUp, Target } from 'lucide-react';
 
-interface Analytics {
-  total_orders: number;
-  total_revenue: number;
-  average_order_value: number;
-  orders_by_status: { [key: string]: number };
-  top_products: Array<{ name: string; orders: number; revenue: number }>;
-  revenue_by_day: Array<{ date: string; revenue: number }>;
-  deployed_products: number;
-  conversion_rate: number;
-  unfulfilled_orders: number;
-  shipped_orders: number;
+interface AnalyticsData {
+  revenue: {
+    total: number;
+    change_percentage: number;
+    trend: 'up' | 'down' | 'neutral';
+  };
+  profit: {
+    total: number;
+    margin_percentage: number;
+  };
+  orders: {
+    total: number;
+    average_order_value: number;
+    conversion_rate: number;
+  };
+  ad_spend: {
+    roi: number;
+    roas: number;
+  };
+}
+
+interface RevenueTimeSeriesData {
+  data: Array<{
+    date: string;
+    revenue: number;
+    orders: number;
+  }>;
 }
 
 export const AnalyticsPage: React.FC = () => {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [revenueData, setRevenueData] = useState<RevenueTimeSeriesData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState('last_30_days');
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/dashboard/v2/analytics');
-      setAnalytics(response.data.analytics);
+      setLoading(true);
+
+      // Fetch overview data
+      const overviewResponse = await fetch(
+        `http://localhost:8001/api/analytics/overview?date_range=${dateRange}&user_id=1`
+      );
+
+      if (!overviewResponse.ok) {
+        throw new Error('Failed to fetch analytics overview');
+      }
+
+      const overviewData = await overviewResponse.json();
+      setAnalytics(overviewData);
+
+      // Fetch revenue time series
+      const revenueResponse = await fetch(
+        `http://localhost:8001/api/analytics/revenue?date_range=${dateRange}&granularity=day&user_id=1`
+      );
+
+      if (revenueResponse.ok) {
+        const revenueTimeSeries = await revenueResponse.json();
+        setRevenueData(revenueTimeSeries);
+      }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
       setLoading(false);
     }
+  }, [dateRange, setAnalytics, setRevenueData, setLoading]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:8001/api/analytics/export?format=csv&date_range=${dateRange}&user_id=1`
+      );
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `analytics_${dateRange}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="text-xl text-gray-600">Loading analytics...</div>
-      </div>
-    );
-  }
-
-  if (!analytics) {
-    return (
-      <div className="text-center py-16">
-        <div className="text-6xl mb-4">📊</div>
-        <h2 className="text-2xl font-semibold text-gray-700 mb-2">No analytics data available</h2>
-        <p className="text-gray-500">Analytics will appear once you have orders</p>
-      </div>
-    );
-  }
-
-  const maxRevenue = Math.max(...analytics.revenue_by_day.map(d => d.revenue), 1);
-
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-800">Analytics</h1>
-        <p className="text-gray-600 mt-2">Business performance metrics and insights</p>
-      </div>
-
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm text-gray-600 mb-2">Total Revenue</div>
-          <div className="text-3xl font-bold text-green-600">
-            ${analytics.total_revenue.toFixed(2)}
-          </div>
+    <div className="space-y-8 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Analytics Dashboard</h1>
+          <p className="text-gray-400 mt-1">Revenue, profit, and performance tracking</p>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm text-gray-600 mb-2">Total Orders</div>
-          <div className="text-3xl font-bold text-blue-600">
-            {analytics.total_orders}
-          </div>
-        </div>
+        <div className="flex items-center gap-4">
+          {/* Date Range Selector */}
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="today">Today</option>
+            <option value="last_7_days">Last 7 Days</option>
+            <option value="last_30_days">Last 30 Days</option>
+            <option value="last_90_days">Last 90 Days</option>
+            <option value="year">This Year</option>
+          </select>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm text-gray-600 mb-2">Average Order Value</div>
-          <div className="text-3xl font-bold text-purple-600">
-            ${analytics.average_order_value.toFixed(2)}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm text-gray-600 mb-2">Conversion Rate</div>
-          <div className="text-3xl font-bold text-orange-600">
-            {analytics.conversion_rate.toFixed(1)}%
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {analytics.total_orders} orders / {analytics.deployed_products} products
-          </div>
+          {/* Export Button */}
+          <button
+            onClick={handleExport}
+            disabled={loading}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Export CSV
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Order Status */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Order Status</h2>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700">Unfulfilled</span>
-              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full font-semibold">
-                {analytics.unfulfilled_orders}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-gray-700">Shipped</span>
-              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
-                {analytics.shipped_orders}
-              </span>
-            </div>
-          </div>
-        </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KPICard
+          title="Total Revenue"
+          value={analytics ? `$${analytics.revenue.total.toFixed(2)}` : '$0.00'}
+          change={analytics?.revenue.change_percentage}
+          trend={analytics?.revenue.trend}
+          icon={DollarSign}
+          loading={loading}
+        />
 
-        {/* Top Products */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Top Products</h2>
-          {analytics.top_products.length === 0 ? (
-            <p className="text-gray-500">No product sales yet</p>
-          ) : (
+        <KPICard
+          title="Total Orders"
+          value={analytics?.orders.total || 0}
+          icon={ShoppingCart}
+          loading={loading}
+        />
+
+        <KPICard
+          title="Profit Margin"
+          value={analytics ? `${analytics.profit.margin_percentage.toFixed(1)}%` : '0%'}
+          icon={TrendingUp}
+          loading={loading}
+        />
+
+        <KPICard
+          title="ROAS"
+          value={analytics ? `${analytics.ad_spend.roas.toFixed(2)}x` : '0x'}
+          icon={Target}
+          loading={loading}
+        />
+      </div>
+
+      {/* Revenue Chart */}
+      <RevenueChart
+        data={revenueData?.data || []}
+        loading={loading}
+      />
+
+      {/* Additional Metrics Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Profit Breakdown */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Profit Overview</h3>
+          {loading ? (
             <div className="space-y-3">
-              {analytics.top_products.map((product, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium text-gray-800">{product.name}</div>
-                    <div className="text-sm text-gray-500">{product.orders} orders</div>
-                  </div>
-                  <div className="text-green-600 font-semibold">
-                    ${product.revenue.toFixed(2)}
-                  </div>
-                </div>
-              ))}
+              <div className="h-4 bg-gray-700 animate-pulse rounded" />
+              <div className="h-4 bg-gray-700 animate-pulse rounded w-3/4" />
             </div>
+          ) : analytics ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Total Profit</span>
+                <span className="text-xl font-bold text-green-400">
+                  ${analytics.profit.total.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Profit Margin</span>
+                <span className="text-lg font-semibold text-white">
+                  {analytics.profit.margin_percentage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">No data available</p>
+          )}
+        </div>
+
+        {/* Order Metrics */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 border border-gray-700 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-white mb-4">Order Metrics</h3>
+          {loading ? (
+            <div className="space-y-3">
+              <div className="h-4 bg-gray-700 animate-pulse rounded" />
+              <div className="h-4 bg-gray-700 animate-pulse rounded w-3/4" />
+            </div>
+          ) : analytics ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Average Order Value</span>
+                <span className="text-xl font-bold text-blue-400">
+                  ${analytics.orders.average_order_value.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-400">Conversion Rate</span>
+                <span className="text-lg font-semibold text-white">
+                  {analytics.orders.conversion_rate.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-500">No data available</p>
           )}
         </div>
       </div>
 
-      {/* Revenue Trend */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold mb-4">Revenue Trend (Last 30 Days)</h2>
-        {analytics.revenue_by_day.length === 0 ? (
-          <p className="text-gray-500">No revenue data yet</p>
-        ) : (
-          <div className="h-64 flex items-end space-x-2">
-            {analytics.revenue_by_day.map((day, index) => {
-              const height = (day.revenue / maxRevenue) * 100;
-              return (
-                <div
-                  key={index}
-                  className="flex-1 flex flex-col items-center group relative"
-                >
-                  <div
-                    className="w-full bg-blue-500 hover:bg-blue-600 transition-all rounded-t cursor-pointer"
-                    style={{ height: `${height}%`, minHeight: '4px' }}
-                  >
-                    {/* Tooltip */}
-                    <div className="hidden group-hover:block absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                      ${day.revenue.toFixed(2)}
-                      <div className="text-gray-300">{new Date(day.date).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                  <div className="text-xs text-gray-500 mt-2 transform rotate-45 origin-left">
-                    {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Empty State */}
+      {!loading && !analytics && (
+        <div className="text-center py-20 bg-gray-900/50 border-2 border-dashed border-gray-800 rounded-xl">
+          <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-400">No Analytics Data</h3>
+          <p className="text-gray-500 mt-1">Data will appear here once you have stores and products.</p>
+        </div>
+      )}
     </div>
   );
 };
+
+export default AnalyticsPage;

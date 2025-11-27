@@ -1,22 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
+import { Star, BarChart2, Layers, ExternalLink, TrendingUp, ShoppingBag, Search } from 'lucide-react';
 
-export interface Product {
+interface Product {
   id: string;
   name: string;
-  price: number;
-  cost: number;
-  profit_margin: number;
-  estimated_profit: number;
-  velocity_score: number;
-  score: number;
-  orders: number;
-  rating: number;
   image_url?: string;
-  category?: string;
+  price: number;
+  cost?: number;
+  trend_score?: number;
+  velocity_score?: number;
+  score?: number;
+  sales_rank?: number;
+  orders?: number;
+  competition_score?: number;
+  profit_margin?: number;
+  estimated_profit?: number;
+  supplier_url?: string;
   niche?: string;
-  aliexpress_url?: string;
+  discovered_at?: string;
+  commission_rate?: number;
+  tier?: string;
+  rating?: number;
+  original_price?: number;
+  aliexpress_cost?: number;
+  shipping_cost?: number;
   source?: string;
+  data_sources?: {
+    aliexpress?: { available: boolean; orders?: number };
+    amazon?: { available: boolean; sales_rank?: number };
+    tiktok?: { available: boolean; views?: number };
+    google_trends?: { available: boolean; trend_score?: number };
+  };
 }
 
 interface ProductCardProps {
@@ -39,61 +54,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     deployed_at?: string;
   } | null>(null);
 
-  // Check deployment status on mount
-  useEffect(() => {
-    checkDeploymentStatus();
-  }, [product.id]);
-
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-green-600';
-    if (score >= 6) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getVelocityColor = (velocity: number) => {
-    if (velocity >= 70) return 'bg-green-100 text-green-800';
-    if (velocity >= 50) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  };
-
-  const syncDeploymentStatus = async () => {
-    try {
-      const response = await axios.post(
-        `http://127.0.0.1:8000/api/dashboard/v2/products/${product.id}/sync-deployment`
-      );
-
-      if (!response.data.deployed) {
-        // Product was deleted from Shopify
-        setDeploymentStatus(null);
-      }
-    } catch (error) {
-      console.error('Sync failed:', error);
-    }
-  };
-
-  const checkDeploymentStatus = async () => {
-    try {
-      // First check database
-      const response = await axios.get(
-        `http://127.0.0.1:8000/api/dashboard/v2/products/${product.id}/deployment-status`
-      );
-
-      if (response.data.deployed) {
-        setDeploymentStatus(response.data);
-        // Then sync with Shopify in background
-        syncDeploymentStatus();
-      }
-    } catch (error) {
-      // Not deployed or error - that's fine
-    }
-  };
-
   const deployToShopify = async () => {
-    setDeploying(true);
+    // Check if this is a demo product
+    if (product.id.startsWith('demo-') || product.source === 'DEMO_FALLBACK') {
+      alert('Demo products cannot be deployed. Please run real product discovery first or configure real data sources.');
+      return;
+    }
 
+    setDeploying(true);
     try {
       const response = await axios.post(
-        `http://127.0.0.1:8000/api/dashboard/v2/products/${product.id}/deploy-to-shopify`
+        `http://localhost:8001/api/dashboard/v2/products/${product.id}/deploy-to-shopify`
       );
 
       if (response.data.status === 'success' || response.data.status === 'already_deployed') {
@@ -102,170 +73,150 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           shopify_url: response.data.shopify_url,
           deployed_at: response.data.deployed_at || new Date().toISOString()
         });
-
-        if (response.data.status === 'success') {
-          alert(`✅ Product deployed to Shopify!\n\nView on store: ${response.data.shopify_url}`);
-        } else {
-          alert(`ℹ️ This product was already deployed on ${new Date(response.data.deployed_at).toLocaleDateString()}\n\nView on store: ${response.data.shopify_url}`);
-        }
+        alert(response.data.message || 'Product deployed successfully!');
       }
-    } catch (error) {
-      console.error('Deploy failed:', error);
-      alert('❌ Failed to deploy to Shopify. Check console for details.');
+    } catch (error: unknown) {
+      console.error('Failed to deploy product:', error);
+      const errorMsg = (error instanceof Error && error.message) || (typeof error === 'object' && error !== null && 'response' in error && typeof error.response === 'object' && error.response !== null && 'data' in error.response && typeof error.response.data === 'object' && error.response.data !== null && 'detail' in error.response.data && typeof error.response.data.detail === 'string' && error.response.data.detail) || 'Failed to deploy product to Shopify. Make sure Shopify is configured.';
+      alert(errorMsg);
     } finally {
       setDeploying(false);
     }
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 8) return 'text-success-green';
+    if (score >= 6) return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  const getVelocityColor = (velocity: number) => {
+    if (velocity >= 70) return 'bg-success-green/10 text-success-green';
+    if (velocity >= 50) return 'bg-yellow-500/10 text-yellow-400';
+    return 'bg-red-500/10 text-red-400';
+  };
+
   return (
-    <div className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition ${isSelected ? 'ring-4 ring-blue-500' : ''}`}>
-      {/* Product Image */}
-      <div className="relative h-48 bg-gray-100">
-        {onToggleSelect && (
-          <div className="absolute top-2 left-2 z-10">
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={() => onToggleSelect(product.id)}
-              onClick={(e) => e.stopPropagation()}
-              className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-            />
-          </div>
-        )}
-
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Better fallback with product-specific color
-              const colors = ['3b82f6', '8b5cf6', '10b981', 'f59e0b', 'ef4444'];
-              const color = colors[Math.floor(Math.random() * colors.length)];
-              e.currentTarget.src = `https://via.placeholder.com/400x300/${color}/ffffff?text=${encodeURIComponent(product.name.substring(0, 25))}`;
-            }}
+    <div className={`relative bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl overflow-hidden transition-all duration-300 ${isSelected ? 'ring-2 ring-brand-blue' : 'hover:border-gray-700'}`}>
+      {onToggleSelect && (
+        <div className="absolute top-3 left-3 z-20">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(product.id)}
+            onClick={(e) => e.stopPropagation()}
+            className="w-5 h-5 rounded-md bg-gray-800/50 border-gray-600 text-brand-blue focus:ring-brand-blue cursor-pointer"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-500 to-purple-600">
-            <span className="text-white text-sm font-medium px-4 text-center">
-              {product.name.substring(0, 30)}
-            </span>
-          </div>
-        )}
-
-        {/* Velocity Badge - Top Right */}
+        </div>
+      )}
+      
+      <div className="relative h-48 bg-gray-800">
+        <img
+          src={product.image_url || `https://via.placeholder.com/400x300/161b22/d0d7de?text=${encodeURIComponent(product.name.substring(0,20))}`}
+          alt={product.name}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.src = `https://via.placeholder.com/400x300/161b22/d0d7de?text=Image+Error`; }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
         <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${getVelocityColor(product.velocity_score || 0)}`}>
-          📈 {product.velocity_score || 0}/100
+          Velocity: {product.velocity_score || 0}
         </div>
 
-        {/* Score Badge - Bottom Right */}
-        <div className="absolute bottom-2 right-2 bg-white px-2 py-1 rounded-full shadow-md">
-          <span className={`text-sm font-bold ${getScoreColor(product.score || 0)}`}>
-            ⭐ {product.score?.toFixed(1) || '0.0'}/10
-          </span>
+        {/* Platform Badges */}
+        <div className="absolute bottom-2 left-2 flex gap-1.5">
+          {product.data_sources?.tiktok?.available && (
+            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`TikTok: ${product.data_sources.tiktok.views?.toLocaleString() || 'N/A'} views`}>
+              <span className="text-[#FF0050]">♪</span>
+              <span className="text-white font-semibold">TikTok</span>
+            </div>
+          )}
+          {product.data_sources?.amazon?.available && (
+            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`Amazon Rank: ${product.data_sources.amazon.sales_rank?.toLocaleString() || 'N/A'}`}>
+              <ShoppingBag className="w-3 h-3 text-[#FF9900]" />
+              <span className="text-white font-semibold">Amazon</span>
+            </div>
+          )}
+          {product.data_sources?.google_trends?.available && (
+            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`Google Trends: ${product.data_sources.google_trends.trend_score || 'N/A'}`}>
+              <Search className="w-3 h-3 text-[#4285F4]" />
+              <span className="text-white font-semibold">Trends</span>
+            </div>
+          )}
+          {product.data_sources?.aliexpress?.available && (
+            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`AliExpress: ${product.data_sources.aliexpress.orders?.toLocaleString() || 'N/A'} orders`}>
+              <TrendingUp className="w-3 h-3 text-[#FF6A00]" />
+              <span className="text-white font-semibold">AliEx</span>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Product Details */}
-      <div className="p-4">
-        {/* Product Name */}
-        <h3 className="font-semibold text-gray-800 mb-2 h-12 overflow-hidden">
+      <div className="p-4 space-y-4">
+        <h3 className="font-semibold text-gray-200 h-10 line-clamp-2">
           {product.name}
         </h3>
 
-        {/* Price & Profit */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center">
           <div>
-            <p className="text-2xl font-bold text-green-600">${product.price.toFixed(2)}</p>
-            <p className="text-sm text-gray-500">Cost: ${product.cost.toFixed(2)}</p>
+            <p className="text-xs text-gray-500">Ospra Score</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-2xl font-bold ${getScoreColor(product.velocity_score || 0)}`}>
+                {product.velocity_score || 0}
+              </span>
+              <span className="text-sm text-gray-500">/100</span>
+            </div>
           </div>
           <div className="text-right">
-            <p className="text-lg font-semibold text-blue-600">
-              Profit: ${product.estimated_profit?.toFixed(2)}
+            <div className="flex items-center gap-1.5 justify-end text-gray-400" title="Customer Rating">
+              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+              <span className="font-semibold">{product.rating?.toFixed(1) || 'N/A'}</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">{product.tier || 'N/A'} tier</p>
+          </div>
+        </div>
+
+        <div className="flex justify-between items-end bg-gray-800/50 p-3 rounded-lg">
+          <div>
+            <p className="text-xs text-gray-400">Profit</p>
+            <p className="text-lg font-bold text-success-green">
+              ${product.estimated_profit?.toFixed(2)}
             </p>
-            <p className="text-xs text-gray-500">{product.profit_margin?.toFixed(0)}% margin</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400">Price</p>
+            <p className="font-semibold text-gray-200">${product.price.toFixed(2)}</p>
           </div>
         </div>
-
-        {/* Stats Row */}
-        <div className="flex justify-between text-sm mb-3 text-gray-600">
-          <div className="flex items-center">
-            <span className="text-yellow-500 mr-1">⭐</span>
-            <span>{product.rating}/5</span>
-          </div>
-          <div className="flex items-center">
-            <span className="mr-1">📦</span>
-            <span>{product.orders?.toLocaleString()} orders</span>
-          </div>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={() => onAnalyze(product)}
+            className="flex-1 bg-brand-blue/10 text-brand-blue border border-brand-blue/20 py-2 px-4 rounded-lg hover:bg-brand-blue/20 transition font-semibold text-sm flex items-center justify-center gap-2"
+          >
+            <BarChart2 className="w-4 h-4" />
+            Analyze
+          </button>
+          <button
+            onClick={deployToShopify}
+            disabled={deploying || deploymentStatus?.deployed}
+            className="flex-1 py-2 px-4 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2 bg-brand-blue text-white hover:opacity-90 disabled:bg-gray-600 disabled:cursor-not-allowed"
+          >
+            <Layers className="w-4 h-4" />
+            {deploymentStatus?.deployed ? 'Deployed' : (deploying ? 'Deploying...' : 'Deploy')}
+          </button>
         </div>
 
-        {/* AliExpress Link */}
-        {product.aliexpress_url && (
+        {product.supplier_url && (
           <a
-            href={product.aliexpress_url}
+            href={product.supplier_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full text-center py-2 mb-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition text-sm font-medium"
-            onClick={(e) => e.stopPropagation()}
+            className="w-full mt-2 bg-orange-600/10 text-orange-400 border border-orange-500/20 py-2 px-4 rounded-lg hover:bg-orange-600/20 transition font-semibold text-sm flex items-center justify-center gap-2"
           >
-            {product.source === 'fallback_data' ? (
-              <>🔍 Search on AliExpress</>
-            ) : (
-              <>🔗 View on AliExpress</>
-            )}
+            <ExternalLink className="w-4 h-4" />
+            View on AliExpress
           </a>
         )}
-
-        {/* Action Buttons */}
-        {deploymentStatus?.deployed ? (
-          <div className="space-y-2 mb-2">
-            <div className="flex gap-2">
-              <a
-                href={deploymentStatus.shopify_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 py-2 px-4 rounded-lg font-semibold bg-green-500 text-white hover:bg-green-600 transition text-center text-sm"
-              >
-                ✅ View on Shopify
-              </a>
-              <button
-                onClick={syncDeploymentStatus}
-                className="py-2 px-3 rounded-lg font-semibold bg-gray-200 hover:bg-gray-300 transition"
-                title="Refresh status"
-              >
-                🔄
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 text-center">
-              Deployed {new Date(deploymentStatus.deployed_at || '').toLocaleDateString()}
-            </p>
-          </div>
-        ) : (
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={() => onAnalyze(product)}
-              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
-            >
-              🔍 Analyze
-            </button>
-            <button
-              onClick={deployToShopify}
-              disabled={deploying}
-              className={`flex-1 py-2 px-4 rounded-lg font-semibold transition text-sm ${
-                deploying
-                  ? 'bg-gray-400 text-white cursor-wait'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
-            >
-              {deploying ? '⏳ Deploying...' : '🚀 Deploy to Shopify'}
-            </button>
-          </div>
-        )}
-
-        {/* Source Badge */}
-        <div className="text-xs text-gray-500 text-center">
-          Source: {product.source?.replace(/_/g, ' ') || 'Unknown'}
-        </div>
       </div>
     </div>
   );

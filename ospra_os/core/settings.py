@@ -64,6 +64,7 @@ class Settings(BaseSettings):
     AI_MODEL: str = Field(default="gpt-4o-mini")
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
+    GOOGLE_CLOUD_PROJECT: Optional[str] = None  # For Gemini API project ID
 
     # Store / public URLs
     STORE_DOMAIN: Optional[str] = None

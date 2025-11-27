@@ -44,7 +44,7 @@ class AIFactory:
         "claude": {
             "display_name": "Claude (Anthropic)",
             "description": "Best for analytical reasoning and detailed analysis",
-            "model": "claude-sonnet-4-20250514",
+            "model": "claude-sonnet-4-5-20250929",
             "cost_per_1k": 0.003,
             "recommended": True,
             "tier": "premium",

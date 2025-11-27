@@ -19,6 +19,14 @@ except ImportError:
     HAS_PYTRENDS = False
     logger.warning("pytrends not installed. Run: pip install pytrends")
 
+# Claude AI for product analysis
+try:
+    from anthropic import Anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
+    logger.warning("anthropic package not installed. AI analysis will be unavailable.")
+
 
 class TrendAnalyzer:
     """
@@ -54,6 +62,20 @@ class TrendAnalyzer:
         else:
             logger.warning("⚠️  TIKTOK_CLIENT_KEY not set")
 
+        # Claude AI for product analysis
+        self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        if HAS_ANTHROPIC and self.anthropic_key:
+            try:
+                self.claude_client = Anthropic(api_key=self.anthropic_key)
+                logger.info("✅ Claude AI initialized for product analysis")
+            except Exception as e:
+                logger.warning(f"⚠️  Claude AI init failed: {e}")
+                self.claude_client = None
+        else:
+            self.claude_client = None
+            if not self.anthropic_key:
+                logger.warning("⚠️  ANTHROPIC_API_KEY not set - AI analysis unavailable")
+
     async def analyze_product_trends(self, product: Dict) -> Dict:
         """
         Comprehensive trend analysis for a product
@@ -71,6 +93,100 @@ class TrendAnalyzer:
         }
 
         return trend_data
+
+    def analyze_product(self, product: Dict) -> Dict:
+        """
+        AI-powered product analysis using Claude
+        Returns investment recommendation and insights
+        """
+        if not self.claude_client:
+            return {
+                "status": "error",
+                "message": "Claude AI not available. Set ANTHROPIC_API_KEY environment variable.",
+                "score": 0,
+                "recommendation": "UNAVAILABLE"
+            }
+
+        try:
+            product_name = product.get('name', 'Unknown Product')
+            price = product.get('price', 0)
+            cost = product.get('cost', 0)
+            velocity_score = product.get('velocity_score', 0)
+            profit_margin = product.get('profit_margin', 0)
+            estimated_profit = product.get('estimated_profit', 0)
+            niche = product.get('niche', 'Unknown')
+
+            # Build analysis prompt
+            prompt = f"""You are an expert e-commerce analyst. Analyze this product opportunity:
+
+**Product:** {product_name}
+**Niche:** {niche}
+**Price:** ${price:.2f}
+**Cost:** ${cost:.2f}
+**Velocity Score:** {velocity_score}/100
+**Profit Margin:** {profit_margin * 100:.1f}%
+**Estimated Profit per Sale:** ${estimated_profit:.2f}
+
+Provide a structured analysis with:
+
+1. **Score** (0-10): Overall investment score
+2. **Recommendation**: One of STRONG_BUY, BUY, HOLD, PASS
+3. **Reasoning**: 3-5 bullet points on marketing angles and opportunities
+4. **Risks**: 2-4 bullet points on potential challenges
+
+Format your response as JSON:
+{{
+  "score": 8.5,
+  "recommendation": "STRONG_BUY",
+  "reasoning": ["Point 1", "Point 2", "Point 3"],
+  "risks": ["Risk 1", "Risk 2"]
+}}"""
+
+            logger.info(f"🤖 Analyzing product with Claude: {product_name}")
+
+            response = self.claude_client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=1500,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            # Parse response
+            import json
+            response_text = response.content[0].text
+
+            # Try to extract JSON from response
+            try:
+                # Find JSON in response (might have markdown code blocks)
+                import re
+                json_match = re.search(r'\{[\s\S]*\}', response_text)
+                if json_match:
+                    analysis = json.loads(json_match.group())
+                else:
+                    raise ValueError("No JSON found in response")
+            except:
+                # Fallback if parsing fails
+                logger.warning("Failed to parse Claude response as JSON, using defaults")
+                analysis = {
+                    "score": 7.0,
+                    "recommendation": "HOLD",
+                    "reasoning": ["AI analysis parsing failed"],
+                    "risks": ["Unable to complete full analysis"]
+                }
+
+            logger.info(f"✅ Analysis complete - Score: {analysis.get('score')}/10, Recommendation: {analysis.get('recommendation')}")
+
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Product analysis failed: {e}")
+            return {
+                "status": "error",
+                "message": f"Analysis failed: {str(e)}",
+                "score": 0,
+                "recommendation": "ERROR",
+                "reasoning": ["Analysis service unavailable"],
+                "risks": ["Technical error occurred"]
+            }
 
     async def _get_google_trends(self, product_name: str, niche: str) -> Dict:
         """
@@ -92,6 +208,9 @@ class TrendAnalyzer:
                 timeframe='today 3-m',  # Last 3 months
                 geo='US'
             )
+
+            # Rate limiting: prevent 429 errors
+            await asyncio.sleep(2)
 
             # Get interest over time
             interest_over_time = self.pytrends.interest_over_time()
@@ -283,3 +402,67 @@ class TrendAnalyzer:
             hashtags.append('#homesecurity')
 
         return hashtags[:8]  # Max 8 hashtags
+
+    def chat_response(self, message: str, context: Optional[Dict] = None) -> str:
+        """
+        Generate a conversational response using Claude AI
+
+        Args:
+            message: User's question/message
+            context: Optional context about current product, niche, etc.
+
+        Returns:
+            Claude's response as a string
+        """
+        if not self.claude_client:
+            return "I'm currently unavailable. Please make sure ANTHROPIC_API_KEY is set in your environment."
+
+        try:
+            # Build system prompt with context
+            system_prompt = """You are an expert e-commerce and dropshipping advisor specializing in product selection and market analysis.
+
+You help users:
+- Analyze product opportunities
+- Understand market trends
+- Evaluate profit potential
+- Identify winning products
+- Optimize pricing and positioning
+
+Provide concise, actionable insights based on data and market signals."""
+
+            # Add context to user message if provided
+            user_message = message
+            if context:
+                context_str = "\n\n**Current Context:**\n"
+                if 'product_name' in context:
+                    context_str += f"Product: {context['product_name']}\n"
+                if 'product_price' in context:
+                    context_str += f"Price: ${context['product_price']}\n"
+                if 'velocity_score' in context:
+                    context_str += f"Velocity Score: {context['velocity_score']}\n"
+                if 'profit_margin' in context:
+                    context_str += f"Profit Margin: {context['profit_margin']}%\n"
+                if 'niche' in context:
+                    context_str += f"Niche: {context['niche']}\n"
+
+                user_message = context_str + "\n" + message
+
+            # Call Claude API
+            response = self.claude_client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": user_message
+                    }
+                ]
+            )
+
+            # Extract text from response
+            return response.content[0].text
+
+        except Exception as e:
+            logger.error(f"Claude chat error: {e}")
+            return f"Sorry, I encountered an error: {str(e)}"

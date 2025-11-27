@@ -249,7 +249,7 @@ class AdvancedProductScraper:
                 product['profit_margin'] = 65.0
                 product['estimated_profit'] = round(product['price'] - product['cost'], 2)
                 product['score'] = self._calculate_score(product)
-                product['velocity_score'] = random.randint(60, 95)
+                product['velocity_score'] = self._calculate_velocity(product)
 
                 products.append(product)
 
@@ -282,6 +282,7 @@ class AdvancedProductScraper:
             if url and not url.startswith('http'):
                 url = f'https:{url}' if url.startswith('//') else f'https://www.aliexpress.com{url}'
 
+            # Build product dict first
             product = {
                 'id': f"ali_{hashlib.md5(title.encode()).hexdigest()[:12]}",
                 'name': title[:100],
@@ -291,14 +292,16 @@ class AdvancedProductScraper:
                 'estimated_profit': round(price * 0.65, 2),
                 'rating': 4.5,
                 'orders': random.randint(500, 5000),
-                'velocity_score': random.randint(60, 95),
                 'image_url': image_url,
                 'aliexpress_url': url,
                 'niche': keyword.replace(' ', '_'),
                 'category': keyword.replace('_', ' ').title(),
                 'source': 'aliexpress_advanced_scraping',
-                'score': 7.0
             }
+
+            # Calculate scores based on product metrics
+            product['velocity_score'] = self._calculate_velocity(product)
+            product['score'] = self._calculate_score(product)
 
             return product
 
@@ -345,6 +348,61 @@ class AdvancedProductScraper:
             score += 1.0
 
         return min(10.0, score)
+
+    def _calculate_velocity(self, product: Dict) -> int:
+        """
+        Calculate product velocity score (0-100) based on metrics
+
+        Velocity indicates how fast a product is trending/selling:
+        - Order volume (high orders = high velocity)
+        - Rating quality (good rating = proven demand)
+        - Price optimization (sweet spot pricing)
+        """
+        velocity = 40  # Base velocity score
+
+        # Orders volume impact (0-35 points)
+        orders = product.get('orders', 0)
+        if orders >= 5000:
+            velocity += 35
+        elif orders >= 2000:
+            velocity += 25
+        elif orders >= 1000:
+            velocity += 20
+        elif orders >= 500:
+            velocity += 15
+        elif orders >= 100:
+            velocity += 10
+
+        # Rating quality impact (0-25 points)
+        rating = product.get('rating', 0)
+        if rating >= 4.7:
+            velocity += 25
+        elif rating >= 4.5:
+            velocity += 20
+        elif rating >= 4.3:
+            velocity += 15
+        elif rating >= 4.0:
+            velocity += 10
+
+        # Price optimization impact (0-15 points)
+        # Sweet spot: $20-50 for dropshipping
+        price = product.get('price', 0)
+        if 20 <= price <= 50:
+            velocity += 15
+        elif 15 <= price <= 70:
+            velocity += 10
+        elif 10 <= price <= 100:
+            velocity += 5
+
+        # Profit margin boost (0-10 points)
+        profit_margin = product.get('profit_margin', 0)
+        if profit_margin >= 65:
+            velocity += 10
+        elif profit_margin >= 50:
+            velocity += 5
+
+        # Cap at 100
+        return min(100, velocity)
 
     async def scrape_google_trends(self, keyword: str, timeframe: str = 'today 3-m') -> Dict:
         """
@@ -435,8 +493,9 @@ class AdvancedProductScraper:
                 else:
                     velocity = int(recent_avg)
             else:
-                # Fallback: random score based on search interest
-                velocity = random.randint(40, 85)
+                # Fallback: conservative baseline when trend data unavailable
+                velocity = 50  # Neutral baseline (no data to calculate from)
+                logger.warning(f"Could not extract trend data for '{keyword}', using baseline")
 
             logger.info(f"✅ Google Trends velocity for '{keyword}': {velocity}/100")
 
@@ -451,6 +510,7 @@ class AdvancedProductScraper:
             logger.error(f"Google Trends scraping failed: {e}")
             return {
                 'keyword': keyword,
-                'velocity_score': random.randint(40, 75),
-                'success': False
+                'velocity_score': 40,  # Conservative baseline on error
+                'success': False,
+                'error': str(e)
             }

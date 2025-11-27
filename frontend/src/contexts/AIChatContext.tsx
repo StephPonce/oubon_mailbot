@@ -1,24 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-interface AIChatContextType {
-  messages: Message[];
-  isOpen: boolean;
-  isMinimized: boolean;
-  loading: boolean;
-  addMessage: (message: Message) => void;
-  setIsOpen: (open: boolean) => void;
-  setIsMinimized: (minimized: boolean) => void;
-  clearMessages: () => void;
-  sendMessage: (text: string) => Promise<void>;
-}
-
-const AIChatContext = createContext<AIChatContextType | undefined>(undefined);
+import React, { useState, useEffect, useContext } from 'react';
+import { AIChatContext, type Message } from './AIChat.types';
 
 export function AIChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,7 +13,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
     if (saved) {
       try {
         const data = JSON.parse(saved);
-        setMessages(data.messages.map((m: any) => ({
+        setMessages(data.messages.map((m: Message) => ({
           ...m,
           timestamp: new Date(m.timestamp)
         })));
@@ -64,8 +45,30 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+interface DashboardContext {
+  url?: string;
+  pathname?: string;
+  timestamp: string;
+  current_page?: string;
+  page_type?: string;
+  capabilities?: Record<string, any>;
+  data: {
+    portfolio?: any;
+    rankings?: any;
+    stores?: any;
+    products?: {
+      count: number;
+      samples: any[];
+      data_source: string;
+    };
+    emails?: any;
+    email_stats?: any;
+    tier?: any;
+  };
+}
+
   const gatherContextFromPage = async () => {
-    const context: any = {
+    const context: DashboardContext = {
       url: window.location.href,
       pathname: window.location.pathname,
       timestamp: new Date().toISOString(),
@@ -77,7 +80,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Always get portfolio overview
-      const overviewRes = await fetch('http://localhost:8000/api/portfolio/overview');
+      const overviewRes = await fetch('http://localhost:8001/api/portfolio/overview');
       if (overviewRes.ok) {
         context.data.portfolio = await overviewRes.json();
       }
@@ -85,7 +88,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
       // Page-specific data
       if (path.includes('products') || path.includes('product')) {
         // Get products data
-        const productsRes = await fetch('http://localhost:8000/api/intelligence/discover', {
+        const productsRes = await fetch('http://localhost:8001/api/intelligence/discover', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ niches: ['smart_home'], max_per_niche: 10 })
@@ -96,12 +99,28 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
           context.page_type = 'products';
         }
       } else if (path.includes('email')) {
-        // Get email data
-        const emailRes = await fetch('http://localhost:8000/api/dashboard/emails');
-        if (emailRes.ok) {
-          context.data.emails = await emailRes.json();
-          context.page_type = 'emails';
+        // Get email data using correct unified API
+        const userId = 1; // Default user ID
+
+        // Get email stats
+        const statsRes = await fetch(`http://localhost:8001/api/emails/stats/summary?user_id=${userId}`);
+        if (statsRes.ok) {
+          context.data.email_stats = await statsRes.json();
         }
+
+        // Get recent emails list
+        const emailsRes = await fetch(`http://localhost:8001/api/emails/list?user_id=${userId}&limit=20`);
+        if (emailsRes.ok) {
+          context.data.emails = await emailsRes.json();
+        }
+
+        context.page_type = 'emails';
+        context.capabilities = {
+          can_read_emails: true,
+          can_reply_to_emails: true,
+          can_mark_as_read: true,
+          can_sync_emails: true
+        };
       } else if (path.includes('analytics')) {
         context.page_type = 'analytics';
       } else {
@@ -109,7 +128,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Always get store data
-      const rankingsRes = await fetch('http://localhost:8000/api/portfolio/rankings');
+      const rankingsRes = await fetch('http://localhost:8001/api/portfolio/rankings');
       if (rankingsRes.ok) {
         context.data.stores = await rankingsRes.json();
       }
@@ -136,7 +155,7 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
     try {
       const context = await gatherContextFromPage();
 
-      const res = await fetch('http://localhost:8000/api/claude/chat', {
+      const res = await fetch('http://localhost:8001/api/claude/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,10 +178,10 @@ export function AIChatProvider({ children }: { children: React.ReactNode }) {
       } else {
         throw new Error(data.error);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       addMessage({
         role: 'assistant',
-        content: `❌ Error: ${err.message}`,
+        content: `❌ Error: ${(err instanceof Error) ? err.message : 'An unknown error occurred'}`,
         timestamp: new Date()
       });
     } finally {
@@ -194,3 +213,7 @@ export function useAIChat() {
   }
   return context;
 }
+
+
+
+

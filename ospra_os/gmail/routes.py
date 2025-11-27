@@ -2,6 +2,10 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 import os, json, pathlib
 from google_auth_oauthlib.flow import Flow
+from datetime import datetime
+
+# Allow OAuth over HTTP for local development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 router = APIRouter(prefix="/gmail/auth", tags=["gmail"])
 
@@ -88,7 +92,95 @@ async def callback(request: Request):
                 status_code=500
             )
 
-        return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code>.</p>")
+        # ALSO save to unified user_email_accounts table
+        try:
+            from google.oauth2.credentials import Credentials
+            from googleapiclient.discovery import build
+            from ospra_os.database.multi_store_models import User, UserEmailAccount, get_multi_store_session
+            from ospra_os.email_automation.oauth.gmail_oauth import GmailOAuthHandler
+
+            # Get user's email address from Gmail API
+            gmail_creds = Credentials(
+                token=c.token,
+                refresh_token=c.refresh_token,
+                token_uri=c.token_uri,
+                client_id=c.client_id,
+                client_secret=c.client_secret,
+                scopes=list(c.scopes or [])
+            )
+            gmail_service = build('gmail', 'v1', credentials=gmail_creds)
+            profile = gmail_service.users().getProfile(userId='me').execute()
+            email_address = profile['emailAddress']
+
+            # Save to database
+            session = get_multi_store_session()
+            try:
+                # Get or create user (default user_id=1)
+                user = session.query(User).filter(User.id == 1).first()
+                if not user:
+                    user = User(id=1, email=email_address, name="Default User", created_at=datetime.utcnow())
+                    session.add(user)
+                    session.commit()
+
+                # Check if Gmail account already exists
+                existing = session.query(UserEmailAccount).filter(
+                    UserEmailAccount.user_id == user.id,
+                    UserEmailAccount.provider == 'gmail',
+                    UserEmailAccount.email_address == email_address
+                ).first()
+
+                if not existing:
+                    # Encrypt and save credentials
+                    gmail_handler = GmailOAuthHandler()
+                    creds_dict = {
+                        'access_token': c.token,
+                        'refresh_token': c.refresh_token,
+                        'token_uri': c.token_uri,
+                        'client_id': c.client_id,
+                        'client_secret': c.client_secret,
+                        'scopes': list(c.scopes or [])
+                    }
+                    encrypted_creds = gmail_handler.encrypt_credentials(creds_dict)
+
+                    # Create new account record
+                    new_account = UserEmailAccount(
+                        user_id=user.id,
+                        provider='gmail',
+                        email_address=email_address,
+                        encrypted_credentials=encrypted_creds,
+                        is_active=True,
+                        is_primary=False,
+                        sync_status='active',
+                        created_at=datetime.utcnow()
+                    )
+                    session.add(new_account)
+                    session.commit()
+                else:
+                    # Update existing account credentials
+                    gmail_handler = GmailOAuthHandler()
+                    creds_dict = {
+                        'access_token': c.token,
+                        'refresh_token': c.refresh_token,
+                        'token_uri': c.token_uri,
+                        'client_id': c.client_id,
+                        'client_secret': c.client_secret,
+                        'scopes': list(c.scopes or [])
+                    }
+                    existing.encrypted_credentials = gmail_handler.encrypt_credentials(creds_dict)
+                    existing.is_active = True
+                    existing.sync_status = 'active'
+                    session.commit()
+
+            finally:
+                session.close()
+
+        except Exception as db_err:
+            # Don't fail the whole OAuth if database save fails
+            import traceback
+            print(f"Warning: Failed to save Gmail to database: {str(db_err)}")
+            print(traceback.format_exc())
+
+        return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code> and database.</p>")
     except Exception as e:
         import traceback
         return HTMLResponse(
@@ -115,3 +207,166 @@ async def debug(request: Request):
         "creds_exist": os.path.exists(cred_path),
         "scopes": SCOPES,
     }
+
+@router.get("/messages")
+async def get_messages(limit: int = 20):
+    """
+    Fetch recent Gmail messages for dashboard display
+
+    Returns unread/important messages with:
+    - Subject
+    - Sender
+    - Snippet
+    - Timestamp
+    - Labels
+    """
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    import base64
+    from datetime import datetime
+
+    _, token_path = _paths()
+    if not os.path.exists(token_path):
+        raise HTTPException(status_code=401, detail="Gmail not connected. Please authenticate first.")
+
+    try:
+        # Load credentials
+        with open(token_path, "r") as f:
+            token_data = json.load(f)
+
+        creds = Credentials(
+            token=token_data.get("token"),
+            refresh_token=token_data.get("refresh_token"),
+            token_uri=token_data.get("token_uri"),
+            client_id=token_data.get("client_id"),
+            client_secret=token_data.get("client_secret"),
+            scopes=token_data.get("scopes")
+        )
+
+        service = build("gmail", "v1", credentials=creds)
+
+        # Fetch messages
+        results = service.users().messages().list(
+            userId="me",
+            maxResults=limit,
+            labelIds=["INBOX"]
+        ).execute()
+
+        messages = results.get("messages", [])
+
+        formatted_messages = []
+        for msg in messages:
+            # Get full message details
+            full_msg = service.users().messages().get(
+                userId="me",
+                id=msg["id"],
+                format="full"
+            ).execute()
+
+            headers = full_msg["payload"]["headers"]
+            subject = next((h["value"] for h in headers if h["name"].lower() == "subject"), "No Subject")
+            sender = next((h["value"] for h in headers if h["name"].lower() == "from"), "Unknown")
+            date_str = next((h["value"] for h in headers if h["name"].lower() == "date"), "")
+
+            formatted_messages.append({
+                "id": msg["id"],
+                "subject": subject,
+                "from": sender,
+                "snippet": full_msg.get("snippet", ""),
+                "date": date_str,
+                "labels": full_msg.get("labelIds", []),
+                "is_unread": "UNREAD" in full_msg.get("labelIds", []),
+                "thread_id": full_msg.get("threadId")
+            })
+
+        return {
+            "success": True,
+            "messages": formatted_messages,
+            "total": len(formatted_messages)
+        }
+
+    except Exception as e:
+        import traceback
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch messages: {str(e)}\n{traceback.format_exc()}"
+        )
+
+@router.get("/stats")
+async def get_stats():
+    """
+    Get Gmail statistics for dashboard
+
+    Returns:
+    - Total unread count
+    - Important messages
+    - Recent activity
+    """
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+
+    _, token_path = _paths()
+    if not os.path.exists(token_path):
+        return {
+            "connected": False,
+            "unread_count": 0,
+            "important_count": 0
+        }
+
+    try:
+        # Load credentials
+        with open(token_path, "r") as f:
+            token_data = json.load(f)
+
+        creds = Credentials(
+            token=token_data.get("token"),
+            refresh_token=token_data.get("refresh_token"),
+            token_uri=token_data.get("token_uri"),
+            client_id=token_data.get("client_id"),
+            client_secret=token_data.get("client_secret"),
+            scopes=token_data.get("scopes")
+        )
+
+        service = build("gmail", "v1", credentials=creds)
+
+        # Get actual unread count in INBOX (using pagination for accuracy)
+        # Gmail's resultSizeEstimate is often inaccurate, so we count messages
+        unread_query = service.users().messages().list(
+            userId="me",
+            labelIds=["INBOX", "UNREAD"],
+            maxResults=500  # Get more for accurate count
+        ).execute()
+
+        unread_count = len(unread_query.get("messages", []))
+
+        # Check if there are more pages (for very high unread counts)
+        next_page_token = unread_query.get("nextPageToken")
+        if next_page_token:
+            # If there are more than 500, fall back to estimate
+            unread_count = unread_query.get("resultSizeEstimate", unread_count)
+
+        # Get important count in INBOX only
+        important_query = service.users().messages().list(
+            userId="me",
+            labelIds=["INBOX", "IMPORTANT"],
+            maxResults=500
+        ).execute()
+
+        important_count = len(important_query.get("messages", []))
+        next_page_token = important_query.get("nextPageToken")
+        if next_page_token:
+            important_count = important_query.get("resultSizeEstimate", important_count)
+
+        return {
+            "connected": True,
+            "unread_count": unread_count,
+            "important_count": important_count
+        }
+
+    except Exception as e:
+        return {
+            "connected": True,
+            "error": str(e),
+            "unread_count": 0,
+            "important_count": 0
+        }

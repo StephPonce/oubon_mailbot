@@ -8,7 +8,7 @@ pkill -f "vite" || true
 sleep 2
 
 # Start frontend
-cd "/Users/stephenponce/Documents/Ospra OS/Bots/oubon_mailbot/frontend"
+cd "/Users/stephenponce/Documents/Ospra OS/Bots/Ospra OS/frontend"
 npm run dev &
 
 sleep 5

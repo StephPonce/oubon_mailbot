@@ -27,9 +27,10 @@ class AliExpressConnector(BaseConnector):
     Note: Can also use unofficial scraping as fallback (slower, less reliable)
     """
 
-    def __init__(self, api_key: Optional[str] = None, app_secret: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, app_secret: Optional[str] = None, access_token: Optional[str] = None):
         super().__init__(api_key)
         self.app_secret = app_secret
+        self.access_token = access_token  # OAuth access token for Dropshipping API
         self.api_url = "https://api-sg.aliexpress.com/sync"
 
     @property
@@ -85,18 +86,21 @@ class AliExpressConnector(BaseConnector):
         min_rating = kwargs.get("min_rating", 4.0)
         sort = kwargs.get("sort", "orders")
 
-        # Build API parameters
+        # Build API parameters for DROPSHIPPING API
         params = {
             "app_key": self.api_key,
-            "method": "aliexpress.affiliate.product.query",
+            "method": "aliexpress.ds.recommend.feed.get",  # Dropshipping API endpoint
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
-            "keywords": query,
+            "session": self.access_token,  # OAuth access token (REQUIRED for Dropshipping API!)
+            "feed_name": "DS hot product",  # Dropshipping feed
+            "country": "US",
             "target_currency": "USD",
             "target_language": "EN",
             "page_size": "20",
+            "page_no": "1",
         }
 
         # Add optional filters
@@ -124,6 +128,9 @@ class AliExpressConnector(BaseConnector):
 
             # Debug: Print response structure
             print(f"🔍 AliExpress API response keys: {list(data.keys())}")
+            import json
+            print(f"📋 Full API response:")
+            print(json.dumps(data, indent=2)[:2000])  # First 2000 chars
 
             # Check for API errors
             if "error_response" in data:
@@ -131,9 +138,9 @@ class AliExpressConnector(BaseConnector):
                 print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
                 return []
 
-            # Parse response and convert to ProductCandidates
+            # Parse DROPSHIPPING API response
             products = []
-            resp_result = data.get("aliexpress_affiliate_product_query_response", {})
+            resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
             result = resp_result.get("resp_result", {})
 
             # Handle both nested and flat product list structures
@@ -177,18 +184,21 @@ class AliExpressConnector(BaseConnector):
             print("⚠️  AliExpress API credentials not configured")
             return []
 
-        # Build API parameters for hot products
+        # Build API parameters for hot products (DROPSHIPPING API)
         params = {
             "app_key": self.api_key,
-            "method": "aliexpress.affiliate.hotproduct.query",
+            "method": "aliexpress.ds.recommend.feed.get",  # Dropshipping API
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
+            "session": self.access_token,  # OAuth access token (REQUIRED!)
+            "feed_name": "DS bestseller",  # Bestseller feed
+            "country": "US",
             "target_currency": "USD",
             "target_language": "EN",
             "page_size": str(limit),
-            "sort": "SALE_PRICE_ASC",  # Sort by sales volume
+            "page_no": "1",
         }
 
         # Add category filter if provided
@@ -221,9 +231,9 @@ class AliExpressConnector(BaseConnector):
                 print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
                 return []
 
-            # Parse response
+            # Parse DROPSHIPPING API response
             products = []
-            resp_result = data.get("aliexpress_affiliate_hotproduct_query_response", {})
+            resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
             result = resp_result.get("resp_result", {})
 
             # Handle both nested and flat product list structures

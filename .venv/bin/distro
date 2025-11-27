@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' '/Users/stephenponce/Documents/Ospra OS/Bots/oubon_mailbot/.venv/bin/python3' "$0" "$@"
+'''exec' '/Users/stephenponce/Documents/Ospra OS/Bots/Ospra OS/.venv/bin/python' "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import sys

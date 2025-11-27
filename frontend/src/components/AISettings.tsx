@@ -149,7 +149,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
     setApiKeyValid(null);
 
     try {
-      const response = await fetch('http://localhost:8000/api/settings/ai-provider/test-key', {
+      const response = await fetch('http://localhost:8001/api/settings/ai-provider/test-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +172,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
     setSaving(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/settings/ai-provider', {
+      const response = await fetch('http://localhost:8001/api/settings/ai-provider', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

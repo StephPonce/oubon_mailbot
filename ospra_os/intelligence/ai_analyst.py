@@ -25,7 +25,7 @@ class AIProductAnalyst:
             raise ValueError("ANTHROPIC_API_KEY or CLAUDE_API_KEY required for AI analysis")
 
         self.claude = Anthropic(api_key=api_key)
-        self.model = "claude-sonnet-4-20250514"  # Latest Sonnet 4
+        self.model = "claude-sonnet-4-5-20250929"  # Latest Sonnet 4.5 - Superior analysis
 
         logger.info(f"✅ AI Analyst initialized with model: {self.model}")
 
@@ -88,13 +88,41 @@ class AIProductAnalyst:
             'score': product.get('score', 0),
             'priority': product.get('priority', 'UNKNOWN'),
 
+            # 🎯 MULTI-SOURCE DISCOVERY DATA (NEW - QUAD PRIMARY SOURCE)
+            'source_count': product.get('source_count', 0),
+            'primary_sources': product.get('primary_sources', []),
+            'multi_source_validated': product.get('source_count', 0) >= 2,
+
+            # Platform-specific scores
+            'platform_scores': product.get('platform_scores', {}),
+
+            # TikTok Shop data
+            'tiktok_sales': product.get('tiktok_sales', 0),
+            'tiktok_sales_7d': product.get('tiktok_sales_7d', 0),
+            'tiktok_price': product.get('tiktok_price', 0),
+            'tiktok_shop_url': product.get('tiktok_shop_url', ''),
+
+            # Amazon data
+            'amazon_bestseller': product.get('amazon_bestseller', False),
+            'amazon_rank': product.get('amazon_rank', 0),
+            'amazon_category': product.get('amazon_category', ''),
+            'amazon_rating': product.get('amazon_rating', 0),
+            'amazon_reviews': product.get('amazon_reviews', 0),
+            'amazon_price': product.get('amazon_price', 0),
+
+            # Shopify Competitor data
+            'shopify_competitor': product.get('shopify_competitor', False),
+            'shopify_price': product.get('shopify_price', 0),
+            'shopify_store_url': product.get('shopify_store_url', ''),
+            'shopify_store_name': product.get('shopify_store_name', ''),
+
             # Pricing & profit
             'supplier_cost': product.get('price', 0),
             'market_price': round(product.get('price', 0) * 3, 2),
             'profit_margin': round(((3 - 1) / 3) * 100, 1),
             'profit_per_sale': round(product.get('price', 0) * 2, 2),
 
-            # Sales data
+            # Sales data (AliExpress)
             'total_orders': aliexpress.get('total_orders', 0),
             'rating': product.get('rating', 0),
             'daily_orders_estimate': aliexpress.get('estimated_daily_orders', 0),
@@ -126,6 +154,63 @@ class AIProductAnalyst:
         """
         Create detailed prompt for Claude to generate unique analysis
         """
+        # Build multi-source validation section
+        source_count = context.get('source_count', 0)
+        primary_sources = context.get('primary_sources', [])
+        multi_validated = context.get('multi_source_validated', False)
+
+        source_names = {
+            'tiktok_shop': 'TikTok Shop',
+            'amazon_bestsellers': 'Amazon Bestsellers',
+            'shopify_competitors': 'Shopify Competitors',
+            'google_trends': 'Google Trends'
+        }
+
+        sources_list = ', '.join([source_names.get(s, s) for s in primary_sources]) if primary_sources else 'Single source'
+
+        validation_status = ""
+        if source_count >= 4:
+            validation_status = "🎯 JACKPOT! Found in ALL 4 primary sources"
+        elif source_count == 3:
+            validation_status = "🔥 HIGHLY VALIDATED - Found in 3 primary sources"
+        elif source_count == 2:
+            validation_status = "⭐ CROSS-VALIDATED - Found in 2 primary sources"
+        else:
+            validation_status = "📍 Single source discovery"
+
+        # Build platform-specific data sections
+        platform_scores = context.get('platform_scores', {})
+
+        tiktok_section = ""
+        if context.get('tiktok_sales', 0) > 0:
+            tiktok_section = f"""
+🎵 TIKTOK SHOP PERFORMANCE:
+- Total Sales: {context['tiktok_sales']:,}
+- Sales (7 days): {context['tiktok_sales_7d']:,}
+- TikTok Price: ${context['tiktok_price']}
+- Platform Score: {platform_scores.get('tiktok_shop_score', 0)}/100
+"""
+
+        amazon_section = ""
+        if context.get('amazon_bestseller', False):
+            amazon_section = f"""
+📦 AMAZON BESTSELLER DATA:
+- Bestseller Rank: #{context['amazon_rank']} in {context['amazon_category']}
+- Customer Rating: {context['amazon_rating']}/5.0 ({context['amazon_reviews']:,} reviews)
+- Amazon Price: ${context['amazon_price']}
+- Platform Score: {platform_scores.get('amazon_score', 0)}/100
+"""
+
+        shopify_section = ""
+        if context.get('shopify_competitor', False):
+            shopify_section = f"""
+🏪 SHOPIFY COMPETITOR INTELLIGENCE:
+- Found in successful store: {context['shopify_store_name']}
+- Competitor Price: ${context['shopify_price']}
+- Store URL: {context['shopify_store_url']}
+- Platform Score: {platform_scores.get('shopify_score', 0)}/100
+"""
+
         return f"""You are an expert e-commerce product analyst. Analyze this product opportunity and provide a comprehensive, unique recommendation.
 
 PRODUCT DETAILS:
@@ -134,6 +219,11 @@ PRODUCT DETAILS:
 - Overall Score: {context['score']}/10
 - Priority Level: {context['priority']}
 
+🎯 MULTI-SOURCE DISCOVERY VALIDATION:
+- {validation_status}
+- Discovery Sources: {sources_list} ({source_count} source{'s' if source_count != 1 else ''})
+- Multi-Source Bonus: +{platform_scores.get('multi_source_bonus', 0)} points
+{tiktok_section}{amazon_section}{shopify_section}
 FINANCIAL METRICS:
 - Supplier Cost: ${context['supplier_cost']}
 - Recommended Retail: ${context['market_price']}
@@ -177,14 +267,25 @@ Generate a detailed, unique analysis in markdown format. Include:
 1. **Opening Assessment** (2-3 sentences)
    - Quick verdict: Should they add this product?
    - Why this specific product stands out (be specific to THIS product)
+   - EMPHASIZE multi-source validation if product found in 2+ sources
 
-2. **📈 Sales & Performance Analysis**
-   - Interpret the sales numbers (what do they mean?)
-   - Calculate realistic profit projections
-   - Analyze the velocity and demand pattern
+2. **🎯 Multi-Source Validation Analysis** (CRITICAL - NEW SECTION)
+   - Analyze what it means that this product was found in {source_count} primary source(s)
+   - If found in multiple sources: explain the significance of cross-platform validation
+   - If JACKPOT (4 sources): This is EXTREMELY rare and valuable - explain why
+   - Compare TikTok sales vs Amazon rank vs Shopify competitor presence
+   - What does cross-platform demand tell us about product viability?
+   - Does pricing differ across platforms? What does that mean?
+
+3. **📈 Sales & Performance Analysis**
+   - Interpret ALL sales numbers from ALL sources (TikTok, Amazon, AliExpress)
+   - Calculate realistic profit projections using actual platform data
+   - Analyze the velocity and demand pattern across platforms
    - Compare to typical products in this niche
+   - If TikTok sales exist: what does social commerce performance indicate?
+   - If Amazon bestseller: what does traditional e-commerce rank mean?
 
-3. **🎯 Market Opportunity**
+4. **🎯 Market Opportunity**
    - Is the market saturated or is there room?
    - What's the competitive landscape?
    - Specific angles to differentiate this product
@@ -235,11 +336,49 @@ Use emojis sparingly for visual hierarchy. Keep it professional yet engaging."""
         competition = trend_data.get('market_signals', {}).get('competition_level', 'MEDIUM')
         demand = trend_data.get('market_signals', {}).get('demand_strength', 'MEDIUM')
 
+        # Multi-source validation info
+        source_count = product.get('source_count', 0)
+        primary_sources = product.get('primary_sources', [])
+        tiktok_sales = product.get('tiktok_sales', 0)
+        amazon_bestseller = product.get('amazon_bestseller', False)
+        amazon_rank = product.get('amazon_rank', 0)
+        shopify_competitor = product.get('shopify_competitor', False)
+
+        validation_badge = ""
+        if source_count >= 4:
+            validation_badge = "🎯 JACKPOT! Found in ALL 4 primary sources"
+        elif source_count == 3:
+            validation_badge = "🔥 HIGHLY VALIDATED - Found in 3 primary sources"
+        elif source_count == 2:
+            validation_badge = "⭐ CROSS-VALIDATED - Found in 2 primary sources"
+
+        multi_source_section = ""
+        if source_count >= 2:
+            sources_display = ', '.join(primary_sources)
+            multi_source_section = f"""
+### 🎯 Multi-Source Validation
+
+**{validation_badge}**
+
+This product was discovered independently by **{source_count} primary sources**: {sources_display}
+
+Cross-platform validation significantly increases confidence in product viability.
+"""
+
+        platform_data = ""
+        if tiktok_sales > 0:
+            platform_data += f"\n- **TikTok Shop**: {tiktok_sales:,} sales"
+        if amazon_bestseller:
+            platform_data += f"\n- **Amazon**: Bestseller Rank #{amazon_rank}"
+        if shopify_competitor:
+            platform_data += f"\n- **Shopify**: Found in successful competitor store"
+
         return f"""## {name}
 
 **Score: {score}/10** | **Priority: {'HIGH' if score > 7.5 else 'MEDIUM' if score > 6 else 'LOW'}**
-
+{multi_source_section}
 ### 📈 Sales Performance
+{platform_data}
 
 This product has achieved **{orders:,} orders** on AliExpress with a **{rating}/5.0** rating.
 
