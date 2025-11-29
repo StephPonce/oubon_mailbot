@@ -1,7 +1,26 @@
 """
 OspraOS Database Package
 Multi-store, multi-tenant database models
+
+Usage:
+    from ospra_os.database import get_session, init_database
+    
+    # Initialize on startup
+    init_database()
+    
+    # Get session for queries
+    session = get_session()
 """
+
+# New connection utilities (PostgreSQL + SQLite)
+from .connection import (
+    get_engine,
+    get_session,
+    get_session_context,
+    get_db,
+    init_database,
+    check_database_connection,
+)
 
 from .multi_store_models import (
     # Base
@@ -23,7 +42,7 @@ from .multi_store_models import (
     AIProvider,
     TaskType,
 
-    # Functions
+    # Functions (backwards compatible)
     init_multi_store_db,
     get_multi_store_session,
     migrate_existing_store,
@@ -32,6 +51,14 @@ from .multi_store_models import (
 )
 
 __all__ = [
+    # Connection utilities
+    "get_engine",
+    "get_session",
+    "get_session_context", 
+    "get_db",
+    "init_database",
+    "check_database_connection",
+    
     # Base
     "Base",
 
@@ -51,7 +78,7 @@ __all__ = [
     "AIProvider",
     "TaskType",
 
-    # Functions
+    # Functions (backwards compatible)
     "init_multi_store_db",
     "get_multi_store_session",
     "migrate_existing_store",

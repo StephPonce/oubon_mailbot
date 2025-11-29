@@ -146,6 +146,14 @@ class Settings(BaseSettings):
     DATABASE_PATH: str = Field(default="data/oubon.db")
     database_url: str = Field(default="sqlite:///./data/oubon.db")
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _fix_postgres_url(cls, v: str) -> str:
+        """Convert postgres:// to postgresql:// for SQLAlchemy compatibility."""
+        if v and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
     # Research module knobs
     RESEARCH_MAX_TERMS: int = Field(default=5)
     RESEARCH_MAX_CANDIDATES_PER_TERM: int = Field(default=3)

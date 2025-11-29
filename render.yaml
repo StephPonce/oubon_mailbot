@@ -1,21 +1,83 @@
 services:
-  # Main web service
+  # ═══════════════════════════════════════════════════════════
+  # MAIN WEB SERVICE - Ospra Intelligence API
+  # ═══════════════════════════════════════════════════════════
   - type: web
     name: oubon-mailbot
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      # PostgreSQL connection (auto-populated by Render)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+      # SQLAlchemy async driver for PostgreSQL
+      - key: OUBONSHOP_database_url
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
 
-  # Cron job: Check Gmail every 5 minutes
+  # ═══════════════════════════════════════════════════════════
+  # CRON JOB: Email Checker (every 5 minutes)
+  # ═══════════════════════════════════════════════════════════
   - type: cron
     name: oubon-mailbot-cron
     env: python
-    schedule: "*/5 * * * *"  # Every 5 minutes
+    schedule: "*/5 * * * *"
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python run_email_check.py"
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+
+  # ═══════════════════════════════════════════════════════════
+  # CRON JOB: Product Discovery (daily at 3 AM UTC)
+  # ═══════════════════════════════════════════════════════════
+  - type: cron
+    name: ospra-product-discovery
+    env: python
+    schedule: "0 3 * * *"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -c \"import asyncio; from ospra_os.background_jobs.auto_discovery import run_discovery; asyncio.run(run_discovery())\""
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+
+  # ═══════════════════════════════════════════════════════════
+  # CRON JOB: Daily Rankings Update (daily at 3:30 AM UTC)
+  # ═══════════════════════════════════════════════════════════
+  - type: cron
+    name: ospra-daily-rankings
+    env: python
+    schedule: "30 3 * * *"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python -c \"import asyncio; from ospra_os.background_jobs.daily_ranking_job import run_daily_ranking; asyncio.run(run_daily_ranking())\""
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+
+# ═══════════════════════════════════════════════════════════
+# DATABASE - PostgreSQL (Free tier)
+# ═══════════════════════════════════════════════════════════
+databases:
+  - name: ospra-db
+    databaseName: ospra_intelligence
+    user: ospra_admin
+    plan: free  # Free tier: 1GB storage, 97 days retention
