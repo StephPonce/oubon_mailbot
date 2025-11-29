@@ -11,11 +11,11 @@ const UnifiedProductsPage = lazy(() => import('./pages/UnifiedProductsPage').the
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then(module => ({ default: module.OrdersPage })));
 const CustomerAnalyticsPage = lazy(() => import('./pages/CustomerAnalyticsPage'));
 const EmailDashboard = lazy(() => import('./pages/EmailDashboard'));
-const LiveTrendsPage = lazy(() => import('./pages/LiveTrendsPage'));
-const RankingsPage = lazy(() => import('./pages/RankingsPage'));
 const NicheAnalysisPage = lazy(() => import('./pages/NicheAnalysisPage').then(module => ({ default: module.NicheAnalysisPage })));
 const CompetitiveIntelPage = lazy(() => import('./pages/CompetitiveIntelPage'));
 const ABTestingPage = lazy(() => import('./pages/ABTestingPage').then(module => ({ default: module.ABTestingPage })));
+const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage'));
+const IntelligencePage = lazy(() => import('./pages/IntelligencePage'));
 const EmailSettings = lazy(() => import('./components/EmailSettings'));
 
 const Loading = () => (
@@ -34,10 +34,10 @@ const router = createBrowserRouter([
       { path: '/customers', element: <CustomerAnalyticsPage /> },
       { path: '/niches', element: <NicheAnalysisPage /> },
       { path: '/competitors', element: <CompetitiveIntelPage /> },
+      { path: '/intelligence', element: <IntelligencePage /> },
       { path: '/emails', element: <EmailDashboard /> },
-      { path: '/trends', element: <LiveTrendsPage /> },
-      { path: '/rankings', element: <RankingsPage /> },
       { path: '/abtesting', element: <ABTestingPage /> },
+      { path: '/system-health', element: <SystemHealthPage /> },
       { path: '/settings', element: <EmailSettings /> },
     ],
   },

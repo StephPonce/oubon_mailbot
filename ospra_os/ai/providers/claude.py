@@ -20,6 +20,7 @@ from ospra_os.ai.providers.base import (
     RateLimitError,
     InvalidResponseError
 )
+from ospra_os.ai.markdown_stripper import strip_markdown
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -230,7 +231,8 @@ class ClaudeProvider(AIProvider):
 
             logger.debug(f"Chat response generated: {tokens_used} tokens used")
 
-            return response_text.strip()
+            # Strip markdown formatting symbols
+            return strip_markdown(response_text)
 
         except AnthropicRateLimitError as e:
             logger.warning(f"Claude rate limit exceeded: {e}")
@@ -448,7 +450,15 @@ Your role is to provide:
 - Marketing and growth recommendations
 - Honest assessments of risks and opportunities
 
-Keep responses concise, specific, and immediately actionable. Use bullet points when listing multiple items.
+FORMATTING RULES:
+- NO markdown symbols (no ##, ***, ---, etc.)
+- NO headings with # or ##
+- NO bold with ** or __
+- NO bullet points with *, -, or +
+- Use plain text with clear paragraph breaks
+- Use numbers (1, 2, 3) for lists
+
+Keep responses concise, specific, and immediately actionable.
 """
 
         if context:

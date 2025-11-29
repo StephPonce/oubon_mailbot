@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Send, Sparkles, X, Minimize2, Maximize2, Bot } from 'lucide-react';
 import { useAIChat } from '../contexts/AIChatContext';
 
@@ -20,18 +21,20 @@ export default function GlobalAIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  if (!isOpen) {
-    return (
-      <button
+  const chatButton = !isOpen ? (
+    <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white transition-all z-50 group hover:bg-white/20"
+        className="fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center text-white transition-all z-50 group hover:scale-110 shadow-lg hover:shadow-2xl backdrop-blur-md"
+        style={{
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.5), rgba(139, 92, 246, 0.5), rgba(99, 102, 241, 0.5))',
+          boxShadow: '0 0 20px rgba(99, 102, 241, 0.3), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 2px 8px rgba(255, 255, 255, 0.4), inset 0 -2px 8px rgba(0, 0, 0, 0.1)',
+          border: '2px solid rgba(255, 255, 255, 0.4)'
+        }}
       >
-        <Sparkles className="w-6 h-6 transform group-hover:scale-110 transition-transform" />
+        <div className="absolute inset-0 rounded-full bg-gradient-to-t from-transparent via-white/30 to-transparent opacity-60"></div>
+        <Sparkles className="w-6 h-6 transform group-hover:rotate-12 transition-transform relative z-10" />
       </button>
-    );
-  }
-
-  return (
+  ) : (
     <div className="fixed bottom-6 right-6 z-50">
       <div className={`bg-gray-950/80 backdrop-blur-2xl border border-gray-800 rounded-2xl shadow-2xl shadow-black/50 ${isMinimized ? 'w-80' : 'w-[32rem] h-[40rem]'} flex flex-col overflow-hidden transition-all duration-300`}>
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
@@ -111,4 +114,6 @@ export default function GlobalAIChat() {
       </div>
     </div>
   );
+
+  return createPortal(chatButton, document.body);
 }

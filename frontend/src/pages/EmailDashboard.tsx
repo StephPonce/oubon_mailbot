@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Mail, Inbox, Star, Send, FileText, Trash2, Edit, Settings, X, Archive, Reply, Forward, StarOff, MailOpen, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import { GlassPanel } from '@/components/GlassPanel';
 
 interface EmailStats {
   total_emails: number;
@@ -268,212 +269,230 @@ export default function EmailDashboard() {
       const cleanHtml = email.body_html
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-      return <div dangerouslySetInnerHTML={{ __html: cleanHtml }} className="prose prose-invert max-w-none" />;
+      return <div dangerouslySetInnerHTML={{ __html: cleanHtml }} className="prose max-w-none" />;
     }
-    return <p className="text-gray-400">No content available</p>;
+    return <p className="text-gray-500">No content available</p>;
   };
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-[calc(100vh-10rem)]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-blue mx-auto"></div>
-          <p className="mt-4 text-gray-400">Loading Emails...</p>
-        </div>
+      <div className="min-h-screen bg-gray-50 p-12 flex items-center justify-center" style={{ perspective: '1500px' }}>
+        <GlassPanel depth={60} delay={0}>
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600 font-light">Loading Emails...</p>
+          </div>
+        </GlassPanel>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full w-full overflow-hidden">
-      {/* Column 1: Navigation */}
-      <div className="w-64 flex-shrink-0 bg-gray-900/50 backdrop-blur-lg border-r border-white/10 p-3 flex flex-col gap-4 h-full">
-        <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-200">Mailbox</h2>
-            <button
-              onClick={syncEmails}
-              disabled={syncing || !stats?.accounts || stats.accounts.length === 0}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Sync emails"
-            >
-              <RefreshCw size={16} className={`text-gray-400 ${syncing ? 'animate-spin' : ''}`} />
-            </button>
-        </div>
-        <div className="space-y-1">
-          {folders.map(folder => (
-            <button
-              key={folder.name}
-              onClick={() => setSelectedFolder(folder.name)}
-              className={`w-full flex justify-between items-center px-3 py-2 rounded-lg font-medium text-sm transition ${
-                selectedFolder === folder.name
-                  ? 'bg-brand-blue/20 text-brand-blue'
-                  : 'text-gray-300 hover:bg-white/10'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <folder.icon size={16} />
-                <span>{folder.name}</span>
+    <>
+      <div className="min-h-screen bg-gray-50 p-8" style={{ perspective: '1500px' }}>
+      <div className="max-w-[1800px] mx-auto">
+        <div className="flex gap-6 h-[calc(100vh-8rem)]">
+          {/* Column 1: Navigation */}
+          <div className="w-64 flex-shrink-0">
+            <GlassPanel depth={80} delay={0.1} className="h-full flex flex-col gap-4 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-light text-gray-900">Mailbox</h2>
+                <button
+                  onClick={syncEmails}
+                  disabled={syncing || !stats?.accounts || stats.accounts.length === 0}
+                  className="p-1.5 rounded-lg hover:bg-gray-900/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Sync emails"
+                >
+                  <RefreshCw size={16} className={`text-gray-600 ${syncing ? 'animate-spin' : ''}`} />
+                </button>
               </div>
-              {folder.count > 0 && <span className="text-xs bg-brand-blue text-white rounded-full px-2 py-0.5">{folder.count}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="mt-auto space-y-2">
-            <button onClick={() => setShowCompose(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:opacity-90 transition">
-                <Edit size={14}/> Compose
-            </button>
-            <a href="/settings" className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-800/70 text-gray-300 rounded-lg text-sm font-semibold hover:bg-gray-700/90 transition">
-                <Settings size={14}/> Settings
-            </a>
-        </div>
-      </div>
-
-      {/* Column 2: Email List */}
-      <div className="w-80 flex-shrink-0 border-r border-white/10 flex flex-col bg-white/5 backdrop-blur-md h-full overflow-y-auto">
-        <div className="p-3 border-b border-gray-800">
-          <input type="search" placeholder="Search emails..." className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {recentEmails.map(email => (
-            <div
-              key={email.id}
-              onClick={() => openEmail(email)}
-              className={`p-3 border-b border-gray-800 cursor-pointer transition ${selectedEmail?.id === email.id ? 'bg-brand-blue/20' : 'hover:bg-white/10'} ${!email.is_read ? 'bg-gray-800/30' : ''}`}
-            >
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {email.is_starred && <Star size={12} fill="currentColor" className="text-yellow-400 flex-shrink-0" />}
-                  <p className={`text-sm truncate ${!email.is_read ? 'font-bold text-gray-100' : 'font-semibold text-gray-200'}`}>{email.from_name || email.from_address}</p>
-                </div>
-                <p className="text-xs text-gray-500 flex-shrink-0 ml-2">{new Date(email.received_at).toLocaleDateString()}</p>
+              <div className="space-y-1">
+                {folders.map(folder => (
+                  <button
+                    key={folder.name}
+                    onClick={() => setSelectedFolder(folder.name)}
+                    className={`w-full flex justify-between items-center px-3 py-2 rounded-lg font-light text-sm transition ${
+                      selectedFolder === folder.name
+                        ? 'bg-gray-900 text-white shadow-lg'
+                        : 'text-gray-700 hover:bg-gray-200/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <folder.icon size={16} />
+                      <span>{folder.name}</span>
+                    </div>
+                    {folder.count > 0 && <span className="text-xs bg-gray-900 text-white rounded-full px-2 py-0.5">{folder.count}</span>}
+                  </button>
+                ))}
               </div>
-              <p className={`text-sm truncate ${!email.is_read ? 'font-semibold text-gray-200' : 'font-medium text-gray-300'}`}>{email.subject}</p>
-              <p className="text-xs text-gray-500 mt-1 truncate">{email.snippet}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+              <div className="mt-auto space-y-2">
+                <button onClick={() => setShowCompose(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white rounded-lg text-sm font-light hover:bg-gray-800 transition">
+                  <Edit size={14}/> Compose
+                </button>
+                <a href="/settings" className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white/50 border border-gray-200 text-gray-700 rounded-lg text-sm font-light hover:bg-white transition">
+                  <Settings size={14}/> Settings
+                </a>
+              </div>
+            </GlassPanel>
+          </div>
 
-      {/* Column 3: Email Content */}
-      <div className="hidden xl:flex flex-1 flex-col bg-white/5 backdrop-blur-md border border-white/10 overflow-y-auto h-full">
-        {selectedEmail ? (
-          <>
-            {/* Email Header */}
-            <div className="px-8 py-5 border-b border-gray-800/50 bg-gray-900/30">
-              <div>
-                <div className="mb-4">
-                  <h1 className="text-2xl font-bold text-gray-100 mb-3">{selectedEmail.subject || '(No Subject)'}</h1>
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-brand-blue/20 flex items-center justify-center text-brand-blue font-semibold">
-                        {(selectedEmail.from_name || selectedEmail.from_address).charAt(0).toUpperCase()}
+          {/* Column 2: Email List */}
+          <div className="w-96 flex-shrink-0">
+            <GlassPanel depth={70} delay={0.2} className="h-full flex flex-col p-0 overflow-hidden">
+              <div className="p-4 border-b border-gray-200">
+                <input type="search" placeholder="Search emails..." className="w-full bg-white/50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                {recentEmails.map(email => (
+                  <div
+                    key={email.id}
+                    onClick={() => openEmail(email)}
+                    className={`p-4 border-b border-gray-200 cursor-pointer transition ${selectedEmail?.id === email.id ? 'bg-gray-900/10' : 'hover:bg-gray-900/5'} ${!email.is_read ? 'bg-gray-100/50' : ''}`}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {email.is_starred && <Star size={12} fill="currentColor" className="text-yellow-500 flex-shrink-0" />}
+                        <p className={`text-sm truncate ${!email.is_read ? 'font-semibold text-gray-900' : 'font-light text-gray-700'}`}>{email.from_name || email.from_address}</p>
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-200">{selectedEmail.from_name || 'Unknown Sender'}</p>
-                        <p className="text-xs text-gray-500">&lt;{selectedEmail.from_address}&gt;</p>
+                      <p className="text-xs text-gray-500 flex-shrink-0 ml-2">{new Date(email.received_at).toLocaleDateString()}</p>
+                    </div>
+                    <p className={`text-sm truncate ${!email.is_read ? 'font-medium text-gray-900' : 'font-light text-gray-700'}`}>{email.subject}</p>
+                    <p className="text-xs text-gray-500 mt-1 truncate">{email.snippet}</p>
+                  </div>
+                ))}
+              </div>
+            </GlassPanel>
+          </div>
+
+          {/* Column 3: Email Content */}
+          <div className="hidden xl:flex flex-1">
+            <GlassPanel depth={60} delay={0.3} className="w-full flex flex-col p-0 overflow-hidden">
+              {selectedEmail ? (
+                <>
+                  {/* Email Header */}
+                  <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-b from-white/30 to-transparent">
+                    <div>
+                      <div className="mb-4">
+                        <h1 className="text-2xl font-light text-gray-900 mb-3">{selectedEmail.subject || '(No Subject)'}</h1>
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-gray-900/10 flex items-center justify-center text-gray-900 font-medium">
+                              {(selectedEmail.from_name || selectedEmail.from_address).charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-900">{selectedEmail.from_name || 'Unknown Sender'}</p>
+                              <p className="text-xs text-gray-500">&lt;{selectedEmail.from_address}&gt;</p>
+                            </div>
+                          </div>
+                          <span className="text-gray-400 mx-2">•</span>
+                          <p className="text-gray-600">
+                            {new Date(selectedEmail.received_at).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-200">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            onClick={() => replyToEmail(selectedEmail)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm font-light"
+                          >
+                            <Reply size={14} />
+                            Reply
+                          </button>
+                          <button
+                            onClick={() => forwardEmail(selectedEmail)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/50 border border-gray-200 text-gray-700 rounded-lg hover:bg-white transition text-sm font-light"
+                          >
+                            <Forward size={14} />
+                            Forward
+                          </button>
+                          <button
+                            onClick={() => toggleStar(selectedEmail)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition text-sm font-light ${
+                              selectedEmail.is_starred
+                                ? 'bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30'
+                                : 'bg-white/50 border border-gray-200 text-gray-700 hover:bg-white'
+                            }`}
+                          >
+                            {selectedEmail.is_starred ? <Star size={14} fill="currentColor" /> : <StarOff size={14} />}
+                            {selectedEmail.is_starred ? 'Starred' : 'Star'}
+                          </button>
+                          <button
+                            onClick={() => toggleRead(selectedEmail)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/50 border border-gray-200 text-gray-700 rounded-lg hover:bg-white transition text-sm font-light"
+                          >
+                            <MailOpen size={14} />
+                            Mark {selectedEmail.is_read ? 'Unread' : 'Read'}
+                          </button>
+                          <button
+                            onClick={() => archiveEmail(selectedEmail)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/50 border border-gray-200 text-gray-700 rounded-lg hover:bg-white transition text-sm font-light"
+                          >
+                            <Archive size={14} />
+                            Archive
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => deleteEmail(selectedEmail)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-600 rounded-lg hover:bg-red-500/30 transition text-sm font-light"
+                        >
+                          <Trash2 size={14} />
+                          Delete
+                        </button>
                       </div>
                     </div>
-                    <span className="text-gray-600 mx-2">•</span>
-                    <p className="text-gray-400">
-                      {new Date(selectedEmail.received_at).toLocaleString()}
-                    </p>
                   </div>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="flex items-center justify-between gap-2 pt-3 border-t border-gray-800/30">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => replyToEmail(selectedEmail)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-lg hover:opacity-90 transition text-sm font-medium"
-                    >
-                      <Reply size={14} />
-                      Reply
-                    </button>
-                    <button
-                      onClick={() => forwardEmail(selectedEmail)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700/70 text-gray-200 rounded-lg hover:bg-gray-700 transition text-sm font-medium"
-                    >
-                      <Forward size={14} />
-                      Forward
-                    </button>
-                    <button
-                      onClick={() => toggleStar(selectedEmail)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition text-sm font-medium ${
-                        selectedEmail.is_starred
-                          ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30'
-                          : 'bg-gray-700/70 text-gray-200 hover:bg-gray-700'
-                      }`}
-                    >
-                      {selectedEmail.is_starred ? <Star size={14} fill="currentColor" /> : <StarOff size={14} />}
-                      {selectedEmail.is_starred ? 'Starred' : 'Star'}
-                    </button>
-                    <button
-                      onClick={() => toggleRead(selectedEmail)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700/70 text-gray-200 rounded-lg hover:bg-gray-700 transition text-sm font-medium"
-                    >
-                      <MailOpen size={14} />
-                      Mark {selectedEmail.is_read ? 'Unread' : 'Read'}
-                    </button>
-                    <button
-                      onClick={() => archiveEmail(selectedEmail)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-700/70 text-gray-200 rounded-lg hover:bg-gray-700 transition text-sm font-medium"
-                    >
-                      <Archive size={14} />
-                      Archive
-                    </button>
+                  {/* Email Body */}
+                  <div className="flex-1 overflow-y-auto overflow-x-auto">
+                    <div className="px-8 py-6">
+                      <div className="text-gray-900 leading-relaxed text-base break-words">
+                        {formatEmailContent(selectedEmail)}
+                      </div>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => deleteEmail(selectedEmail)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition text-sm font-medium"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                  <Mail size={64} className="mb-4 opacity-30" />
+                  <p className="text-xl font-light text-gray-600">Select an email to read</p>
+                  <p className="text-sm mt-2 text-gray-500">Choose an email from the list to view its contents</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Email Body */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto">
-              <div className="px-8 py-6">
-                <div className="text-gray-200 leading-relaxed text-base break-words">
-                  {formatEmailContent(selectedEmail)}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <Mail size={64} className="mb-4 opacity-50" />
-            <p className="text-xl font-medium">Select an email to read</p>
-            <p className="text-sm mt-2">Choose an email from the list to view its contents</p>
+              )}
+            </GlassPanel>
           </div>
-        )}
+        </div>
+      </div>
       </div>
 
       {/* Compose Modal */}
       {showCompose && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCompose(false)}>
-            <div className="bg-gray-950/80 backdrop-blur-xl border border-gray-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-100">New Message</h2>
-                    <button onClick={() => setShowCompose(false)} className="p-1 rounded-full hover:bg-white/10 text-gray-500 hover:text-white transition"><X size={20}/></button>
-                </div>
-                <div className="space-y-4">
-                    <input type="email" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="To" className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-                    <input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Subject" className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-                    <textarea value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Message..." rows={10} className="w-full bg-gray-800/70 border border-gray-700 rounded-lg px-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-blue"></textarea>
-                </div>
-                <div className="flex justify-end gap-4 mt-6">
-                    <button onClick={() => setShowCompose(false)} className="px-5 py-2 text-gray-300 font-semibold rounded-lg hover:bg-gray-800 transition">Cancel</button>
-                    <button onClick={sendComposeEmail} disabled={sending} className="px-5 py-2 bg-brand-blue text-white font-semibold rounded-lg hover:opacity-90 disabled:bg-gray-600 transition">
-                        {sending ? 'Sending...' : 'Send'}
-                    </button>
-                </div>
+        <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setShowCompose(false)}>
+          <div className="glass p-8 max-w-2xl w-full" style={{ boxShadow: '0 40px 120px rgba(0, 0, 0, 0.25)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-light text-gray-900">New Message</h2>
+              <button onClick={() => setShowCompose(false)} className="p-1.5 rounded-full hover:bg-gray-900/10 text-gray-500 hover:text-gray-900 transition">
+                <X size={20}/>
+              </button>
             </div>
+            <div className="space-y-4">
+              <input type="email" value={composeTo} onChange={e => setComposeTo(e.target.value)} placeholder="To" className="w-full bg-white/50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              <input type="text" value={composeSubject} onChange={e => setComposeSubject(e.target.value)} placeholder="Subject" className="w-full bg-white/50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900" />
+              <textarea value={composeBody} onChange={e => setComposeBody(e.target.value)} placeholder="Message..." rows={10} className="w-full bg-white/50 border border-gray-200 rounded-lg px-4 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-900 resize-none"></textarea>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowCompose(false)} className="px-5 py-2 text-gray-700 font-light rounded-lg hover:bg-gray-900/5 transition">
+                Cancel
+              </button>
+              <button onClick={sendComposeEmail} disabled={sending} className="px-5 py-2 bg-gray-900 text-white font-light rounded-lg hover:bg-gray-800 disabled:bg-gray-400 transition">
+                {sending ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

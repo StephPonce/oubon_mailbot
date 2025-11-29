@@ -28,19 +28,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`bg-white/5 backdrop-blur-md border border-white/10 shadow-xl rounded-xl p-5 transition-all duration-300 hover:border-white/20 hover:bg-white/10 group ${
-        onClick ? 'cursor-pointer hover:scale-105 hover:shadow-2xl' : ''
+      className={`bg-cyan-500/5 backdrop-blur-lg border border-cyan-500/20 shadow-xl rounded-xl p-5 transition-all duration-300 hover:border-cyan-400/40 hover:bg-cyan-500/10 group ${
+        onClick ? 'cursor-pointer hover:scale-105 hover:shadow-2xl hover:shadow-cyan-500/10' : ''
       }`}
     >
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-gray-400">{title}</h3>
-        <div className="p-2 bg-black/20 rounded-lg">
-          <Icon className="w-5 h-5 text-blue-400" />
+        <h3 className="text-sm font-light text-cyan-300">{title}</h3>
+        <div className="p-2 bg-black/30 rounded-lg border border-cyan-500/20">
+          <Icon className="w-5 h-5 text-cyan-400" />
         </div>
       </div>
 
       <div className="mb-3">
-        <p className="text-3xl font-semibold text-gray-100">{value}</p>
+        <p className="text-3xl font-light text-white">{value}</p>
       </div>
 
       <div className="flex items-center justify-between text-xs">
@@ -55,12 +55,12 @@ const MetricCard: React.FC<MetricCardProps> = ({
           <div></div>
         )}
         {subtitle && (
-          <span className="text-gray-500">{subtitle}</span>
+          <span className="text-cyan-400/60">{subtitle}</span>
         )}
       </div>
 
       {onClick && (
-        <div className="mt-2 text-xs text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="mt-2 text-xs text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity">
           Click for details →
         </div>
       )}

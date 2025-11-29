@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Package, AlertTriangle, TrendingDown, ShoppingCart, RefreshCw, Filter, Search, X } from 'lucide-react';
+import { GlassPanel } from '../components/GlassPanel';
 
 interface InventoryProduct {
   product_id: string;
@@ -125,12 +126,12 @@ export const InventoryPage = () => {
   });
 
   return (
-    <div className="p-6 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gray-50 p-12">
+      <div className="max-w-7xl mx-auto space-y-12">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <GlassPanel className="flex items-center justify-between p-6">
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-2">
+            <h1 className="text-3xl font-light text-gray-900 mb-2">
               Inventory Management
             </h1>
             <p className="text-gray-400">Monitor stock levels, velocity, and reorder recommendations</p>
@@ -143,93 +144,93 @@ export const InventoryPage = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-        </div>
+        </GlassPanel>
 
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-5">
+          <GlassPanel className="p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Package className="w-5 h-5 text-blue-400" />
+                <Package className="w-5 h-5 text-blue-600" />
               </div>
-              <span className="text-2xl font-bold text-white">{stats.total}</span>
+              <span className="text-2xl font-bold text-gray-900">{stats.total}</span>
             </div>
-            <p className="text-gray-400 text-sm">Total Products</p>
-            <p className="text-green-400 text-xs mt-1">{stats.healthy} healthy</p>
-          </div>
+            <p className="text-gray-700 text-sm">Total Products</p>
+            <p className="text-green-600 text-xs mt-1">{stats.healthy} healthy</p>
+          </GlassPanel>
 
-          <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-5">
+          <GlassPanel className="p-5" delay={0.1}>
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 bg-yellow-500/10 rounded-lg">
-                <TrendingDown className="w-5 h-5 text-yellow-400" />
+                <TrendingDown className="w-5 h-5 text-yellow-600" />
               </div>
-              <span className="text-2xl font-bold text-white">{stats.low}</span>
+              <span className="text-2xl font-bold text-gray-900">{stats.low}</span>
             </div>
-            <p className="text-gray-400 text-sm">Low Stock</p>
-            <p className="text-yellow-400 text-xs mt-1">Needs attention</p>
-          </div>
+            <p className="text-gray-700 text-sm">Low Stock</p>
+            <p className="text-yellow-600 text-xs mt-1">Needs attention</p>
+          </GlassPanel>
 
-          <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-5">
+          <GlassPanel className="p-5" delay={0.2}>
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 bg-orange-500/10 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-orange-400" />
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
               </div>
-              <span className="text-2xl font-bold text-white">{stats.critical}</span>
+              <span className="text-2xl font-bold text-gray-900">{stats.critical}</span>
             </div>
-            <p className="text-gray-400 text-sm">Critical Stock</p>
-            <p className="text-orange-400 text-xs mt-1">Urgent reorder</p>
-          </div>
+            <p className="text-gray-700 text-sm">Critical Stock</p>
+            <p className="text-orange-600 text-xs mt-1">Urgent reorder</p>
+          </GlassPanel>
 
-          <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-5">
+          <GlassPanel className="p-5" delay={0.3}>
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 bg-red-500/10 rounded-lg">
-                <ShoppingCart className="w-5 h-5 text-red-400" />
+                <ShoppingCart className="w-5 h-5 text-red-600" />
               </div>
-              <span className="text-2xl font-bold text-white">{stats.outOfStock}</span>
+              <span className="text-2xl font-bold text-gray-900">{stats.outOfStock}</span>
             </div>
-            <p className="text-gray-400 text-sm">Out of Stock</p>
-            <p className="text-red-400 text-xs mt-1">{stats.needReorder} need reorder</p>
-          </div>
+            <p className="text-gray-700 text-sm">Out of Stock</p>
+            <p className="text-red-600 text-xs mt-1">{stats.needReorder} need reorder</p>
+          </GlassPanel>
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-4">
+        <GlassPanel className="p-4" delay={0.4}>
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600" />
                 <input
                   type="text"
                   placeholder="Search products or SKU..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400"
                 />
               </div>
             </div>
 
             {/* Filters */}
             <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400" />
+              <Filter className="w-4 h-4 text-gray-600" />
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                className="px-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400 appearance-none cursor-pointer pr-10"
               >
-                <option value="all">All Products</option>
-                <option value="HEALTHY">Healthy</option>
-                <option value="LOW">Low Stock</option>
-                <option value="CRITICAL">Critical</option>
-                <option value="OUT_OF_STOCK">Out of Stock</option>
-                <option value="reorder">Needs Reorder</option>
+                <option value="all" className="bg-white text-gray-900">All Products</option>
+                <option value="HEALTHY" className="bg-white text-gray-900">Healthy</option>
+                <option value="LOW" className="bg-white text-gray-900">Low Stock</option>
+                <option value="CRITICAL" className="bg-white text-gray-900">Critical</option>
+                <option value="OUT_OF_STOCK" className="bg-white text-gray-900">Out of Stock</option>
+                <option value="reorder" className="bg-white text-gray-900">Needs Reorder</option>
               </select>
             </div>
           </div>
-        </div>
+        </GlassPanel>
 
         {/* Inventory Table */}
-        <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl overflow-hidden">
+        <GlassPanel className="overflow-hidden p-0" delay={0.5}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -364,10 +365,10 @@ export const InventoryPage = () => {
               </tbody>
             </table>
           </div>
-        </div>
+        </GlassPanel>
 
         {/* Summary Footer */}
-        <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-4">
+        <GlassPanel className="p-4" delay={0.6}>
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-400">
               Showing {filteredProducts.length} of {stats.total} products
@@ -378,7 +379,7 @@ export const InventoryPage = () => {
               </span>
             )}
           </div>
-        </div>
+        </GlassPanel>
       </div>
 
       {/* Product Details Modal */}

@@ -97,7 +97,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   return (
-    <div className={`relative bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl overflow-hidden transition-all duration-300 ${isSelected ? 'ring-2 ring-brand-blue' : 'hover:border-gray-700'}`}>
+    <div className={`relative bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl overflow-hidden transition-all duration-300 shadow-sm ${isSelected ? 'ring-2 ring-blue-500' : 'hover:border-gray-300 hover:shadow-md'}`}>
       {onToggleSelect && (
         <div className="absolute top-3 left-3 z-20">
           <input
@@ -105,19 +105,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             checked={isSelected}
             onChange={() => onToggleSelect(product.id)}
             onClick={(e) => e.stopPropagation()}
-            className="w-5 h-5 rounded-md bg-gray-800/50 border-gray-600 text-brand-blue focus:ring-brand-blue cursor-pointer"
+            className="w-5 h-5 rounded-md bg-white/50 border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
           />
         </div>
       )}
-      
-      <div className="relative h-48 bg-gray-800">
+
+      <div className="relative h-48 bg-gray-100">
         <img
           src={product.image_url || `https://via.placeholder.com/400x300/161b22/d0d7de?text=${encodeURIComponent(product.name.substring(0,20))}`}
           alt={product.name}
           className="w-full h-full object-cover"
           onError={(e) => { e.currentTarget.src = `https://via.placeholder.com/400x300/161b22/d0d7de?text=Image+Error`; }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-950/70 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/30 via-transparent to-transparent"></div>
         <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${getVelocityColor(product.velocity_score || 0)}`}>
           Velocity: {product.velocity_score || 0}
         </div>
@@ -152,46 +152,46 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </div>
 
       <div className="p-4 space-y-4">
-        <h3 className="font-semibold text-gray-200 h-10 line-clamp-2">
+        <h3 className="font-semibold text-gray-900 h-10 line-clamp-2">
           {product.name}
         </h3>
 
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-xs text-gray-500">Ospra Score</p>
+            <p className="text-xs text-gray-600">Ospra Score</p>
             <div className="flex items-center gap-2 mt-1">
               <span className={`text-2xl font-bold ${getScoreColor(product.velocity_score || 0)}`}>
                 {product.velocity_score || 0}
               </span>
-              <span className="text-sm text-gray-500">/100</span>
+              <span className="text-sm text-gray-600">/100</span>
             </div>
           </div>
           <div className="text-right">
-            <div className="flex items-center gap-1.5 justify-end text-gray-400" title="Customer Rating">
+            <div className="flex items-center gap-1.5 justify-end text-gray-700" title="Customer Rating">
               <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
               <span className="font-semibold">{product.rating?.toFixed(1) || 'N/A'}</span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">{product.tier || 'N/A'} tier</p>
+            <p className="text-xs text-gray-600 mt-1">{product.tier || 'N/A'} tier</p>
           </div>
         </div>
 
-        <div className="flex justify-between items-end bg-gray-800/50 p-3 rounded-lg">
+        <div className="flex justify-between items-end bg-gray-100 p-3 rounded-lg">
           <div>
-            <p className="text-xs text-gray-400">Profit</p>
-            <p className="text-lg font-bold text-success-green">
+            <p className="text-xs text-gray-600">Profit</p>
+            <p className="text-lg font-bold text-green-600">
               ${product.estimated_profit?.toFixed(2)}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-gray-400">Price</p>
-            <p className="font-semibold text-gray-200">${product.price.toFixed(2)}</p>
+            <p className="text-xs text-gray-600">Price</p>
+            <p className="font-semibold text-gray-900">${product.price.toFixed(2)}</p>
           </div>
         </div>
         
         <div className="flex gap-2">
           <button
             onClick={() => onAnalyze(product)}
-            className="flex-1 bg-brand-blue/10 text-brand-blue border border-brand-blue/20 py-2 px-4 rounded-lg hover:bg-brand-blue/20 transition font-semibold text-sm flex items-center justify-center gap-2"
+            className="flex-1 bg-blue-50 text-blue-700 border border-blue-200 py-2 px-4 rounded-lg hover:bg-blue-100 transition font-semibold text-sm flex items-center justify-center gap-2"
           >
             <BarChart2 className="w-4 h-4" />
             Analyze
@@ -199,7 +199,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           <button
             onClick={deployToShopify}
             disabled={deploying || deploymentStatus?.deployed}
-            className="flex-1 py-2 px-4 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2 bg-brand-blue text-white hover:opacity-90 disabled:bg-gray-600 disabled:cursor-not-allowed"
+            className="flex-1 py-2 px-4 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <Layers className="w-4 h-4" />
             {deploymentStatus?.deployed ? 'Deployed' : (deploying ? 'Deploying...' : 'Deploy')}
@@ -211,7 +211,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             href={product.supplier_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full mt-2 bg-orange-600/10 text-orange-400 border border-orange-500/20 py-2 px-4 rounded-lg hover:bg-orange-600/20 transition font-semibold text-sm flex items-center justify-center gap-2"
+            className="w-full mt-2 bg-orange-50 text-orange-700 border border-orange-200 py-2 px-4 rounded-lg hover:bg-orange-100 transition font-semibold text-sm flex items-center justify-center gap-2"
           >
             <ExternalLink className="w-4 h-4" />
             View on AliExpress

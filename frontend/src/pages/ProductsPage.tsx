@@ -4,6 +4,7 @@ import { ProductCard } from '../components/ProductCard';
 import ProductModal from '../components/ProductModal';
 import { Layers, ChevronDown, RefreshCw, Search, ArrowDownUp } from 'lucide-react';
 import { useProducts } from '../contexts/ProductsContext';
+import { GlassPanel } from '../components/GlassPanel';
 
 interface Product {
   id: string;
@@ -108,7 +109,7 @@ export const ProductsPage = () => {
       if (forceDiscovery) {
         // Use new unified discovery API (AliExpress Affiliate + Google Trends)
         const response = await axios.get(`http://localhost:8001/api/discovery/quick/${niche}`, {
-          params: { count: 20 }
+          params: { count: 50 }
         });
 
         if (response.data.success && response.data.products) {
@@ -268,12 +269,13 @@ export const ProductsPage = () => {
   };
 
   return (
-    <div className="space-y-6 px-8 py-6">
-      {/* Header and Filters */}
-      <div className="space-y-4">
+    <div className="min-h-screen bg-gray-50 p-12">
+      <div className="max-w-7xl mx-auto space-y-12">
+        {/* Header and Filters */}
+        <GlassPanel className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-gray-200">Product Discovery</h2>
+            <h2 className="text-2xl font-light text-gray-900">Product Discovery</h2>
             <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
               dataSource.includes('REAL_TIME') ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'
             }`}>
@@ -300,13 +302,13 @@ export const ProductsPage = () => {
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-grow min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
             <input
               type="text"
               placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-900/70 border border-gray-700 rounded-lg pl-10 pr-4 py-2 text-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              className="w-full bg-white border-2 border-gray-300 rounded-lg pl-10 pr-4 py-2.5 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:border-gray-400"
             />
           </div>
 
@@ -315,15 +317,15 @@ export const ProductsPage = () => {
             <select
               value={niche}
               onChange={(e) => setNiche(e.target.value)}
-              className="bg-gray-900/70 border border-gray-700 rounded-lg px-4 py-2 pr-8 text-gray-200 appearance-none cursor-pointer hover:border-brand-blue transition focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              className="bg-white border-2 border-gray-300 rounded-lg px-4 py-2.5 pr-10 text-gray-900 appearance-none cursor-pointer hover:border-gray-400 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {niches.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.name}{n.trending ? ' (Trending)' : ''}
+                <option key={n.id} value={n.id} className="bg-white text-gray-900">
+                  {n.name}
                 </option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
           </div>
 
           {/* Sort By Select */}
@@ -331,31 +333,31 @@ export const ProductsPage = () => {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="bg-gray-900/70 border border-gray-700 rounded-lg px-4 py-2 pr-8 text-gray-200 appearance-none cursor-pointer hover:border-brand-blue transition focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              className="bg-white border-2 border-gray-300 rounded-lg px-4 py-2.5 pr-10 text-gray-900 appearance-none cursor-pointer hover:border-gray-400 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="velocity_score">Sort by Velocity</option>
-              <option value="score">Sort by Grade</option>
-              <option value="rating">Sort by Rating</option>
-              <option value="estimated_profit">Sort by Profit</option>
-              <option value="price">Sort by Price</option>
-              <option value="orders">Sort by Sales</option>
+              <option value="velocity_score" className="bg-white text-gray-900">Sort by Velocity</option>
+              <option value="score" className="bg-white text-gray-900">Sort by Grade</option>
+              <option value="rating" className="bg-white text-gray-900">Sort by Rating</option>
+              <option value="estimated_profit" className="bg-white text-gray-900">Sort by Profit</option>
+              <option value="price" className="bg-white text-gray-900">Sort by Price</option>
+              <option value="orders" className="bg-white text-gray-900">Sort by Sales</option>
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-600 pointer-events-none" />
           </div>
 
           <button
             onClick={() => setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc')}
-            className="px-3 py-2 bg-gray-900/70 border border-gray-700 text-gray-300 rounded-lg hover:bg-glass-white flex items-center gap-2"
+            className="px-3 py-2.5 bg-white border-2 border-gray-300 text-gray-900 rounded-lg hover:border-gray-400 transition-all flex items-center gap-2"
             title="Toggle Sort Order"
           >
             <ArrowDownUp className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </GlassPanel>
 
       {/* Bulk Actions Bar */}
       {selectedProducts.size > 0 && (
-        <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 rounded-xl p-4 flex items-center justify-between sticky top-4 z-10">
+        <GlassPanel className="p-4 flex items-center justify-between sticky top-4 z-10">
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-3 cursor-pointer">
               <input
@@ -383,7 +385,7 @@ export const ProductsPage = () => {
             <Layers className="w-4 h-4" />
             {bulkDeploying ? 'Deploying...' : `Deploy to Store`}
           </button>
-        </div>
+        </GlassPanel>
       )}
 
       {/* Product Grid */}
@@ -418,6 +420,7 @@ export const ProductsPage = () => {
           onClose={() => setSelectedProduct(null)}
         />
       )}
+      </div>
     </div>
   );
 };

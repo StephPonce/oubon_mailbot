@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Package, ShoppingCart } from 'lucide-react';
+import { Search, Package, ShoppingCart, TrendingUp } from 'lucide-react';
 
 // Import existing page components
 import { ProductsPage } from './ProductsPage';
@@ -10,17 +10,17 @@ export const UnifiedProductsPage = () => {
   const [activeTab, setActiveTab] = useState('discovery');
 
   return (
-    <div className="min-h-screen">
-      {/* Tabs - No extra padding, let child pages control their layout */}
-      <div className="sticky top-0 z-20 bg-gray-950/95 backdrop-blur-sm border-b border-gray-800">
+    <div className="min-h-screen bg-gray-50">
+      {/* Tabs - Glass design with light theme */}
+      <div className="sticky top-0 z-20 bg-white/80 backdrop-blur-lg border-b border-gray-200">
         <div className="px-6 pt-6">
           <div className="flex gap-2">
             <button
               onClick={() => setActiveTab('discovery')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium transition-all rounded-t-lg ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-light text-sm transition ${
                 activeTab === 'discovery'
-                  ? 'bg-gray-900/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-900/30'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-200/50'
               }`}
             >
               <Search className="w-4 h-4" />
@@ -28,10 +28,10 @@ export const UnifiedProductsPage = () => {
             </button>
             <button
               onClick={() => setActiveTab('inventory')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium transition-all rounded-t-lg ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-light text-sm transition ${
                 activeTab === 'inventory'
-                  ? 'bg-gray-900/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-900/30'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-200/50'
               }`}
             >
               <Package className="w-4 h-4" />
@@ -39,10 +39,10 @@ export const UnifiedProductsPage = () => {
             </button>
             <button
               onClick={() => setActiveTab('orders')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium transition-all rounded-t-lg ${
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg font-light text-sm transition ${
                 activeTab === 'orders'
-                  ? 'bg-gray-900/50 text-blue-400 border-b-2 border-blue-400'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-900/30'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-200/50'
               }`}
             >
               <ShoppingCart className="w-4 h-4" />

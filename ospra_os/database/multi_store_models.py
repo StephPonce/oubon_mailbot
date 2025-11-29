@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from datetime import datetime
 import enum
 import json
+import os
 
 Base = declarative_base()
 
@@ -237,6 +238,7 @@ class Product(Base):
 
     # Product Identity
     product_name = Column(String(512), nullable=False)
+    title = Column(String(512), nullable=True)  # Alias for product_name (used by intelligence)
     product_sku = Column(String(255), nullable=True, index=True)
 
     # Source Information
@@ -247,12 +249,37 @@ class Product(Base):
     # Pricing
     supplier_cost = Column(Float, nullable=True)
     selling_price = Column(Float, nullable=True)
+    price = Column(Float, nullable=True)  # Alias for selling_price (used by intelligence)
     profit_margin = Column(Float, nullable=True)  # Percentage
 
     # Intelligence Scores
     discovery_score = Column(Float, default=0.0)  # 0-10 scale
     trend_score = Column(Float, default=0.0)      # 0-100 Google Trends scale
     ai_explanation = Column(Text, nullable=True)   # Why this product was recommended
+    grade = Column(String(3), nullable=True)  # A+, A, B+, B, C+, C, D, F
+
+    # Intelligence - Profit Potential (Grade Factor 1)
+    expected_monthly_sales = Column(Integer, default=0)
+
+    # Intelligence - Trend Score (Grade Factor 2)
+    velocity_score = Column(Float, default=0.0)  # 0-10 from velocity detector
+    social_score = Column(Float, default=0.0)    # 0-100 TikTok/Instagram mentions
+    search_trend = Column(Float, default=0.0)    # 0-100 Google Trends
+
+    # Intelligence - Market Saturation (Grade Factor 3)
+    saturation_level = Column(Float, default=50.0)  # 0-100 (lower = better)
+    competitor_count = Column(Integer, default=0)
+    differentiation_score = Column(Float, default=0.0)  # 0-10 uniqueness score
+
+    # Intelligence - Quality (Grade Factor 4)
+    rating = Column(Float, default=0.0)  # 0-5 stars
+    review_count = Column(Integer, default=0)
+    complaint_rate = Column(Float, default=0.0)  # 0-1 (complaints / sales)
+
+    # Intelligence - Competitive Edge (Grade Factor 5)
+    price_competitiveness = Column(Float, default=50.0)  # 0-100 (100 = best price)
+    feature_superiority = Column(Float, default=0.0)  # 0-10 feature score
+    brand_strength = Column(Float, default=0.0)  # 0-10 brand score
 
     # AI-Generated Content
     ai_title = Column(String(512), nullable=True)
@@ -271,8 +298,11 @@ class Product(Base):
 
     # Timestamps
     discovered_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    queued_at = Column(DateTime, nullable=True)  # When queued for deployment
     deployed_at = Column(DateTime, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # Alias for updated_at
 
     # Relationships
     store = relationship("Store", back_populates="products")
@@ -1439,3 +1469,43 @@ class ABTestAssignment(Base):
 
 print("✅ Intelligence models added")
 print("✅ A/B Testing models added")
+
+
+# ============================================================================
+# DATABASE SESSION MANAGEMENT
+# ============================================================================
+
+# Database URL (from environment or default to SQLite)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ospra_os.db")
+
+# Create engine
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    echo=False
+)
+
+# Create session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    """
+    Database session dependency for FastAPI.
+
+    Usage in FastAPI routes:
+        @router.get("/endpoint")
+        def endpoint(db: Session = Depends(get_db)):
+            # Use db session here
+            pass
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db():
+    """Initialize database (create all tables)"""
+    Base.metadata.create_all(bind=engine)

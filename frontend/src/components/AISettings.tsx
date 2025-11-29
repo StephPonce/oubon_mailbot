@@ -228,7 +228,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
     <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+        <h1 className="text-3xl font-light text-white mb-2 flex items-center gap-3">
           <Brain className="w-8 h-8 text-blue-400" />
           AI Provider Settings
         </h1>
@@ -239,7 +239,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
       {/* Current Usage Stats */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-light text-white mb-4 flex items-center gap-2">
           <DollarSign className="w-5 h-5 text-green-400" />
           Current Month Usage
         </h2>
@@ -295,7 +295,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
       {/* Provider Selection */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-light text-white mb-4 flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-blue-400" />
           Select AI Provider
         </h2>
@@ -306,10 +306,10 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               key={provider.id}
               onClick={() => !provider.comingSoon && setSelectedProvider(provider.id)}
               disabled={provider.comingSoon}
-              className={`relative p-5 rounded-lg border-2 text-left transition-all ${
+              className={`relative p-5 rounded-lg border text-left transition-all ${
                 selectedProvider === provider.id && !provider.comingSoon
-                  ? `${getProviderColorClass(provider.color, 'border')} ${getProviderColorClass(provider.color, 'bg')}`
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600'
+                  ? 'bg-gray-900 text-white shadow-lg border-gray-900'
+                  : 'bg-white/50 border-gray-200 hover:bg-gray-200/50 text-gray-900'
               } ${provider.comingSoon ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {/* Recommended Badge */}
@@ -338,8 +338,8 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               <div className="flex items-start gap-3 mb-3 mt-4">
                 <div className="text-3xl">{provider.icon}</div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">{provider.displayName}</h3>
-                  <p className="text-sm text-gray-400">{provider.name}</p>
+                  <h3 className={`font-light text-lg ${selectedProvider === provider.id ? 'text-white' : 'text-gray-900'}`}>{provider.displayName}</h3>
+                  <p className={`text-sm ${selectedProvider === provider.id ? 'text-gray-300' : 'text-gray-600'}`}>{provider.name}</p>
                 </div>
               </div>
 
@@ -395,7 +395,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <h2 className="text-lg font-light text-white flex items-center gap-2">
               <Key className="w-5 h-5 text-yellow-400" />
               Custom API Key (Advanced)
             </h2>
@@ -530,7 +530,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
       {/* Comparison Table */}
       <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-        <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-light text-white mb-4 flex items-center gap-2">
           <Info className="w-5 h-5 text-blue-400" />
           Provider Comparison
         </h2>

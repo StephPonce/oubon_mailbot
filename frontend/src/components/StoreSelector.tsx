@@ -294,10 +294,10 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
             <button
               key={platform.id}
               onClick={() => handlePlatformFilter(platform.id)}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 flex items-center gap-2 ${
+              className={`w-full flex justify-between items-center px-3 py-2 rounded-lg font-light text-sm transition ${
                 selectedPlatform === platform.id
-                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/50'
-                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
+                  ? 'bg-gray-900 text-white shadow-lg'
+                  : 'text-gray-700 hover:bg-gray-200/50'
               }`}
             >
               <Filter className="w-4 h-4" />

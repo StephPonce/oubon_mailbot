@@ -10,6 +10,7 @@ import {
   Star,
   RefreshCw
 } from 'lucide-react';
+import { GlassPanel } from './GlassPanel';
 
 // Types
 interface EmailAccount {
@@ -193,7 +194,7 @@ const EmailSettings: React.FC = () => {
   const getStatusBadge = (status: string, isActive: boolean) => {
     if (!isActive) {
       return (
-        <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs font-medium rounded-full flex items-center gap-1">
+        <span className="px-2 py-1 bg-gray-500/20 text-gray-600 text-xs font-medium rounded-full flex items-center gap-1">
           <X className="w-3 h-3" />
           Disconnected
         </span>
@@ -218,17 +219,17 @@ const EmailSettings: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-8 space-y-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-white mb-3 flex items-center gap-4">
-          <Mail className="w-10 h-10 text-blue-400" />
-          Email Account Settings
-        </h1>
-        <p className="text-lg text-gray-400">
-          Connect and manage your email accounts for automated email processing
-        </p>
-      </div>
+    <div className="min-h-screen bg-gray-50 p-12" style={{ perspective: '1500px' }}>
+      <div className="max-w-7xl mx-auto space-y-12">
+        {/* Header */}
+        <GlassPanel depth={80} delay={0.2}>
+          <h1 className="text-4xl font-light text-gray-900 mb-3">
+            Email Account Settings
+          </h1>
+          <p className="text-lg text-gray-600">
+            Connect and manage your email accounts for automated email processing
+          </p>
+        </GlassPanel>
 
       {/* Error Message */}
       {error && (
@@ -247,16 +248,16 @@ const EmailSettings: React.FC = () => {
       )}
 
       {/* Connected Accounts */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
+      <GlassPanel depth={60} delay={0.3}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white flex items-center gap-3">
+          <h2 className="text-xl font-light text-gray-900 flex items-center gap-3">
             <Mail className="w-6 h-6 text-blue-400" />
             Connected Email Accounts
           </h2>
           <button
             onClick={fetchAccounts}
             disabled={loading}
-            className="p-2.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
+            className="p-2.5 text-gray-600 hover:text-gray-900 hover:bg-gray-200/50 rounded-lg transition"
           >
             <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -269,7 +270,7 @@ const EmailSettings: React.FC = () => {
         ) : accounts.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-gray-400">No email accounts connected yet</p>
+            <p className="text-gray-600">No email accounts connected yet</p>
             <p className="text-sm text-gray-500 mt-1">
               Connect an account below to get started
             </p>
@@ -282,7 +283,7 @@ const EmailSettings: React.FC = () => {
               return (
                 <div
                   key={account.id}
-                  className="bg-gray-900/50 rounded-xl border border-gray-700 p-5 flex items-center justify-between hover:bg-gray-900/70 transition-colors"
+                  className="bg-gray-100 rounded-xl border border-gray-200 p-5 flex items-center justify-between hover:bg-gray-200/50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
                     {/* Provider Icon */}
@@ -297,7 +298,7 @@ const EmailSettings: React.FC = () => {
                     {/* Account Info */}
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-white">{account.email_address}</p>
+                        <p className="font-medium text-gray-900">{account.email_address}</p>
                         {account.is_primary && (
                           <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-full flex items-center gap-1">
                             <Star className="w-3 h-3" />
@@ -342,11 +343,11 @@ const EmailSettings: React.FC = () => {
             })}
           </div>
         )}
-      </div>
+      </GlassPanel>
 
       {/* Connect New Account */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+      <GlassPanel depth={60} delay={0.4}>
+        <h2 className="text-xl font-light text-gray-900 mb-6 flex items-center gap-3">
           <ExternalLink className="w-6 h-6 text-blue-400" />
           Connect New Email Account
         </h2>
@@ -360,7 +361,7 @@ const EmailSettings: React.FC = () => {
               className={`group relative p-6 rounded-xl border-2 text-left transition-all ${
                 connecting === provider.id
                   ? 'border-blue-500/50 bg-blue-500/10'
-                  : 'border-gray-700 bg-gray-900/50 hover:border-gray-600 hover:bg-gray-800/50'
+                  : 'border-gray-200 bg-gray-100 hover:border-gray-600 hover:bg-white/50/50'
               } disabled:cursor-not-allowed`}
             >
               {/* Provider Icon & Name */}
@@ -368,19 +369,19 @@ const EmailSettings: React.FC = () => {
                 <div className="w-16 h-16 mb-4 bg-white rounded-xl p-3 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                   <img src={provider.icon} alt={provider.name} className="w-full h-full object-contain" />
                 </div>
-                <h3 className="font-bold text-white text-lg mb-1">{provider.name}</h3>
-                <p className="text-sm text-gray-400">{provider.description}</p>
+                <h3 className="font-light text-gray-900 text-lg mb-1">{provider.name}</h3>
+                <p className="text-sm text-gray-600">{provider.description}</p>
               </div>
 
               {/* Connect Button */}
-              <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="mt-4 pt-4 border-t border-gray-200">
                 {connecting === provider.id ? (
                   <div className="flex items-center justify-center gap-2 text-blue-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span className="text-sm font-medium">Connecting...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-2 text-gray-300 group-hover:text-blue-400 transition-colors">
+                  <div className="flex items-center justify-center gap-2 text-gray-600 group-hover:text-blue-400 transition-colors">
                     <ExternalLink className="w-4 h-4" />
                     <span className="text-sm font-medium">Connect Account</span>
                   </div>
@@ -395,17 +396,17 @@ const EmailSettings: React.FC = () => {
           <AlertCircle className="w-6 h-6 text-blue-400 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
             <p className="text-base font-semibold text-blue-400 mb-2">Secure OAuth Connection</p>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-600">
               You'll be redirected to your email provider to grant access. Your credentials are never stored by us - we only receive secure OAuth tokens.
             </p>
           </div>
         </div>
-      </div>
+      </GlassPanel>
 
       {/* Feature Info */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 p-8">
-        <h2 className="text-xl font-bold text-white mb-6">What you can do with connected accounts:</h2>
-        <ul className="space-y-3 text-gray-300">
+      <GlassPanel depth={60} delay={0.5}>
+        <h2 className="text-xl font-light text-gray-900 mb-6">What you can do with connected accounts:</h2>
+        <ul className="space-y-3 text-gray-600">
           <li className="flex items-center gap-2">
             <Check className="w-4 h-4 text-green-400" />
             Automated email classification and routing
@@ -423,8 +424,9 @@ const EmailSettings: React.FC = () => {
             Order tracking integration and automated status updates
           </li>
         </ul>
-      </div>
+      </GlassPanel>
     </div>
+  </div>
   );
 };
 
