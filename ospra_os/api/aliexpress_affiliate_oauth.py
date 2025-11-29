@@ -1,5 +1,6 @@
 """
-AliExpress OAuth callback handler
+AliExpress Affiliate API OAuth callback handler
+Separate from Dropshipping API - uses different callback URL
 """
 import json
 import httpx
@@ -12,84 +13,31 @@ from datetime import datetime
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
 
-router = APIRouter(prefix="/api/aliexpress", tags=["aliexpress"])
+router = APIRouter(prefix="/api/aliexpress-affiliate", tags=["aliexpress-affiliate"])
 
-# AliExpress Dropshipping API credentials (from .env)
-# Dropshipping: 520918 / idjX6tOzHx6urVsSylVzEcHZKwBN4YhN
-# Affiliate: 522382 / 9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL
-ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "520918")
-ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
-# CORRECT OAuth 2.0 endpoint (not the API endpoint!)
+# AliExpress Affiliate API credentials (from .env)
+ALIEXPRESS_AFFILIATE_APP_KEY = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
+ALIEXPRESS_AFFILIATE_APP_SECRET = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
+# OAuth 2.0 endpoint
 ALIEXPRESS_TOKEN_URL = "https://oauth.aliexpress.com/token"
-ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
+ALIEXPRESS_AFFILIATE_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress-affiliate/callback"
 
 # Token storage path
-TOKENS_FILE = Path(".secrets/aliexpress_tokens.json")
-
-
-def generate_aliexpress_signature_md5(params: dict, app_secret: str) -> str:
-    """
-    Generate AliExpress API signature using MD5
-
-    Algorithm:
-    1. Sort parameters alphabetically by key
-    2. Concatenate as: key1value1key2value2...
-    3. Prepend and append app_secret
-    4. Calculate MD5 hash
-    5. Convert to uppercase
-    """
-    # Sort parameters alphabetically (exclude 'sign' if present)
-    sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
-
-    # Concatenate as key1value1key2value2...
-    concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
-
-    # Prepend and append app_secret
-    sign_str = f"{app_secret}{concat_str}{app_secret}"
-
-    # Calculate MD5 and convert to uppercase
-    signature = hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
-
-    return signature
-
-
-def generate_aliexpress_signature_hmac(params: dict, app_secret: str) -> str:
-    """
-    Generate AliExpress API signature using HMAC-MD5
-
-    Algorithm:
-    1. Sort parameters alphabetically by key
-    2. Concatenate as: key1value1key2value2...
-    3. Use HMAC-MD5 with app_secret as key
-    4. Convert to uppercase
-    """
-    # Sort parameters alphabetically (exclude 'sign' if present)
-    sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
-
-    # Concatenate as key1value1key2value2...
-    concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
-
-    # Calculate HMAC-MD5 and convert to uppercase
-    signature = hmac.new(
-        app_secret.encode('utf-8'),
-        concat_str.encode('utf-8'),
-        hashlib.md5
-    ).hexdigest().upper()
-
-    return signature
+TOKENS_FILE = Path(".secrets/aliexpress_affiliate_tokens.json")
 
 
 @router.get("/oauth-callback")
-@router.get("/callback")  # Support both /oauth-callback and /callback
-async def oauth_callback(
+@router.get("/callback")  # Support both routes
+async def affiliate_oauth_callback(
     code: str = Query(None, description="Authorization code from AliExpress"),
     state: str = Query(None, description="State parameter"),
     error: str = Query(None, description="Error if authorization failed")
 ):
     """
-    OAuth callback endpoint for AliExpress Dropshipping API
+    OAuth callback endpoint for AliExpress Affiliate API
 
-    Automatically exchanges the authorization code for access tokens
+    Callback URL: https://ospra-intelligence.com/api/aliexpress/callback
+    App Key: 522382
     """
 
     if error:
@@ -98,7 +46,7 @@ async def oauth_callback(
             <!DOCTYPE html>
             <html>
             <head>
-                <title>AliExpress OAuth - Error</title>
+                <title>AliExpress Affiliate OAuth - Error</title>
                 <style>
                     body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
                     .error {{ background: #fee; border: 2px solid #c00; padding: 20px; border-radius: 5px; }}
@@ -109,7 +57,7 @@ async def oauth_callback(
                 <div class="error">
                     <h1>❌ Authorization Failed</h1>
                     <p><strong>Error:</strong> {error}</p>
-                    <p>Please try again or check your AliExpress app configuration.</p>
+                    <p>Please try again or check your AliExpress Affiliate app configuration.</p>
                 </div>
             </body>
             </html>
@@ -123,11 +71,11 @@ async def oauth_callback(
             <!DOCTYPE html>
             <html>
             <head>
-                <title>AliExpress OAuth - Missing Code</title>
+                <title>AliExpress Affiliate OAuth - Missing Code</title>
                 <style>
-                    body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-                    .error {{ background: #fee; border: 2px solid #c00; padding: 20px; border-radius: 5px; }}
-                    h1 {{ color: #c00; }}
+                    body { font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+                    .error { background: #fee; border: 2px solid #c00; padding: 20px; border-radius: 5px; }
+                    h1 { color: #c00; }
                 </style>
             </head>
             <body>
@@ -147,19 +95,19 @@ async def oauth_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # AliExpress OAuth wants BOTH standard and custom parameter names
+            # Standard OAuth 2.0 parameters
             params = {
-                "client_id": ALIEXPRESS_APP_KEY,
-                "app_key": ALIEXPRESS_APP_KEY,  # Also send as app_key
-                "client_secret": ALIEXPRESS_APP_SECRET,
-                "app_secret": ALIEXPRESS_APP_SECRET,  # Also send as app_secret
+                "client_id": ALIEXPRESS_AFFILIATE_APP_KEY,
+                "app_key": ALIEXPRESS_AFFILIATE_APP_KEY,
+                "client_secret": ALIEXPRESS_AFFILIATE_APP_SECRET,
+                "app_secret": ALIEXPRESS_AFFILIATE_APP_SECRET,
                 "grant_type": "authorization_code",
                 "code": code,
-                "redirect_uri": ALIEXPRESS_REDIRECT_URI,
-                "sp": "ae"  # AliExpress account type
+                "redirect_uri": ALIEXPRESS_AFFILIATE_REDIRECT_URI,
+                "sp": "ae"
             }
 
-            # Exchange code for tokens using standard OAuth 2.0
+            # Exchange code for tokens
             response = await client.post(
                 ALIEXPRESS_TOKEN_URL,
                 data=params,
@@ -175,12 +123,17 @@ async def oauth_callback(
 
                 # Add timestamp
                 token_response["obtained_at"] = datetime.now().isoformat()
+                token_response["app_key"] = ALIEXPRESS_AFFILIATE_APP_KEY
 
                 # Save to file
                 with open(TOKENS_FILE, "w") as f:
                     json.dump(token_response, f, indent=2)
 
-                print(f"✅ AliExpress tokens saved to {TOKENS_FILE}")
+                print(f"✅ AliExpress Affiliate API tokens saved to {TOKENS_FILE}")
+
+                # Also update .env file with new token
+                access_token = token_response.get("access_token")
+                print(f"✅ Access Token: {access_token[:20]}...")
             else:
                 token_error = f"Token exchange failed: {response.status_code} - {response.text}"
                 print(f"❌ {token_error}")
@@ -194,12 +147,13 @@ async def oauth_callback(
     if token_response and "access_token" in token_response:
         # Success - show tokens
         token_json = json.dumps(token_response, indent=2)
+        access_token = token_response.get("access_token", "")
         return HTMLResponse(
             content=f"""
             <!DOCTYPE html>
             <html>
             <head>
-                <title>AliExpress OAuth - Success</title>
+                <title>AliExpress Affiliate OAuth - Success</title>
                 <style>
                     body {{
                         font-family: Arial, sans-serif;
@@ -254,32 +208,50 @@ async def oauth_callback(
                         border-radius: 3px;
                         font-family: monospace;
                     }}
+                    .env-update {{
+                        background: #fff3cd;
+                        color: #856404;
+                        padding: 15px;
+                        border-radius: 5px;
+                        margin: 20px 0;
+                        border: 2px solid #ffc107;
+                    }}
                 </style>
             </head>
             <body>
                 <div class="success">
-                    <h1>🎉 OAuth Successful!</h1>
+                    <h1>🎉 Affiliate OAuth Successful!</h1>
 
                     <div class="info">
                         <p><strong>✅ Tokens obtained and stored successfully!</strong></p>
-                        <p>📁 Saved to: <span class="highlight">.secrets/aliexpress_tokens.json</span></p>
-                        <p>🔑 Access Token: <span class="highlight">{token_response.get('access_token', '')[:20]}...</span></p>
-                        <p>🔄 Refresh Token: <span class="highlight">{token_response.get('refresh_token', '')[:20] if token_response.get('refresh_token') else 'N/A'}...</span></p>
+                        <p>📁 Saved to: <span class="highlight">.secrets/aliexpress_affiliate_tokens.json</span></p>
+                        <p>🔑 App Key: <span class="highlight">{ALIEXPRESS_AFFILIATE_APP_KEY}</span></p>
+                        <p>🔑 Access Token: <span class="highlight">{access_token[:20]}...</span></p>
+                        <p>🔄 Refresh Token: <span class="highlight">{token_response.get('refresh_token', 'N/A')[:20] if token_response.get('refresh_token') else 'N/A'}...</span></p>
                         <p>⏱️ Expires In: <span class="highlight">{token_response.get('expires_in', 'N/A')} seconds</span></p>
+                    </div>
+
+                    <div class="env-update">
+                        <p><strong>⚠️ UPDATE YOUR .env FILE:</strong></p>
+                        <p>Replace the old ALIEXPRESS_ACCESS_TOKEN with:</p>
+                        <code style="display:block; background:#fff; color:#000; padding:10px; margin-top:10px; border-radius:3px;">
+                        ALIEXPRESS_ACCESS_TOKEN={access_token}
+                        </code>
                     </div>
 
                     <h3>📄 Full Token Response:</h3>
                     <div class="token-box" id="tokens">{token_json}</div>
 
                     <button onclick="copyTokens()">📋 Copy Full Response</button>
+                    <button onclick="copyAccessToken()">🔑 Copy Access Token</button>
                     <button onclick="window.close()">✅ Done - Close Window</button>
 
                     <div class="info">
                         <p>🚀 <strong>Next Steps:</strong></p>
                         <ul>
-                            <li>Tokens are automatically available for API calls</li>
-                            <li>Check <span class="highlight">.secrets/aliexpress_tokens.json</span> for the full response</li>
-                            <li>Use the access token in your AliExpress API requests</li>
+                            <li>Update ALIEXPRESS_ACCESS_TOKEN in your .env file</li>
+                            <li>Test with: python3 /tmp/test_affiliate_api.py</li>
+                            <li>Fetch 50 products and verify it works!</li>
                         </ul>
                     </div>
                 </div>
@@ -289,6 +261,11 @@ async def oauth_callback(
                         const tokens = document.getElementById('tokens').textContent;
                         navigator.clipboard.writeText(tokens.trim()).then(() => {{
                             alert('✅ Token response copied to clipboard!');
+                        }});
+                    }}
+                    function copyAccessToken() {{
+                        navigator.clipboard.writeText('{access_token}').then(() => {{
+                            alert('✅ Access token copied to clipboard!');
                         }});
                     }}
                 </script>
@@ -304,7 +281,7 @@ async def oauth_callback(
             <!DOCTYPE html>
             <html>
             <head>
-                <title>AliExpress OAuth - Token Exchange Failed</title>
+                <title>AliExpress Affiliate OAuth - Token Exchange Failed</title>
                 <style>
                     body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
                     .error {{ background: #fee; border: 2px solid #c00; padding: 20px; border-radius: 5px; }}

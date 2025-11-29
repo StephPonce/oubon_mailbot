@@ -202,6 +202,26 @@ except Exception as e:
     aliexpress_router = None
     _HAS_ALIEXPRESS = False
 
+# AliExpress Dropshipping API OAuth Callback
+try:
+    from ospra_os.api.aliexpress_oauth import router as aliexpress_callback_router  # type: ignore
+    _HAS_ALIEXPRESS_CALLBACK = True
+    print("✅ AliExpress Dropshipping API callback router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AliExpress callback router not loaded: {e}")
+    aliexpress_callback_router = None
+    _HAS_ALIEXPRESS_CALLBACK = False
+
+# AliExpress Affiliate API OAuth Callback (different callback URL)
+try:
+    from ospra_os.api.aliexpress_affiliate_oauth import router as aliexpress_affiliate_callback_router  # type: ignore
+    _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = True
+    print("✅ AliExpress Affiliate API callback router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AliExpress Affiliate callback router not loaded: {e}")
+    aliexpress_affiliate_callback_router = None
+    _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = False
+
 # TikTok OAuth router
 try:
     from ospra_os.auth.tiktok_oauth import router as tiktok_oauth_router  # type: ignore
@@ -279,6 +299,16 @@ except Exception as e:
     notifications_router = None
     _HAS_NOTIFICATIONS = False
 
+# System Health Monitoring router (Health Dashboard & Alerts)
+try:
+    from ospra_os.monitoring.routes import router as health_monitor_router  # type: ignore
+    _HAS_HEALTH_MONITOR = True
+    print("✅ System Health Monitoring router loaded successfully")
+except Exception as e:
+    print(f"⚠️  System Health Monitoring router not loaded: {e}")
+    health_monitor_router = None
+    _HAS_HEALTH_MONITOR = False
+
 # Niche Analysis router (Market Health & Entry Timing)
 try:
     from ospra_os.intelligence.niche_routes import router as niche_router  # type: ignore
@@ -318,6 +348,16 @@ except Exception as e:
     print(f"⚠️  Unified Product Discovery router not loaded: {e}")
     unified_discovery_router = None
     _HAS_UNIFIED_DISCOVERY = False
+
+# Intelligence Core router (Unified AI Brain - Briefings, Grading, Progress, Actions)
+try:
+    from ospra_os.intelligence.intelligence_core_routes import router as intelligence_core_router  # type: ignore
+    _HAS_INTELLIGENCE_CORE = True
+    print("✅ Intelligence Core router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Intelligence Core router not loaded: {e}")
+    intelligence_core_router = None
+    _HAS_INTELLIGENCE_CORE = False
 
 # Inventory Forecasting router
 try:
@@ -662,7 +702,13 @@ if _HAS_MULTI_STORE and multi_store_router:
 if _HAS_ALIEXPRESS and aliexpress_router:
     app.include_router(aliexpress_router)  # exposes /api/aliexpress/*
 
-# Note: aliexpress_router already includes OAuth routes
+# AliExpress Dropshipping API OAuth callback
+if _HAS_ALIEXPRESS_CALLBACK and aliexpress_callback_router:
+    app.include_router(aliexpress_callback_router)
+
+# AliExpress Affiliate API OAuth callback
+if _HAS_ALIEXPRESS_AFFILIATE_CALLBACK and aliexpress_affiliate_callback_router:
+    app.include_router(aliexpress_affiliate_callback_router)  # exposes /api/aliexpress/callback and /api/aliexpress/oauth-callback
 
 if _HAS_TIKTOK_OAUTH and tiktok_oauth_router:
     app.include_router(tiktok_oauth_router)  # exposes /auth/tiktok/*
@@ -706,6 +752,9 @@ if _HAS_JOBS and jobs_router:
 if _HAS_NOTIFICATIONS and notifications_router:
     app.include_router(notifications_router)  # exposes /api/notifications/*
 
+if _HAS_HEALTH_MONITOR and health_monitor_router:
+    app.include_router(health_monitor_router)  # exposes /api/health/*
+
 if _HAS_NICHE_ANALYSIS and niche_router:
     app.include_router(niche_router)  # exposes /api/niches/*
 
@@ -717,6 +766,9 @@ if _HAS_REPORTS and report_router:
 
 if _HAS_UNIFIED_DISCOVERY and unified_discovery_router:
     app.include_router(unified_discovery_router)  # exposes /api/discovery/*
+
+if _HAS_INTELLIGENCE_CORE and intelligence_core_router:
+    app.include_router(intelligence_core_router)  # exposes /api/intelligence/*
 
 if _HAS_INVENTORY and inventory_router:
     app.include_router(inventory_router)  # exposes /api/inventory/*
