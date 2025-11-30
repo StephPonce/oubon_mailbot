@@ -515,7 +515,7 @@ class AutoDiscoveryJob:
         user_settings: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
-        Discover products for a specific niche.
+        Discover products for a specific niche using Apify-first approach.
 
         Args:
             niche: Niche to search
@@ -526,14 +526,44 @@ class AutoDiscoveryJob:
         """
         products = []
 
-        # Use multi-source discovery if available
-        if MULTI_SOURCE_AVAILABLE:
+        # PRIMARY: Use new Apify-first unified discovery
+        try:
+            from ospra_os.intelligence.unified_product_discovery import get_live_products
+            
+            results = await get_live_products(
+                niche=niche,
+                limit=user_settings.get('max_products_per_niche', 10)
+            )
+            
+            # Transform to expected format
+            for product in results:
+                products.append({
+                    'title': product.get('title', product.get('name', 'Unknown')),
+                    'description': product.get('description', ''),
+                    'price': product.get('price', 0),
+                    'score': product.get('final_score', product.get('velocity_score', 50)) / 10,  # Convert to 0-10
+                    'images': [product.get('main_image', '')],
+                    'url': product.get('source_url', ''),
+                    'source': product.get('source', 'apify_discovery'),
+                    'niche': niche,
+                    'tier': product.get('tier', 'FAIR'),
+                    'data_sources': product.get('data_sources', {})
+                })
+            
+            logger.info(f"Found {len(products)} products via Apify-first discovery for '{niche}'")
+            return products
+            
+        except Exception as e:
+            logger.error(f"Apify-first discovery failed for '{niche}': {e}")
+
+        # FALLBACK: Use multi-source discovery if available
+        if MULTI_SOURCE_AVAILABLE and not products:
             try:
                 discovery = MultiSourceDiscovery()
                 results = await discovery.discover_products(
                     query=niche,
                     max_results=user_settings.get('max_products_per_niche', 10),
-                    sources=['google_trends']  # Reddit removed per user request
+                    sources=['google_trends']
                 )
 
                 products.extend(results.get('products', []))
@@ -541,16 +571,16 @@ class AutoDiscoveryJob:
             except Exception as e:
                 logger.error(f"Multi-source discovery failed for '{niche}': {e}")
 
-        # Use intelligence v3 if available
+        # FALLBACK 2: Use intelligence v3 if available
         if INTELLIGENCE_V3_AVAILABLE and not products:
             try:
-                intelligence = ProductIntelligenceV3()
-                results = await intelligence.discover_trending_products(
+                intelligence = ProductIntelligenceEngine()
+                results = intelligence.discover_products_by_niche(
                     niche=niche,
-                    limit=user_settings.get('max_products_per_niche', 10)
+                    count=user_settings.get('max_products_per_niche', 10)
                 )
 
-                products.extend(results.get('products', []))
+                products.extend(results)
 
             except Exception as e:
                 logger.error(f"Intelligence v3 discovery failed for '{niche}': {e}")
@@ -558,8 +588,7 @@ class AutoDiscoveryJob:
         # Score products with AI if not already scored
         for product in products:
             if 'score' not in product or product['score'] == 0:
-                # AI scoring would happen here
-                product['score'] = 7.5  # Mock score
+                product['score'] = 7.5  # Default score
 
         return products
 

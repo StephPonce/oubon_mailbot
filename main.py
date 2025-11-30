@@ -65,7 +65,22 @@ async def startup_event():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "2025-10-29-18:40", "commit": "b8fa638"}
+    """Health check with system status"""
+    import os
+    
+    # Check database type
+    db_url = os.getenv('DATABASE_URL', 'sqlite')
+    db_type = 'postgresql' if 'postgresql' in db_url or 'postgres' in db_url else 'sqlite'
+    
+    # Check Apify
+    apify_configured = bool(os.getenv('APIFY_API_TOKEN') or os.getenv('OUBONSHOP_APIFY_API_TOKEN'))
+    
+    return {
+        "status": "ok",
+        "version": "2025-11-30",
+        "database": db_type,
+        "apify": "configured" if apify_configured else "not_configured"
+    }
 
 @app.get("/debug/intelligence")
 async def debug_intelligence():
@@ -878,6 +893,144 @@ async def get_intelligence_stats():
         return {
             'success': False,
             'error': str(e)
+        }
+
+
+# ---------------------------------------------------------------
+# APIFY-POWERED Discovery (NEW - Primary Data Source)
+# ---------------------------------------------------------------
+
+@app.get("/api/apify/status")
+async def apify_status():
+    """
+    Check Apify integration status and available scrapers
+    """
+    apify_token = os.getenv('APIFY_API_TOKEN') or os.getenv('OUBONSHOP_APIFY_API_TOKEN')
+    
+    status = {
+        'configured': bool(apify_token),
+        'token_prefix': apify_token[:10] + '...' if apify_token else None,
+        'scrapers': {
+            'tiktok_shop': False,
+            'amazon_bestsellers': False
+        }
+    }
+    
+    if apify_token:
+        try:
+            from ospra_os.product_research.connectors.apify import (
+                TikTokShopScraper,
+                AmazonBestsellersScraper
+            )
+            status['scrapers']['tiktok_shop'] = TikTokShopScraper().is_available()
+            status['scrapers']['amazon_bestsellers'] = AmazonBestsellersScraper().is_available()
+        except Exception as e:
+            status['import_error'] = str(e)
+    
+    return status
+
+
+class UnifiedDiscoverRequest(BaseModel):
+    niche: str = "smart_home"
+    max_products: int = 20
+    min_score: float = 40.0
+
+
+@app.post("/api/v2/discover")
+async def discover_products_v2(request: UnifiedDiscoverRequest):
+    """
+    APIFY-FIRST Product Discovery (v2)
+    
+    Uses:
+    1. TikTok Shop (viral products)
+    2. Amazon Bestsellers (proven demand)
+    3. Google Trends (validation)
+    4. AliExpress (fallback only)
+    
+    Returns real products with scores, not mock data.
+    """
+    try:
+        from ospra_os.intelligence.unified_product_discovery import UnifiedProductDiscoveryV2
+        
+        engine = UnifiedProductDiscoveryV2()
+        products = await engine.discover_products(
+            niche=request.niche,
+            max_products=request.max_products,
+            min_score=request.min_score
+        )
+        
+        # Determine data sources used
+        sources_used = set()
+        for p in products:
+            sources_used.add(p.get('source', 'unknown'))
+        
+        return {
+            'success': True,
+            'products': products,
+            'count': len(products),
+            'niche': request.niche,
+            'sources_used': list(sources_used),
+            'engine': 'unified_v2_apify_first'
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+
+
+@app.get("/api/v2/trending")
+async def get_trending_products(niche: str = "smart_home", limit: int = 10):
+    """
+    Quick endpoint for trending products (cached where possible)
+    """
+    try:
+        from ospra_os.intelligence.unified_product_discovery import get_live_products
+        
+        products = await get_live_products(niche=niche, limit=limit)
+        
+        return {
+            'success': True,
+            'products': products,
+            'count': len(products),
+            'niche': niche
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+
+@app.get("/api/v2/niches")
+async def get_all_niches(products_per_niche: int = 5):
+    """
+    Discover products across all supported niches
+    """
+    try:
+        from ospra_os.intelligence.unified_product_discovery import discover_all_niches
+        
+        results = await discover_all_niches(products_per_niche=products_per_niche)
+        
+        total = sum(len(prods) for prods in results.values())
+        
+        return {
+            'success': True,
+            'niches': results,
+            'total_products': total,
+            'niches_count': len(results)
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }
 
 

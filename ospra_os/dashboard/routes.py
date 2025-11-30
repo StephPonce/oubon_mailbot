@@ -1179,3 +1179,50 @@ async def run_job_now(job_name: str):
     except Exception as e:
         logger.error(f"Run job now failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# LIVE PRODUCTS ENDPOINT (Uses Apify-first discovery)
+# ============================================================================
+
+@router.get("/live-products")
+async def get_live_products_endpoint(
+    niche: str = Query("smart_home", description="Product niche"),
+    limit: int = Query(20, ge=1, le=100, description="Max products to return")
+):
+    """
+    Get LIVE trending products using Apify-first discovery
+    
+    This endpoint fetches real-time data from:
+    1. TikTok Shop (viral products)
+    2. Amazon Bestsellers (proven demand)
+    3. Google Trends (validation)
+    4. AliExpress (fallback)
+    
+    Returns:
+        List of products with scores, sources, and metadata
+    """
+    try:
+        from ospra_os.intelligence.unified_product_discovery import get_live_products
+        
+        products = await get_live_products(niche=niche, limit=limit)
+        
+        return {
+            "success": True,
+            "products": products,
+            "total": len(products),
+            "niche": niche,
+            "data_source": "apify_first_discovery",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Live products fetch failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Export get_live_products for internal use (backwards compatibility)
+async def get_live_products(niche: str = "smart_home", limit: int = 20):
+    """Internal function to get live products (for realtime updater)"""
+    from ospra_os.intelligence.unified_product_discovery import get_live_products as _get_live
+    return await _get_live(niche=niche, limit=limit)

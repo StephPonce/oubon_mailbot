@@ -129,20 +129,21 @@ class RealtimeUpdater:
 
     async def _fetch_products(self) -> List[Dict]:
         """
-        Fetch latest product data from dashboard or database.
+        Fetch latest product data from discovery engine.
 
         Returns:
             List of product dictionaries
         """
         try:
-            # Try to import and use dashboard routes
-            from ospra_os.dashboard.routes import get_live_products
+            # Use the new unified discovery engine
+            from ospra_os.intelligence.unified_product_discovery import get_live_products
 
-            products = await get_live_products(limit=100)
+            products = await get_live_products(niche="smart_home", limit=100)
+            logger.info(f"Fetched {len(products)} products from discovery engine")
             return products
 
         except Exception as e:
-            logger.warning(f"Could not fetch from dashboard routes: {e}")
+            logger.warning(f"Could not fetch from discovery engine: {e}")
 
             # Fallback: Generate mock data for testing
             logger.info("Using mock product data for momentum calculation")
