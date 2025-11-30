@@ -84,8 +84,8 @@ class ProductMonitor:
         Returns:
             List of detected changes
         """
-        product_id = current_product['id']
-        product_name = current_product['name']
+        product_id = current_product.get('id', current_product.get('product_id', 'unknown'))
+        product_name = current_product.get('name', current_product.get('title', 'Unknown Product'))
 
         # Get last snapshot
         last_snapshot = self.db.get_latest_snapshot(product_id)
@@ -98,9 +98,9 @@ class ProductMonitor:
 
         changes = []
 
-        # Check velocity change
-        old_velocity = last_snapshot['velocity_score']
-        new_velocity = current_product['velocity_score']
+        # Check velocity change (defensive access)
+        old_velocity = last_snapshot.get('velocity_score', last_snapshot.get('velocity', 0)) or 0
+        new_velocity = current_product.get('velocity_score', current_product.get('velocity', 0)) or 0
 
         if abs(old_velocity - new_velocity) >= 15:
             severity = "high" if abs(old_velocity - new_velocity) >= 30 else "medium"
@@ -127,9 +127,9 @@ class ProductMonitor:
 
             logger.info(f"Velocity change detected: {product_name} ({old_velocity} → {new_velocity})")
 
-        # Check price change
-        old_price = last_snapshot['price']
-        new_price = current_product['price']
+        # Check price change (defensive access)
+        old_price = last_snapshot.get('price', 0) or 0
+        new_price = current_product.get('price', 0) or 0
 
         if abs(old_price - new_price) >= 5:
             severity = "high" if abs(old_price - new_price) >= 20 else "medium"
