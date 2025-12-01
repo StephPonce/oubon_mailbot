@@ -428,3 +428,70 @@ async def get_reddit_trending(
         "total_found": len(ranked),
         "products": ranked
     }
+
+
+# ========================================================================
+# NEW: xAI Twitter Discovery Routes
+# ========================================================================
+
+class TwitterDiscoveryRequest(BaseModel):
+    """Request for Twitter/X viral product discovery."""
+    niche: str
+    max_products: int = 10
+    time_range: str = "24h"  # "24h", "7d", "30d"
+
+
+@router.post("/twitter-viral", response_model=List[ProductResponse])
+async def discover_twitter_viral(
+    request: TwitterDiscoveryRequest,
+    settings: Settings = Depends(get_settings)
+):
+    """
+    Discover viral products from Twitter/X using xAI Grok.
+
+    Analyzes Twitter engagement, viral trends, and social sentiment
+    to find products gaining traction on social media.
+
+    Requires XAI_API_KEY in environment.
+
+    Example:
+        {
+            "niche": "smart_home",
+            "max_products": 10,
+            "time_range": "24h"
+        }
+
+    Time Ranges:
+        - "24h": Last 24 hours (most viral)
+        - "7d": Last 7 days (trending up)
+        - "30d": Last 30 days (sustained interest)
+
+    Returns:
+        List of viral products with Twitter engagement metrics
+    """
+    from .multi_source_discovery import MultiSourceDiscovery
+
+    # Initialize discovery engine
+    discovery = MultiSourceDiscovery()
+
+    # Discover viral products from Twitter
+    products = await discovery.discover_with_twitter(
+        niche=request.niche,
+        max_products=request.max_products,
+        time_range=request.time_range
+    )
+
+    if not products:
+        return []
+
+    # Convert to response format
+    return [
+        ProductResponse(
+            name=p.get("name", "Unknown Product"),
+            score=p.get("viral_score", 0.0),
+            recommendation=p.get("buy_signal", "⏸️ WATCH"),
+            source="twitter_xai",
+            details=p
+        )
+        for p in products
+    ]

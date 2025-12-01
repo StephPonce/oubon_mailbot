@@ -40,6 +40,14 @@ class ClaudeProvider(AIProvider):
         cost_per_1k (float): 0.003 (USD per 1K tokens)
     """
 
+    # Model fallback order (try newer models first, fallback to stable versions)
+    MODEL_FALLBACK_ORDER = [
+        "claude-sonnet-4-5-20250929",    # Latest Sonnet 4.5
+        "claude-3-5-sonnet-20241022",    # Sonnet 3.5 v2
+        "claude-3-5-haiku-20241022",     # Haiku 3.5
+        "claude-3-haiku-20240307",       # Haiku 3 (stable fallback)
+    ]
+
     def __init__(self, api_key: str):
         """
         Initialize Claude provider with API key.
@@ -54,7 +62,7 @@ class ClaudeProvider(AIProvider):
 
         # Set provider details
         self.provider_name = "claude"
-        self.model_name = "claude-sonnet-4-5-20250929"  # Latest Sonnet 4.5
+        self.model_name = self.MODEL_FALLBACK_ORDER[0]  # Start with latest
         self.cost_per_1k = 0.003
 
         # Initialize Anthropic client

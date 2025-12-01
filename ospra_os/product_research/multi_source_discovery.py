@@ -37,6 +37,13 @@ except ImportError:
     AliExpressScraper = None
     HAS_APIFY = False
 
+try:
+    from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
+    HAS_XAI_TWITTER = True
+except ImportError:
+    XAITwitterDiscovery = None
+    HAS_XAI_TWITTER = False
+
 
 class MultiSourceDiscovery:
     """
@@ -126,6 +133,7 @@ class MultiSourceDiscovery:
         self.amazon_bestsellers = None
         self.reddit = None
         self.shopify_competitor = None
+        self.xai_twitter = None
 
         # Try to initialize Amazon connector
         try:
@@ -223,6 +231,17 @@ class MultiSourceDiscovery:
         except Exception as e:
             print(f"⚠️  Failed to initialize AliExpress scraper: {e}")
             self.aliexpress_scraper = None
+
+        # Try to initialize xAI Twitter discovery
+        try:
+            self.xai_twitter = XAITwitterDiscovery()
+            if self.xai_twitter.is_available():
+                print("✅ xAI Twitter Discovery initialized")
+            else:
+                self.xai_twitter = None
+        except Exception as e:
+            print(f"⚠️  xAI Twitter init failed: {e}")
+            self.xai_twitter = None
 
         # Initialize cross-reference engine if all required scrapers are available
         self.cross_ref = None
@@ -1707,3 +1726,37 @@ class MultiSourceDiscovery:
                     return f"CONSIDER - Good potential ({score:.1f})"
 
         return f"SKIP - Score too low ({score:.1f}/100)"
+
+    async def discover_with_twitter(
+        self,
+        niche: str,
+        max_products: int = 10,
+        time_range: str = "24h"
+    ) -> List[Dict]:
+        """
+        Discover viral products using xAI Twitter Discovery.
+        
+        Args:
+            niche: Product niche (smart_home, fitness, etc.)
+            max_products: Maximum products to return
+            time_range: Time range for Twitter search ("24h", "7d", "30d")
+            
+        Returns:
+            List of product dicts with Twitter viral metrics
+        """
+        if not self.xai_twitter:
+            print("⚠️  xAI Twitter Discovery not available")
+            return []
+        
+        try:
+            twitter_products = await self.xai_twitter.discover_viral_products(
+                niche=niche,
+                max_products=max_products,
+                time_range=time_range
+            )
+
+            return [p.to_dict() for p in twitter_products]
+
+        except Exception as e:
+            print(f"❌ Twitter discovery error: {e}")
+            return []

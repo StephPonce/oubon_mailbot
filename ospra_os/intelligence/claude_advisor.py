@@ -23,6 +23,14 @@ class ClaudeBusinessAdvisor:
     Provides insights, recommendations, weekly reports
     """
 
+    # Model fallback order (try newer models first, fallback to stable versions)
+    MODEL_FALLBACK_ORDER = [
+        "claude-sonnet-4-5-20250929",    # Latest Sonnet 4.5
+        "claude-3-5-sonnet-20241022",    # Sonnet 3.5 v2
+        "claude-3-5-haiku-20241022",     # Haiku 3.5
+        "claude-3-haiku-20240307",       # Haiku 3 (stable fallback)
+    ]
+
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv('ANTHROPIC_API_KEY')
         if not self.api_key:
@@ -33,7 +41,7 @@ class ClaudeBusinessAdvisor:
 
         # Model to use - Claude Sonnet 4.5 (best intelligence and reasoning)
         # Note: Requires credits in Anthropic account
-        self.model = "claude-sonnet-4-5-20250929"
+        self.model = self.MODEL_FALLBACK_ORDER[0]
 
     async def daily_briefing(self, date: Optional[str] = None) -> str:
         """
