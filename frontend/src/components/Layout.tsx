@@ -1,9 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, Mails, BarChart, Settings, Bot, Activity, Trophy, Target, Users, PackageCheck, Search, FlaskConical, Brain } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Mails, BarChart, Settings, Bot, Activity, Trophy, Target, Users, PackageCheck, Search, FlaskConical, Brain, TrendingUp } from 'lucide-react';
 
 const navLinks = [
   { to: '/', text: 'Portfolio', icon: LayoutDashboard },
   { to: '/products', text: 'Products', icon: Package },
+  { to: '/live-trends', text: 'Live Trends', icon: TrendingUp },
   { to: '/customers', text: 'Customers', icon: Users },
   { to: '/niches', text: 'Niche Analysis', icon: Target },
   { to: '/competitors', text: 'Competitors', icon: Search },

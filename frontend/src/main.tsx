@@ -8,6 +8,7 @@ import ErrorBoundary from './ErrorBoundary.tsx';
 
 const PortfolioDashboard = lazy(() => import('./pages/PortfolioDashboard'));
 const UnifiedProductsPage = lazy(() => import('./pages/UnifiedProductsPage').then(module => ({ default: module.UnifiedProductsPage })));
+const LiveTrendsPage = lazy(() => import('./pages/LiveTrendsPage'));
 const OrdersPage = lazy(() => import('./pages/OrdersPage').then(module => ({ default: module.OrdersPage })));
 const CustomerAnalyticsPage = lazy(() => import('./pages/CustomerAnalyticsPage'));
 const EmailDashboard = lazy(() => import('./pages/EmailDashboard'));
@@ -31,6 +32,7 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <PortfolioDashboard /> },
       { path: '/products', element: <UnifiedProductsPage /> },
+      { path: '/live-trends', element: <LiveTrendsPage /> },
       { path: '/customers', element: <CustomerAnalyticsPage /> },
       { path: '/niches', element: <NicheAnalysisPage /> },
       { path: '/competitors', element: <CompetitiveIntelPage /> },
