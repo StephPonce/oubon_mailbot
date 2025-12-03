@@ -116,21 +116,22 @@ class AliExpressProductAPI:
         params["sign"] = self.generate_signature(params, self.dropship_app_secret)
 
         # Make API request
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.api_url, params=params, timeout=15) as response:
-                data = await response.json()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
 
-                # Check for errors
-                if "error_response" in data:
-                    error = data["error_response"]
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"AliExpress API error: {error.get('msg')} (code: {error.get('code')})"
-                    )
+                    # Check for errors
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')} (code: {error.get('code')})"
+                        )
 
-                # Parse response
-                resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-                result = resp_result.get("resp_result", {})
+                    # Parse response
+                    resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
+                    result = resp_result.get("resp_result", {})
 
                 # Extract products
                 if isinstance(result.get("products"), dict):
@@ -163,6 +164,13 @@ class AliExpressProductAPI:
                     "source": "dropshipping_api",
                     "feed": "hot_products"
                 }
+        except HTTPException:
+            raise  # Re-raise HTTP exceptions as-is
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch hot products: {str(e)}"
+            )
 
     async def get_bestsellers(self, page_size: int = 20) -> dict:
         """Get bestselling products from Dropshipping API"""
@@ -189,44 +197,52 @@ class AliExpressProductAPI:
 
         params["sign"] = self.generate_signature(params, self.dropship_app_secret)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.api_url, params=params, timeout=15) as response:
-                data = await response.json()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
 
-                if "error_response" in data:
-                    error = data["error_response"]
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"AliExpress API error: {error.get('msg')}"
-                    )
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')}"
+                        )
 
-                resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-                result = resp_result.get("resp_result", {})
+                    resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
+                    result = resp_result.get("resp_result", {})
 
-                if isinstance(result.get("products"), dict):
-                    product_list = result.get("products", {}).get("product", [])
-                else:
-                    product_list = result.get("products", [])
+                    if isinstance(result.get("products"), dict):
+                        product_list = result.get("products", {}).get("product", [])
+                    else:
+                        product_list = result.get("products", [])
 
-                products = []
-                for item in product_list:
-                    products.append({
-                        "product_id": item.get("product_id"),
-                        "title": item.get("product_title"),
-                        "price": float(item.get("target_sale_price", 0)),
-                        "image_url": item.get("product_main_image_url"),
-                        "url": item.get("promotion_link"),
-                        "orders": int(item.get("volume", 0)),
-                        "rating": float(item.get("evaluate_rate", 0)) / 20.0,
-                    })
+                    products = []
+                    for item in product_list:
+                        products.append({
+                            "product_id": item.get("product_id"),
+                            "title": item.get("product_title"),
+                            "price": float(item.get("target_sale_price", 0)),
+                            "image_url": item.get("product_main_image_url"),
+                            "url": item.get("promotion_link"),
+                            "orders": int(item.get("volume", 0)),
+                            "rating": float(item.get("evaluate_rate", 0)) / 20.0,
+                        })
 
-                return {
-                    "success": True,
-                    "products": products,
-                    "count": len(products),
-                    "source": "dropshipping_api",
-                    "feed": "bestsellers"
-                }
+                    return {
+                        "success": True,
+                        "products": products,
+                        "count": len(products),
+                        "source": "dropshipping_api",
+                        "feed": "bestsellers"
+                    }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch bestsellers: {str(e)}"
+            )
 
     async def get_product_details(self, product_ids: List[str]) -> dict:
         """Get product details from Affiliate API"""
@@ -251,22 +267,30 @@ class AliExpressProductAPI:
 
         params["sign"] = self.generate_signature(params, self.affiliate_app_secret)
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.api_url, params=params, timeout=15) as response:
-                data = await response.json()
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
 
-                if "error_response" in data:
-                    error = data["error_response"]
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"AliExpress API error: {error.get('msg')}"
-                    )
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')}"
+                        )
 
-                return {
-                    "success": True,
-                    "data": data,
-                    "source": "affiliate_api"
-                }
+                    return {
+                        "success": True,
+                        "data": data,
+                        "source": "affiliate_api"
+                    }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch product details: {str(e)}"
+            )
 
 
 # Create API instance
