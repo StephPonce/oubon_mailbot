@@ -114,7 +114,19 @@ async def affiliate_oauth_callback(
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
 
-            token_response = response.json()
+            # Log response details for debugging
+            print(f"📡 Token Exchange Response (Affiliate):")
+            print(f"   Status Code: {response.status_code}")
+            print(f"   Headers: {dict(response.headers)}")
+            print(f"   Raw Body: {response.text[:500]}")
+
+            # Try to parse JSON response
+            try:
+                token_response = response.json()
+            except Exception as json_error:
+                token_error = f"Failed to parse JSON response. Status: {response.status_code}, Body: {response.text}"
+                print(f"❌ {token_error}")
+                raise Exception(token_error)
 
             # Store tokens if successful
             if response.status_code == 200 and "access_token" in token_response:
