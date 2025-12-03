@@ -31,14 +31,40 @@ ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/cal
 TOKENS_FILE = Path(".secrets/aliexpress_tokens.json")
 
 
-def generate_aliexpress_signature_md5(params: dict, app_secret: str, api_path: str = "/auth/token/create") -> str:
+def generate_aliexpress_signature_md5_wrapped(params: dict, app_secret: str) -> str:
     """
-    Generate AliExpress API signature using HMAC-MD5
+    Generate AliExpress API signature using MD5 with secret wrapping
 
-    Algorithm:
+    Algorithm (from working Stack Overflow examples):
+    1. Sort parameters alphabetically by key (exclude 'sign')
+    2. Concatenate as: key1value1key2value2...
+    3. Wrap with secret: secret + concatenated_string + secret
+    4. Calculate MD5 hash
+    5. Convert to uppercase hexadecimal
+    """
+    # Sort parameters alphabetically (exclude 'sign' if present)
+    sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
+
+    # Concatenate as: key1value1key2value2...
+    concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
+
+    # Wrap with secret on both sides
+    sign_str = f"{app_secret}{concat_str}{app_secret}"
+
+    # Calculate plain MD5 and convert to uppercase
+    signature = hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
+
+    return signature
+
+
+def generate_aliexpress_signature_sha256(params: dict, app_secret: str, api_path: str = "/auth/token/create") -> str:
+    """
+    Generate AliExpress API signature using HMAC-SHA256
+
+    Algorithm (from working JavaScript examples):
     1. Sort parameters alphabetically by key (exclude 'sign')
     2. Concatenate as: /api/pathkey1value1key2value2...
-    3. Use HMAC-MD5 with app_secret as key
+    3. Use HMAC-SHA256 with app_secret as key
     4. Convert to uppercase hexadecimal
     """
     # Sort parameters alphabetically (exclude 'sign' if present)
@@ -47,11 +73,11 @@ def generate_aliexpress_signature_md5(params: dict, app_secret: str, api_path: s
     # Concatenate as: /api/path + key1value1key2value2...
     concat_str = api_path + ''.join([f"{k}{v}" for k, v in sorted_params])
 
-    # Calculate HMAC-MD5 signature
+    # Calculate HMAC-SHA256 signature
     signature = hmac.new(
         app_secret.encode('utf-8'),
         concat_str.encode('utf-8'),
-        hashlib.md5
+        hashlib.sha256
     ).hexdigest().upper()
 
     return signature
@@ -151,18 +177,34 @@ async def oauth_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Standard OAuth 2.0 token exchange - NO signature required!
-            # AliExpress OAuth endpoint uses standard OAuth 2.0 format
+            # AliExpress REST API token exchange with signature
+            # Based on working examples from Stack Overflow and official SDKs
+            timestamp = str(int(time.time() * 1000))  # Milliseconds
+
+            # System parameters (required for all AliExpress API calls)
             params = {
-                "client_id": ALIEXPRESS_APP_KEY,
-                "client_secret": ALIEXPRESS_APP_SECRET,
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": ALIEXPRESS_REDIRECT_URI,
-                "sp": "ae"  # AliExpress account type
+                "app_key": ALIEXPRESS_APP_KEY,
+                "timestamp": timestamp,
+                "sign_method": "sha256",  # Using SHA256 (more common in recent examples)
+                "format": "json",
+                "v": "2.0",
+                "method": "auth.token.create",
+                "code": code  # Authorization code
             }
 
-            # Exchange code for tokens using standard OAuth 2.0
+            # Generate signature using HMAC-SHA256 (from working JavaScript examples)
+            signature = generate_aliexpress_signature_sha256(params, ALIEXPRESS_APP_SECRET)
+            params["sign"] = signature
+
+            # Also generate MD5 wrapped signature for debugging
+            md5_signature = generate_aliexpress_signature_md5_wrapped(params, ALIEXPRESS_APP_SECRET)
+
+            print(f"🔐 Signature Debug:")
+            print(f"   SHA256: {signature}")
+            print(f"   MD5 (wrapped): {md5_signature}")
+            print(f"   Parameters: {params}")
+
+            # Exchange code for tokens
             response = await client.post(
                 ALIEXPRESS_TOKEN_URL,
                 data=params,
