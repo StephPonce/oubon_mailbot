@@ -20,7 +20,8 @@ router = APIRouter(prefix="/api/aliexpress", tags=["aliexpress"])
 ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "520918")
 ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
 # CORRECT OAuth 2.0 endpoint for OVERSEAS (api-sg = Singapore gateway)
-ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
+# AliExpress uses REST API structure for token exchange
+ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
 ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
 
 # Token storage path
