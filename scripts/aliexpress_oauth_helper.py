@@ -15,9 +15,9 @@ load_dotenv()
 APP_KEY = os.getenv('ALIEXPRESS_APP_KEY')
 APP_SECRET = os.getenv('ALIEXPRESS_APP_SECRET')
 
-# OAuth endpoints
-AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
-TOKEN_URL = "https://oauth.aliexpress.com/token"
+# OAuth endpoints - OVERSEAS (api-sg = Singapore gateway for non-China users)
+AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
+TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
 
 # Your callback URL (this needs to match what's registered in your AliExpress app)
 # Use production HTTPS URL since AliExpress requires HTTPS

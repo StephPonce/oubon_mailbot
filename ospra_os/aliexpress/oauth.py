@@ -46,8 +46,8 @@ class AliExpressOAuth:
     6. Store token in database
     """
 
-    # Official AliExpress OAuth endpoints from documentation
-    AUTHORIZE_URL = "https://oauth.aliexpress.com/authorize"
+    # Official AliExpress OAuth endpoints - OVERSEAS (api-sg = Singapore gateway)
+    AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
     TOKEN_URL = "https://api-sg.aliexpress.com/sync"  # Uses /auth/token/create method
 
     def __init__(self, app_key: str, app_secret: str, redirect_uri: str, database_url: str = None):

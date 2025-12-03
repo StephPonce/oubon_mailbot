@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:8001/oauth2callback"
-    google_scopes: str = "https://www.googleapis.com/auth/gmail.modify"
+    google_scopes: str = "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.labels https://www.googleapis.com/auth/gmail.send"
     google_credentials_file: str = ".secrets/credentials.json"
     google_token_file: str = ".secrets/gmail_token.json"
 

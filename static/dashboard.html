@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ospra Intelligence - Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * { font-family: 'Inter', sans-serif; }
+    
+    :root {
+      --ospra-primary: #6366f1;
+      --ospra-primary-dark: #4f46e5;
+      --ospra-success: #10b981;
+      --ospra-warning: #f59e0b;
+      --ospra-danger: #ef4444;
+      --ospra-bg: #0f172a;
+      --ospra-card: #1e293b;
+      --ospra-border: #334155;
+    }
+    
+    body {
+      background: var(--ospra-bg);
+      color: #e2e8f0;
+    }
+    
+    .card {
+      background: var(--ospra-card);
+      border: 1px solid var(--ospra-border);
+      border-radius: 12px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, var(--ospra-primary), var(--ospra-primary-dark));
+      transition: all 0.2s;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+    
+    .stat-card {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(99, 102, 241, 0.05));
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    
+    .pulse {
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .sidebar-link {
+      transition: all 0.2s;
+    }
+    
+    .sidebar-link:hover, .sidebar-link.active {
+      background: rgba(99, 102, 241, 0.1);
+      border-left: 3px solid var(--ospra-primary);
+    }
+    
+    .email-row:hover {
+      background: rgba(99, 102, 241, 0.05);
+    }
+    
+    .product-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--ospra-primary);
+    }
+    
+    .tab-btn.active {
+      background: var(--ospra-primary);
+      color: white;
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .toast {
+      animation: slideIn 0.3s ease;
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-64 min-h-screen bg-slate-900 border-r border-slate-700 fixed">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-8">
+          <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+            <span class="text-white font-bold text-lg">O</span>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg">Ospra Intelligence</h1>
+            <p class="text-xs text-slate-400">Command Center</p>
+          </div>
+        </div>
+        
+        <nav class="space-y-1">
+          <a href="#dashboard" class="sidebar-link active flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('dashboard')">
+            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+            Dashboard
+          </a>
+          <a href="#emails" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('emails')">
+            <i data-lucide="mail" class="w-5 h-5"></i>
+            Email Automation
+            <span class="ml-auto bg-indigo-500/20 text-indigo-400 text-xs px-2 py-0.5 rounded-full" id="emailBadge">0</span>
+          </a>
+          <a href="#products" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('products')">
+            <i data-lucide="package" class="w-5 h-5"></i>
+            Product Discovery
+          </a>
+          <a href="#shopify" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('shopify')">
+            <i data-lucide="shopping-bag" class="w-5 h-5"></i>
+            Shopify Store
+          </a>
+          <a href="#trends" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('trends')">
+            <i data-lucide="trending-up" class="w-5 h-5"></i>
+            Live Trends
+          </a>
+          <a href="#ai" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-lg text-slate-300" onclick="showSection('ai')">
+            <i data-lucide="brain" class="w-5 h-5"></i>
+            AI Assistant
+          </a>
+        </nav>
+        
+        <div class="absolute bottom-6 left-6 right-6">
+          <div class="card p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="w-2 h-2 bg-green-500 rounded-full pulse"></div>
+              <span class="text-sm text-slate-400">System Status</span>
+            </div>
+            <p class="text-xs text-green-400">All systems operational</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-64 flex-1 p-8">
+      
+      <!-- Dashboard Section -->
+      <section id="dashboard" class="section">
+        <div class="mb-8">
+          <h2 class="text-2xl font-bold mb-2">Welcome back, Steph</h2>
+          <p class="text-slate-400">Here's what's happening with your e-commerce empire today.</p>
+        </div>
+        
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-4 gap-6 mb-8">
+          <div class="stat-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <i data-lucide="mail" class="w-8 h-8 text-indigo-400"></i>
+              <span class="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded">AI Active</span>
+            </div>
+            <p class="text-3xl font-bold" id="statEmails">--</p>
+            <p class="text-slate-400 text-sm">Emails processed today</p>
+          </div>
+          
+          <div class="stat-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <i data-lucide="package" class="w-8 h-8 text-purple-400"></i>
+              <span class="text-xs text-purple-400 bg-purple-500/10 px-2 py-1 rounded">Discovery</span>
+            </div>
+            <p class="text-3xl font-bold" id="statProducts">--</p>
+            <p class="text-slate-400 text-sm">Products tracked</p>
+          </div>
+          
+          <div class="stat-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <i data-lucide="shopping-bag" class="w-8 h-8 text-emerald-400"></i>
+              <span class="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">Shopify</span>
+            </div>
+            <p class="text-3xl font-bold" id="statShopify">--</p>
+            <p class="text-slate-400 text-sm">Live products</p>
+          </div>
+          
+          <div class="stat-card rounded-xl p-6">
+            <div class="flex items-center justify-between mb-4">
+              <i data-lucide="dollar-sign" class="w-8 h-8 text-amber-400"></i>
+              <span class="text-xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded">Revenue</span>
+            </div>
+            <p class="text-3xl font-bold" id="statRevenue">$--</p>
+            <p class="text-slate-400 text-sm">Estimated value</p>
+          </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="card p-6 mb-8">
+          <h3 class="font-semibold mb-4 flex items-center gap-2">
+            <i data-lucide="zap" class="w-5 h-5 text-indigo-400"></i>
+            Quick Actions
+          </h3>
+          <div class="flex gap-4">
+            <button onclick="syncEmails()" class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Sync Emails
+            </button>
+            <button onclick="discoverProducts()" class="btn-primary px-6 py-3 rounded-lg font-medium flex items-center gap-2">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              Discover Products
+            </button>
+            <button onclick="showSection('shopify')" class="bg-emerald-600 hover:bg-emerald-700 px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition">
+              <i data-lucide="upload" class="w-4 h-4"></i>
+              Deploy to Shopify
+            </button>
+            <button onclick="showSection('ai')" class="bg-slate-700 hover:bg-slate-600 px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition">
+              <i data-lucide="message-square" class="w-4 h-4"></i>
+              Ask AI
+            </button>
+          </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-2 gap-6">
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4 flex items-center gap-2">
+              <i data-lucide="activity" class="w-5 h-5 text-indigo-400"></i>
+              Recent Email Activity
+            </h3>
+            <div id="recentEmails" class="space-y-3">
+              <p class="text-slate-400 text-sm">Loading...</p>
+            </div>
+          </div>
+          
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4 flex items-center gap-2">
+              <i data-lucide="trending-up" class="w-5 h-5 text-emerald-400"></i>
+              Top Trending Products
+            </h3>
+            <div id="trendingProducts" class="space-y-3">
+              <p class="text-slate-400 text-sm">Loading...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Email Automation Section -->
+      <section id="emails" class="section hidden">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Email Automation</h2>
+            <p class="text-slate-400">AI-powered customer support with smart routing</p>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="syncEmails()" class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Sync Now
+            </button>
+            <button onclick="testEmailAI()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 transition">
+              <i data-lucide="flask-conical" class="w-4 h-4"></i>
+              Test AI
+            </button>
+          </div>
+        </div>
+        
+        <!-- Email Stats -->
+        <div class="grid grid-cols-5 gap-4 mb-8">
+          <div class="card p-4 text-center">
+            <p class="text-2xl font-bold text-indigo-400" id="emailTotal">0</p>
+            <p class="text-xs text-slate-400">Total</p>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-2xl font-bold text-yellow-400" id="emailPending">0</p>
+            <p class="text-xs text-slate-400">Pending</p>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-2xl font-bold text-green-400" id="emailReplied">0</p>
+            <p class="text-xs text-slate-400">Replied</p>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-2xl font-bold text-red-400" id="emailUrgent">0</p>
+            <p class="text-xs text-slate-400">Urgent</p>
+          </div>
+          <div class="card p-4 text-center">
+            <p class="text-2xl font-bold text-slate-400" id="emailIgnored">0</p>
+            <p class="text-xs text-slate-400">Auto-Ignored</p>
+          </div>
+        </div>
+        
+        <!-- Email Filters -->
+        <div class="card p-4 mb-6">
+          <div class="flex gap-2">
+            <button class="tab-btn active px-4 py-2 rounded-lg text-sm" onclick="filterEmails('all')">All</button>
+            <button class="tab-btn px-4 py-2 rounded-lg text-sm bg-slate-700" onclick="filterEmails('pending')">Pending</button>
+            <button class="tab-btn px-4 py-2 rounded-lg text-sm bg-slate-700" onclick="filterEmails('urgent')">Urgent</button>
+            <button class="tab-btn px-4 py-2 rounded-lg text-sm bg-slate-700" onclick="filterEmails('replied')">Replied</button>
+          </div>
+        </div>
+        
+        <!-- Email List -->
+        <div class="card">
+          <div id="emailList" class="divide-y divide-slate-700">
+            <p class="p-6 text-slate-400">No emails to display. Click "Sync Now" to fetch emails.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Product Discovery Section -->
+      <section id="products" class="section hidden">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Product Discovery</h2>
+            <p class="text-slate-400">AI-powered product research and trend analysis</p>
+          </div>
+          <button onclick="discoverProducts()" class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2">
+            <i data-lucide="search" class="w-4 h-4"></i>
+            Run Discovery
+          </button>
+        </div>
+        
+        <!-- Product Grid -->
+        <div id="productGrid" class="grid grid-cols-3 gap-6">
+          <div class="card p-6 text-center">
+            <i data-lucide="package-search" class="w-12 h-12 mx-auto mb-4 text-slate-600"></i>
+            <p class="text-slate-400">No products discovered yet.</p>
+            <p class="text-sm text-slate-500 mt-2">Click "Run Discovery" to find trending products.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Shopify Section -->
+      <section id="shopify" class="section hidden">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Shopify Store</h2>
+            <p class="text-slate-400">Manage your store and deploy products</p>
+          </div>
+          <div class="flex gap-3">
+            <button onclick="refreshShopify()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 transition">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              Refresh
+            </button>
+            <button onclick="openDeployModal()" class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2">
+              <i data-lucide="rocket" class="w-4 h-4"></i>
+              Deploy Product
+            </button>
+          </div>
+        </div>
+        
+        <!-- Shopify Status -->
+        <div class="card p-6 mb-8">
+          <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 bg-green-500 rounded-full pulse" id="shopifyStatusDot"></div>
+              <span id="shopifyStatusText">Checking connection...</span>
+            </div>
+            <div class="text-slate-400">|</div>
+            <div>Store: <span class="text-indigo-400" id="shopifyStoreName">--</span></div>
+            <div class="text-slate-400">|</div>
+            <div>Products: <span class="text-emerald-400" id="shopifyProductCount">--</span></div>
+          </div>
+        </div>
+        
+        <!-- Shopify Products -->
+        <div id="shopifyProducts" class="grid grid-cols-4 gap-4">
+          <p class="col-span-4 text-center text-slate-400 py-8">Loading Shopify products...</p>
+        </div>
+      </section>
+
+      <!-- Live Trends Section -->
+      <section id="trends" class="section hidden">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="text-2xl font-bold mb-2">Live Trends</h2>
+            <p class="text-slate-400">Real-time market trends powered by xAI</p>
+          </div>
+          <button onclick="refreshTrends()" class="btn-primary px-4 py-2 rounded-lg flex items-center gap-2">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            Refresh Trends
+          </button>
+        </div>
+        
+        <div id="trendsContainer" class="grid grid-cols-2 gap-6">
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">Loading trends...</h3>
+          </div>
+        </div>
+      </section>
+
+      <!-- AI Assistant Section -->
+      <section id="ai" class="section hidden">
+        <div class="mb-8">
+          <h2 class="text-2xl font-bold mb-2">AI Assistant</h2>
+          <p class="text-slate-400">Ask anything about your business, products, or strategy</p>
+        </div>
+        
+        <div class="card p-6">
+          <div id="chatMessages" class="h-96 overflow-y-auto mb-4 space-y-4">
+            <div class="flex gap-3">
+              <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                <i data-lucide="brain" class="w-4 h-4"></i>
+              </div>
+              <div class="bg-slate-700 rounded-lg p-4 max-w-xl">
+                <p>Hello! I'm your Ospra Intelligence AI assistant. I can help you with:</p>
+                <ul class="list-disc list-inside mt-2 text-sm text-slate-300">
+                  <li>Product analysis and recommendations</li>
+                  <li>Email response drafting</li>
+                  <li>Pricing strategy</li>
+                  <li>Market trend insights</li>
+                  <li>Business strategy questions</li>
+                </ul>
+                <p class="mt-2 text-sm">What would you like to know?</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="flex gap-3">
+            <input 
+              type="text" 
+              id="chatInput" 
+              placeholder="Ask me anything..." 
+              class="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 focus:outline-none focus:border-indigo-500"
+              onkeypress="if(event.key === 'Enter') sendChat()"
+            >
+            <button onclick="sendChat()" class="btn-primary px-6 py-3 rounded-lg font-medium">
+              <i data-lucide="send" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Deploy Modal -->
+  <div id="deployModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+    <div class="card p-8 w-full max-w-lg">
+      <h3 class="text-xl font-bold mb-6">Deploy Product to Shopify</h3>
+      <form onsubmit="deployProduct(event)">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Product Name *</label>
+            <input type="text" id="deployName" required class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Niche/Category</label>
+            <input type="text" id="deployNiche" value="smart home" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Supplier Cost ($)</label>
+            <input type="number" id="deployCost" step="0.01" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Supplier URL</label>
+            <input type="url" id="deployUrl" placeholder="https://aliexpress.com/..." class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div>
+            <label class="block text-sm text-slate-400 mb-1">Image URL</label>
+            <input type="url" id="deployImage" class="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500">
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="deployAI" checked class="rounded">
+            <label for="deployAI" class="text-sm">Generate AI description</label>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-6">
+          <button type="button" onclick="closeDeployModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg transition">Cancel</button>
+          <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded-lg">
+            🚀 Deploy
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // API Configuration
+    const API_BASE = window.location.origin;
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadDashboard();
+      checkShopifyStatus();
+    });
+    
+    // Section Navigation
+    function showSection(sectionId) {
+      document.querySelectorAll('.section').forEach(s => s.classList.add('hidden'));
+      document.getElementById(sectionId).classList.remove('hidden');
+      
+      document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+      document.querySelector(`[href="#${sectionId}"]`).classList.add('active');
+      
+      // Load section data
+      if (sectionId === 'shopify') refreshShopify();
+      if (sectionId === 'emails') loadEmails();
+      if (sectionId === 'trends') refreshTrends();
+    }
+    
+    // Toast Notifications
+    function showToast(message, type = 'info') {
+      const colors = {
+        success: 'bg-green-600',
+        error: 'bg-red-600',
+        info: 'bg-indigo-600',
+        warning: 'bg-yellow-600'
+      };
+      
+      const toast = document.createElement('div');
+      toast.className = `toast ${colors[type]} px-6 py-3 rounded-lg shadow-lg`;
+      toast.textContent = message;
+      
+      document.getElementById('toastContainer').appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+    
+    // Dashboard
+    async function loadDashboard() {
+      try {
+        // Load stats
+        const [shopifyRes, healthRes] = await Promise.all([
+          fetch(`${API_BASE}/api/shopify/analytics`).catch(() => null),
+          fetch(`${API_BASE}/health`)
+        ]);
+        
+        if (shopifyRes?.ok) {
+          const data = await shopifyRes.json();
+          document.getElementById('statShopify').textContent = data.total_products || 0;
+          document.getElementById('statRevenue').textContent = `$${(data.estimated_value || 0).toLocaleString()}`;
+        }
+        
+        document.getElementById('statEmails').textContent = '0';
+        document.getElementById('statProducts').textContent = '0';
+        
+      } catch (error) {
+        console.error('Dashboard load error:', error);
+      }
+    }
+    
+    // Shopify
+    async function checkShopifyStatus() {
+      try {
+        const res = await fetch(`${API_BASE}/api/shopify/status`);
+        const data = await res.json();
+        
+        const dot = document.getElementById('shopifyStatusDot');
+        const text = document.getElementById('shopifyStatusText');
+        
+        if (data.connection === 'active') {
+          dot.classList.add('bg-green-500');
+          dot.classList.remove('bg-red-500');
+          text.textContent = 'Connected';
+          document.getElementById('shopifyStoreName').textContent = data.store_name;
+        } else {
+          dot.classList.add('bg-red-500');
+          dot.classList.remove('bg-green-500');
+          text.textContent = data.error || 'Not connected';
+        }
+      } catch (error) {
+        console.error('Shopify status error:', error);
+      }
+    }
+    
+    async function refreshShopify() {
+      try {
+        const res = await fetch(`${API_BASE}/api/shopify/products`);
+        const products = await res.json();
+        
+        document.getElementById('shopifyProductCount').textContent = products.length;
+        
+        const container = document.getElementById('shopifyProducts');
+        
+        if (products.length === 0) {
+          container.innerHTML = '<p class="col-span-4 text-center text-slate-400 py-8">No products in store yet.</p>';
+          return;
+        }
+        
+        container.innerHTML = products.map(p => `
+          <div class="card p-4 product-card transition cursor-pointer">
+            <div class="aspect-square bg-slate-700 rounded-lg mb-3 overflow-hidden">
+              ${p.image_url ? `<img src="${p.image_url}" class="w-full h-full object-cover">` : '<div class="w-full h-full flex items-center justify-center"><i data-lucide="image" class="w-8 h-8 text-slate-600"></i></div>'}
+            </div>
+            <h4 class="font-medium text-sm truncate">${p.title}</h4>
+            <div class="flex items-center justify-between mt-2">
+              <span class="text-indigo-400 font-bold">$${p.price}</span>
+              <span class="text-xs text-slate-400">${p.inventory_quantity} in stock</span>
+            </div>
+            ${p.ospra_tracked ? '<span class="text-xs text-green-400 mt-1 block">✓ Ospra Tracked</span>' : ''}
+          </div>
+        `).join('');
+        
+        lucide.createIcons();
+        
+      } catch (error) {
+        console.error('Shopify refresh error:', error);
+        showToast('Failed to load Shopify products', 'error');
+      }
+    }
+    
+    // Deploy Modal
+    function openDeployModal() {
+      document.getElementById('deployModal').classList.remove('hidden');
+      document.getElementById('deployModal').classList.add('flex');
+    }
+    
+    function closeDeployModal() {
+      document.getElementById('deployModal').classList.add('hidden');
+      document.getElementById('deployModal').classList.remove('flex');
+    }
+    
+    async function deployProduct(event) {
+      event.preventDefault();
+      
+      const data = {
+        product_id: `ospra_${Date.now()}`,
+        name: document.getElementById('deployName').value,
+        niche: document.getElementById('deployNiche').value,
+        supplier_cost: parseFloat(document.getElementById('deployCost').value) || 0,
+        supplier_url: document.getElementById('deployUrl').value,
+        images: document.getElementById('deployImage').value ? [document.getElementById('deployImage').value] : [],
+        generate_ai_description: document.getElementById('deployAI').checked
+      };
+      
+      showToast('Deploying product...', 'info');
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/shopify/deploy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+          showToast('Product deployed successfully!', 'success');
+          closeDeployModal();
+          refreshShopify();
+        } else {
+          showToast(`Deployment failed: ${result.error}`, 'error');
+        }
+        
+      } catch (error) {
+        showToast('Deployment error', 'error');
+      }
+    }
+    
+    // Emails
+    async function syncEmails() {
+      showToast('Syncing emails...', 'info');
+      try {
+        const res = await fetch(`${API_BASE}/api/email/sync`, { method: 'POST' });
+        const data = await res.json();
+        showToast(`Synced ${data.synced || 0} emails`, 'success');
+        loadEmails();
+      } catch (error) {
+        showToast('Sync failed - check Gmail OAuth', 'error');
+      }
+    }
+    
+    async function loadEmails() {
+      // Placeholder - would load from email API
+      document.getElementById('emailList').innerHTML = `
+        <div class="email-row p-4 flex items-center gap-4 cursor-pointer">
+          <div class="w-2 h-2 bg-yellow-500 rounded-full"></div>
+          <div class="flex-1">
+            <p class="font-medium">Sample Customer Email</p>
+            <p class="text-sm text-slate-400">Where is my order #12345?</p>
+          </div>
+          <span class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">HIGH</span>
+          <span class="text-xs text-slate-400">2 min ago</span>
+        </div>
+      `;
+    }
+    
+    function testEmailAI() {
+      showToast('Running AI email test...', 'info');
+      // Would trigger the test endpoint
+    }
+    
+    function filterEmails(filter) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('active', 'bg-indigo-600');
+        b.classList.add('bg-slate-700');
+      });
+      event.target.classList.add('active');
+      event.target.classList.remove('bg-slate-700');
+    }
+    
+    // Products
+    async function discoverProducts() {
+      showToast('Running product discovery...', 'info');
+      // Would trigger discovery endpoint
+    }
+    
+    // Trends
+    async function refreshTrends() {
+      try {
+        const res = await fetch(`${API_BASE}/api/trends/ecommerce`);
+        if (!res.ok) throw new Error('API error');
+        
+        const data = await res.json();
+        
+        document.getElementById('trendsContainer').innerHTML = `
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">🔥 Trending Topics</h3>
+            <div class="space-y-2">
+              ${(data.trends || []).slice(0, 5).map(t => `
+                <div class="flex items-center justify-between p-2 bg-slate-700/50 rounded">
+                  <span>${t.topic || t}</span>
+                  <span class="text-xs text-indigo-400">${t.score || '--'}%</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          <div class="card p-6">
+            <h3 class="font-semibold mb-4">📊 Market Insights</h3>
+            <p class="text-slate-400 text-sm">${data.summary || 'Loading insights...'}</p>
+          </div>
+        `;
+        
+      } catch (error) {
+        document.getElementById('trendsContainer').innerHTML = `
+          <div class="card p-6 col-span-2 text-center">
+            <p class="text-slate-400">Could not load trends. Make sure xAI API is configured.</p>
+          </div>
+        `;
+      }
+    }
+    
+    // AI Chat
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const message = input.value.trim();
+      if (!message) return;
+      
+      const container = document.getElementById('chatMessages');
+      
+      // Add user message
+      container.innerHTML += `
+        <div class="flex gap-3 justify-end">
+          <div class="bg-indigo-600 rounded-lg p-4 max-w-xl">
+            <p>${message}</p>
+          </div>
+          <div class="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <i data-lucide="user" class="w-4 h-4"></i>
+          </div>
+        </div>
+      `;
+      
+      input.value = '';
+      container.scrollTop = container.scrollHeight;
+      
+      // Add loading
+      container.innerHTML += `
+        <div class="flex gap-3" id="chatLoading">
+          <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <i data-lucide="brain" class="w-4 h-4"></i>
+          </div>
+          <div class="bg-slate-700 rounded-lg p-4">
+            <div class="loading"></div>
+          </div>
+        </div>
+      `;
+      
+      lucide.createIcons();
+      
+      try {
+        const res = await fetch(`${API_BASE}/api/ai/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        
+        const data = await res.json();
+        
+        document.getElementById('chatLoading')?.remove();
+        
+        container.innerHTML += `
+          <div class="flex gap-3">
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i data-lucide="brain" class="w-4 h-4"></i>
+            </div>
+            <div class="bg-slate-700 rounded-lg p-4 max-w-xl">
+              <p>${data.response || data.error || 'No response'}</p>
+            </div>
+          </div>
+        `;
+        
+        lucide.createIcons();
+        container.scrollTop = container.scrollHeight;
+        
+      } catch (error) {
+        document.getElementById('chatLoading')?.remove();
+        container.innerHTML += `
+          <div class="flex gap-3">
+            <div class="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i data-lucide="alert-circle" class="w-4 h-4"></i>
+            </div>
+            <div class="bg-slate-700 rounded-lg p-4">
+              <p class="text-red-400">Error: Could not get AI response</p>
+            </div>
+          </div>
+        `;
+        lucide.createIcons();
+      }
+    }
+  </script>
+</body>
+</html>

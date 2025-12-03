@@ -92,6 +92,7 @@ class ActionType(str, enum.Enum):
     FORWARD = "forward"
     DELETE = "delete"
     MARK_READ = "mark_read"
+    AI_REPLY = "ai_reply"  # AI-powered contextual response
 
 
 class LifecycleStage(str, enum.Enum):

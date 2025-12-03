@@ -85,6 +85,27 @@ const SystemHealthPage: React.FC = () => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
+  // User-friendly display names for integrations
+  const integrationDisplayNames: Record<string, string> = {
+    claude_ai: 'Ospra Intelligence',
+    shopify: 'Shopify',
+    aliexpress: 'AliExpress',
+    meta_ads: 'Meta Advertising',
+    gmail: 'Email Service',
+  };
+
+  // User-friendly display names for jobs
+  const jobDisplayNames: Record<string, string> = {
+    product_discovery: 'Product Discovery',
+    competitor_monitoring: 'Competitor Monitoring',
+    email_processor: 'Email Processing',
+    inventory_sync: 'Inventory Synchronization',
+    analytics_aggregation: 'Analytics Reports',
+    ab_test_monitor: 'A/B Test Monitor',
+    ranking_update: 'Product Rankings',
+    niche_analysis: 'Niche Analysis',
+  };
+
   const fetchHealthData = async () => {
     try {
       // Fetch overall status
@@ -379,7 +400,7 @@ const SystemHealthPage: React.FC = () => {
                 }}
               >
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-gray-900 font-light text-lg capitalize">{name.replace('_', ' ')}</h3>
+                  <h3 className="text-gray-900 font-light text-lg">{integrationDisplayNames[name] || name}</h3>
                   <div className={`flex items-center gap-2 ${getStatusColor(integration.status)}`}>
                     {getStatusIcon(integration.status)}
                     <span className="text-sm font-light">{integration.status}</span>
@@ -443,7 +464,7 @@ const SystemHealthPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <h3 className="text-gray-900 font-light text-lg">{job.name}</h3>
+                    <h3 className="text-gray-900 font-light text-lg">{jobDisplayNames[job.name] || job.name}</h3>
                     <p className="text-gray-600 text-sm font-light">{job.description}</p>
                   </div>
                   <div className={`flex items-center gap-2 ${getStatusColor(job.status)}`}>

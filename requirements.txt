@@ -12,6 +12,8 @@ psycopg2-binary
 asyncpg
 openai
 anthropic
+groq
+google-generativeai
 requests
 jinja2
 slack_sdk

@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/aliexpress-affiliate", tags=["aliexpress-affilia
 # AliExpress Affiliate API credentials (from .env)
 ALIEXPRESS_AFFILIATE_APP_KEY = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
 ALIEXPRESS_AFFILIATE_APP_SECRET = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
-# OAuth 2.0 endpoint
-ALIEXPRESS_TOKEN_URL = "https://oauth.aliexpress.com/token"
+# OAuth 2.0 endpoint for OVERSEAS (api-sg = Singapore gateway)
+ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/oauth/token"
 ALIEXPRESS_AFFILIATE_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress-affiliate/callback"
 
 # Token storage path

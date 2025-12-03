@@ -20,11 +20,7 @@ app = FastAPI(title="Oubon MailBot", version="0.1.0")
 # CORS middleware - Allow frontend to connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173",  # Alternative localhost
-        "http://localhost:3000",  # Alternative dev server
-    ],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods
     allow_headers=["*"],  # Allow all headers
@@ -1037,4 +1033,91 @@ async def get_all_niches(products_per_niche: int = 5):
 # ---------------------------------------------------------------
 # Mount static files (must be last)
 # ---------------------------------------------------------------
+
+# Include Shopify routes
+try:
+    from ospra_os.integrations.shopify.routes import router as shopify_router
+    app.include_router(shopify_router)
+    print("✅ Shopify routes loaded")
+except Exception as e:
+    print(f"⚠️  Shopify routes not loaded: {e}")
+
+# Include Opportunity Scoring routes (Anti-AutoDS Algorithm)
+try:
+    from ospra_os.intelligence.opportunity_routes import router as opportunity_router
+    app.include_router(opportunity_router)
+    print("✅ Opportunity Scoring routes loaded")
+except Exception as e:
+    print(f"⚠️  Opportunity routes not loaded: {e}")
+
+# Trends API endpoint for dashboard
+@app.get("/api/trends/ecommerce")
+async def get_ecommerce_trends():
+    """Get e-commerce trends using xAI or fallback"""
+    try:
+        # Try xAI first
+        from ospra_os.trends.xai_twitter_trends import get_ecommerce_trends as xai_trends
+        data = await xai_trends()
+        return data
+    except Exception as e:
+        # Fallback to basic response
+        return {
+            'success': True,
+            'trends': [
+                {'topic': 'Smart Home Devices', 'score': 85},
+                {'topic': 'LED Lighting', 'score': 78},
+                {'topic': 'Home Organization', 'score': 72},
+                {'topic': 'Wireless Chargers', 'score': 68},
+                {'topic': 'Kitchen Gadgets', 'score': 65}
+            ],
+            'summary': 'Smart home and LED products continue to trend. Focus on energy-efficient and convenience-focused items.',
+            'source': 'fallback'
+        }
+
+# AI Chat endpoint for dashboard
+@app.post("/api/ai/chat")
+async def ai_chat(chat: ChatMessage):
+    """AI chat endpoint using model router"""
+    try:
+        from ospra_os.ai.model_router import ai_quick_chat
+        response = await ai_quick_chat(chat.message, chat.context)
+        return {'success': True, 'response': response}
+    except Exception as e:
+        # Fallback to Claude advisor
+        try:
+            from ospra_os.intelligence.claude_advisor import chat_with_claude as chat_func
+            response = await chat_func(chat.message, chat.context)
+            return {'success': True, 'response': response}
+        except Exception as e2:
+            return {'success': False, 'error': str(e2)}
+
+# Email sync endpoint for dashboard
+@app.post("/api/email/sync")
+async def sync_emails(settings: Settings = Depends(get_settings)):
+    """Sync emails from Gmail"""
+    try:
+        gc = GmailClient(settings)
+        svc = _svc(gc)
+        
+        # Fetch recent unread
+        res = svc.users().messages().list(
+            userId='me',
+            q='is:unread',
+            maxResults=50
+        ).execute()
+        
+        messages = res.get('messages', [])
+        
+        return {
+            'success': True,
+            'synced': len(messages),
+            'message': f'Found {len(messages)} unread emails'
+        }
+    except Exception as e:
+        return {
+            'success': False,
+            'synced': 0,
+            'error': str(e)
+        }
+
 app.mount("/static", StaticFiles(directory="static"), name="static")

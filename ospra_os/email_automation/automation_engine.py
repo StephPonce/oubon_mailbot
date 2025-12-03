@@ -299,6 +299,41 @@ class AutomationEngine:
 
                 return result
 
+            elif rule.action_type == ActionType.AI_REPLY:
+                # Use AI to generate contextual response
+                from ospra_os.email_automation.ai_responder import EmailAutomationAI
+                
+                ai = EmailAutomationAI()
+                ai_result = await ai.process_email(
+                    email_id=str(email.id),
+                    from_address=email.from_address or '',
+                    from_name=email.from_name or '',
+                    subject=email.subject or '',
+                    body=email.body_plain or '',
+                    received_at=email.received_at or datetime.utcnow()
+                )
+                
+                if ai_result.get('should_respond'):
+                    # Send the AI-generated response
+                    send_result = await self.email_sender.send_reply(
+                        account=account,
+                        original_email=email,
+                        reply_message=ai_result['response_text']
+                    )
+                    
+                    return {
+                        'success': send_result.get('success', False),
+                        'ai_category': ai_result.get('category'),
+                        'ai_urgency': ai_result.get('urgency'),
+                        'response_type': ai_result.get('response_type'),
+                        'order_detected': ai_result.get('order_number')
+                    }
+                else:
+                    return {
+                        'success': True,
+                        'message': f"Email auto-ignored: {ai_result.get('reason', 'no response needed')}"
+                    }
+
             else:
                 return {
                     'success': False,

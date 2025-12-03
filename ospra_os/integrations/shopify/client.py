@@ -207,6 +207,24 @@ class ShopifyClient:
             print(f"❌ Error listing products: {e}")
             return []
 
+    async def get_shop_info(self) -> Dict:
+        """Get shop information from Shopify"""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/shop.json",
+                    headers=self.headers
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    return result.get('shop', {})
+                return {}
+
+        except Exception as e:
+            print(f"❌ Error getting shop info: {e}")
+            return {}
+
     async def _add_metafields(
         self,
         product_id: int,
