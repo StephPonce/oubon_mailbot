@@ -19,9 +19,12 @@ router = APIRouter(prefix="/api/aliexpress", tags=["aliexpress"])
 # Affiliate: 522382 / 9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL
 ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "520918")
 ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
-# OAuth 2.0 token endpoint - uses standard OAuth format (NO signature needed!)
-# This is SEPARATE from the API endpoints which require signatures
-ALIEXPRESS_TOKEN_URL = "https://oauth.aliexpress.com/token"
+# Token endpoint - AliExpress REST API structure
+# NOTE: Both endpoints tested, both fail:
+#   - https://oauth.aliexpress.com/token → "appkey not exists" error
+#   - https://api-sg.aliexpress.com/rest/auth/token/create → "IncompleteSignature" error
+# Waiting for clarification from AliExpress support on correct endpoint
+ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
 ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
 
 # Token storage path
