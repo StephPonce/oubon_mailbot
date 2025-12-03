@@ -232,6 +232,16 @@ except Exception as e:
     aliexpress_token_router = None
     _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = False
 
+# AliExpress Product Scraping
+try:
+    from ospra_os.api.aliexpress_product_routes import router as aliexpress_product_router  # type: ignore
+    _HAS_ALIEXPRESS_PRODUCTS = True
+    print("✅ AliExpress Product Scraping router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AliExpress Product Scraping router not loaded: {e}")
+    aliexpress_product_router = None
+    _HAS_ALIEXPRESS_PRODUCTS = False
+
 # TikTok OAuth router
 try:
     from ospra_os.auth.tiktok_oauth import router as tiktok_oauth_router  # type: ignore
@@ -743,6 +753,10 @@ if _HAS_ALIEXPRESS_AFFILIATE_CALLBACK and aliexpress_affiliate_callback_router:
 # AliExpress Token Management
 if _HAS_ALIEXPRESS_TOKEN_MANAGEMENT and aliexpress_token_router:
     app.include_router(aliexpress_token_router)  # exposes /api/aliexpress/tokens/*
+
+# AliExpress Product Scraping
+if _HAS_ALIEXPRESS_PRODUCTS and aliexpress_product_router:
+    app.include_router(aliexpress_product_router)  # exposes /api/aliexpress/products/*
 
 if _HAS_TIKTOK_OAUTH and tiktok_oauth_router:
     app.include_router(tiktok_oauth_router)  # exposes /auth/tiktok/*
