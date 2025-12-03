@@ -26,8 +26,9 @@ class AliExpressProductAPI:
 
     def __init__(self):
         # Load credentials from environment
-        self.dropship_app_key = os.getenv("ALIEXPRESS_APP_KEY", "520918")
-        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET")
+        # Try OUBONSHOP_ prefix first (existing), then standard names
+        self.dropship_app_key = os.getenv("ALIEXPRESS_APP_KEY") or os.getenv("OUBONSHOP_ALIEXPRESS_API_KEY", "520918")
+        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET") or os.getenv("OUBONSHOP_ALIEXPRESS_APP_SECRET")
         self.affiliate_app_key = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
         self.affiliate_app_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET")
 
