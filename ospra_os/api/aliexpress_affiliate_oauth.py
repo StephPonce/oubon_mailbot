@@ -27,30 +27,30 @@ ALIEXPRESS_AFFILIATE_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/alie
 TOKENS_FILE = Path(".secrets/aliexpress_affiliate_tokens.json")
 
 
-def generate_aliexpress_signature_md5(params: dict, app_secret: str) -> str:
+def generate_aliexpress_signature_md5(params: dict, app_secret: str, api_path: str = "/auth/token/create") -> str:
     """
-    Generate AliExpress API signature using MD5
+    Generate AliExpress API signature using HMAC-MD5
 
     Algorithm:
-    1. Sort parameters alphabetically by key
-    2. Concatenate as: key1value1key2value2...
-    3. Prepend and append app_secret
-    4. Calculate MD5 hash
-    5. Convert to uppercase
+    1. Sort parameters alphabetically by key (exclude 'sign')
+    2. Concatenate as: /api/pathkey1value1key2value2...
+    3. Use HMAC-MD5 with app_secret as key
+    4. Convert to uppercase hexadecimal
     """
     # Sort parameters alphabetically (exclude 'sign' if present)
     sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
 
-    # Concatenate as key1value1key2value2...
-    concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
+    # Concatenate as: /api/path + key1value1key2value2...
+    concat_str = api_path + ''.join([f"{k}{v}" for k, v in sorted_params])
 
-    # Prepend and append app_secret
-    sign_str = f"{app_secret}{concat_str}{app_secret}"
+    # Calculate HMAC-MD5 signature
+    signature = hmac.new(
+        app_secret.encode('utf-8'),
+        concat_str.encode('utf-8'),
+        hashlib.md5
+    ).hexdigest().upper()
 
-    # Calculate MD5 and convert to uppercase
-    md5_hash = hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
-
-    return md5_hash
+    return signature
 
 
 @router.get("/oauth-callback")
