@@ -27,6 +27,32 @@ ALIEXPRESS_AFFILIATE_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/alie
 TOKENS_FILE = Path(".secrets/aliexpress_affiliate_tokens.json")
 
 
+def generate_aliexpress_signature_md5(params: dict, app_secret: str) -> str:
+    """
+    Generate AliExpress API signature using MD5
+
+    Algorithm:
+    1. Sort parameters alphabetically by key
+    2. Concatenate as: key1value1key2value2...
+    3. Prepend and append app_secret
+    4. Calculate MD5 hash
+    5. Convert to uppercase
+    """
+    # Sort parameters alphabetically (exclude 'sign' if present)
+    sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
+
+    # Concatenate as key1value1key2value2...
+    concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
+
+    # Prepend and append app_secret
+    sign_str = f"{app_secret}{concat_str}{app_secret}"
+
+    # Calculate MD5 and convert to uppercase
+    md5_hash = hashlib.md5(sign_str.encode('utf-8')).hexdigest().upper()
+
+    return md5_hash
+
+
 @router.get("/oauth-callback")
 @router.get("/callback")  # Support both routes
 async def affiliate_oauth_callback(
@@ -96,19 +122,27 @@ async def affiliate_oauth_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # Standard OAuth 2.0 parameters
+            # AliExpress REST API requires system parameters + signature
+            timestamp = str(int(time.time() * 1000))  # Milliseconds
+
+            # System parameters (required for ALL AliExpress API calls)
             params = {
-                "client_id": ALIEXPRESS_AFFILIATE_APP_KEY,
                 "app_key": ALIEXPRESS_AFFILIATE_APP_KEY,
-                "client_secret": ALIEXPRESS_AFFILIATE_APP_SECRET,
-                "app_secret": ALIEXPRESS_AFFILIATE_APP_SECRET,
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": ALIEXPRESS_AFFILIATE_REDIRECT_URI,
-                "sp": "ae"
+                "timestamp": timestamp,
+                "sign_method": "md5",
+                "format": "json",
+                "v": "2.0",
+                "method": "auth.token.create",  # The API method we're calling
+                # API-specific parameter:
+                "code": code  # The authorization code
             }
 
-            # Exchange code for tokens
+            # Generate signature (AliExpress uses MD5 signature)
+            signature = generate_aliexpress_signature_md5(params, ALIEXPRESS_AFFILIATE_APP_SECRET)
+            params["sign"] = signature
+
+            # Exchange code for tokens using AliExpress REST API
+            # Note: AliExpress uses POST with form-urlencoded, not JSON
             response = await client.post(
                 ALIEXPRESS_TOKEN_URL,
                 data=params,

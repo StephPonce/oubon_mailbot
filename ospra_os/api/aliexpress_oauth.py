@@ -148,19 +148,27 @@ async def oauth_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # AliExpress OAuth wants BOTH standard and custom parameter names
+            # AliExpress REST API requires system parameters + signature
+            timestamp = str(int(time.time() * 1000))  # Milliseconds
+
+            # System parameters (required for ALL AliExpress API calls)
             params = {
-                "client_id": ALIEXPRESS_APP_KEY,
-                "app_key": ALIEXPRESS_APP_KEY,  # Also send as app_key
-                "client_secret": ALIEXPRESS_APP_SECRET,
-                "app_secret": ALIEXPRESS_APP_SECRET,  # Also send as app_secret
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": ALIEXPRESS_REDIRECT_URI,
-                "sp": "ae"  # AliExpress account type
+                "app_key": ALIEXPRESS_APP_KEY,
+                "timestamp": timestamp,
+                "sign_method": "md5",
+                "format": "json",
+                "v": "2.0",
+                "method": "auth.token.create",  # The API method we're calling
+                # API-specific parameter:
+                "code": code  # The authorization code
             }
 
-            # Exchange code for tokens using standard OAuth 2.0
+            # Generate signature (AliExpress uses MD5 signature)
+            signature = generate_aliexpress_signature_md5(params, ALIEXPRESS_APP_SECRET)
+            params["sign"] = signature
+
+            # Exchange code for tokens using AliExpress REST API
+            # Note: AliExpress uses POST with form-urlencoded, not JSON
             response = await client.post(
                 ALIEXPRESS_TOKEN_URL,
                 data=params,
