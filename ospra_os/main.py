@@ -222,6 +222,16 @@ except Exception as e:
     aliexpress_affiliate_callback_router = None
     _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = False
 
+# AliExpress Token Management (Automatic Refresh)
+try:
+    from ospra_os.api.aliexpress_token_routes import router as aliexpress_token_router  # type: ignore
+    _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = True
+    print("✅ AliExpress Token Management router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AliExpress Token Management router not loaded: {e}")
+    aliexpress_token_router = None
+    _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = False
+
 # TikTok OAuth router
 try:
     from ospra_os.auth.tiktok_oauth import router as tiktok_oauth_router  # type: ignore
@@ -626,6 +636,16 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  Customer analytics scheduler failed to start: {e}")
 
+    # Start AliExpress token refresh scheduler
+    try:
+        from ospra_os.api.aliexpress_token_scheduler import start_token_refresh_scheduler, check_tokens_on_startup
+        start_token_refresh_scheduler()
+        # Check tokens immediately on startup
+        await check_tokens_on_startup()
+        print("✅ AliExpress token refresh scheduler started")
+    except Exception as e:
+        print(f"⚠️  AliExpress token refresh scheduler failed to start: {e}")
+
 
 # ---------------------------------------------------------------
 # Shutdown Event - Stop Background Jobs
@@ -658,6 +678,16 @@ async def shutdown_event():
     except Exception as e:
         logger.error(f"Error stopping realtime updater: {e}")
         print(f"⚠️  Error stopping realtime updater: {e}")
+
+    # Stop AliExpress token refresh scheduler
+    try:
+        from ospra_os.api.aliexpress_token_scheduler import stop_token_refresh_scheduler
+        stop_token_refresh_scheduler()
+        logger.info("✅ AliExpress token refresh scheduler stopped")
+        print("✅ AliExpress token refresh scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping token refresh scheduler: {e}")
+        print(f"⚠️  Error stopping token refresh scheduler: {e}")
 
     # Stop report scheduler
     try:
@@ -709,6 +739,10 @@ if _HAS_ALIEXPRESS_CALLBACK and aliexpress_callback_router:
 # AliExpress Affiliate API OAuth callback
 if _HAS_ALIEXPRESS_AFFILIATE_CALLBACK and aliexpress_affiliate_callback_router:
     app.include_router(aliexpress_affiliate_callback_router)  # exposes /api/aliexpress/callback and /api/aliexpress/oauth-callback
+
+# AliExpress Token Management
+if _HAS_ALIEXPRESS_TOKEN_MANAGEMENT and aliexpress_token_router:
+    app.include_router(aliexpress_token_router)  # exposes /api/aliexpress/tokens/*
 
 if _HAS_TIKTOK_OAUTH and tiktok_oauth_router:
     app.include_router(tiktok_oauth_router)  # exposes /auth/tiktok/*
