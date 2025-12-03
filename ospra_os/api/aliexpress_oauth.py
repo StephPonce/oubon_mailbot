@@ -19,9 +19,9 @@ router = APIRouter(prefix="/api/aliexpress", tags=["aliexpress"])
 # Affiliate: 522382 / 9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL
 ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "520918")
 ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
-# CORRECT OAuth 2.0 endpoint for OVERSEAS (api-sg = Singapore gateway)
-# AliExpress uses REST API structure for token exchange
-ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
+# OAuth 2.0 token endpoint - uses standard OAuth format (NO signature needed!)
+# This is SEPARATE from the API endpoints which require signatures
+ALIEXPRESS_TOKEN_URL = "https://oauth.aliexpress.com/token"
 ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
 
 # Token storage path
@@ -148,27 +148,18 @@ async def oauth_callback(
 
     try:
         async with httpx.AsyncClient() as client:
-            # AliExpress REST API requires system parameters + signature
-            timestamp = str(int(time.time() * 1000))  # Milliseconds
-
-            # System parameters (required for ALL AliExpress API calls)
+            # Standard OAuth 2.0 token exchange - NO signature required!
+            # AliExpress OAuth endpoint uses standard OAuth 2.0 format
             params = {
-                "app_key": ALIEXPRESS_APP_KEY,
-                "timestamp": timestamp,
-                "sign_method": "md5",
-                "format": "json",
-                "v": "2.0",
-                "method": "auth.token.create",  # The API method we're calling
-                # API-specific parameter:
-                "code": code  # The authorization code
+                "client_id": ALIEXPRESS_APP_KEY,
+                "client_secret": ALIEXPRESS_APP_SECRET,
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": ALIEXPRESS_REDIRECT_URI,
+                "sp": "ae"  # AliExpress account type
             }
 
-            # Generate signature (AliExpress uses MD5 signature)
-            signature = generate_aliexpress_signature_md5(params, ALIEXPRESS_APP_SECRET)
-            params["sign"] = signature
-
-            # Exchange code for tokens using AliExpress REST API
-            # Note: AliExpress uses POST with form-urlencoded, not JSON
+            # Exchange code for tokens using standard OAuth 2.0
             response = await client.post(
                 ALIEXPRESS_TOKEN_URL,
                 data=params,
