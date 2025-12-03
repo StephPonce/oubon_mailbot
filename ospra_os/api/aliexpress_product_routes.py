@@ -41,14 +41,15 @@ class AliExpressProductAPI:
         self.affiliate_tokens_file = self.secrets_dir / "aliexpress_affiliate_tokens.json"
 
     def load_tokens(self, tokens_file: Path) -> Optional[dict]:
-        """Load access tokens from file"""
-        if not tokens_file.exists():
-            return None
+        """Load access tokens from database (file path used to determine api_type)"""
+        # Determine API type from filename
+        api_type = "affiliate" if "affiliate" in str(tokens_file) else "dropship"
 
         try:
-            with open(tokens_file, 'r') as f:
-                return json.load(f)
-        except Exception:
+            from ospra_os.database.aliexpress_tokens import load_token
+            return load_token(api_type)
+        except Exception as e:
+            print(f"❌ Error loading {api_type} token from database: {e}")
             return None
 
     def generate_signature(self, params: dict, app_secret: str, api_path: str = "/sync") -> str:

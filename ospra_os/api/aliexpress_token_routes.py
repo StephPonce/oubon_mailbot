@@ -58,47 +58,12 @@ async def refresh_affiliate_token_endpoint(background_tasks: BackgroundTasks):
 @router.get("/status")
 async def get_token_status():
     """
-    Get status of all AliExpress tokens
+    Get status of all AliExpress tokens (from database)
 
     Returns information about when tokens were obtained,
     when they expire, and whether they need refresh.
     """
-    from ospra_os.api.aliexpress_token_refresh import refresher
-    from datetime import datetime, timedelta
+    from ospra_os.database.aliexpress_tokens import get_token_status as db_get_status
 
-    def get_token_info(tokens_file):
-        tokens = refresher.load_tokens(tokens_file)
-        if not tokens:
-            return {"status": "not_authorized", "message": "No tokens found"}
-
-        obtained_at_str = tokens.get("obtained_at") or tokens.get("refreshed_at")
-        if not obtained_at_str:
-            return {"status": "invalid", "message": "Token missing timestamp"}
-
-        try:
-            obtained_at = datetime.fromisoformat(obtained_at_str)
-            expires_in = tokens.get("expires_in", 0)
-            expires_at = obtained_at + timedelta(seconds=expires_in)
-            time_until_expiry = (expires_at - datetime.now()).total_seconds()
-            days_until_expiry = time_until_expiry / 86400
-
-            needs_refresh = refresher.is_token_expiring_soon(tokens)
-
-            return {
-                "status": "valid" if not needs_refresh else "expiring_soon",
-                "obtained_at": obtained_at_str,
-                "expires_at": expires_at.isoformat(),
-                "expires_in_seconds": int(time_until_expiry),
-                "expires_in_days": round(days_until_expiry, 1),
-                "needs_refresh": needs_refresh,
-                "has_refresh_token": bool(tokens.get("refresh_token")),
-                "access_token_preview": tokens.get("access_token", "")[:20] + "..."
-            }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
-
-    return JSONResponse({
-        "timestamp": datetime.now().isoformat(),
-        "dropship": get_token_info(refresher.dropship_tokens_file),
-        "affiliate": get_token_info(refresher.affiliate_tokens_file)
-    })
+    # Load status from database (survives deployments!)
+    return JSONResponse(db_get_status())

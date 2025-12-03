@@ -227,17 +227,20 @@ async def oauth_callback(
 
             # Store tokens if successful
             if response.status_code == 200 and "access_token" in token_response:
-                # Ensure .secrets directory exists
-                TOKENS_FILE.parent.mkdir(parents=True, exist_ok=True)
+                # Save to database (survives deployments!)
+                from ospra_os.database.aliexpress_tokens import save_token
 
-                # Add timestamp
-                token_response["obtained_at"] = datetime.now().isoformat()
+                success = save_token(
+                    api_type="dropship",
+                    access_token=token_response["access_token"],
+                    refresh_token=token_response.get("refresh_token", ""),
+                    expires_in=token_response.get("expires_in", 2592000)
+                )
 
-                # Save to file
-                with open(TOKENS_FILE, "w") as f:
-                    json.dump(token_response, f, indent=2)
-
-                print(f"✅ AliExpress tokens saved to {TOKENS_FILE}")
+                if success:
+                    print(f"✅ AliExpress Dropshipping tokens saved to database")
+                else:
+                    print(f"❌ Failed to save tokens to database")
             else:
                 token_error = f"Token exchange failed: {response.status_code} - {response.text}"
                 print(f"❌ {token_error}")
