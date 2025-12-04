@@ -73,7 +73,8 @@ class AliExpressProductAPI:
     async def get_hot_products(
         self,
         page_size: int = 20,
-        category_id: Optional[str] = None
+        category_id: Optional[str] = None,
+        feed_name: str = "DS_Global_topsellers"
     ) -> dict:
         """
         Get hot/trending products from Dropshipping API
@@ -104,7 +105,7 @@ class AliExpressProductAPI:
             "v": "2.0",
             "sign_method": "sha256",
             "session": tokens["access_token"],
-            "feed_name": "DS hot product",
+            "feed_name": feed_name,
             "country": "US",
             "target_currency": "USD",
             "target_language": "EN",
@@ -335,12 +336,27 @@ class AliExpressProductAPI:
 
                     # Parse response
                     resp = data.get("aliexpress_ds_feedname_get_response", {})
-                    result = resp.get("result") or resp.get("resp_result", {})
+                    resp_result = resp.get("resp_result", {})
+                    result = resp_result.get("result", {})
+
+                    # Extract promo names from nested structure
+                    promos_data = result.get("promos", {})
+                    promo_list = promos_data.get("promo", [])
+
+                    # Format feed names
+                    feed_names = [
+                        {
+                            "name": promo.get("promo_name"),
+                            "description": promo.get("promo_desc"),
+                            "product_count": promo.get("product_num")
+                        }
+                        for promo in promo_list
+                    ]
 
                     return {
                         "success": True,
-                        "feed_names": result.get("feed_name_list", []),
-                        "raw_response": data
+                        "total_feeds": result.get("current_record_count", 0),
+                        "feeds": feed_names
                     }
         except HTTPException:
             raise
@@ -456,14 +472,21 @@ async def get_feed_names():
 @router.get("/hot")
 async def get_hot_products(
     page_size: int = Query(20, ge=1, le=50, description="Number of products to return"),
-    category_id: Optional[str] = Query(None, description="Category ID filter")
+    category_id: Optional[str] = Query(None, description="Category ID filter"),
+    feed_name: str = Query("DS_Global_topsellers", description="Feed name (use /feed-names to see available feeds)")
 ):
     """
     Get hot/trending products from AliExpress
 
-    Uses Dropshipping API to fetch currently trending products.
+    Uses Dropshipping API to fetch products from a specific feed.
+    Use the /feed-names endpoint to see all available feeds.
+
+    Popular feeds:
+    - DS_Global_topsellers
+    - DS_Home&Kitchen_bestsellers
+    - AEB_Topseller_PriceRange0~20$
     """
-    return await api.get_hot_products(page_size=page_size, category_id=category_id)
+    return await api.get_hot_products(page_size=page_size, category_id=category_id, feed_name=feed_name)
 
 
 @router.get("/bestsellers")
