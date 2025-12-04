@@ -58,8 +58,8 @@ class AliExpressProductAPI:
         # Sort parameters (excluding 'sign')
         sorted_params = sorted([(k, v) for k, v in params.items() if k != 'sign'])
 
-        # Concatenate: API_PATH + sorted params
-        concat_str = api_path + ''.join([f"{k}{v}" for k, v in sorted_params])
+        # Concatenate: sorted params ONLY (no API path for product API calls)
+        concat_str = ''.join([f"{k}{v}" for k, v in sorted_params])
 
         # Generate HMAC-SHA256 signature
         signature = hmac.new(
