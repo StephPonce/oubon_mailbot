@@ -27,10 +27,11 @@ class AliExpressProductAPI:
     def __init__(self):
         # Load credentials from environment
         # Try OUBONSHOP_ prefix first (existing), then standard names
+        # Defaults match the OAuth routes
         self.dropship_app_key = os.getenv("ALIEXPRESS_APP_KEY") or os.getenv("OUBONSHOP_ALIEXPRESS_API_KEY", "520918")
-        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET") or os.getenv("OUBONSHOP_ALIEXPRESS_APP_SECRET")
+        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET") or os.getenv("OUBONSHOP_ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
         self.affiliate_app_key = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
-        self.affiliate_app_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET")
+        self.affiliate_app_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
 
         # API endpoint
         self.api_url = "https://api-sg.aliexpress.com/sync"
@@ -88,13 +89,6 @@ class AliExpressProductAPI:
                 "count": int
             }
         """
-        # Check if app secret is configured
-        if not self.dropship_app_secret:
-            raise HTTPException(
-                status_code=500,
-                detail="ALIEXPRESS_APP_SECRET environment variable not set"
-            )
-
         # Load dropshipping tokens
         tokens = self.load_tokens(self.dropship_tokens_file)
         if not tokens or not tokens.get("access_token"):
@@ -183,13 +177,6 @@ class AliExpressProductAPI:
 
     async def get_bestsellers(self, page_size: int = 20) -> dict:
         """Get bestselling products from Dropshipping API"""
-        # Check if app secret is configured
-        if not self.dropship_app_secret:
-            raise HTTPException(
-                status_code=500,
-                detail="ALIEXPRESS_APP_SECRET environment variable not set"
-            )
-
         tokens = self.load_tokens(self.dropship_tokens_file)
         if not tokens or not tokens.get("access_token"):
             raise HTTPException(status_code=401, detail="Dropshipping API not authorized")
@@ -262,13 +249,6 @@ class AliExpressProductAPI:
 
     async def get_product_details(self, product_ids: List[str]) -> dict:
         """Get product details from Affiliate API"""
-        # Check if app secret is configured
-        if not self.affiliate_app_secret:
-            raise HTTPException(
-                status_code=500,
-                detail="ALIEXPRESS_AFFILIATE_APP_SECRET environment variable not set"
-            )
-
         tokens = self.load_tokens(self.affiliate_tokens_file)
         if not tokens or not tokens.get("access_token"):
             raise HTTPException(status_code=401, detail="Affiliate API not authorized")
