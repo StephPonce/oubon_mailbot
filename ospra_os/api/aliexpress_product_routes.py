@@ -250,6 +250,101 @@ class AliExpressProductAPI:
                 detail=f"Failed to fetch bestsellers: {str(e)}"
             )
 
+    async def affiliate_product_query(
+        self,
+        keywords: Optional[str] = None,
+        category_ids: Optional[str] = None,
+        page_size: int = 20,
+        page_no: int = 1,
+        sort: str = "SALE_PRICE_ASC"
+    ) -> dict:
+        """
+        Search for products using Affiliate API
+
+        This is more reliable than Dropshipping feeds and works for all account types.
+        """
+        # Load affiliate tokens
+        tokens = self.load_tokens(self.affiliate_tokens_file)
+        if not tokens or not tokens.get("access_token"):
+            raise HTTPException(status_code=401, detail="Affiliate API not authorized")
+
+        timestamp = str(int(time.time() * 1000))
+        params = {
+            "app_key": self.affiliate_app_key,
+            "method": "aliexpress.affiliate.product.query",
+            "timestamp": timestamp,
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "session": tokens["access_token"],
+            "target_currency": "USD",
+            "target_language": "EN",
+            "ship_to_country": "US",
+            "page_size": str(min(page_size, 50)),
+            "page_no": str(page_no),
+            "sort": sort,
+        }
+
+        if keywords:
+            params["keywords"] = keywords
+        if category_ids:
+            params["category_ids"] = category_ids
+
+        params["sign"] = self.generate_signature(params, self.affiliate_app_secret)
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
+
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')}"
+                        )
+
+                    # Parse response
+                    resp = data.get("aliexpress_affiliate_product_query_response", {})
+                    resp_result = resp.get("resp_result", {})
+                    result = resp_result.get("result", {})
+
+                    # Extract products
+                    products_data = result.get("products", {})
+                    product_list = products_data.get("product", []) if isinstance(products_data, dict) else products_data
+
+                    # Format products
+                    products = []
+                    for item in product_list:
+                        products.append({
+                            "product_id": item.get("product_id"),
+                            "title": item.get("product_title"),
+                            "price": float(item.get("target_sale_price", 0)),
+                            "original_price": float(item.get("target_original_price", 0)),
+                            "discount": item.get("discount", "0%"),
+                            "image_url": item.get("product_main_image_url"),
+                            "url": item.get("promotion_link"),
+                            "orders": int(item.get("volume", 0)),
+                            "rating": float(item.get("evaluate_rate", 0)) / 20.0,
+                            "category": item.get("second_level_category_name"),
+                            "commission_rate": item.get("commission_rate"),
+                        })
+
+                    return {
+                        "success": True,
+                        "products": products,
+                        "count": len(products),
+                        "total": result.get("total_record_count", 0),
+                        "source": "affiliate_api"
+                    }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to query products: {str(e)}"
+            )
+
     async def get_product_details(self, product_ids: List[str]) -> dict:
         """Get product details from Affiliate API"""
         tokens = self.load_tokens(self.affiliate_tokens_file)
@@ -515,15 +610,41 @@ async def get_product_details(
 
 
 @router.get("/search")
-async def search_products(
-    product_id: str = Query(..., description="Product ID to fetch"),
+async def search_products_affiliate(
+    keywords: Optional[str] = Query(None, description="Search keywords"),
+    category_ids: Optional[str] = Query(None, description="Category IDs"),
+    page_size: int = Query(20, ge=1, le=50),
+    page_no: int = Query(1, ge=1),
+    sort: str = Query("SALE_PRICE_ASC", description="Sort order (SALE_PRICE_ASC, SALE_PRICE_DESC, LAST_VOLUME_ASC, LAST_VOLUME_DESC)")
+):
+    """
+    Search for products using Affiliate API
+
+    This endpoint is more reliable than Dropshipping feeds and works for all account types.
+    You can search by keywords, category, or both.
+
+    Examples:
+    - ?keywords=phone
+    - ?keywords=smart+watch&sort=LAST_VOLUME_DESC
+    - ?category_ids=509,1511
+    """
+    return await api.affiliate_product_query(
+        keywords=keywords,
+        category_ids=category_ids,
+        page_size=page_size,
+        page_no=page_no,
+        sort=sort
+    )
+
+
+@router.get("/product/{product_id}")
+async def get_single_product(
+    product_id: str,
     page_size: int = Query(20, ge=1, le=50),
     page_no: int = Query(1, ge=1)
 ):
     """
-    Get product details by ID
-
-    Uses Dropshipping API to get product information.
+    Get product details by ID using Dropshipping API
     """
     return await api.search_products(
         keywords=product_id,
