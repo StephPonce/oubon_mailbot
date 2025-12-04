@@ -33,3 +33,7 @@ boto3>=1.34.0
 # Shopify Integration (Optional - install manually when needed)
 # ShopifyAPI>=12.0.0  # For Shopify store automation (slow to install)
 # Install only when using: pip install ShopifyAPI
+
+# JWT Authentication
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4

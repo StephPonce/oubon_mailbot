@@ -71,6 +71,16 @@ except Exception as e:
     HealthMonitor = None
     _HAS_HEALTH_MONITOR = False
 
+# Authentication router (required for user accounts)
+try:
+    from ospra_os.api.auth_routes import router as auth_router  # type: ignore
+    _HAS_AUTH = True
+    print("✅ Authentication router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Authentication router not loaded: {e}")
+    auth_router = None
+    _HAS_AUTH = False
+
 # Gmail OAuth router (optional)
 try:
     from ospra_os.gmail.routes import router as gmail_oauth_router  # type: ignore
@@ -723,6 +733,9 @@ async def shutdown_event():
 
 if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
+
+if _HAS_AUTH and auth_router:
+    app.include_router(auth_router)  # exposes /api/auth/* (registration, login, JWT)
 
 if _HAS_TIKTOK and tiktok_router:
     app.include_router(tiktok_router)

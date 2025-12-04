@@ -4,6 +4,12 @@ AliExpress Product Scraping API Routes
 Provides endpoints for product search and scraping using both APIs:
 - Dropshipping API (520918): Product feeds, search
 - Affiliate API (522382): Product details, affiliate links
+
+Tier Enforcement:
+- NEST (Free): 50 results, no enrichment
+- FLIGHT ($29): 100 results, no enrichment
+- SOAR ($79): 500 results, enrichment enabled
+- STRATOSPHERE ($199): unlimited results, enrichment + auto-ordering
 """
 import os
 import json
@@ -12,13 +18,59 @@ import hashlib
 import time
 from typing import Optional, List
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import aiohttp
 
+# Import tier system
+from ospra_os.core.tiers import (
+    SubscriptionTier,
+    TierEnforcer,
+    get_tier_feature,
+    get_tier_definition,
+)
+
+# Import usage tracking
+from ospra_os.core.usage_tracking import (
+    UsageTracker,
+    TierUsageEnforcer,
+    UsageType,
+    get_tracker,
+    get_enforcer,
+)
+from ospra_os.database.multi_store_models import SessionLocal, User
+
+# Import authentication
+from ospra_os.auth.jwt_auth import get_current_user, get_current_user_optional
+
 
 router = APIRouter(prefix="/api/aliexpress/products", tags=["aliexpress-products"])
+
+
+# ==================== TIER ENFORCEMENT ====================
+
+async def get_user_tier(
+    tier: Optional[str] = Query(None, description="User subscription tier (nest/flight/soar/stratosphere). Defaults to nest.")
+) -> SubscriptionTier:
+    """
+    Get user's subscription tier from query parameter.
+
+    TODO: Replace with actual authentication system that loads tier from database.
+    For now, accepts tier as query parameter for testing, defaults to NEST (free).
+    """
+    if not tier:
+        return SubscriptionTier.NEST
+
+    # Convert string to enum
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+    }
+
+    return tier_map.get(tier.lower(), SubscriptionTier.NEST)
 
 
 class AliExpressProductAPI:
@@ -727,7 +779,8 @@ async def search_products_affiliate(
     category_ids: Optional[str] = Query(None, description="Category IDs"),
     page_size: int = Query(20, ge=1, le=50),
     page_no: int = Query(1, ge=1),
-    sort: str = Query("SALE_PRICE_ASC", description="Sort order (SALE_PRICE_ASC, SALE_PRICE_DESC, LAST_VOLUME_ASC, LAST_VOLUME_DESC)")
+    sort: str = Query("SALE_PRICE_ASC", description="Sort order (SALE_PRICE_ASC, SALE_PRICE_DESC, LAST_VOLUME_ASC, LAST_VOLUME_DESC)"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Search for products using Affiliate API
@@ -735,18 +788,106 @@ async def search_products_affiliate(
     This endpoint is more reliable than Dropshipping feeds and works for all account types.
     You can search by keywords, category, or both.
 
+    **Tier Limits:**
+    - NEST (Free): max 50 results per search, 10 searches/day
+    - FLIGHT ($29): max 100 results per search, 25 searches/day
+    - SOAR ($79): max 500 results per search, 100 searches/day
+    - STRATOSPHERE ($199): unlimited results, unlimited searches
+
     Examples:
     - ?keywords=phone
     - ?keywords=smart+watch&sort=LAST_VOLUME_DESC
     - ?category_ids=509,1511
+    
+    **Requires Authentication**: JWT token in Authorization header
     """
-    return await api.affiliate_product_query(
-        keywords=keywords,
-        category_ids=category_ids,
-        page_size=page_size,
-        page_no=page_no,
-        sort=sort
-    )
+    # Extract user info from authenticated user
+    user_id = current_user.id
+    
+    # Convert subscription_tier string to enum (default to NEST if not set)
+    tier_str = current_user.subscription_tier or "nest"
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+    }
+    user_tier = tier_map.get(tier_str.lower(), SubscriptionTier.NEST)
+    
+    # Enforce tier limits on page_size
+    tier_enforcer = TierEnforcer(user_tier)
+    max_results = tier_enforcer.get_limit("aliexpress_search_results_limit")
+
+    if max_results != -1 and page_size > max_results:
+        tier_info = get_tier_definition(user_tier)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "page_size_limit_exceeded",
+                "message": f"Your {tier_info['name']} tier allows max {max_results} results per search. Upgrade to get more results.",
+                "current_tier": user_tier.value,
+                "requested": page_size,
+                "limit": max_results,
+                "upgrade_to": "soar" if user_tier == SubscriptionTier.FLIGHT else "stratosphere",
+            }
+        )
+
+    # Check daily search limit using UsageTracker
+    db = SessionLocal()
+    try:
+        usage_enforcer = TierUsageEnforcer(db)
+        can_search = usage_enforcer.can_perform(user_id, "aliexpress_search")
+        
+        if not can_search.get("allowed", True):
+            tier_info = get_tier_definition(user_tier)
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "daily_search_limit_exceeded",
+                    "message": f"You've reached your daily search limit ({can_search.get('limit', 'N/A')} searches/day for {tier_info['name']} tier).",
+                    "current_tier": user_tier.value,
+                    "current_usage": can_search.get("current", 0),
+                    "limit": can_search.get("limit", 0),
+                    "remaining": can_search.get("remaining", 0),
+                    "resets": "midnight UTC",
+                    "upgrade_to": can_search.get("upgrade_suggestion", "soar"),
+                }
+            )
+        
+        # Execute the search
+        result = await api.affiliate_product_query(
+            keywords=keywords,
+            category_ids=category_ids,
+            page_size=page_size,
+            page_no=page_no,
+            sort=sort
+        )
+        
+        # Record the usage after successful search
+        usage_enforcer.record_action(
+            user_id=user_id,
+            action="aliexpress_search",
+            event_data={"keywords": keywords, "page_size": page_size, "results": result.get("count", 0)}
+        )
+        
+        # Add usage info to response
+        result["usage"] = {
+            "searches_today": can_search.get("current", 0) + 1,
+            "daily_limit": can_search.get("limit", "unlimited"),
+            "remaining": max(0, can_search.get("remaining", 0) - 1) if can_search.get("limit") != -1 else "unlimited"
+        }
+        
+        # Add user info to response
+        result["user"] = {
+            "id": current_user.id,
+            "email": current_user.email,
+            "tier": user_tier.value
+        }
+        
+        return result
+        
+    finally:
+        db.close()
 
 
 @router.get("/product/{product_id}")
@@ -772,7 +913,8 @@ async def hybrid_product_discovery(
     page_size: int = Query(20, ge=1, le=50),
     page_no: int = Query(1, ge=1),
     sort: str = Query("SALE_PRICE_ASC", description="Sort order"),
-    enrich: bool = Query(False, description="Enrich with Dropshipping API details (slower)")
+    enrich: bool = Query(False, description="Enrich with Dropshipping API details (slower)"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     🔥 HYBRID DISCOVERY: Best of both APIs
@@ -784,19 +926,141 @@ async def hybrid_product_discovery(
 
     This is the RECOMMENDED method for product discovery.
 
+    **Tier Limits:**
+    - NEST (Free): max 50 results, no enrichment, 10 searches/day
+    - FLIGHT ($29): max 100 results, no enrichment, 25 searches/day
+    - SOAR ($79): max 500 results, enrichment enabled, 100 searches/day
+    - STRATOSPHERE ($199): unlimited results, enrichment enabled, unlimited searches
+
     Examples:
     - ?keywords=smart+watch (fast, affiliate only)
-    - ?keywords=smart+watch&enrich=true (slower, includes shipping details)
+    - ?keywords=smart+watch&enrich=true (with enrichment, requires Soar tier)
     - ?keywords=headphones&sort=LAST_VOLUME_DESC&enrich=true
+    
+    **Requires Authentication**: JWT token in Authorization header
     """
-    return await api.hybrid_product_discovery(
-        keywords=keywords,
-        category_ids=category_ids,
-        page_size=page_size,
-        page_no=page_no,
-        sort=sort,
-        enrich_with_dropship=enrich
-    )
+    # Extract user info from authenticated user
+    user_id = current_user.id
+    
+    # Convert subscription_tier string to enum (default to NEST if not set)
+    tier_str = current_user.subscription_tier or "nest"
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+    }
+    user_tier = tier_map.get(tier_str.lower(), SubscriptionTier.NEST)
+    
+    # Enforce tier limits
+    tier_enforcer = TierEnforcer(user_tier)
+    max_results = tier_enforcer.get_limit("aliexpress_search_results_limit")
+
+    # Check page_size limit
+    if max_results != -1 and page_size > max_results:
+        tier_info = get_tier_definition(user_tier)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "page_size_limit_exceeded",
+                "message": f"Your {tier_info['name']} tier allows max {max_results} results per search. Upgrade to get more results.",
+                "current_tier": user_tier.value,
+                "requested": page_size,
+                "limit": max_results,
+                "upgrade_to": "soar" if user_tier in [SubscriptionTier.NEST, SubscriptionTier.FLIGHT] else "stratosphere",
+            }
+        )
+
+    # Check enrichment access (SOAR and STRATOSPHERE only)
+    if enrich and not tier_enforcer.can_access("aliexpress_enrichment"):
+        tier_info = get_tier_definition(user_tier)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "enrichment_not_available",
+                "message": f"Product enrichment (real-time stock, shipping details) requires Soar tier or higher. Your current tier: {tier_info['name']}.",
+                "current_tier": user_tier.value,
+                "feature": "aliexpress_enrichment",
+                "upgrade_to": "soar",
+                "upgrade_benefits": [
+                    "Real-time inventory monitoring",
+                    "Shipping details and delivery times",
+                    "SKU variants and product options",
+                    "Seller quality ratings",
+                ]
+            }
+        )
+
+    # Check daily search limit using UsageTracker
+    db = SessionLocal()
+    try:
+        usage_enforcer = TierUsageEnforcer(db)
+        can_search = usage_enforcer.can_perform(user_id, "aliexpress_search")
+        
+        if not can_search.get("allowed", True):
+            tier_info = get_tier_definition(user_tier)
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "daily_search_limit_exceeded",
+                    "message": f"You've reached your daily search limit ({can_search.get('limit', 'N/A')} searches/day for {tier_info['name']} tier).",
+                    "current_tier": user_tier.value,
+                    "current_usage": can_search.get("current", 0),
+                    "limit": can_search.get("limit", 0),
+                    "remaining": can_search.get("remaining", 0),
+                    "resets": "midnight UTC",
+                    "upgrade_to": can_search.get("upgrade_suggestion", "soar"),
+                }
+            )
+        
+        # Execute the search
+        result = await api.hybrid_product_discovery(
+            keywords=keywords,
+            category_ids=category_ids,
+            page_size=page_size,
+            page_no=page_no,
+            sort=sort,
+            enrich_with_dropship=enrich
+        )
+        
+        # Record the usage after successful search
+        usage_enforcer.record_action(
+            user_id=user_id,
+            action="aliexpress_search",
+            event_data={
+                "keywords": keywords, 
+                "page_size": page_size, 
+                "results": result.get("count", 0),
+                "enriched": enrich
+            }
+        )
+        
+        # If enrichment was used, record that too
+        if enrich:
+            usage_enforcer.record_action(
+                user_id=user_id,
+                action="aliexpress_enrichment",
+                event_data={"products_enriched": result.get("count", 0)}
+            )
+        
+        # Add usage info to response
+        result["usage"] = {
+            "searches_today": can_search.get("current", 0) + 1,
+            "daily_limit": can_search.get("limit", "unlimited"),
+            "remaining": max(0, can_search.get("remaining", 0) - 1) if can_search.get("limit") != -1 else "unlimited"
+        }
+        
+        # Add user info to response
+        result["user"] = {
+            "id": current_user.id,
+            "email": current_user.email,
+            "tier": user_tier.value
+        }
+        
+        return result
+        
+    finally:
+        db.close()
 
 
 @router.get("/debug/raw-response")
