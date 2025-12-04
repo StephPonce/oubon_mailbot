@@ -319,13 +319,13 @@ class AliExpressProductAPI:
                         products.append({
                             "product_id": item.get("product_id"),
                             "title": item.get("product_title"),
-                            "price": float(item.get("target_sale_price", 0)),
-                            "original_price": float(item.get("target_original_price", 0)),
+                            "price": float(item.get("target_sale_price", 0)) if item.get("target_sale_price") else 0.0,
+                            "original_price": float(item.get("target_original_price", 0)) if item.get("target_original_price") else 0.0,
                             "discount": item.get("discount", "0%"),
                             "image_url": item.get("product_main_image_url"),
                             "url": item.get("promotion_link"),
-                            "orders": int(item.get("volume", 0)),
-                            "rating": float(item.get("evaluate_rate", 0)) / 20.0,
+                            "orders": int(item.get("volume", 0)) if item.get("volume") else 0,
+                            "rating": float(item.get("evaluate_rate", 0)) / 20.0 if item.get("evaluate_rate") else 0.0,
                             "category": item.get("second_level_category_name"),
                             "commission_rate": item.get("commission_rate"),
                         })
