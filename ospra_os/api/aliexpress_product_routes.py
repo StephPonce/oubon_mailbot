@@ -297,6 +297,59 @@ class AliExpressProductAPI:
                 detail=f"Failed to fetch product details: {str(e)}"
             )
 
+    async def get_feed_names(self) -> dict:
+        """
+        Get available feed names for the Dropshipping API
+
+        Returns list of valid feed names that can be used with aliexpress.ds.recommend.feed.get
+        """
+        # Load dropshipping tokens
+        tokens = self.load_tokens(self.dropship_tokens_file)
+        if not tokens or not tokens.get("access_token"):
+            raise HTTPException(status_code=401, detail="Dropshipping API not authorized")
+
+        timestamp = str(int(time.time() * 1000))
+        params = {
+            "app_key": self.dropship_app_key,
+            "method": "aliexpress.ds.feedname.get",
+            "timestamp": timestamp,
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "session": tokens["access_token"],
+        }
+
+        params["sign"] = self.generate_signature(params, self.dropship_app_secret)
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
+
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')}"
+                        )
+
+                    # Parse response
+                    resp = data.get("aliexpress_ds_feedname_get_response", {})
+                    result = resp.get("result") or resp.get("resp_result", {})
+
+                    return {
+                        "success": True,
+                        "feed_names": result.get("feed_name_list", []),
+                        "raw_response": data
+                    }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get feed names: {str(e)}"
+            )
+
     async def search_products(
         self,
         keywords: str,
@@ -389,6 +442,16 @@ api = AliExpressProductAPI()
 
 
 # Route handlers
+
+@router.get("/feed-names")
+async def get_feed_names():
+    """
+    Get available feed names for the Dropshipping API
+
+    Returns a list of valid feed names that can be used with the /hot and /bestsellers endpoints.
+    """
+    return await api.get_feed_names()
+
 
 @router.get("/hot")
 async def get_hot_products(
