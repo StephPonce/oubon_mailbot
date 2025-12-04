@@ -132,9 +132,10 @@ class AliExpressProductAPI:
                             detail=f"AliExpress API error: {error.get('msg')} (code: {error.get('code')})"
                         )
 
-                    # Parse response
+                    # Parse response - try both response formats
                     resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-                    result = resp_result.get("resp_result", {})
+                    # Try "result" first (new format), then "resp_result" (old format)
+                    result = resp_result.get("result") or resp_result.get("resp_result", {})
 
                 # Extract products
                 if isinstance(result.get("products"), dict):
@@ -213,7 +214,8 @@ class AliExpressProductAPI:
                         )
 
                     resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-                    result = resp_result.get("resp_result", {})
+                    # Try "result" first (new format), then "resp_result" (old format)
+                    result = resp_result.get("result") or resp_result.get("resp_result", {})
 
                     if isinstance(result.get("products"), dict):
                         product_list = result.get("products", {}).get("product", [])
@@ -295,6 +297,92 @@ class AliExpressProductAPI:
                 detail=f"Failed to fetch product details: {str(e)}"
             )
 
+    async def search_products(
+        self,
+        keywords: str,
+        page_size: int = 20,
+        page_no: int = 1
+    ) -> dict:
+        """
+        Get product by ID using Dropshipping API
+
+        Args:
+            keywords: Product ID
+            page_size: Not used (kept for compatibility)
+            page_no: Not used (kept for compatibility)
+        """
+        # Load dropshipping tokens
+        tokens = self.load_tokens(self.dropship_tokens_file)
+        if not tokens or not tokens.get("access_token"):
+            raise HTTPException(status_code=401, detail="Dropshipping API not authorized")
+
+        timestamp = str(int(time.time() * 1000))
+        params = {
+            "app_key": self.dropship_app_key,
+            "method": "aliexpress.ds.product.get",
+            "timestamp": timestamp,
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "session": tokens["access_token"],
+            "product_id": keywords,
+            "target_currency": "USD",
+            "target_language": "EN",
+        }
+
+        params["sign"] = self.generate_signature(params, self.dropship_app_secret)
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.api_url, params=params, timeout=15) as response:
+                    data = await response.json()
+
+                    if "error_response" in data:
+                        error = data["error_response"]
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"AliExpress API error: {error.get('msg')}"
+                        )
+
+                    # Parse product data
+                    resp = data.get("aliexpress_ds_product_get_response", {})
+                    result = resp.get("result") or resp.get("resp_result", {})
+
+                    if not result:
+                        return {
+                            "success": True,
+                            "products": [],
+                            "count": 0,
+                            "source": "dropshipping_search"
+                        }
+
+                    # Format single product
+                    product = {
+                        "product_id": result.get("ae_item_id"),
+                        "title": result.get("subject"),
+                        "price": float(result.get("target_sale_price", 0)),
+                        "original_price": float(result.get("target_original_price", 0)),
+                        "image_url": result.get("ae_item_main_image_url"),
+                        "images": result.get("ae_multimedia_info_dto", {}).get("image_urls", []),
+                        "url": result.get("item_url"),
+                        "category": result.get("category_id"),
+                        "ship_from": result.get("ship_from_country"),
+                    }
+
+                    return {
+                        "success": True,
+                        "products": [product],
+                        "count": 1,
+                        "source": "dropshipping_search"
+                    }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to search products: {str(e)}"
+            )
+
 
 # Create API instance
 api = AliExpressProductAPI()
@@ -338,6 +426,24 @@ async def get_product_details(
     """
     ids = [pid.strip() for pid in product_ids.split(",")]
     return await api.get_product_details(product_ids=ids)
+
+
+@router.get("/search")
+async def search_products(
+    product_id: str = Query(..., description="Product ID to fetch"),
+    page_size: int = Query(20, ge=1, le=50),
+    page_no: int = Query(1, ge=1)
+):
+    """
+    Get product details by ID
+
+    Uses Dropshipping API to get product information.
+    """
+    return await api.search_products(
+        keywords=product_id,
+        page_size=page_size,
+        page_no=page_no
+    )
 
 
 @router.get("/debug/raw-response")
