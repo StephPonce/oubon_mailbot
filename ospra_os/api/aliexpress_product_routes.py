@@ -345,6 +345,116 @@ class AliExpressProductAPI:
                 detail=f"Failed to query products: {str(e)}"
             )
 
+    async def hybrid_product_discovery(
+        self,
+        keywords: Optional[str] = None,
+        category_ids: Optional[str] = None,
+        page_size: int = 20,
+        page_no: int = 1,
+        sort: str = "SALE_PRICE_ASC",
+        enrich_with_dropship: bool = False
+    ) -> dict:
+        """
+        HYBRID: Use Affiliate API for discovery + optionally enrich with Dropshipping API
+
+        This combines the best of both APIs:
+        1. Affiliate API: Broad product search with keywords (WORKS)
+        2. Dropshipping API: Detailed product info by ID (WORKS if you have product IDs)
+
+        Args:
+            keywords: Search keywords
+            category_ids: Category filter
+            page_size: Number of products (max 50)
+            page_no: Page number
+            sort: Sort order
+            enrich_with_dropship: If True, fetch detailed info from Dropshipping API
+
+        Returns:
+            Products with metadata from both APIs
+        """
+        # Step 1: Get products from Affiliate API (discovery)
+        affiliate_result = await self.affiliate_product_query(
+            keywords=keywords,
+            category_ids=category_ids,
+            page_size=page_size,
+            page_no=page_no,
+            sort=sort
+        )
+
+        if not affiliate_result["success"] or not affiliate_result["products"]:
+            return affiliate_result
+
+        products = affiliate_result["products"]
+
+        # Step 2: Optionally enrich with Dropshipping API details
+        if enrich_with_dropship:
+            # Load dropshipping tokens
+            tokens = self.load_tokens(self.dropship_tokens_file)
+
+            # Only enrich if we have dropship authorization
+            if tokens and tokens.get("access_token"):
+                enriched_products = []
+
+                for product in products:
+                    product_id = product.get("product_id")
+
+                    if not product_id:
+                        enriched_products.append(product)
+                        continue
+
+                    try:
+                        # Fetch detailed info from Dropshipping API
+                        timestamp = str(int(time.time() * 1000))
+                        params = {
+                            "app_key": self.dropship_app_key,
+                            "method": "aliexpress.ds.product.get",
+                            "timestamp": timestamp,
+                            "format": "json",
+                            "v": "2.0",
+                            "sign_method": "sha256",
+                            "session": tokens["access_token"],
+                            "product_id": str(product_id),
+                            "target_currency": "USD",
+                            "target_language": "EN",
+                        }
+
+                        params["sign"] = self.generate_signature(params, self.dropship_app_secret)
+
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(self.api_url, params=params, timeout=10) as response:
+                                data = await response.json()
+
+                                # If we got dropship data, merge it
+                                if "error_response" not in data:
+                                    resp = data.get("aliexpress_ds_product_get_response", {})
+                                    result = resp.get("result") or resp.get("resp_result", {})
+
+                                    if result:
+                                        # Enrich product with dropship data
+                                        product["detailed_images"] = result.get("ae_multimedia_info_dto", {}).get("image_urls", [])
+                                        product["ship_from"] = result.get("ship_from_country")
+                                        product["package_type"] = result.get("package_type")
+                                        product["delivery_time"] = result.get("delivery_time")
+                                        product["source"] = "hybrid_affiliate+dropship"
+
+                        enriched_products.append(product)
+
+                    except Exception as e:
+                        # If dropship enrichment fails, just use affiliate data
+                        print(f"Failed to enrich product {product_id}: {e}")
+                        enriched_products.append(product)
+
+                products = enriched_products
+
+        return {
+            "success": True,
+            "products": products,
+            "count": len(products),
+            "total": affiliate_result.get("total", 0),
+            "source": "hybrid_affiliate" + ("+dropship" if enrich_with_dropship else ""),
+            "method": "affiliate_discovery" + (" + dropship_details" if enrich_with_dropship else "")
+        }
+
     async def get_product_details(self, product_ids: List[str]) -> dict:
         """Get product details from Affiliate API"""
         tokens = self.load_tokens(self.affiliate_tokens_file)
@@ -650,6 +760,40 @@ async def get_single_product(
         keywords=product_id,
         page_size=page_size,
         page_no=page_no
+    )
+
+
+@router.get("/hybrid-discover")
+async def hybrid_product_discovery(
+    keywords: Optional[str] = Query(None, description="Search keywords"),
+    category_ids: Optional[str] = Query(None, description="Category IDs"),
+    page_size: int = Query(20, ge=1, le=50),
+    page_no: int = Query(1, ge=1),
+    sort: str = Query("SALE_PRICE_ASC", description="Sort order"),
+    enrich: bool = Query(False, description="Enrich with Dropshipping API details (slower)")
+):
+    """
+    🔥 HYBRID DISCOVERY: Best of both APIs
+
+    Uses Affiliate API for discovery (keyword search) + optionally enriches with Dropshipping API.
+
+    - **Affiliate API**: Fast product search with keywords
+    - **Dropshipping API**: Detailed shipping/delivery info (optional, use ?enrich=true)
+
+    This is the RECOMMENDED method for product discovery.
+
+    Examples:
+    - ?keywords=smart+watch (fast, affiliate only)
+    - ?keywords=smart+watch&enrich=true (slower, includes shipping details)
+    - ?keywords=headphones&sort=LAST_VOLUME_DESC&enrich=true
+    """
+    return await api.hybrid_product_discovery(
+        keywords=keywords,
+        category_ids=category_ids,
+        page_size=page_size,
+        page_no=page_no,
+        sort=sort,
+        enrich_with_dropship=enrich
     )
 
 
