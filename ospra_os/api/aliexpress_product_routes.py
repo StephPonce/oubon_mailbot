@@ -416,6 +416,7 @@ class AliExpressProductAPI:
                             "product_id": str(product_id),
                             "target_currency": "USD",
                             "target_language": "EN",
+                            "ship_to_country": "US",
                         }
 
                         params["sign"] = self.generate_signature(params, self.dropship_app_secret)
@@ -602,6 +603,7 @@ class AliExpressProductAPI:
             "product_id": keywords,
             "target_currency": "USD",
             "target_language": "EN",
+            "ship_to_country": "US",
         }
 
         params["sign"] = self.generate_signature(params, self.dropship_app_secret)
@@ -838,4 +840,95 @@ async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
                 "raw_response": data,
                 "token_preview": tokens["access_token"][:20] + "...",
                 "signature_preview": params["sign"][:40] + "..."
+            }
+
+
+@router.get("/test/enrichment/{product_id}")
+async def test_dropship_enrichment(product_id: str):
+    """
+    🧪 TEST: Get full raw response from ds.product.get
+
+    Shows ALL fields available from Dropshipping API for enrichment analysis.
+    This helps us see what stock/inventory/shipping data is available.
+    """
+    # Load tokens
+    tokens = api.load_tokens(api.dropship_tokens_file)
+    if not tokens or not tokens.get("access_token"):
+        raise HTTPException(status_code=401, detail="Dropshipping API not authorized")
+
+    # Build request
+    timestamp = str(int(time.time() * 1000))
+    params = {
+        "app_key": api.dropship_app_key,
+        "method": "aliexpress.ds.product.get",
+        "timestamp": timestamp,
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "sha256",
+        "session": tokens["access_token"],
+        "product_id": product_id,
+        "target_currency": "USD",
+        "target_language": "EN",
+        "ship_to_country": "US",
+    }
+
+    params["sign"] = api.generate_signature(params, api.dropship_app_secret)
+
+    # Make request
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api.api_url, params=params, timeout=15) as response:
+            data = await response.json()
+
+            if "error_response" in data:
+                return {
+                    "error": data["error_response"]["msg"],
+                    "code": data["error_response"].get("code"),
+                    "full_error": data["error_response"]
+                }
+
+            # Extract and analyze response
+            resp = data.get("aliexpress_ds_product_get_response", {})
+            result = resp.get("result") or resp.get("resp_result", {})
+
+            # Check for key enrichment fields
+            enrichment_analysis = {
+                "stock_fields": {},
+                "sku_fields": {},
+                "shipping_fields": {},
+                "multimedia_fields": {},
+                "other_fields": {}
+            }
+
+            # Stock/Inventory
+            stock_fields = ["sku_stock", "available_stock", "inventory", "stock_quantity"]
+            for field in stock_fields:
+                if field in result:
+                    enrichment_analysis["stock_fields"][field] = result[field]
+
+            # SKU Variants
+            if "ae_sku_property_dtos" in result:
+                enrichment_analysis["sku_fields"]["ae_sku_property_dtos"] = result["ae_sku_property_dtos"]
+
+            # Shipping
+            shipping_fields = ["ship_from_country", "delivery_time", "shipping_method", "freight_amount"]
+            for field in shipping_fields:
+                if field in result:
+                    enrichment_analysis["shipping_fields"][field] = result[field]
+
+            # Multimedia
+            if "ae_multimedia_info_dto" in result:
+                enrichment_analysis["multimedia_fields"] = result["ae_multimedia_info_dto"]
+
+            # Other useful fields
+            other_fields = ["package_type", "product_unit", "bulk_order", "owner_member_seq"]
+            for field in other_fields:
+                if field in result:
+                    enrichment_analysis["other_fields"][field] = result[field]
+
+            return {
+                "success": True,
+                "product_id": product_id,
+                "enrichment_analysis": enrichment_analysis,
+                "full_response": result,
+                "response_keys": list(result.keys()) if result else []
             }
