@@ -338,3 +338,47 @@ async def get_product_details(
     """
     ids = [pid.strip() for pid in product_ids.split(",")]
     return await api.get_product_details(product_ids=ids)
+
+
+@router.get("/debug/raw-response")
+async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
+    """
+    DEBUG: Get raw AliExpress API response to see structure
+    """
+    import aiohttp
+    import time
+
+    # Load tokens
+    tokens = api.load_tokens(api.dropship_tokens_file)
+    if not tokens or not tokens.get("access_token"):
+        raise HTTPException(status_code=401, detail="Dropshipping API not authorized")
+
+    # Build request
+    timestamp = str(int(time.time() * 1000))
+    params = {
+        "app_key": api.dropship_app_key,
+        "method": "aliexpress.ds.recommend.feed.get",
+        "timestamp": timestamp,
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "sha256",
+        "session": tokens["access_token"],
+        "feed_name": "DS hot product",
+        "country": "US",
+        "target_currency": "USD",
+        "target_language": "EN",
+        "page_size": str(page_size),
+        "page_no": "1",
+    }
+
+    params["sign"] = api.generate_signature(params, api.dropship_app_secret)
+
+    # Make request
+    async with aiohttp.ClientSession() as session:
+        async with session.get(api.api_url, params=params, timeout=15) as response:
+            data = await response.json()
+            return {
+                "raw_response": data,
+                "token_preview": tokens["access_token"][:20] + "...",
+                "signature_preview": params["sign"][:40] + "..."
+            }
