@@ -843,6 +843,98 @@ async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
             }
 
 
+@router.get("/test/order-create-check")
+async def test_order_create_capability():
+    """
+    🧪 TEST: Check if ds.order.create API is accessible
+
+    This tests whether we have permission to create orders via Dropshipping API.
+    DOES NOT place a real order - uses invalid data to check API access.
+    """
+    # Load tokens
+    tokens = api.load_tokens(api.dropship_tokens_file)
+    if not tokens or not tokens.get("access_token"):
+        return {
+            "success": False,
+            "error": "Dropshipping API not authorized",
+            "verdict": "Cannot test - no authorization"
+        }
+
+    # Build minimal test request with intentionally invalid data
+    # This will fail validation but tells us if we have API access
+    timestamp = str(int(time.time() * 1000))
+    params = {
+        "app_key": api.dropship_app_key,
+        "method": "aliexpress.trade.buy.placeorder",  # The actual order creation method
+        "timestamp": timestamp,
+        "format": "json",
+        "v": "2.0",
+        "sign_method": "sha256",
+        "session": tokens["access_token"],
+        # Intentionally minimal/invalid to trigger validation error, not real order
+        "product_items": "test",  # Invalid format - will fail validation
+    }
+
+    params["sign"] = api.generate_signature(params, api.dropship_app_secret)
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(api.api_url, params=params, timeout=15) as response:
+                data = await response.json()
+
+                if "error_response" in data:
+                    error = data["error_response"]
+                    error_code = error.get("code")
+                    error_msg = error.get("msg")
+
+                    # Analyze error to determine capability
+                    if "Invalid" in error_msg or "required" in error_msg.lower():
+                        return {
+                            "success": True,
+                            "api_accessible": True,
+                            "error_code": error_code,
+                            "error_message": error_msg,
+                            "verdict": "✅ API IS ACCESSIBLE - Just needs valid order data",
+                            "capability": "AUTO_ORDERING_POSSIBLE",
+                            "note": "Got validation error (expected). This means the API endpoint works and we can place orders with correct data."
+                        }
+                    elif "permission" in error_msg.lower() or "authorize" in error_msg.lower():
+                        return {
+                            "success": False,
+                            "api_accessible": False,
+                            "error_code": error_code,
+                            "error_message": error_msg,
+                            "verdict": "❌ NO PERMISSION - Requires additional authorization",
+                            "capability": "AFFILIATE_LINK_ONLY",
+                            "note": "Order API requires seller/store setup or additional permissions"
+                        }
+                    else:
+                        return {
+                            "success": False,
+                            "api_accessible": False,
+                            "error_code": error_code,
+                            "error_message": error_msg,
+                            "verdict": "❓ UNCLEAR - Unexpected error",
+                            "capability": "UNKNOWN"
+                        }
+                else:
+                    return {
+                        "success": True,
+                        "api_accessible": True,
+                        "verdict": "⚠️ UNEXPECTED SUCCESS - Test data should have failed",
+                        "capability": "NEEDS_FURTHER_TESTING",
+                        "response": data
+                    }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "verdict": "❌ TEST FAILED",
+            "capability": "ERROR"
+        }
+
+
 @router.get("/test/enrichment/{product_id}")
 async def test_dropship_enrichment(product_id: str):
     """
