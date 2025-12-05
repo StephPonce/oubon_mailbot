@@ -1,16 +1,25 @@
 services:
   # ═══════════════════════════════════════════════════════════
-  # MAIN WEB SERVICE - Ospra Intelligence API
+  # MAIN WEB SERVICE - Ospra Intelligence API (with Authentication)
   # ═══════════════════════════════════════════════════════════
   - type: web
     name: oubon-mailbot
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    startCommand: "uvicorn ospra_os.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      # JWT Authentication
+      - key: JWT_SECRET_KEY
+        generateValue: true  # Render will auto-generate a secure random key
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 1440  # 24 hours
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 30
       # PostgreSQL connection (auto-populated by Render)
       - key: DATABASE_URL
         fromDatabase:
