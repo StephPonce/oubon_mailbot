@@ -439,11 +439,26 @@ app.add_middleware(
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 # ---------------------------------------------------------------
+# CRITICAL: Immediate Health Check Endpoint
+# Must be defined BEFORE heavy router imports to respond quickly
+# This ensures Render health checks pass even during startup
+# ---------------------------------------------------------------
+@app.get("/health")
+def health_check_immediate():
+    """Immediate health check that responds before full initialization."""
+    return {"status": "ok", "service": "Ospra Intelligence Platform"}
+
+# ---------------------------------------------------------------
 # Startup Event - Initialize DBs and Scheduler
 # ---------------------------------------------------------------
 @app.on_event("startup")
 async def startup_event():
     """Initialize databases and start background scheduler."""
+    import time
+    import asyncio
+    startup_start = time.time()
+    print(f"🚀 Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
     settings = get_settings()
 
     # Initialize follow-up tracking database
@@ -666,6 +681,10 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  AliExpress token refresh scheduler failed to start: {e}")
 
+    # Log startup completion with timing
+    startup_duration = time.time() - startup_start
+    print(f"✅ Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
 
 # ---------------------------------------------------------------
 # Shutdown Event - Stop Background Jobs
@@ -846,44 +865,45 @@ def oauth_cb_root(code: str, settings: Settings = Depends(get_settings)):
     gc.exchange_code_for_tokens(code)
     return RedirectResponse(url="/admin/dashboard")
 
-# Health check endpoint for Render
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "service": "Ospra Intelligence Platform",
-        "version": "2.0.0",
-        "features": {
-            "multi_store": _HAS_MULTI_STORE,
-            "ai_abstraction": _HAS_AI_FACTORY,
-            "platform_adapters": _HAS_PLATFORM_FACTORY,
-            "auto_discovery": _HAS_AUTO_DISCOVERY,
-            "unified_deployment": _HAS_UNIFIED_DEPLOYER,
-            "product_research": _HAS_RESEARCH,
-            "admin_dashboard": _HAS_ADMIN,
-            "dashboard_v2": _HAS_DASHBOARD_V2
-        },
-        "integrations": {
-            "gmail": gmail_oauth_router is not None,
-            "shopify": _HAS_MULTI_STORE or _HAS_SHOPIFY_WEBHOOKS,
-            "amazon": _HAS_PLATFORM_FACTORY,
-            "woocommerce": _HAS_PLATFORM_FACTORY,
-            "tiktok": _HAS_TIKTOK or _HAS_TIKTOK_OAUTH,
-            "aliexpress": _HAS_ALIEXPRESS,
-            "claude": _HAS_AI_FACTORY,
-            "openai": _HAS_AI_FACTORY,
-            "gemini": _HAS_AI_FACTORY
-        },
-        "legacy_status": {
-            "gmail_oauth_loaded": gmail_oauth_router is not None,
-            "gmail_client_loaded": GmailClient is not None,
-            "tiktok_loaded": _HAS_TIKTOK,
-            "tiktok_oauth_loaded": _HAS_TIKTOK_OAUTH,
-            "product_research_loaded": _HAS_RESEARCH,
-            "aliexpress_oauth_loaded": _HAS_ALIEXPRESS,
-            "multi_store_loaded": _HAS_MULTI_STORE
-        }
-    }
+# NOTE: Duplicate health endpoint commented out - using immediate health endpoint defined earlier
+# This detailed health endpoint moved to line 446 to respond before heavy router initialization
+# @app.get("/health")
+# def health_check():
+#     return {
+#         "status": "ok",
+#         "service": "Ospra Intelligence Platform",
+#         "version": "2.0.0",
+#         "features": {
+#             "multi_store": _HAS_MULTI_STORE,
+#             "ai_abstraction": _HAS_AI_FACTORY,
+#             "platform_adapters": _HAS_PLATFORM_FACTORY,
+#             "auto_discovery": _HAS_AUTO_DISCOVERY,
+#             "unified_deployment": _HAS_UNIFIED_DEPLOYER,
+#             "product_research": _HAS_RESEARCH,
+#             "admin_dashboard": _HAS_ADMIN,
+#             "dashboard_v2": _HAS_DASHBOARD_V2
+#         },
+#         "integrations": {
+#             "gmail": gmail_oauth_router is not None,
+#             "shopify": _HAS_MULTI_STORE or _HAS_SHOPIFY_WEBHOOKS,
+#             "amazon": _HAS_PLATFORM_FACTORY,
+#             "woocommerce": _HAS_PLATFORM_FACTORY,
+#             "tiktok": _HAS_TIKTOK or _HAS_TIKTOK_OAUTH,
+#             "aliexpress": _HAS_ALIEXPRESS,
+#             "claude": _HAS_AI_FACTORY,
+#             "openai": _HAS_AI_FACTORY,
+#             "gemini": _HAS_AI_FACTORY
+#         },
+#         "legacy_status": {
+#             "gmail_oauth_loaded": gmail_oauth_router is not None,
+#             "gmail_client_loaded": GmailClient is not None,
+#             "tiktok_loaded": _HAS_TIKTOK,
+#             "tiktok_oauth_loaded": _HAS_TIKTOK_OAUTH,
+#             "product_research_loaded": _HAS_RESEARCH,
+#             "aliexpress_oauth_loaded": _HAS_ALIEXPRESS,
+#             "multi_store_loaded": _HAS_MULTI_STORE
+#         }
+#     }
 
 
 @app.get("/api/health/detailed")

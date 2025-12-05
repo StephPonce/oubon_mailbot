@@ -6,7 +6,7 @@ services:
     name: oubon-mailbot
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn ospra_os.main:app --host 0.0.0.0 --port $PORT"
+    startCommand: "uvicorn ospra_os.main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 120 --workers 1"
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
