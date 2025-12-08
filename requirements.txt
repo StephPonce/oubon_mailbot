@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+python-multipart  # Required for form data handling
 pydantic
 pydantic-settings
 python-dotenv

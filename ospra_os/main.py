@@ -491,7 +491,15 @@ app.add_middleware(
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
-# Mount static files for product images
+# Mount static files for product images (only if directory exists)
+import os
+from pathlib import Path
+
+images_dir = Path("data/images")
+if not images_dir.exists():
+    os.makedirs(images_dir, exist_ok=True)
+    print(f"✅ Created images directory: {images_dir}")
+
 app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
 
 # ---------------------------------------------------------------
