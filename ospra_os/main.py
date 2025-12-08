@@ -3628,7 +3628,12 @@ async def check_tier_limit(
 class ChatRequest(BaseModel):
     message: str
     dashboard_context: Optional[Dict] = None
+    context: Optional[Dict] = None  # Backward compatibility with frontend
     conversation_history: Optional[List[Dict]] = None
+
+    def get_context(self) -> Optional[Dict]:
+        """Get context from either dashboard_context or context field"""
+        return self.dashboard_context or self.context
 
 
 @app.post("/api/claude/chat")
@@ -3649,9 +3654,11 @@ async def claude_chat(request: ChatRequest):
         # Check for API key
         api_key = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
         if not api_key:
+            demo_message = "I'm running in demo mode. To enable full AI capabilities, add ANTHROPIC_API_KEY to your environment variables.\n\nI can still help with basic questions about your dashboard!"
             return {
                 'success': True,
-                'message': "I'm running in demo mode. To enable full AI capabilities, add ANTHROPIC_API_KEY to your environment variables.\n\nI can still help with basic questions about your dashboard!",
+                'response': demo_message,  # Frontend expects this field
+                'message': demo_message,   # Keep for backward compatibility
                 'demo_mode': True
             }
 
@@ -3659,9 +3666,10 @@ async def claude_chat(request: ChatRequest):
 
         # Build comprehensive context summary
         context_summary = ""
-        if request.dashboard_context and request.dashboard_context.get('data'):
-            data = request.dashboard_context['data']
-            current_page = request.dashboard_context.get('current_page', '/')
+        context_data = request.get_context()  # Use helper method for compatibility
+        if context_data and context_data.get('data'):
+            data = context_data['data']
+            current_page = context_data.get('current_page', '/')
 
             context_summary += f"**Current Page:** {current_page}\n\n"
 
@@ -3739,7 +3747,7 @@ async def claude_chat(request: ChatRequest):
 
         # Build system prompt with all context
         email_capabilities = ""
-        if request.dashboard_context and request.dashboard_context.get('capabilities', {}).get('can_read_emails'):
+        if context_data and context_data.get('capabilities', {}).get('can_read_emails'):
             email_capabilities = """
 
 **Email Capabilities:**
@@ -3780,9 +3788,11 @@ Provide helpful, actionable advice based on the actual dashboard data shown abov
             }]
         )
 
+        assistant_response = response.content[0].text
         return {
             'success': True,
-            'message': response.content[0].text,
+            'response': assistant_response,  # Frontend expects this field
+            'message': assistant_response,   # Keep for backward compatibility
             'model': 'claude-sonnet-4-5-20250929',
             'demo_mode': False
         }

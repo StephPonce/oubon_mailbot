@@ -134,10 +134,11 @@ export function useOspra() {
       console.log('[Ospra] Context:', enrichedContext);
 
       const response = await api.post<ChatResponse>(
-        '/api/dashboard/v2/claude/chat',
+        '/api/claude/chat',
         {
           message: content,
-          context: enrichedContext,
+          context: enrichedContext,  // Backend accepts both 'context' and 'dashboard_context'
+          conversation_history: messages.slice(-10),  // Include last 10 messages for context
         },
         {
           signal: abortControllerRef.current.signal,
