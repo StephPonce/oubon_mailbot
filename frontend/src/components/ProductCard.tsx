@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import axios from 'axios';
-import { Star, BarChart2, Layers, ExternalLink, TrendingUp, ShoppingBag, Search } from 'lucide-react';
+import { ArrowRight, Flame, BarChart2, Layers } from 'lucide-react';
+import { ImageEnhanceModal } from './ImageEnhanceModal';
+import { DeployPreviewModal } from './DeployPreviewModal';
+import type { DeployResult } from '../services/api';
 
 interface Product {
   id: string;
@@ -41,63 +43,142 @@ interface ProductCardProps {
   onToggleSelect?: (productId: string) => void;
 }
 
+// Utility functions
+function sanitizeImageUrl(url?: string, productName?: string): string {
+  if (!url || url.trim() === '') {
+    const text = encodeURIComponent(productName?.substring(0, 20) || 'Product');
+    return `https://placehold.co/400x200/1a1a2e/eaeaea?text=${text}`;
+  }
+  let cleanUrl = url.replace(/^http:\/\//i, 'https://');
+  if (cleanUrl.includes('alicdn.com') || cleanUrl.includes('aliexpress-media')) {
+    cleanUrl = cleanUrl.split('_')[0];
+    if (!cleanUrl.includes('?')) {
+      cleanUrl = cleanUrl + '_400x200.jpg';
+    }
+  }
+  return cleanUrl;
+}
+
+// ProductCardSkeleton Component - Loading state
+export const ProductCardSkeleton: React.FC = () => {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm animate-pulse">
+      {/* Image skeleton */}
+      <div className="h-[200px] bg-gray-200" />
+
+      {/* Content skeleton */}
+      <div className="p-4 space-y-3">
+        {/* Title skeleton */}
+        <div className="h-5 bg-gray-200 rounded w-3/4" />
+
+        {/* Niche badge skeleton */}
+        <div className="h-4 bg-gray-200 rounded w-1/3" />
+
+        {/* Metrics row skeleton */}
+        <div className="flex justify-between py-3 border-y border-gray-200">
+          <div className="text-center space-y-2">
+            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
+            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
+          </div>
+          <div className="text-center space-y-2">
+            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
+            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
+          </div>
+          <div className="text-center space-y-2">
+            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
+            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
+          </div>
+        </div>
+
+        {/* Action buttons skeleton */}
+        <div className="flex gap-2 pt-2">
+          <div className="h-10 bg-gray-200 rounded-lg flex-1" />
+          <div className="h-10 bg-gray-200 rounded-lg flex-1" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// MetricPill Component
+const MetricPill: React.FC<{
+  icon: string;
+  value: string | number;
+  label: string;
+  color: 'green' | 'blue' | 'purple';
+}> = ({ icon, value, label, color }) => {
+  const colorClasses = {
+    green: 'text-green-600',
+    blue: 'text-blue-600',
+    purple: 'text-purple-600',
+  };
+
+  return (
+    <div className="text-center">
+      <div className={`text-lg font-bold ${colorClasses[color]} flex items-center justify-center gap-1`}>
+        <span>{icon}</span>
+        <span>{value}</span>
+      </div>
+      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+    </div>
+  );
+};
+
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onAnalyze,
   isSelected = false,
   onToggleSelect
 }) => {
-  const [deploying, setDeploying] = useState(false);
+  const [showDeployModal, setShowDeployModal] = useState(false);
   const [deploymentStatus, setDeploymentStatus] = useState<{
     deployed: boolean;
     shopify_url?: string;
     deployed_at?: string;
   } | null>(null);
+  const [showEnhanceModal, setShowEnhanceModal] = useState(false);
+  const [enhancedImageUrl, setEnhancedImageUrl] = useState<string | null>(null);
 
-  const deployToShopify = async () => {
-    // Check if this is a demo product
+  const handleOpenDeployModal = () => {
     if (product.id.startsWith('demo-') || product.source === 'DEMO_FALLBACK') {
       alert('Demo products cannot be deployed. Please run real product discovery first or configure real data sources.');
       return;
     }
-
-    setDeploying(true);
-    try {
-      const response = await axios.post(
-        `http://localhost:8001/api/dashboard/v2/products/${product.id}/deploy-to-shopify`
-      );
-
-      if (response.data.status === 'success' || response.data.status === 'already_deployed') {
-        setDeploymentStatus({
-          deployed: true,
-          shopify_url: response.data.shopify_url,
-          deployed_at: response.data.deployed_at || new Date().toISOString()
-        });
-        alert(response.data.message || 'Product deployed successfully!');
-      }
-    } catch (error: unknown) {
-      console.error('Failed to deploy product:', error);
-      const errorMsg = (error instanceof Error && error.message) || (typeof error === 'object' && error !== null && 'response' in error && typeof error.response === 'object' && error.response !== null && 'data' in error.response && typeof error.response.data === 'object' && error.response.data !== null && 'detail' in error.response.data && typeof error.response.data.detail === 'string' && error.response.data.detail) || 'Failed to deploy product to Shopify. Make sure Shopify is configured.';
-      alert(errorMsg);
-    } finally {
-      setDeploying(false);
-    }
+    setShowDeployModal(true);
   };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return 'text-success-green';
-    if (score >= 6) return 'text-yellow-400';
-    return 'text-red-400';
+  const handleDeploymentSuccess = (result: DeployResult) => {
+    setDeploymentStatus({
+      deployed: true,
+      shopify_url: result.shopify_url,
+      deployed_at: new Date().toISOString()
+    });
   };
 
-  const getVelocityColor = (velocity: number) => {
-    if (velocity >= 70) return 'bg-success-green/10 text-success-green';
-    if (velocity >= 50) return 'bg-yellow-500/10 text-yellow-400';
-    return 'bg-red-500/10 text-red-400';
+  const handleUseEnhanced = (enhancedUrl: string) => {
+    setEnhancedImageUrl(enhancedUrl);
+  };
+
+  // Calculate metrics
+  const score = (product.velocity_score || 0) / 10; // Convert 0-100 to 0-10
+  const profit = product.estimated_profit || (product.price - (product.cost || 0));
+  const margin = Math.round(product.profit_margin || ((product.price - (product.cost || 0)) / product.price * 100));
+  const velocity = product.velocity_score || 0;
+
+  // Determine if product is "hot"
+  const isHot = velocity > 80 || product.data_sources?.tiktok?.available;
+
+  // Get score color
+  const getScoreColor = () => {
+    if (score >= 8) return 'bg-green-500/90';
+    if (score >= 6) return 'bg-blue-500/90';
+    return 'bg-amber-500/90';
   };
 
   return (
-    <div className={`relative bg-white/50 backdrop-blur-lg border border-gray-200 rounded-xl overflow-hidden transition-all duration-300 shadow-sm ${isSelected ? 'ring-2 ring-blue-500' : 'hover:border-gray-300 hover:shadow-md'}`}>
+    <div className={`relative bg-white border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-200'} rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300`}>
+
+      {/* Selection Checkbox */}
       {onToggleSelect && (
         <div className="absolute top-3 left-3 z-20">
           <input
@@ -105,119 +186,179 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             checked={isSelected}
             onChange={() => onToggleSelect(product.id)}
             onClick={(e) => e.stopPropagation()}
-            className="w-5 h-5 rounded-md bg-white/50 border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            className="w-5 h-5 rounded-md bg-white/90 backdrop-blur-sm border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
           />
         </div>
       )}
 
-      <div className="relative h-48 bg-gray-100">
+      {/* ========================================
+          IMAGE SECTION - 200px height
+      ======================================== */}
+      <div className="relative h-[200px] bg-gray-100 overflow-hidden">
         <img
-          src={product.image_url || `https://via.placeholder.com/400x300/161b22/d0d7de?text=${encodeURIComponent(product.name.substring(0,20))}`}
+          src={sanitizeImageUrl(enhancedImageUrl || product.image_url, product.name)}
           alt={product.name}
           className="w-full h-full object-cover"
-          onError={(e) => { e.currentTarget.src = `https://via.placeholder.com/400x300/161b22/d0d7de?text=Image+Error`; }}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (!target.dataset.retried) {
+              target.dataset.retried = 'true';
+              const text = encodeURIComponent(product.name.substring(0, 20));
+              target.src = `https://placehold.co/400x200/1a1a2e/eaeaea?text=${text}`;
+            }
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/30 via-transparent to-transparent"></div>
-        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-semibold ${getVelocityColor(product.velocity_score || 0)}`}>
-          Velocity: {product.velocity_score || 0}
-        </div>
 
-        {/* Platform Badges */}
-        <div className="absolute bottom-2 left-2 flex gap-1.5">
-          {product.data_sources?.tiktok?.available && (
-            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`TikTok: ${product.data_sources.tiktok.views?.toLocaleString() || 'N/A'} views`}>
-              <span className="text-[#FF0050]">♪</span>
-              <span className="text-white font-semibold">TikTok</span>
-            </div>
-          )}
-          {product.data_sources?.amazon?.available && (
-            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`Amazon Rank: ${product.data_sources.amazon.sales_rank?.toLocaleString() || 'N/A'}`}>
-              <ShoppingBag className="w-3 h-3 text-[#FF9900]" />
-              <span className="text-white font-semibold">Amazon</span>
-            </div>
-          )}
-          {product.data_sources?.google_trends?.available && (
-            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`Google Trends: ${product.data_sources.google_trends.trend_score || 'N/A'}`}>
-              <Search className="w-3 h-3 text-[#4285F4]" />
-              <span className="text-white font-semibold">Trends</span>
-            </div>
-          )}
-          {product.data_sources?.aliexpress?.available && (
-            <div className="bg-black/70 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1 text-xs" title={`AliExpress: ${product.data_sources.aliexpress.orders?.toLocaleString() || 'N/A'} orders`}>
-              <TrendingUp className="w-3 h-3 text-[#FF6A00]" />
-              <span className="text-white font-semibold">AliEx</span>
-            </div>
-          )}
+        {/* Gradient overlay at bottom */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+
+        {/* HOT/TRENDING Badge (top left) */}
+        {isHot && (
+          <div className="absolute top-3 left-3 px-2 py-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
+            <Flame className="w-3 h-3" />
+            HOT
+          </div>
+        )}
+
+        {/* Score Badge (top right) */}
+        <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl backdrop-blur-md ${getScoreColor()} shadow-lg`}>
+          <div className="text-white font-bold text-lg text-center">{score.toFixed(1)}</div>
+          <div className="flex gap-0.5 mt-1">
+            {[...Array(10)].map((_, i) => (
+              <div
+                key={i}
+                className={`w-1.5 h-1.5 rounded-full ${i < Math.floor(score) ? 'bg-white' : 'bg-white/30'}`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <h3 className="font-semibold text-gray-900 h-10 line-clamp-2">
-          {product.name}
-        </h3>
+      {/* ========================================
+          CONTENT SECTION
+      ======================================== */}
+      <div className="p-4 space-y-3">
 
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-xs text-gray-600">Ospra Score</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`text-2xl font-bold ${getScoreColor(product.velocity_score || 0)}`}>
-                {product.velocity_score || 0}
-              </span>
-              <span className="text-sm text-gray-600">/100</span>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="flex items-center gap-1.5 justify-end text-gray-700" title="Customer Rating">
-              <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-              <span className="font-semibold">{product.rating?.toFixed(1) || 'N/A'}</span>
-            </div>
-            <p className="text-xs text-gray-600 mt-1">{product.tier || 'N/A'} tier</p>
-          </div>
+        {/* Product Name & Niche */}
+        <div>
+          <h3 className="font-bold text-gray-900 text-base line-clamp-2 mb-2">
+            {product.name}
+          </h3>
+          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+            {product.niche?.replace(/_/g, ' ') || 'General'}
+          </span>
         </div>
 
-        <div className="flex justify-between items-end bg-gray-100 p-3 rounded-lg">
-          <div>
-            <p className="text-xs text-gray-600">Profit</p>
-            <p className="text-lg font-bold text-green-600">
-              ${product.estimated_profit?.toFixed(2)}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-600">Price</p>
-            <p className="font-semibold text-gray-900">${product.price.toFixed(2)}</p>
-          </div>
+        {/* ========================================
+            METRICS ROW (compact, scannable)
+        ======================================== */}
+        <div className="flex justify-between items-center py-3 border-y border-gray-200">
+          <MetricPill
+            icon="💰"
+            value={`$${profit.toFixed(0)}`}
+            label="Profit"
+            color="green"
+          />
+          <MetricPill
+            icon="📊"
+            value={`${margin}%`}
+            label="Margin"
+            color="blue"
+          />
+          <MetricPill
+            icon="🚀"
+            value={velocity}
+            label="Velocity"
+            color="purple"
+          />
         </div>
-        
-        <div className="flex gap-2">
+
+        {/* ========================================
+            ACTION BUTTONS
+        ======================================== */}
+        <div className="flex gap-2 pt-2">
           <button
             onClick={() => onAnalyze(product)}
-            className="flex-1 bg-blue-50 text-blue-700 border border-blue-200 py-2 px-4 rounded-lg hover:bg-blue-100 transition font-semibold text-sm flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
           >
             <BarChart2 className="w-4 h-4" />
             Analyze
           </button>
           <button
-            onClick={deployToShopify}
-            disabled={deploying || deploymentStatus?.deployed}
-            className="flex-1 py-2 px-4 rounded-lg font-semibold transition text-sm flex items-center justify-center gap-2 bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            onClick={handleOpenDeployModal}
+            disabled={deploymentStatus?.deployed}
+            className="flex-1 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center justify-center gap-1 shadow-md"
           >
-            <Layers className="w-4 h-4" />
-            {deploymentStatus?.deployed ? 'Deployed' : (deploying ? 'Deploying...' : 'Deploy')}
+            {deploymentStatus?.deployed ? (
+              <>
+                <Layers className="w-4 h-4" />
+                Deployed
+              </>
+            ) : (
+              <>
+                Deploy
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
 
-        {product.supplier_url && (
-          <a
-            href={product.supplier_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full mt-2 bg-orange-50 text-orange-700 border border-orange-200 py-2 px-4 rounded-lg hover:bg-orange-100 transition font-semibold text-sm flex items-center justify-center gap-2"
-          >
-            <ExternalLink className="w-4 h-4" />
-            View on AliExpress
-          </a>
+        {/* Deployment Status (if deployed) */}
+        {deploymentStatus?.deployed && (
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs text-green-700 font-medium flex-1">
+              Live on Shopify
+            </span>
+            {deploymentStatus.shopify_url && (
+              <a
+                href={deploymentStatus.shopify_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-green-600 hover:text-green-700 font-medium"
+              >
+                View →
+              </a>
+            )}
+          </div>
         )}
       </div>
+
+      {/* ========================================
+          MODALS
+      ======================================== */}
+      {/* Image Enhancement Modal */}
+      {showEnhanceModal && (
+        <ImageEnhanceModal
+          product={{
+            id: product.id,
+            name: product.name,
+            image_url: product.image_url,
+          }}
+          onClose={() => setShowEnhanceModal(false)}
+          onUseEnhanced={handleUseEnhanced}
+        />
+      )}
+
+      {/* Deploy Preview Modal */}
+      {showDeployModal && (
+        <DeployPreviewModal
+          product={{
+            id: product.id,
+            name: product.name,
+            niche: product.niche,
+            image_url: enhancedImageUrl || product.image_url,
+            cost: product.cost,
+            price: product.price,
+            supplier_url: product.supplier_url,
+            description: product.description,
+          }}
+          onClose={() => setShowDeployModal(false)}
+          onSuccess={handleDeploymentSuccess}
+        />
+      )}
     </div>
   );
-}
+};

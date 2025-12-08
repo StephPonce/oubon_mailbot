@@ -1,301 +1,336 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { TrendingUp, ShoppingBag, Search, ExternalLink } from 'lucide-react';
+import {
+  X,
+  ExternalLink,
+  Sparkles,
+  DollarSign,
+  TrendingUp,
+  Percent,
+  Zap,
+  Package,
+  Loader2,
+  ShoppingBag,
+  AlertCircle,
+} from 'lucide-react';
 
 interface ProductModalProps {
   product: {
     id: string;
     name: string;
-    price: number;
-    cost: number;
-    velocity_score: number;
-    niche: string;
-    data_sources?: {
-      aliexpress?: { available: boolean; orders?: number; url?: string };
-      amazon?: { available: boolean; sales_rank?: number; url?: string };
-      tiktok?: { available: boolean; views?: number; url?: string };
-      google_trends?: { available: boolean; trend_score?: number };
-    };
+    price: number;         // Customer pays this
+    cost?: number;         // You pay this
+    velocity_score?: number;
+    niche?: string;
+    image_url?: string;
+    supplier_url?: string;
+    aliexpress_url?: string;
+    profit_margin?: number;
+    estimated_profit?: number;
+    score?: number;        // 0-10 Ospra score (pre-calculated)
+    rating?: number;
+    orders?: number;
   };
   onClose: () => void;
+}
+
+// Utility: Format niche name
+function formatNiche(niche?: string): string {
+  if (!niche) return 'General';
+  return niche.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Utility: Sanitize image URL
+function sanitizeImageUrl(url?: string, productName?: string): string {
+  if (!url) {
+    const text = encodeURIComponent(productName?.substring(0, 20) || 'Product');
+    return `https://placehold.co/400x400/1f2937/9ca3af?text=${text}`;
+  }
+  return url.replace(/^http:\/\//i, 'https://');
 }
 
 export default function ProductModal({ product, onClose }: ProductModalProps) {
   const [analysis, setAnalysis] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState<Array<{ role: string; content: string }>>([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatLoading, setChatLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Enhanced debugging - complete product inspection
+  console.log('ProductModal received:', product);
+  console.log('image_url:', product.image_url);
+  console.log('velocity_score:', product.velocity_score);
+  console.log('score:', product.score);
+  console.log('price:', product.price, 'cost:', product.cost, 'estimated_profit:', product.estimated_profit);
+
+  // Calculate metrics with fallbacks
+  const customerPrice = product.price || 0;
+  const yourCost = product.cost || 0;
+  const profit = product.estimated_profit ?? (customerPrice - yourCost);
+  const margin = product.profit_margin ?? (customerPrice > 0 ? ((customerPrice - yourCost) / customerPrice) * 100 : 0);
+  const velocity = product.velocity_score || 0;
+  const supplierUrl = product.aliexpress_url || product.supplier_url;
+
+  // Determine if this product is profitable
+  const isProfitable = profit > 0;
+
+  console.log('Calculated metrics:', {
+    customerPrice,
+    yourCost,
+    profit,
+    margin,
+    velocity,
+    isProfitable
+  });
 
   const analyzeProduct = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await axios.post(
         `http://127.0.0.1:8001/api/dashboard/v2/products/${product.id}/analyze`
       );
       setAnalysis(response.data);
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      alert('Analysis failed - check console');
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setError('Analysis failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const sendChatMessage = async () => {
-    if (!chatInput.trim() || chatLoading) return;
-
-    const userMessage = chatInput;
-    setChatInput('');
-    setChatLoading(true);
-
-    // Add user message to chat
-    const newMessages = [...chatMessages, { role: 'user', content: userMessage }];
-    setChatMessages(newMessages);
-
-    try {
-      const response = await axios.post('http://127.0.0.1:8001/api/dashboard/v2/claude/chat', {
-        message: userMessage,
-        context: {
-          product_name: product.name,
-          product_price: product.price,
-          product_cost: product.cost,
-          velocity_score: product.velocity_score,
-          profit_margin: (product as any).profit_margin,
-          estimated_profit: (product as any).estimated_profit,
-          niche: product.niche
-        }
-      });
-
-      // Add Claude's response
-      setChatMessages([...newMessages, {
-        role: 'assistant',
-        content: response.data.response
-      }]);
-
-    } catch (error) {
-      console.error('Chat failed:', error);
-      setChatMessages([...newMessages, {
-        role: 'assistant',
-        content: 'Sorry, I had trouble responding. Please try again.'
-      }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-      <div className="bg-white/5 border border-white/10 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 text-white">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-2xl font-bold text-white">{product.name}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            ✕
-          </button>
-        </div>
-
-        {/* Product Info */}
-        <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-          <div>
-            <div className="text-sm text-gray-400">Price</div>
-            <div className="text-xl font-bold text-green-400">${product.price.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-400">Cost</div>
-            <div className="text-xl font-bold text-gray-200">${product.cost.toFixed(2)}</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-400">Velocity</div>
-            <div className="text-xl font-bold text-blue-400">{product.velocity_score}/100</div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-400">Niche</div>
-            <div className="text-xl font-bold text-gray-200">{product.niche.replace('_', ' ')}</div>
-          </div>
-        </div>
-
-        {/* AI Analysis Button */}
-        {!analysis && (
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* ============ HEADER ============ */}
+        <div className="relative p-6 border-b border-gray-200">
+          {/* Close Button */}
           <button
-            onClick={analyzeProduct}
-            disabled={loading}
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 transition-all"
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"
           >
-            {loading ? '🤖 Claude is analyzing...' : '🤖 Analyze with Claude AI'}
+            <X className="w-5 h-5 text-gray-500" />
           </button>
-        )}
 
-        {/* AI Analysis Results */}
-        {analysis && (
-          <div className="space-y-4">
-            <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold">Claude AI Analysis</h3>
-                <span className={`px-3 py-1 rounded font-bold text-sm ${
-                  analysis.recommendation === 'STRONG_BUY' ? 'bg-green-500/80 text-white' :
-                  analysis.recommendation === 'BUY' ? 'bg-blue-500/80 text-white' :
-                  analysis.recommendation === 'HOLD' ? 'bg-yellow-500/80 text-white' :
-                  'bg-red-500/80 text-white'
-                }`}>
-                  {analysis.recommendation}
+          {/* Product Info */}
+          <div className="flex gap-4">
+            {/* Image */}
+            <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+              <img
+                src={sanitizeImageUrl(product.image_url, product.name)}
+                alt={product.name}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  console.error('Image load failed:', {
+                    original_url: product.image_url,
+                    fallback_url: e.currentTarget.src
+                  });
+                  e.currentTarget.src = `https://placehold.co/400x400/1f2937/9ca3af?text=No+Image`;
+                }}
+              />
+            </div>
+
+            {/* Title & Niche */}
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 leading-tight mb-2">
+                {product.name}
+              </h2>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
+                  <Package className="w-3 h-3" />
+                  {formatNiche(product.niche)}
                 </span>
+                <span className="text-xs text-gray-500">via AliExpress</span>
               </div>
-              <div className="text-2xl font-bold text-purple-300 mb-2">
-                Score: {analysis.score}/10
-              </div>
-              <div className="text-sm text-gray-300 mb-2">
-                Success Prediction: {analysis.success_prediction}
-              </div>
-            </div>
-
-            {/* Reasoning */}
-            {analysis.reasoning && analysis.reasoning.length > 0 && (
-              <div>
-                <h4 className="font-bold mb-2 text-gray-200">💡 Marketing Pitches & Angles:</h4>
-                <ul className="space-y-1">
-                  {analysis.reasoning.map((reason: string, i: number) => (
-                    <li key={i} className="text-sm text-gray-300">• {reason}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Risks */}
-            {analysis.risks && analysis.risks.length > 0 && (
-              <div>
-                <h4 className="font-bold mb-2 text-gray-200">⚠️ Risks to Consider:</h4>
-                <ul className="space-y-1">
-                  {analysis.risks.map((risk: string, i: number) => (
-                    <li key={i} className="text-sm text-gray-300">• {risk}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Full Analysis */}
-            <div className="mt-4 p-4 bg-black/20 rounded text-sm text-gray-300 max-h-60 overflow-y-auto whitespace-pre-wrap border border-white/10">
-              {analysis.analysis}
-            </div>
-
-            {/* Data Sources Section */}
-            {product.data_sources && (
-              <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
-                <h4 className="font-bold mb-3 flex items-center gap-2 text-gray-200">
-                  <ExternalLink className="w-4 h-4" />
-                  Data Sources & Verification
-                </h4>
-                <div className="space-y-2">
-                  {product.data_sources.tiktok?.available && (
-                    <div className="flex items-center justify-between p-2 bg-black/20 rounded-lg border border-white/10">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#FF0050] text-lg">♪</span>
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">TikTok</p>
-                          <p className="text-xs text-gray-400">{product.data_sources.tiktok.views?.toLocaleString() || 'N/A'} views</p>
-                        </div>
-                      </div>
-                      {product.data_sources.tiktok.url && (
-                        <a href={product.data_sources.tiktok.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs">
-                          View →
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  {product.data_sources.amazon?.available && (
-                    <div className="flex items-center justify-between p-2 bg-black/20 rounded-lg border border-white/10">
-                      <div className="flex items-center gap-2">
-                        <ShoppingBag className="w-4 h-4 text-[#FF9900]" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">Amazon</p>
-                          <p className="text-xs text-gray-400">Rank: {product.data_sources.amazon.sales_rank?.toLocaleString() || 'N/A'}</p>
-                        </div>
-                      </div>
-                      {product.data_sources.amazon.url && (
-                        <a href={product.data_sources.amazon.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs">
-                          View →
-                        </a>
-                      )}
-                    </div>
-                  )}
-                  {product.data_sources.google_trends?.available && (
-                    <div className="flex items-center justify-between p-2 bg-black/20 rounded-lg border border-white/10">
-                      <div className="flex items-center gap-2">
-                        <Search className="w-4 h-4 text-[#4285F4]" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">Google Trends</p>
-                          <p className="text-xs text-gray-400">Score: {product.data_sources.google_trends.trend_score || 'N/A'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {product.data_sources.aliexpress?.available && (
-                    <div className="flex items-center justify-between p-2 bg-black/20 rounded-lg border border-white/10">
-                      <div className="flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-[#FF6A00]" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">AliExpress</p>
-                          <p className="text-xs text-gray-400">{product.data_sources.aliexpress.orders?.toLocaleString() || 'N/A'} orders</p>
-                        </div>
-                      </div>
-                      {product.data_sources.aliexpress.url && (
-                        <a href={product.data_sources.aliexpress.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs">
-                          View →
-                        </a>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="text-xs text-gray-500 text-center">
-              Source: {analysis.source} • {new Date(analysis.timestamp).toLocaleString()}
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Product Chat */}
-        <div className="mt-6 border-t border-white/10 pt-4">
-          <h4 className="font-bold mb-2 text-gray-200">💬 Ask Claude About This Product</h4>
-          <div className="space-y-2 max-h-60 overflow-y-auto mb-3 p-2 bg-black/20 rounded-lg border border-white/10">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`p-3 rounded-lg ${
-                msg.role === 'user'
-                  ? 'bg-blue-500/30 text-right'
-                  : 'bg-white/10'
-              }`}>
-                <div className="text-xs text-gray-400 mb-1">
-                  {msg.role === 'user' ? 'You' : 'Claude AI'}
-                </div>
-                <div className="text-sm text-white">{msg.content}</div>
+        {/* ============ METRICS GRID ============ */}
+        <div className="p-6 border-b border-gray-200">
+          <div className="grid grid-cols-4 gap-4">
+            {/* Customer Price */}
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="flex justify-center mb-2">
+                <DollarSign className="w-5 h-5 text-gray-600" />
               </div>
-            ))}
-            {chatLoading && (
-              <div className="p-3 rounded-lg bg-white/10">
-                <div className="text-xs text-gray-400 mb-1">Claude AI</div>
-                <div className="text-sm text-white">Thinking...</div>
+              <div className="text-2xl font-bold text-gray-900">
+                ${customerPrice.toFixed(2)}
               </div>
-            )}
+              <div className="text-xs text-gray-500 mt-1">Sell Price</div>
+            </div>
+
+            {/* Your Cost */}
+            <div className="text-center p-4 bg-gray-50 rounded-xl">
+              <div className="flex justify-center mb-2">
+                <ShoppingBag className="w-5 h-5 text-gray-600" />
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                ${yourCost.toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Your Cost</div>
+            </div>
+
+            {/* Profit */}
+            <div className={`text-center p-4 rounded-xl ${isProfitable ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="flex justify-center mb-2">
+                <TrendingUp className={`w-5 h-5 ${isProfitable ? 'text-green-600' : 'text-red-600'}`} />
+              </div>
+              <div className={`text-2xl font-bold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
+                ${profit.toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Est. Profit</div>
+            </div>
+
+            {/* Margin */}
+            <div className={`text-center p-4 rounded-xl ${margin >= 30 ? 'bg-blue-50' : 'bg-yellow-50'}`}>
+              <div className="flex justify-center mb-2">
+                <Percent className={`w-5 h-5 ${margin >= 30 ? 'text-blue-600' : 'text-yellow-600'}`} />
+              </div>
+              <div className={`text-2xl font-bold ${margin >= 30 ? 'text-blue-600' : 'text-yellow-600'}`}>
+                {margin.toFixed(0)}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">Margin</div>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="Ask anything about this product..."
-              className="flex-1 px-3 py-2 border border-white/20 bg-white/10 rounded-lg placeholder-gray-400"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendChatMessage()}
-              disabled={chatLoading}
-            />
+
+          {/* Velocity Bar */}
+          <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-gray-700">Market Velocity</span>
+              </div>
+              <span className="text-lg font-bold text-purple-600">{velocity}/100</span>
+            </div>
+            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-500"
+                style={{ width: `${velocity}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Warning if not profitable */}
+          {!isProfitable && (
+            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Low Profit Margin</p>
+                <p className="text-xs text-red-600 mt-1">
+                  This product may not be profitable at current pricing. Consider adjusting your sell price.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ============ AI ANALYSIS SECTION ============ */}
+        <div className="p-6 border-b border-gray-200">
+          {!analysis && !loading && (
             <button
-              className="px-4 py-2 bg-blue-600/80 text-white rounded-lg hover:bg-blue-700/80 disabled:opacity-50 transition"
-              onClick={sendChatMessage}
-              disabled={chatLoading || !chatInput.trim()}
+              onClick={analyzeProduct}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-lg"
             >
-              Send
+              <Sparkles className="w-5 h-5" />
+              Deep Analysis with Claude AI
             </button>
-          </div>
+          )}
+
+          {loading && (
+            <div className="flex items-center justify-center gap-3 py-8">
+              <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+              <span className="text-gray-600 font-medium">Claude is analyzing this product...</span>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+              <p className="text-red-600">{error}</p>
+              <button
+                onClick={analyzeProduct}
+                className="mt-2 text-sm text-red-700 underline"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
+          {analysis && (
+            <div className="space-y-4">
+              {/* AI Score Hero */}
+              <div className="flex items-center justify-between p-6 bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl">
+                <div>
+                  <p className="text-gray-400 text-sm">AI Score</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-bold text-white">{analysis.score || 0}</span>
+                    <span className="text-2xl text-gray-500">/10</span>
+                  </div>
+                </div>
+                <div className={`px-4 py-2 rounded-lg font-bold ${
+                  analysis.recommendation === 'STRONG_BUY' ? 'bg-green-500 text-white' :
+                  analysis.recommendation === 'BUY' ? 'bg-blue-500 text-white' :
+                  analysis.recommendation === 'HOLD' ? 'bg-yellow-500 text-gray-900' :
+                  'bg-red-500 text-white'
+                }`}>
+                  {analysis.recommendation?.replace('_', ' ') || 'PENDING'}
+                </div>
+              </div>
+
+              {/* Reasoning */}
+              {analysis.reasoning?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">✨ Why This Product Wins</h4>
+                  <div className="space-y-2">
+                    {analysis.reasoning.map((reason: string, i: number) => (
+                      <div key={i} className="flex gap-2 p-3 bg-green-50 rounded-lg">
+                        <span className="text-green-500">✓</span>
+                        <p className="text-sm text-gray-700">{reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Risks */}
+              {analysis.risks?.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-3">⚠️ Risks to Consider</h4>
+                  <div className="space-y-2">
+                    {analysis.risks.map((risk: string, i: number) => (
+                      <div key={i} className="flex gap-2 p-3 bg-yellow-50 rounded-lg">
+                        <span className="text-yellow-500">!</span>
+                        <p className="text-sm text-gray-700">{risk}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ============ ACTION FOOTER ============ */}
+        <div className="p-6 bg-gray-50 flex gap-3">
+          <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2">
+            <ShoppingBag className="w-5 h-5" />
+            Deploy to Shopify
+          </button>
+          {supplierUrl && (
+            <a
+              href={supplierUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3 border border-gray-300 hover:border-gray-400 rounded-xl font-medium transition flex items-center gap-2"
+            >
+              <ExternalLink className="w-5 h-5" />
+              AliExpress
+            </a>
+          )}
         </div>
       </div>
     </div>
