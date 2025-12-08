@@ -1,49 +1,62 @@
 """
 Ospra Intelligence - Payments Module
 ====================================
-Sky/Flight themed subscription tiers: Nest → Flight → Soar → Stratosphere
 
-Supports both:
-- LemonSqueezy (recommended for MVP - simpler, handles taxes)
-- Stripe (for when you need lower fees at scale)
+LemonSqueezy integration for subscription management.
+
+Tier definitions are imported from ospra_os.core.tiers (single source of truth).
+
+Sky/Flight themed subscription tiers: Nest → Flight → Soar → Stratosphere
 """
-from .lemonsqueezy import (
+
+# Import tier system from core (single source of truth)
+from ospra_os.core.tiers import (
     SubscriptionTier,
     TIER_DEFINITIONS,
     TIER_HIERARCHY,
-    LemonSqueezyClient,
     get_pricing_table,
-    get_tier_from_variant,
-    get_variant_for_tier,
     compare_tiers,
     tier_has_feature,
     get_tier_limit,
-    verify_webhook_signature,
-    handle_webhook_event,
-    get_setup_instructions
 )
 
+# LemonSqueezy specific
+from .lemonsqueezy import (
+    LemonSqueezyClient,
+    get_tier_from_variant,
+    get_variant_for_tier,
+    get_checkout_url_for_tier,
+    verify_webhook_signature,
+    handle_webhook_event,
+    get_setup_instructions,
+)
+
+# Routes
+from .routes import router as payments_router
+
 __all__ = [
-    # Tier definitions
+    # Tier definitions (from core)
     "SubscriptionTier",
     "TIER_DEFINITIONS", 
     "TIER_HIERARCHY",
-    
-    # LemonSqueezy
-    "LemonSqueezyClient",
-    
-    # Helpers
     "get_pricing_table",
-    "get_tier_from_variant",
-    "get_variant_for_tier",
     "compare_tiers",
     "tier_has_feature",
     "get_tier_limit",
+    
+    # LemonSqueezy
+    "LemonSqueezyClient",
+    "get_tier_from_variant",
+    "get_variant_for_tier",
+    "get_checkout_url_for_tier",
     
     # Webhooks
     "verify_webhook_signature",
     "handle_webhook_event",
     
     # Setup
-    "get_setup_instructions"
+    "get_setup_instructions",
+    
+    # FastAPI Router
+    "payments_router",
 ]

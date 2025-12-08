@@ -1,5 +1,10 @@
 """
-Ospra OS Self-Learning System
+Ospra OS Learning System
+========================
+
+Two-Layer Hybrid Learning Architecture:
+- Global Brain: Learns from ALL Ospra users (network effect)
+- Personal Layer: Learns from individual user patterns (Soar+ only)
 
 Learns from:
 - Actual Shopify sales data
@@ -14,12 +19,36 @@ Adjusts:
 - Trend velocity importance
 """
 
-from .self_learning_engine import SelfLearningEngine
+# Primary export - Hybrid Learning Engine (database-backed)
+from .hybrid_learning_engine import (
+    HybridLearningEngine,
+    GlobalLearningWeights,
+    PersonalLearningWeights,
+    LearningEvent,
+    get_learning_engine,
+    init_hybrid_learning,
+)
+
+# Supporting utilities
 from .performance_tracker import PerformanceTracker
 from .trend_velocity_detector import TrendVelocityDetector
 
+# Legacy (deprecated - forwards to hybrid)
+from .self_learning_engine import SelfLearningEngine
+
 __all__ = [
-    'SelfLearningEngine',
+    # Primary (use these)
+    'HybridLearningEngine',
+    'GlobalLearningWeights',
+    'PersonalLearningWeights',
+    'LearningEvent',
+    'get_learning_engine',
+    'init_hybrid_learning',
+    
+    # Supporting
     'PerformanceTracker',
-    'TrendVelocityDetector'
+    'TrendVelocityDetector',
+    
+    # Legacy (deprecated)
+    'SelfLearningEngine',
 ]

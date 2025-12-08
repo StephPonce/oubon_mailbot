@@ -1,521 +1,549 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+/**
+ * Ospra Intelligence - A/B Testing Page
+ * 
+ * FULLY FUNCTIONAL:
+ * - Real A/B test management
+ * - Create, pause, resume tests
+ * - View test results
+ * - Statistical confidence tracking
+ */
+
+import { useState } from 'react';
 import {
   FlaskConical,
-  Plus,
-  RefreshCw,
   Play,
   Pause,
-  Square,
+  CheckCircle2,
   TrendingUp,
-  TrendingDown,
-  Minus,
-  BarChart3,
   DollarSign,
-  Image as ImageIcon,
-  FileText,
-  Megaphone
+  Plus,
+  RefreshCw,
+  Loader2,
+  BarChart3,
+  X,
+  Target,
+  AlertCircle,
+  Clock,
+  Eye,
 } from 'lucide-react';
-import { CreateTestModal } from '../components/CreateTestModal';
-import { GlassPanel } from '@/components/GlassPanel';
 
-const API_BASE = 'http://localhost:8001';
+import {
+  useABTests,
+  useABTestResults,
+} from '../hooks/useData';
+import { abTestingAPI } from '../services/api';
+import type { ABTest } from '../services/api';
 
-interface ABTest {
-  id: number;
-  name: string;
-  test_type: string;
-  status: string;
-  started_at: string | null;
-  ended_at: string | null;
-  scheduled_end: string | null;
-  winner_variant_id: number | null;
-  product_id: string;
-  store_id: string;
-  min_sample_size: number;
-  confidence_level: number;
+// =============================================================================
+// TEST CARD
+// =============================================================================
+
+interface TestCardProps {
+  test: ABTest;
+  onPause: (test: ABTest) => void;
+  onResume: (test: ABTest) => void;
+  onViewResults: (test: ABTest) => void;
+  isPausing: boolean;
+  isResuming: boolean;
 }
 
-interface Variant {
-  id: number;
-  name: string;
-  impressions: number;
-  conversions: number;
-  revenue: number;
-  conversion_rate: number;
-  is_control: boolean;
-  is_significant?: boolean;
-  confidence_interval?: [number, number];
-  p_value?: number;
-}
-
-interface TestDetails extends ABTest {
-  variants: Variant[];
-  winner_variant?: Variant;
-}
-
-export const ABTestingPage: React.FC = () => {
-  const [tests, setTests] = useState<ABTest[]>([]);
-  const [selectedTest, setSelectedTest] = useState<TestDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  useEffect(() => {
-    fetchTests();
-    const interval = setInterval(fetchTests, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
-  }, [statusFilter, typeFilter]);
-
-  const fetchTests = async () => {
-    try {
-      const params: any = {};
-      if (statusFilter !== 'all') params.status = statusFilter;
-      if (typeFilter !== 'all') params.test_type = typeFilter;
-
-      const response = await axios.get(`${API_BASE}/api/abtesting/tests`, { params });
-      setTests(response.data.tests || []);
-    } catch (error) {
-      console.error('Failed to fetch tests:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTestDetails = async (testId: number) => {
-    try {
-      const response = await axios.get(`${API_BASE}/api/abtesting/tests/${testId}?include_results=true`);
-      setSelectedTest(response.data);
-    } catch (error) {
-      console.error('Failed to fetch test details:', error);
-    }
-  };
-
-  const handleTestAction = async (testId: number, action: 'start' | 'pause' | 'resume' | 'end') => {
-    try {
-      await axios.post(`${API_BASE}/api/abtesting/tests/${testId}/${action}`);
-      fetchTests();
-      if (selectedTest?.id === testId) {
-        fetchTestDetails(testId);
-      }
-    } catch (error) {
-      console.error(`Failed to ${action} test:`, error);
-    }
-  };
-
-  const getTestTypeIcon = (type: string) => {
-    switch (type) {
-      case 'price':
-        return <DollarSign className="w-4 h-4" />;
-      case 'product_title':
-      case 'product_description':
-        return <FileText className="w-4 h-4" />;
-      case 'product_image':
-        return <ImageIcon className="w-4 h-4" />;
-      case 'ad_creative':
-      case 'ad_copy':
-        return <Megaphone className="w-4 h-4" />;
-      default:
-        return <FlaskConical className="w-4 h-4" />;
-    }
-  };
-
+function TestCard({ test, onPause, onResume, onViewResults, isPausing, isResuming }: TestCardProps) {
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-      draft: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
-      running: { bg: 'bg-green-100', text: 'text-green-700', label: 'Running' },
-      paused: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Paused' },
-      ended: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Ended' }
-    };
-
-    const config = statusConfig[status] || statusConfig.draft;
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
-    );
+    switch (status) {
+      case 'running': return 'text-green-600 bg-green-500/10 border-green-500/20';
+      case 'completed': return 'text-blue-600 bg-blue-500/10 border-blue-500/20';
+      case 'paused': return 'text-amber-600 bg-amber-500/10 border-amber-500/20';
+      case 'draft': return 'text-gray-600 bg-gray-500/10 border-gray-500/20';
+      default: return 'text-gray-600 bg-gray-500/10 border-gray-500/20';
+    }
   };
 
-  const getSignificanceBadge = (variant: Variant) => {
-    if (!variant.is_significant) {
-      return <span className="text-xs text-gray-500">Not significant</span>;
-    }
-
-    if (variant.p_value && variant.p_value < 0.01) {
-      return (
-        <span className="px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-medium">
-          Highly Significant (p &lt; 0.01)
-        </span>
-      );
-    }
-
-    return (
-      <span className="px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-medium">
-        Significant (p &lt; 0.05)
-      </span>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-12 flex items-center justify-center" style={{ perspective: '1500px' }}>
-        <GlassPanel depth={60} delay={0}>
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-gray-600 font-light">Loading A/B tests...</p>
-          </div>
-        </GlassPanel>
-      </div>
-    );
-  }
+  const conversionA = test.results?.variant_a?.conversion_rate || test.conversion_a || 0;
+  const conversionB = test.results?.variant_b?.conversion_rate || test.conversion_b || 0;
+  const confidence = test.results?.confidence || test.confidence || 0;
+  const isWinnerB = conversionB > conversionA;
+  const lift = conversionA > 0 ? ((conversionB - conversionA) / conversionA) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-12" style={{ perspective: '1500px' }}>
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <GlassPanel depth={80} delay={0.1}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-light text-gray-900">
-                A/B Testing
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Optimize your products with data-driven testing
-              </p>
-            </div>
+    <div className="glass-card p-5 hover:shadow-lg transition-all">
+      <div className="flex items-center gap-6">
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-lg font-medium text-primary">{test.name}</h3>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(test.status)}`}>
+              {test.status}
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-black/5 text-secondary">
+              {test.type || 'price'}
+            </span>
+          </div>
+          <div className="flex items-center gap-6 text-sm text-secondary">
+            {test.product_name && <span>Product: {test.product_name}</span>}
+            <span>{test.variant_count || 2} variants</span>
+            {test.start_date && <span>Started: {new Date(test.start_date).toLocaleDateString()}</span>}
+          </div>
+          {test.description && (
+            <p className="text-xs text-tertiary mt-2 line-clamp-1">{test.description}</p>
+          )}
+        </div>
+
+        {/* Variant A */}
+        <div className="text-center px-6 border-l border-black/10">
+          <div className="text-xs text-tertiary mb-1">Variant A</div>
+          <div className="text-xl font-semibold text-primary">{conversionA.toFixed(1)}%</div>
+        </div>
+
+        {/* Variant B */}
+        <div className="text-center px-6 border-l border-black/10">
+          <div className="text-xs text-tertiary mb-1">Variant B</div>
+          <div className={`text-xl font-semibold ${isWinnerB ? 'text-green-600' : 'text-primary'}`}>
+            {conversionB.toFixed(1)}%
+            {isWinnerB && lift > 0 && (
+              <span className="text-xs text-green-600 ml-1">+{lift.toFixed(0)}%</span>
+            )}
+          </div>
+        </div>
+
+        {/* Confidence */}
+        <div className="text-center px-6 border-l border-black/10">
+          <div className="text-xs text-tertiary mb-1">Confidence</div>
+          <div className={`text-xl font-semibold ${confidence >= 95 ? 'text-green-600' : confidence >= 80 ? 'text-amber-600' : 'text-secondary'}`}>
+            {confidence.toFixed(0)}%
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 pl-6 border-l border-black/10">
+          <button
+            className="btn-ghost text-sm"
+            onClick={() => onViewResults(test)}
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          {test.status === 'running' ? (
             <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-light transition-colors"
+              className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 transition-colors"
+              onClick={() => onPause(test)}
+              disabled={isPausing}
             >
-              <Plus className="w-5 h-5" />
-              Create Test
+              {isPausing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Pause className="w-5 h-5" />}
+            </button>
+          ) : test.status === 'paused' ? (
+            <button
+              className="p-2.5 rounded-xl bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
+              onClick={() => onResume(test)}
+              disabled={isResuming}
+            >
+              {isResuming ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5" />}
+            </button>
+          ) : (
+            <div className="p-2.5">
+              <CheckCircle2 className="w-5 h-5 text-blue-600" />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// CREATE TEST MODAL
+// =============================================================================
+
+interface CreateTestModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (data: any) => void;
+  isCreating: boolean;
+}
+
+function CreateTestModal({ isOpen, onClose, onCreate, isCreating }: CreateTestModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'price',
+    product_id: '',
+    variant_a: '',
+    variant_b: '',
+    description: '',
+  });
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onCreate(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+      <div className="glass-card max-w-lg w-full my-8">
+        <div className="p-6 border-b border-black/10">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-primary">Create A/B Test</h2>
+            <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-lg">
+              <X className="w-5 h-5 text-tertiary" />
             </button>
           </div>
-        </GlassPanel>
+        </div>
 
-        {/* Filters */}
-        <GlassPanel depth={70} delay={0.15}>
-          <div className="flex gap-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-primary mb-1 block">Test Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData(f => ({ ...f, name: e.target.value }))}
+              placeholder="e.g., LED Lights Price Test"
+              className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm text-primary placeholder-text-tertiary"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-primary mb-1 block">Test Type</label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData(f => ({ ...f, type: e.target.value }))}
+              className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm text-primary"
+            >
+              <option value="price">Price Test</option>
+              <option value="title">Title Test</option>
+              <option value="image">Image Test</option>
+              <option value="description">Description Test</option>
+              <option value="ad">Ad Creative Test</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-light text-gray-700 mb-1">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 bg-white/50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-light text-gray-900"
-              >
-                <option value="all">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="running">Running</option>
-                <option value="paused">Paused</option>
-                <option value="ended">Ended</option>
-              </select>
+              <label className="text-sm font-medium text-primary mb-1 block">Variant A</label>
+              <input
+                type="text"
+                value={formData.variant_a}
+                onChange={(e) => setFormData(f => ({ ...f, variant_a: e.target.value }))}
+                placeholder="e.g., $24.99"
+                className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm text-primary placeholder-text-tertiary"
+              />
             </div>
-
             <div>
-              <label className="block text-sm font-light text-gray-700 mb-1">Test Type</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                className="px-3 py-2 bg-white/50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-light text-gray-900"
-              >
-                <option value="all">All Types</option>
-                <option value="price">Price</option>
-                <option value="product_title">Title</option>
-                <option value="product_description">Description</option>
-                <option value="product_image">Image</option>
-                <option value="ad_creative">Ad Creative</option>
-                <option value="ad_copy">Ad Copy</option>
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <button
-                onClick={fetchTests}
-                className="flex items-center gap-2 px-4 py-2 bg-white/50 border border-gray-200 text-gray-700 rounded-lg hover:bg-white font-light transition-colors"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
+              <label className="text-sm font-medium text-primary mb-1 block">Variant B</label>
+              <input
+                type="text"
+                value={formData.variant_b}
+                onChange={(e) => setFormData(f => ({ ...f, variant_b: e.target.value }))}
+                placeholder="e.g., $29.99"
+                className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm text-primary placeholder-text-tertiary"
+              />
             </div>
           </div>
-        </GlassPanel>
 
-        {/* Test List */}
-        {tests.length === 0 ? (
-          <GlassPanel depth={60} delay={0.2}>
-            <div className="text-center py-12">
-              <FlaskConical className="w-16 h-16 text-gray-400 mx-auto mb-4 opacity-30" />
-              <h3 className="text-lg font-light text-gray-900 mb-2">No tests found</h3>
-              <p className="text-gray-600 mb-4">
-                Create your first A/B test to start optimizing
-              </p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-light"
-              >
-                Create Test
-              </button>
-            </div>
-          </GlassPanel>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {tests.map((test, idx) => (
-              <GlassPanel
-                key={test.id}
-                depth={65}
-                delay={0.2 + idx * 0.05}
-              >
-                <div className="cursor-pointer" onClick={() => fetchTestDetails(test.id)}>
-                  {/* Test Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-purple-500/10 rounded-lg">
-                        {getTestTypeIcon(test.test_type)}
-                      </div>
-                      <div>
-                        <h3 className="font-light text-gray-900">{test.name}</h3>
-                        <p className="text-sm text-gray-600 capitalize">
-                          {test.test_type.replace(/_/g, ' ')}
-                        </p>
-                      </div>
-                    </div>
-                    {getStatusBadge(test.status)}
-                  </div>
-
-                  {/* Test Info */}
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Product ID:</span>
-                      <span className="font-light text-gray-900">{test.product_id}</span>
-                    </div>
-                    {test.started_at && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Started:</span>
-                        <span className="font-light text-gray-900">
-                          {new Date(test.started_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {test.scheduled_end && test.status === 'running' && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Ends:</span>
-                        <span className="font-light text-gray-900">
-                          {new Date(test.scheduled_end).toLocaleDateString()}
-                        </span>
-                      </div>
-                    )}
-                    {test.winner_variant_id && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Winner:</span>
-                        <span className="font-light text-green-600">Variant #{test.winner_variant_id}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
-                    {test.status === 'draft' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTestAction(test.id, 'start');
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 font-light"
-                      >
-                        <Play className="w-3 h-3" />
-                        Start
-                      </button>
-                    )}
-                    {test.status === 'running' && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleTestAction(test.id, 'pause');
-                          }}
-                          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700 font-light"
-                        >
-                          <Pause className="w-3 h-3" />
-                          Pause
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleTestAction(test.id, 'end');
-                          }}
-                          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 font-light"
-                        >
-                          <Square className="w-3 h-3" />
-                          End
-                        </button>
-                      </>
-                    )}
-                    {test.status === 'paused' && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTestAction(test.id, 'resume');
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 font-light"
-                      >
-                        <Play className="w-3 h-3" />
-                        Resume
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        fetchTestDetails(test.id);
-                      }}
-                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-white/50 border border-gray-200 rounded hover:bg-white font-light"
-                    >
-                      <BarChart3 className="w-3 h-3" />
-                      Details
-                    </button>
-                  </div>
-                </div>
-              </GlassPanel>
-            ))}
+          <div>
+            <label className="text-sm font-medium text-primary mb-1 block">Description (optional)</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(f => ({ ...f, description: e.target.value }))}
+              placeholder="Describe what you're testing..."
+              className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm text-primary placeholder-text-tertiary resize-none"
+              rows={3}
+            />
           </div>
-        )}
 
-        {/* Test Details Modal */}
-        {selectedTest && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="glass max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-gray-200 sticky top-0 glass">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-2xl font-light text-gray-900">{selectedTest.name}</h2>
-                    <p className="text-gray-600 capitalize">
-                      {selectedTest.test_type.replace(/_/g, ' ')} Test
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedTest(null)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <Square className="w-6 h-6" />
-                  </button>
+          <div className="flex items-center justify-end gap-3 pt-4">
+            <button type="button" className="btn-ghost" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary" disabled={isCreating || !formData.name}>
+              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              <span>Create Test</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// RESULTS MODAL
+// =============================================================================
+
+interface ResultsModalProps {
+  test: ABTest | null;
+  onClose: () => void;
+}
+
+function ResultsModal({ test, onClose }: ResultsModalProps) {
+  if (!test) return null;
+
+  const conversionA = test.results?.variant_a?.conversion_rate || test.conversion_a || 0;
+  const conversionB = test.results?.variant_b?.conversion_rate || test.conversion_b || 0;
+  const confidence = test.results?.confidence || test.confidence || 0;
+  const lift = conversionA > 0 ? ((conversionB - conversionA) / conversionA) * 100 : 0;
+  const isSignificant = confidence >= 95;
+  const winner = conversionB > conversionA ? 'B' : 'A';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="glass-card max-w-2xl w-full">
+        <div className="p-6 border-b border-black/10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-primary">{test.name}</h2>
+              <p className="text-sm text-secondary mt-1">Test Results</p>
+            </div>
+            <button onClick={onClose} className="btn-ghost">Close</button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {/* Status */}
+          <div className={`p-4 rounded-xl mb-6 ${isSignificant ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+            <div className="flex items-center gap-2">
+              {isSignificant ? (
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              )}
+              <span className={`font-medium ${isSignificant ? 'text-green-700' : 'text-amber-700'}`}>
+                {isSignificant 
+                  ? `Variant ${winner} is the winner with ${confidence.toFixed(0)}% confidence!`
+                  : `Not yet significant (${confidence.toFixed(0)}% confidence). Keep running the test.`
+                }
+              </span>
+            </div>
+          </div>
+
+          {/* Comparison */}
+          <div className="grid grid-cols-2 gap-6 mb-6">
+            <div className={`p-6 rounded-xl border ${winner === 'A' && isSignificant ? 'bg-green-500/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
+              <div className="text-sm text-secondary mb-2">Variant A (Control)</div>
+              <div className="text-3xl font-bold text-primary">{conversionA.toFixed(2)}%</div>
+              <div className="text-xs text-tertiary mt-1">Conversion Rate</div>
+              {test.results?.variant_a?.visitors && (
+                <div className="text-sm text-secondary mt-3">
+                  {test.results.variant_a.visitors.toLocaleString()} visitors
                 </div>
+              )}
+            </div>
+            <div className={`p-6 rounded-xl border ${winner === 'B' && isSignificant ? 'bg-green-500/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
+              <div className="text-sm text-secondary mb-2">Variant B (Treatment)</div>
+              <div className="text-3xl font-bold text-primary">{conversionB.toFixed(2)}%</div>
+              <div className="text-xs text-tertiary mt-1">Conversion Rate</div>
+              {lift !== 0 && (
+                <div className={`text-sm font-medium mt-3 ${lift > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  {lift > 0 ? '+' : ''}{lift.toFixed(1)}% vs Control
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-4 rounded-xl bg-black/5">
+              <div className="text-2xl font-bold text-primary">{confidence.toFixed(0)}%</div>
+              <div className="text-xs text-tertiary">Confidence</div>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-black/5">
+              <div className={`text-2xl font-bold ${lift > 0 ? 'text-green-600' : lift < 0 ? 'text-red-500' : 'text-primary'}`}>
+                {lift > 0 ? '+' : ''}{lift.toFixed(1)}%
               </div>
-
-              <div className="p-6">
-                {/* Test Stats */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="text-center p-4 bg-white/50 rounded-lg">
-                    <div className="text-2xl font-light text-gray-900">
-                      {selectedTest.variants.length}
-                    </div>
-                    <div className="text-sm text-gray-600">Variants</div>
-                  </div>
-                  <div className="text-center p-4 bg-white/50 rounded-lg">
-                    <div className="text-2xl font-light text-gray-900">
-                      {selectedTest.variants.reduce((sum, v) => sum + v.impressions, 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Impressions</div>
-                  </div>
-                  <div className="text-center p-4 bg-white/50 rounded-lg">
-                    <div className="text-2xl font-light text-gray-900">
-                      {selectedTest.variants.reduce((sum, v) => sum + v.conversions, 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Conversions</div>
-                  </div>
-                  <div className="text-center p-4 bg-white/50 rounded-lg">
-                    <div className="text-2xl font-light text-gray-900">
-                      ${selectedTest.variants.reduce((sum, v) => sum + v.revenue, 0).toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-600">Total Revenue</div>
-                  </div>
-                </div>
-
-                {/* Variants */}
-                <h3 className="text-lg font-light text-gray-900 mb-4">Variant Performance</h3>
-                <div className="space-y-4">
-                  {selectedTest.variants.map((variant) => (
-                    <div
-                      key={variant.id}
-                      className={`p-4 rounded-lg border-2 ${
-                        variant.id === selectedTest.winner_variant_id
-                          ? 'border-green-500 bg-green-50/50'
-                          : variant.is_control
-                          ? 'border-blue-500 bg-blue-50/50'
-                          : 'border-gray-200 bg-white/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-light text-gray-900">{variant.name}</h4>
-                          {variant.is_control && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded">
-                              Control
-                            </span>
-                          )}
-                          {variant.id === selectedTest.winner_variant_id && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                              Winner
-                            </span>
-                          )}
-                        </div>
-                        {getSignificanceBadge(variant)}
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <div className="text-gray-600">Impressions</div>
-                          <div className="text-lg font-light text-gray-900">
-                            {variant.impressions.toLocaleString()}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600">Conversions</div>
-                          <div className="text-lg font-light text-gray-900">
-                            {variant.conversions.toLocaleString()}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600">Conversion Rate</div>
-                          <div className="text-lg font-light text-gray-900">
-                            {variant.conversion_rate.toFixed(2)}%
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-gray-600">Revenue</div>
-                          <div className="text-lg font-light text-gray-900">
-                            ${variant.revenue.toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-
-                      {variant.confidence_interval && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <div className="text-xs text-gray-600">
-                            95% Confidence Interval: {variant.confidence_interval[0].toFixed(2)}% - {variant.confidence_interval[1].toFixed(2)}%
-                          </div>
-                          {variant.p_value && (
-                            <div className="text-xs text-gray-600 mt-1">
-                              p-value: {variant.p_value.toFixed(4)}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <div className="text-xs text-tertiary">Lift</div>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-black/5">
+              <div className="text-2xl font-bold text-primary">{test.variant_count || 2}</div>
+              <div className="text-xs text-tertiary">Variants</div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+export default function ABTestingPage() {
+  // State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedTest, setSelectedTest] = useState<ABTest | null>(null);
+  const [pausingId, setPausingId] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+
+  // Data hooks
+  const { data: tests, isLoading: testsLoading, refetch: refetchTests } = useABTests();
+
+  // Stats
+  const activeTests = tests?.filter(t => t.status === 'running').length || 0;
+  const completedTests = tests?.filter(t => t.status === 'completed').length || 0;
+  const avgConfidence = tests?.length 
+    ? (tests.reduce((sum, t) => sum + (t.confidence || 0), 0) / tests.length).toFixed(0)
+    : '0';
+
+  // Handlers
+  const handleCreate = async (data: any) => {
+    setIsCreating(true);
+    try {
+      await abTestingAPI.create(data);
+      await refetchTests();
+      setShowCreateModal(false);
+      alert('✅ A/B Test created successfully!');
+    } catch (error) {
+      console.error('Failed to create test:', error);
+      alert('❌ Failed to create test. Please try again.');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handlePause = async (test: ABTest) => {
+    setPausingId(test.id);
+    try {
+      await abTestingAPI.pause(test.id);
+      await refetchTests();
+    } catch (error) {
+      console.error('Failed to pause test:', error);
+      alert('❌ Failed to pause test.');
+    } finally {
+      setPausingId(null);
+    }
+  };
+
+  const handleResume = async (test: ABTest) => {
+    setResumingId(test.id);
+    try {
+      await abTestingAPI.resume(test.id);
+      await refetchTests();
+    } catch (error) {
+      console.error('Failed to resume test:', error);
+      alert('❌ Failed to resume test.');
+    } finally {
+      setResumingId(null);
+    }
+  };
+
+  const handleViewResults = (test: ABTest) => {
+    setSelectedTest(test);
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-primary flex items-center gap-2">
+            <FlaskConical className="w-6 h-6 text-accent" />
+            A/B Testing
+          </h1>
+          <p className="text-sm text-secondary mt-1">
+            Run experiments to optimize conversions
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-ghost"
+            onClick={() => refetchTests()}
+            disabled={testsLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${testsLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-4 h-4" />
+            <span>New Test</span>
+          </button>
+        </div>
       </div>
 
-      {/* Create Test Modal */}
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-secondary mb-1">Active Tests</div>
+              <div className="text-2xl font-semibold text-primary">{activeTests}</div>
+            </div>
+            <FlaskConical className="w-8 h-8 text-blue-500/30" />
+          </div>
+        </div>
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-secondary mb-1">Completed</div>
+              <div className="text-2xl font-semibold text-primary">{completedTests}</div>
+            </div>
+            <CheckCircle2 className="w-8 h-8 text-green-500/30" />
+          </div>
+        </div>
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-secondary mb-1">Avg Confidence</div>
+              <div className="text-2xl font-semibold text-primary">{avgConfidence}%</div>
+            </div>
+            <Target className="w-8 h-8 text-purple-500/30" />
+          </div>
+        </div>
+        <div className="glass-card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-xs text-secondary mb-1">Total Tests</div>
+              <div className="text-2xl font-semibold text-primary">{tests?.length || 0}</div>
+            </div>
+            <BarChart3 className="w-8 h-8 text-cyan-500/30" />
+          </div>
+        </div>
+      </div>
+
+      {/* Tests List */}
+      {testsLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+        </div>
+      ) : !tests || tests.length === 0 ? (
+        <div className="glass-card p-12 text-center">
+          <FlaskConical className="w-12 h-12 text-tertiary mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-primary mb-2">No A/B Tests Yet</h3>
+          <p className="text-sm text-secondary mb-6">
+            Create your first A/B test to start optimizing your conversions.
+          </p>
+          <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
+            <Plus className="w-4 h-4" />
+            <span>Create Test</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {tests.map((test, index) => (
+            <TestCard
+              key={test.id}
+              test={test}
+              onPause={handlePause}
+              onResume={handleResume}
+              onViewResults={handleViewResults}
+              isPausing={pausingId === test.id}
+              isResuming={resumingId === test.id}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Create Modal */}
       <CreateTestModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onTestCreated={fetchTests}
+        onCreate={handleCreate}
+        isCreating={isCreating}
+      />
+
+      {/* Results Modal */}
+      <ResultsModal
+        test={selectedTest}
+        onClose={() => setSelectedTest(null)}
       />
     </div>
   );
-};
+}

@@ -23,11 +23,24 @@ Base = declarative_base()
 # ============================================================================
 
 class SubscriptionTier(str, enum.Enum):
-    """User subscription levels"""
-    FREE = "free"
-    STARTER = "starter"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+    """
+    User subscription levels - Sky/Flight themed
+    
+    🪺 Nest → Free tier (grounded, learning)
+    ✈️ Flight → $29/mo (first flight, momentum)
+    🦅 Soar → $79/mo (high altitude, seeing far)
+    🌌 Stratosphere → $199/mo (edge of space, first to see)
+    """
+    NEST = "nest"
+    FLIGHT = "flight"
+    SOAR = "soar"
+    STRATOSPHERE = "stratosphere"
+    
+    # Legacy aliases for backward compatibility
+    FREE = "nest"        # Maps to NEST
+    STARTER = "flight"   # Maps to FLIGHT  
+    PRO = "soar"         # Maps to SOAR
+    ENTERPRISE = "stratosphere"  # Maps to STRATOSPHERE
 
 
 class Platform(str, enum.Enum):
@@ -132,9 +145,12 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
+    
+    # Authentication
+    password_hash = Column(String(255), nullable=True)  # Nullable for existing users
 
     # Subscription
-    subscription_tier = Column(SQLEnum(SubscriptionTier), default=SubscriptionTier.FREE, nullable=False)
+    subscription_tier = Column(SQLEnum(SubscriptionTier), default=SubscriptionTier.NEST, nullable=False)
     subscription_started = Column(DateTime, default=datetime.utcnow)
     subscription_expires = Column(DateTime, nullable=True)
 
@@ -1029,7 +1045,7 @@ def migrate_existing_store(
             user = User(
                 email=user_email,
                 name=user_name,
-                subscription_tier=SubscriptionTier.PRO,
+                subscription_tier=SubscriptionTier.SOAR,
                 ai_preference=AIProvider.CLAUDE
             )
             session.add(user)

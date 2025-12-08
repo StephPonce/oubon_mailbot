@@ -6,13 +6,16 @@ from typing import Dict, List
 from .client import ShopifyClient
 from anthropic import Anthropic
 from ospra_os.intelligence.ai_pricing_generator import generate_product_pricing
+from ospra_os.services.image_processor import ProductImageProcessor
+from ospra_os.services.image_storage import ImageStorage
 
 
 class ProductDeploymentService:
     """Service for deploying products to Shopify with AI-powered content generation"""
 
-    def __init__(self, shopify_client: ShopifyClient = None):
+    def __init__(self, shopify_client: ShopifyClient = None, enable_image_enhancement: bool = True):
         self.shopify = shopify_client or ShopifyClient()
+        self.enable_image_enhancement = enable_image_enhancement
 
         # Initialize AI client for content generation
         self.ai_client = None
@@ -25,6 +28,17 @@ class ProductDeploymentService:
                 print(f"⚠️  AI initialization failed: {e}")
         else:
             print("⚠️  ANTHROPIC_API_KEY not set - using template descriptions")
+
+        # Initialize image enhancement services
+        self.image_processor = None
+        self.image_storage = None
+        if enable_image_enhancement:
+            try:
+                self.image_processor = ProductImageProcessor()
+                self.image_storage = ImageStorage()
+                print("✅ AI-powered image enhancement enabled (DALL-E 3 + rembg)")
+            except Exception as e:
+                print(f"⚠️  Image enhancement initialization failed: {e}")
 
     async def deploy_product(
         self,
@@ -52,7 +66,11 @@ class ProductDeploymentService:
             title = self._generate_title(product_data)
             description = await self._generate_description(product_data, generate_description)
             price = self._calculate_price(product_data)
-            images = self._get_images(product_data)
+
+            # Get original images and enhance with AI
+            original_images = self._get_images(product_data)
+            images = await self._enhance_images(product_data, original_images)
+
             tags = self._generate_tags(product_data)
 
             # Metafields for internal tracking
@@ -285,6 +303,118 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
             return rounded - 3  # $97
         else:
             return rounded - 5  # $195
+
+    async def _enhance_images(
+        self,
+        product_data: Dict,
+        original_images: List[str]
+    ) -> List[str]:
+        """
+        Enhance product images using AI pipeline
+
+        Pipeline:
+        1. Remove background from original image (FREE - rembg)
+        2. Generate lifestyle background (DALL-E 3 - ~$0.04)
+        3. Composite product onto background
+        4. Add branding/watermark
+        5. Save to local storage
+        6. Return HTTP URLs for Shopify
+
+        Args:
+            product_data: Product information
+            original_images: Original image URLs
+
+        Returns:
+            List of enhanced image URLs (HTTP accessible)
+        """
+        if not self.image_processor or not self.image_storage:
+            print("⚠️  Image enhancement disabled, using original images")
+            return original_images
+
+        if not original_images:
+            print("⚠️  No images to enhance")
+            return []
+
+        enhanced_urls = []
+        product_id = str(product_data.get('id', 'unknown'))
+        product_name = product_data.get('name', 'Product')
+        niche = product_data.get('niche', 'smart_home')
+
+        print(f"\n🎨 ENHANCING IMAGES WITH AI")
+        print(f"   Product: {product_name[:40]}")
+        print(f"   Niche: {niche}")
+        print(f"   Images to process: {len(original_images)}")
+        print()
+
+        # Process first image only (to save on DALL-E costs)
+        # Can be expanded to process more images later
+        image_url = original_images[0]
+
+        try:
+            print(f"   Processing image 1/{len(original_images)}...")
+
+            # Run through AI enhancement pipeline
+            result = await self.image_processor.process_product_image(
+                aliexpress_image_url=image_url,
+                product_name=product_name,
+                niche=niche,
+                add_branding=True,
+                save_to_disk=False,  # We'll handle storage ourselves
+                position="center",
+                scale=0.6
+            )
+
+            if result.get("success") and result.get("image_base64"):
+                # Convert base64 back to PIL Image
+                import base64
+                import io
+                from PIL import Image
+
+                image_data = base64.b64decode(result["image_base64"])
+                enhanced_image = Image.open(io.BytesIO(image_data))
+
+                # Save enhanced image to storage
+                storage_result = self.image_storage.save_product_image(
+                    image=enhanced_image,
+                    product_id=product_id,
+                    image_type="enhanced",
+                    format="png"
+                )
+
+                if storage_result.get("success"):
+                    # Get HTTP accessible URL
+                    http_url = storage_result.get("url")  # e.g., /static/images/products/{id}/enhanced_...png
+
+                    # Convert to full URL (Shopify needs absolute URLs)
+                    # In production, this should use your domain
+                    base_url = os.getenv("BASE_URL", "http://localhost:8001")
+                    full_url = f"{base_url}{http_url}"
+
+                    enhanced_urls.append(full_url)
+
+                    cost = result.get("cost_estimate", 0.04)
+                    print(f"   ✅ Image enhanced successfully (cost: ${cost:.2f})")
+                    print(f"   📸 Saved to: {storage_result.get('filename')}")
+                else:
+                    print(f"   ⚠️  Storage failed, using original")
+                    enhanced_urls.append(image_url)
+            else:
+                error = result.get("error", "Unknown error")
+                print(f"   ⚠️  Enhancement failed: {error}")
+                enhanced_urls.append(image_url)
+
+        except Exception as e:
+            print(f"   ❌ Enhancement error: {e}")
+            enhanced_urls.append(image_url)
+
+        # Add remaining original images (unprocessed)
+        if len(original_images) > 1:
+            enhanced_urls.extend(original_images[1:])
+            print(f"   ℹ️  Added {len(original_images) - 1} original images (unprocessed)")
+
+        print(f"\n   ✅ Final image count: {len(enhanced_urls)}\n")
+
+        return enhanced_urls
 
     def _get_images(self, product_data: Dict) -> List[str]:
         """Get product images"""

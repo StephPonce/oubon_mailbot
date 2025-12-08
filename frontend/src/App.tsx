@@ -1,26 +1,39 @@
-import { motion } from 'framer-motion';
+import { useEffect } from 'react';
 import { AIChatProvider } from './contexts/AIChatContext';
 import { ProductsProvider } from './contexts/ProductsContext';
-import GlobalAIChat from './components/GlobalAIChat';
+import OspraChat from './components/OspraChat';
 import Layout from './components/Layout';
+import { WelcomeModal, SetupWizard } from './components/onboarding';
+import { wsService } from './services/websocket';
+import { useOspraStore } from './store/ospra.store';
 import './index.css';
 
 export default function App() {
+  const { isOnboarded, onboardingStep, setShowWelcomeModal } = useOspraStore();
+
+  // Trigger welcome modal for fresh users
+  useEffect(() => {
+    if (!isOnboarded && onboardingStep === 0) {
+      setShowWelcomeModal(true);
+    }
+  }, [isOnboarded, onboardingStep, setShowWelcomeModal]);
+
+  // WebSocket disabled - backend doesn't have /ws endpoint yet
+  useEffect(() => {
+    // Uncomment when backend WebSocket is implemented:
+    // wsService.connect().catch(() => {});
+    // return () => wsService.disconnect();
+    console.log('[App] WebSocket disabled - using REST polling');
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50" style={{ perspective: '1500px' }}>
-      <AIChatProvider>
-        <ProductsProvider>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8 }}
-            className="relative z-10"
-          >
-            <Layout />
-          </motion.div>
-          <GlobalAIChat />
-        </ProductsProvider>
-      </AIChatProvider>
-    </div>
+    <AIChatProvider>
+      <ProductsProvider>
+        <Layout />
+        <OspraChat />
+        <WelcomeModal />
+        <SetupWizard />
+      </ProductsProvider>
+    </AIChatProvider>
   );
 }

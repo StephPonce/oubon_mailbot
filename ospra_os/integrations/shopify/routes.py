@@ -1,7 +1,8 @@
 """
-Shopify One-Click Deployment API Routes
+Shopify One-Click Deployment API Routes - Enhanced with Unified AI Pipeline
 
-Endpoints for deploying products directly from the Ospra Intelligence dashboard.
+Endpoints for deploying products directly from the Ospra Intelligence dashboard
+with full AI-powered content generation, image enhancement, and SEO optimization.
 
 Author: OspraOS
 Date: December 2025
@@ -23,7 +24,7 @@ router = APIRouter(prefix="/api/shopify", tags=["shopify"])
 # ============================================================================
 
 class ProductDeployRequest(BaseModel):
-    """Request to deploy a single product."""
+    """Request to deploy a single product with AI-powered enhancements."""
     product_id: str = Field(..., description="Internal product ID from discovery")
     name: str = Field(..., description="Product name")
     niche: str = Field(default="general", description="Product niche/category")
@@ -32,8 +33,19 @@ class ProductDeployRequest(BaseModel):
     images: List[str] = Field(default=[], description="Product image URLs")
     description: Optional[str] = Field(None, description="Optional description (AI generates if empty)")
     trend_score: float = Field(default=0, description="Trend score 0-100")
-    generate_ai_description: bool = Field(default=True, description="Use AI to generate description")
-    auto_publish: bool = Field(default=True, description="Publish immediately")
+    features: List[str] = Field(default=[], description="Product features for AI content generation")
+
+    # AI Control Flags
+    ai_content: bool = Field(default=True, description="Auto-generate title/description with AI")
+    ai_images: bool = Field(default=True, description="Auto-enhance images with AI (bg removal + lifestyle)")
+    ai_pricing: bool = Field(default=True, description="Auto-suggest competitive price with AI")
+    ai_seo: bool = Field(default=True, description="Auto-generate SEO metadata with AI")
+    publish: bool = Field(default=False, description="Publish immediately (False = save as draft)")
+
+    # Deployment Options
+    target_margin: float = Field(default=0.4, description="Target profit margin (0.4 = 40%)")
+    add_branding: bool = Field(default=True, description="Add branding/watermark to images")
+    max_images: int = Field(default=5, description="Maximum number of images to process")
 
 
 class BulkDeployRequest(BaseModel):
@@ -43,7 +55,7 @@ class BulkDeployRequest(BaseModel):
 
 
 class DeploymentResult(BaseModel):
-    """Result of a deployment."""
+    """Result of a deployment with AI metrics."""
     success: bool
     product_id: str
     shopify_product_id: Optional[int] = None
@@ -52,6 +64,28 @@ class DeploymentResult(BaseModel):
     price: Optional[float] = None
     error: Optional[str] = None
     deployed_at: Optional[datetime] = None
+
+    # AI Enhancement Metrics
+    content_generated: Optional[Dict] = None  # AI-generated title, description, SEO
+    images_enhanced: Optional[int] = None  # Number of images enhanced
+    ai_costs: Optional[Dict] = None  # Cost breakdown (content, images)
+    total_cost: Optional[float] = None  # Total AI cost
+    processing_time_seconds: Optional[float] = None  # Time to deploy
+    published: Optional[bool] = None  # Whether product was published
+
+
+class PreviewResult(BaseModel):
+    """Result of a deployment preview."""
+    title: str
+    description_html: str
+    short_description: str
+    bullet_points: List[str]
+    images: List[str]
+    pricing: Dict
+    seo: Dict
+    tags: List[str]
+    estimated_cost: float
+    processing_time: float
 
 
 class ShopifyProduct(BaseModel):
@@ -73,6 +107,7 @@ class ShopifyProduct(BaseModel):
 
 _shopify_client = None
 _deployment_service = None
+_unified_deployer = None  # New unified AI deployer
 
 
 def get_shopify_client():
@@ -90,17 +125,31 @@ def get_shopify_client():
 
 
 def get_deployment_service():
-    """Get or create deployment service."""
+    """Get or create legacy deployment service (for backwards compatibility)."""
     global _deployment_service
     if _deployment_service is None:
         try:
             from ospra_os.integrations.shopify.deployment import ProductDeploymentService
             _deployment_service = ProductDeploymentService(get_shopify_client())
-            logger.info("✅ Deployment service initialized")
+            logger.info("✅ Legacy deployment service initialized")
         except Exception as e:
             logger.error(f"Failed to initialize deployment service: {e}")
             raise HTTPException(status_code=500, detail=f"Deployment service error: {e}")
     return _deployment_service
+
+
+def get_unified_deployer():
+    """Get or create unified AI-powered deployer (NEW)."""
+    global _unified_deployer
+    if _unified_deployer is None:
+        try:
+            from ospra_os.services.product_deployer import ProductDeployer
+            _unified_deployer = ProductDeployer()
+            logger.info("✅ Unified AI deployer initialized (Claude + DALL-E + rembg)")
+        except Exception as e:
+            logger.error(f"Failed to initialize unified deployer: {e}")
+            raise HTTPException(status_code=500, detail=f"Unified deployer error: {e}")
+    return _unified_deployer
 
 
 # ============================================================================
@@ -206,35 +255,60 @@ async def list_shopify_products(limit: int = 50):
 @router.post("/deploy", response_model=DeploymentResult)
 async def deploy_product(request: ProductDeployRequest, background_tasks: BackgroundTasks):
     """
-    🚀 ONE-CLICK DEPLOY
-    
-    Deploy a single product to Shopify with AI-generated content.
+    🚀 ONE-CLICK DEPLOY with Full AI Pipeline
+
+    Deploy a single product to Shopify with AI-powered enhancements:
+    - Content generation (Claude Sonnet 4.5)
+    - Image enhancement (DALL-E 3 + rembg)
+    - SEO optimization
+    - Competitive pricing
+
+    AI features can be controlled via flags:
+    - ai_content: Generate title/description
+    - ai_images: Enhance images
+    - ai_pricing: Suggest competitive price
+    - ai_seo: Generate SEO metadata
+    - publish: Publish immediately (vs draft)
+
+    Cost: ~$0.02-0.06 per product (depending on AI features enabled)
+    Time: ~20-30 seconds
     """
     try:
         logger.info(f"🚀 Deploying product: {request.name}")
-        
-        service = get_deployment_service()
-        
-        # Build product data for deployment service
-        product_data = {
-            "id": request.product_id,
-            "name": request.name,
-            "niche": request.niche,
-            "cost": request.supplier_cost,
-            "fulfillment_url": request.supplier_url,
-            "images": request.images,
+        logger.info(f"   AI Flags: content={request.ai_content}, images={request.ai_images}, pricing={request.ai_pricing}, seo={request.ai_seo}")
+
+        deployer = get_unified_deployer()
+
+        # Build AliExpress product data for unified deployer
+        aliexpress_product = {
+            "title": request.name,
             "description": request.description,
-            "trend_score": request.trend_score,
-            "discovery_source": "ospra_dashboard",
-            "created_at": datetime.now().isoformat()
+            "features": request.features,
+            "category": request.niche,
+            "price": request.supplier_cost,
+            "images": request.images
         }
-        
-        # Deploy
-        result = await service.deploy_product(
-            product_data,
-            generate_description=request.generate_ai_description
+
+        # Build deployment options based on AI flags
+        options = {
+            "enhance_images": request.ai_images,
+            "generate_content": request.ai_content,
+            "generate_seo": request.ai_seo,
+            "generate_pricing": request.ai_pricing,
+            "publish_immediately": request.publish,
+            "add_branding": request.add_branding,
+            "target_margin": request.target_margin,
+            "max_images": request.max_images
+        }
+
+        # Deploy with unified AI pipeline
+        result = await deployer.deploy_product(
+            aliexpress_product=aliexpress_product,
+            niche=request.niche,
+            shopify_store_id=None,  # Use default store
+            options=options
         )
-        
+
         if result.get("success"):
             return DeploymentResult(
                 success=True,
@@ -242,23 +316,93 @@ async def deploy_product(request: ProductDeployRequest, background_tasks: Backgr
                 shopify_product_id=result.get("shopify_product_id"),
                 shopify_url=result.get("shopify_url"),
                 admin_url=result.get("admin_url"),
-                price=result.get("price"),
-                deployed_at=datetime.now()
+                price=result.get("pricing", {}).get("retail_price"),
+                deployed_at=datetime.now(),
+                content_generated=result.get("content_generated"),
+                images_enhanced=result.get("images_enhanced"),
+                ai_costs=result.get("ai_costs"),
+                total_cost=result.get("total_cost"),
+                processing_time_seconds=result.get("processing_time_seconds"),
+                published=result.get("published")
             )
         else:
             return DeploymentResult(
                 success=False,
                 product_id=request.product_id,
-                error=result.get("error", "Unknown error")
+                error=result.get("error", "Unknown error"),
+                ai_costs=result.get("ai_costs"),
+                total_cost=result.get("total_cost"),
+                processing_time_seconds=result.get("processing_time_seconds")
             )
-            
+
     except Exception as e:
         logger.error(f"Deployment failed: {e}")
+        import traceback
+        traceback.print_exc()
         return DeploymentResult(
             success=False,
             product_id=request.product_id,
             error=str(e)
         )
+
+
+@router.post("/deploy/preview", response_model=PreviewResult)
+async def preview_deployment(request: ProductDeployRequest):
+    """
+    👁️ PREVIEW DEPLOYMENT
+
+    Generate AI content and enhanced images WITHOUT deploying to Shopify.
+    Use this to preview what the product will look like before going live.
+
+    Returns:
+    - AI-generated title, description, bullet points
+    - Enhanced product images (with background removal + lifestyle bg)
+    - SEO metadata (meta title, description, keywords)
+    - Competitive pricing suggestion
+    - Estimated deployment cost
+
+    Cost: ~$0.02-0.06 (same as deployment)
+    Time: ~15-20 seconds
+    """
+    try:
+        logger.info(f"👁️ Previewing product: {request.name}")
+
+        deployer = get_unified_deployer()
+
+        # Build AliExpress product data
+        aliexpress_product = {
+            "title": request.name,
+            "description": request.description,
+            "features": request.features,
+            "category": request.niche,
+            "price": request.supplier_cost,
+            "images": request.images
+        }
+
+        # Generate preview
+        result = await deployer.preview_deployment(
+            aliexpress_product=aliexpress_product,
+            niche=request.niche
+        )
+
+        return PreviewResult(
+            title=result["title"],
+            description_html=result["description_html"],
+            short_description=result["short_description"],
+            bullet_points=result["bullet_points"],
+            images=result["images"],
+            pricing=result["pricing"],
+            seo=result["seo"],
+            tags=result["tags"],
+            estimated_cost=result["estimated_deployment_cost"],
+            processing_time=result["processing_time"]
+        )
+
+    except Exception as e:
+        logger.error(f"Preview failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/deploy/bulk", response_model=List[DeploymentResult])

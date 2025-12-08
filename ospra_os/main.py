@@ -12,8 +12,8 @@ load_dotenv(dotenv_path=env_path, override=True)
 print(f"🔑 GOOGLE_OAUTH_CLIENT_ID loaded: {bool(os.getenv('GOOGLE_OAUTH_CLIENT_ID'))}")
 
 from fastapi import FastAPI, Depends, Body, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 from ospra_os.core.settings import Settings, get_settings
@@ -80,6 +80,16 @@ except Exception as e:
     print(f"⚠️  Authentication router not loaded: {e}")
     auth_router = None
     _HAS_AUTH = False
+
+# Frontend Compatibility router (provides missing endpoint aliases)
+try:
+    from ospra_os.api.frontend_compat_routes import router as frontend_compat_router  # type: ignore
+    _HAS_FRONTEND_COMPAT = True
+    print("✅ Frontend compatibility router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Frontend compatibility router not loaded: {e}")
+    frontend_compat_router = None
+    _HAS_FRONTEND_COMPAT = False
 
 # Gmail OAuth router (optional)
 try:
@@ -279,15 +289,35 @@ _HAS_SHOPIFY_OAUTH = False
 shopify_oauth_router = None
 print("⚠️  Shopify OAuth router not implemented yet")
 
-# Deployment router (Unified Product Deployment)
+# Shopify Deployment router (AI-Enhanced Shopify Integration)
 try:
-    from ospra_os.platforms.deployment_routes import router as deployment_router  # type: ignore
+    from ospra_os.integrations.shopify.routes import router as shopify_deployment_router  # type: ignore
+    _HAS_SHOPIFY_DEPLOYMENT = True
+    print("✅ Shopify Deployment router loaded successfully (AI-powered)")
+except Exception as e:
+    print(f"⚠️  Shopify Deployment router not loaded: {e}")
+    shopify_deployment_router = None
+    _HAS_SHOPIFY_DEPLOYMENT = False
+
+# Deployment router (Unified Product Deployment with AI)
+try:
+    from ospra_os.api.deployment_routes import router as deployment_router  # type: ignore
     _HAS_DEPLOYMENT = True
-    print("✅ Deployment router loaded successfully")
+    print("✅ Unified Deployment router loaded successfully (AI-powered)")
 except Exception as e:
     print(f"⚠️  Deployment router not loaded: {e}")
     deployment_router = None
     _HAS_DEPLOYMENT = False
+
+# Auto-Deploy router (Automated Product Deployment)
+try:
+    from ospra_os.api.auto_deploy_routes import router as auto_deploy_router  # type: ignore
+    _HAS_AUTO_DEPLOY = True
+    print("✅ Auto-Deploy router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Auto-Deploy router not loaded: {e}")
+    auto_deploy_router = None
+    _HAS_AUTO_DEPLOY = False
 
 # Analytics router (Revenue & Profit Tracking)
 try:
@@ -409,6 +439,16 @@ except Exception as e:
     abtesting_router = None
     _HAS_ABTESTING = False
 
+# Image Processing router
+try:
+    from ospra_os.api.image_routes import router as image_router  # type: ignore
+    _HAS_IMAGE_PROCESSING = True
+    print("✅ Image Processing router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Image Processing router not loaded: {e}")
+    image_router = None
+    _HAS_IMAGE_PROCESSING = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -423,20 +463,36 @@ app = FastAPI(title="OspraOS API", version="0.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173",  # Alternative localhost
-        "http://localhost:3000",  # Alternative dev server
-        "https://policies.oubonshop.com",  # Production demo page
-        "https://blond-ross-ticket-duplicate.trycloudflare.com",  # Cloudflare tunnel
-        "https://app.oubonshop.com",  # Production app
+        # Vite dev servers (all possible ports)
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176",
+        # Alternative dev servers
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        # Cloudflare tunnel
+        "https://blond-ross-ticket-duplicate.trycloudflare.com",
+        # Production domains
+        "https://ospra.io",
+        "https://www.ospra.io",
+        "https://app.oubonshop.com",
+        "https://policies.oubonshop.com",
     ],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],  # Allow all headers (Authorization, Content-Type, etc.)
 )
 
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# Mount static files for product images
+app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
 
 # ---------------------------------------------------------------
 # CRITICAL: Immediate Health Check Endpoint
@@ -681,6 +737,14 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  AliExpress token refresh scheduler failed to start: {e}")
 
+    # Start Auto-Deploy scheduler
+    try:
+        from ospra_os.background_jobs.auto_deploy_job import start_auto_deploy_scheduler
+        start_auto_deploy_scheduler()
+        print("✅ Auto-deploy scheduler started (runs every hour)")
+    except Exception as e:
+        print(f"⚠️  Auto-deploy scheduler failed to start: {e}")
+
     # Log startup completion with timing
     startup_duration = time.time() - startup_start
     print(f"✅ Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -756,6 +820,9 @@ if gmail_oauth_router:
 if _HAS_AUTH and auth_router:
     app.include_router(auth_router)  # exposes /api/auth/* (registration, login, JWT)
 
+if _HAS_FRONTEND_COMPAT and frontend_compat_router:
+    app.include_router(frontend_compat_router)  # exposes /auth/* aliases + missing endpoints
+
 if _HAS_TIKTOK and tiktok_router:
     app.include_router(tiktok_router)
 
@@ -799,6 +866,9 @@ if _HAS_SHOPIFY_WEBHOOKS and shopify_webhooks_router:
 if _HAS_SHOPIFY_OAUTH and shopify_oauth_router:
     app.include_router(shopify_oauth_router)  # exposes /oauth/shopify/*
 
+if _HAS_SHOPIFY_DEPLOYMENT and shopify_deployment_router:
+    app.include_router(shopify_deployment_router)  # exposes /api/shopify/* (AI-powered deployment)
+
 if _HAS_ADVERTISING and advertising_router:
     app.include_router(advertising_router)  # exposes /api/ads/*
 
@@ -819,6 +889,9 @@ if _HAS_EMAIL_SETTINGS and email_settings_router:
 
 if _HAS_DEPLOYMENT and deployment_router:
     app.include_router(deployment_router)  # exposes /api/deploy/*
+
+if _HAS_AUTO_DEPLOY and auto_deploy_router:
+    app.include_router(auto_deploy_router)  # exposes /api/auto-deploy/*
 
 if _HAS_ANALYTICS and analytics_router:
     app.include_router(analytics_router)  # exposes /api/analytics/*
@@ -855,6 +928,9 @@ if _HAS_INVENTORY and inventory_router:
 
 if _HAS_ABTESTING and abtesting_router:
     app.include_router(abtesting_router)  # exposes /api/abtesting/*
+
+if _HAS_IMAGE_PROCESSING and image_router:
+    app.include_router(image_router)  # exposes /api/images/*
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
@@ -2543,8 +2619,8 @@ async def scrape_aliexpress_product(url: str):
     """
     Scrape product details from AliExpress URL.
 
-    Temporary solution until OAuth is approved.
-    Currently returns error asking for manual entry.
+    DEPRECATED (2025-12-07): AliExpress scraper removed.
+    Use official AliExpress Affiliate API instead via /api/aliexpress/* endpoints.
 
     Args:
         url: AliExpress product URL
@@ -2552,24 +2628,22 @@ async def scrape_aliexpress_product(url: str):
     Returns:
         {
             "success": False,
-            "error": "Manual entry required",
-            "message": "Auto-import coming when AliExpress OAuth approved"
+            "error": "Scraper removed - use official AliExpress API",
+            "message": "Use /api/aliexpress/search or /api/aliexpress/product endpoints"
         }
     """
-    try:
-        from ospra_os.integrations.aliexpress_scraper import AliExpressScraper
-
-        scraper = AliExpressScraper()
-        result = scraper.scrape_product(url)
-        return result
-
-    except Exception as e:
-        import traceback
-        return {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
+    # AliExpress scraper removed 2025-12-07
+    # Use official AliExpress Affiliate API instead
+    return {
+        "success": False,
+        "error": "AliExpress scraper removed (2025-12-07)",
+        "message": "Use official AliExpress API endpoints instead",
+        "alternatives": [
+            "POST /api/aliexpress/search - Search products",
+            "GET /api/aliexpress/product/{product_id} - Get product details",
+            "See docs/DATA_SOURCES.md for AliExpress API documentation"
+        ]
+    }
 
 
 @app.post("/api/optimize-price")
@@ -2638,6 +2712,58 @@ async def optimize_product_price(
 class DiscoverRequest(BaseModel):
     niches: Optional[List[str]] = None
     max_per_niche: int = 5
+
+
+@app.post("/api/intelligence/saturation")
+async def check_product_saturation(product_name: str):
+    """
+    🎯 PRODUCT SATURATION CHECKER
+
+    Analyze market saturation using Amazon data to avoid deploying
+    products that are already oversaturated.
+
+    Uses Amazon Bestsellers scraper to check:
+    - Seller count (competition level)
+    - Review velocity (market maturity)
+    - Best Seller Rank (BSR) trends
+    - Price competition
+
+    Returns:
+        {
+            "saturation_score": float (0-100),
+            "competitor_count": int,
+            "review_velocity": float (reviews/day),
+            "bsr": int,
+            "bsr_trend": "rising" | "stable" | "falling",
+            "price_range": {"min": float, "max": float},
+            "recommendation": "deploy" | "caution" | "skip",
+            "reasons": List[str],
+            "opportunity_score": float (0-100)
+        }
+
+    Saturation Scores:
+    - 0-30: ✅ DEPLOY - Blue ocean (low competition)
+    - 31-60: ⚠️  CAUTION - Moderate competition
+    - 61-100: ❌ SKIP - Saturated (high competition)
+    """
+    try:
+        from ospra_os.intelligence.saturation_scorer import calculate_saturation_score
+
+        result = await calculate_saturation_score(product_name)
+
+        return {
+            "success": True,
+            "product_name": product_name,
+            **result
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
 
 
 @app.post("/api/intelligence/discover")

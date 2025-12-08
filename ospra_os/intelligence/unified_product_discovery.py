@@ -1,20 +1,31 @@
 """
 Unified Product Discovery Engine v2
 ====================================
-APIFY-FIRST Architecture (AliExpress OAuth is currently broken)
+MULTI-SOURCE Architecture (Official APIs + Strategic Apify)
 
-Data Flow:
-1. Apify TikTok Shop → Viral products with engagement metrics
-2. Apify Amazon Bestsellers → Proven demand products
-3. Google Trends → Validate search momentum
-4. AliExpress Affiliate API → FALLBACK (when OAuth fixed)
+Data Source Priority (Updated 2025-12-07):
+1. TikTok API (viral products) - PRIMARY
+   - Viral product detection with engagement metrics
+   - Apify scraper supplements official TikTok API with shop-specific data
+2. Amazon Apify (bestsellers, proven demand) - SECONDARY
+   - No official Amazon Product API exists for non-sellers
+   - Provides sales rank and demand validation
+3. AliExpress Official API (supplier/pricing) - FOR SOURCING
+   - Official Affiliate API (App ID: 522382) for product discovery
+   - Dropshipping API (App ID: 520918) for order fulfillment
+4. Google Trends API (search interest) - VALIDATION
+   - Advanced scraper bypasses rate limits
+   - Validates niche momentum and search volume
+5. X/Twitter via xAI (social buzz) - SENTIMENT
+   - Real-time trending topics via Grok AI
+   - Replaces Reddit sentiment analysis
 
-Why Apify-First:
-- ✅ TikTok Shop = viral products with REAL engagement data
-- ✅ Amazon Bestsellers = PROVEN demand (sales rank)
-- ✅ No OAuth required - just API token
-- ✅ Rich engagement metrics (views, likes, shares)
-- ✅ Multiple data sources for validation
+Removed Sources (2025-12-07):
+- ❌ Reddit Sentiment Apify scraper (covered by X/Twitter API)
+- ❌ AliExpress Apify scraper (replaced by official APIs)
+- ❌ Shopify Competitor scraper (not priority)
+
+Cost Savings: ~$30-45/month from Apify cleanup
 """
 
 import asyncio
@@ -37,11 +48,19 @@ except ImportError as e:
 
 class UnifiedProductDiscoveryV2:
     """
-    Apify-First Product Discovery Engine
+    Multi-Source Product Discovery Engine (Updated 2025-12-07)
 
-    PRIMARY: Apify (TikTok Shop + Amazon Bestsellers)
-    SECONDARY: Google Trends (validation)
-    FALLBACK: AliExpress Affiliate API (when OAuth works)
+    Data Source Priority:
+    1. TikTok (via Apify) - Viral products with engagement metrics
+    2. Amazon (via Apify) - Bestsellers with proven demand
+    3. AliExpress (Official API) - Supplier pricing and sourcing
+    4. Google Trends (Advanced Scraper) - Search interest validation
+    5. X/Twitter (via xAI Grok) - Social sentiment (future integration)
+
+    Removed deprecated Apify scrapers:
+    - Reddit sentiment (replaced by X/Twitter API)
+    - AliExpress scraper (replaced by official API)
+    - Shopify competitor (not priority)
     """
 
     # Niche-to-search-term mapping (40+ curated niches)
@@ -349,16 +368,16 @@ class UnifiedProductDiscoveryV2:
                 self.tiktok_scraper = TikTokShopScraper()
                 self.amazon_scraper = AmazonBestsellersScraper()
                 self.apify_available = True
-                logger.info("✅ Apify scrapers loaded (PRIMARY SOURCE)")
+                logger.info("✅ Apify scrapers loaded (TikTok: VIRAL DATA / Amazon: DEMAND VALIDATION)")
             except Exception as e:
                 logger.warning(f"⚠️  Apify import failed: {e}")
 
-        # Check AliExpress (FALLBACK)
+        # Check AliExpress (FOR SOURCING)
         try:
             from ospra_os.integrations.aliexpress.client import AliExpressClient
             self.aliexpress = AliExpressClient(use_affiliate=True)
             self.aliexpress_available = True
-            logger.info("✅ AliExpress client loaded (FALLBACK)")
+            logger.info("✅ AliExpress Official API loaded (SUPPLIER SOURCING & PRICING)")
         except Exception as e:
             logger.warning(f"⚠️  AliExpress not available: {e}")
 
@@ -367,7 +386,7 @@ class UnifiedProductDiscoveryV2:
             from ospra_os.intelligence.advanced_scraper import AdvancedProductScraper
             self.advanced_scraper = AdvancedProductScraper()
             self.trends_available = True
-            logger.info("✅ Google Trends (Advanced Scraper) loaded (VALIDATION)")
+            logger.info("✅ Google Trends (Advanced Scraper) loaded (SEARCH INTEREST VALIDATION)")
         except Exception as e:
             self.advanced_scraper = None
             logger.warning(f"⚠️  Advanced Scraper not available: {e}")

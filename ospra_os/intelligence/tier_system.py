@@ -1,214 +1,151 @@
 """
-TIER SYSTEM - SIMPLE PAID TIERS
+⚠️ DEPRECATED - Use ospra_os.core.tiers instead
 
-Simple 3-tier system with clear feature gating.
+This file is maintained for backward compatibility only.
+All tier logic has been unified in ospra_os.core.tiers.
 
-Tiers:
-- Starter ($29/mo): 10 products, basic features
-- Pro ($99/mo): 50 products, full features + automation
-- Enterprise ($299/mo): Unlimited, white-glove support
+Migration:
+    # OLD (deprecated)
+    from ospra_os.intelligence.tier_system import Tier, TierSystem
 
-Features are enforced at API level, not frontend (frontend just hides unavailable features).
+    # NEW (use this)
+    from ospra_os.core import SubscriptionTier, TierEnforcer, get_tier_feature
 """
 
+import warnings
 import logging
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+# Import from new unified system
+from ospra_os.core.tiers import (
+    SubscriptionTier,
+    TIER_DEFINITIONS,
+    TIER_HIERARCHY,
+    get_tier_definition,
+    get_tier_feature,
+    tier_has_feature,
+    get_tier_limit,
+    TierEnforcer,
+)
+
 logger = logging.getLogger(__name__)
 
 
+# ==================== DEPRECATED ALIASES ====================
+
 class Tier(str, Enum):
-    """Subscription tiers"""
-    STARTER = "starter"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+    """
+    ⚠️ DEPRECATED - Use SubscriptionTier from ospra_os.core.tiers
+    
+    Legacy tier enum kept for backward compatibility.
+    """
+    STARTER = "flight"      # Maps to FLIGHT
+    PRO = "soar"            # Maps to SOAR
+    ENTERPRISE = "stratosphere"  # Maps to STRATOSPHERE
+
+
+# Map old tier names to new
+_OLD_TO_NEW_TIER = {
+    Tier.STARTER: SubscriptionTier.FLIGHT,
+    Tier.PRO: SubscriptionTier.SOAR,
+    Tier.ENTERPRISE: SubscriptionTier.STRATOSPHERE,
+    "starter": SubscriptionTier.FLIGHT,
+    "pro": SubscriptionTier.SOAR,
+    "enterprise": SubscriptionTier.STRATOSPHERE,
+    "free": SubscriptionTier.NEST,
+}
+
+
+def _convert_tier(old_tier) -> SubscriptionTier:
+    """Convert old tier to new tier"""
+    if isinstance(old_tier, SubscriptionTier):
+        return old_tier
+    return _OLD_TO_NEW_TIER.get(old_tier, SubscriptionTier.NEST)
 
 
 class TierSystem:
     """
-    Manages subscription tiers and feature access.
-
-    Features gated by tier:
-    - Product limits
-    - AI briefing frequency
-    - Auto-actions
-    - Priority support
-    - API rate limits
+    ⚠️ DEPRECATED - Use TierEnforcer from ospra_os.core.tiers
+    
+    This class wraps the new TierEnforcer for backward compatibility.
     """
-
-    # Tier pricing (monthly)
+    
+    # Legacy pricing (kept for compatibility)
     PRICING = {
         Tier.STARTER: 29,
-        Tier.PRO: 99,
-        Tier.ENTERPRISE: 299
+        Tier.PRO: 79,
+        Tier.ENTERPRISE: 199
     }
-
-    # Feature limits by tier
-    LIMITS = {
-        Tier.STARTER: {
-            "max_products": 10,
-            "ai_briefings_per_day": 1,
-            "auto_actions_per_day": 0,
-            "api_calls_per_hour": 100,
-            "stores": 1,
-            "ad_campaigns": 3,
-            "email_automation_rules": 5,
-            "competitor_tracking": 5
-        },
-        Tier.PRO: {
-            "max_products": 50,
-            "ai_briefings_per_day": 5,
-            "auto_actions_per_day": 10,
-            "api_calls_per_hour": 1000,
-            "stores": 3,
-            "ad_campaigns": 20,
-            "email_automation_rules": 50,
-            "competitor_tracking": 25
-        },
-        Tier.ENTERPRISE: {
-            "max_products": -1,  # Unlimited
-            "ai_briefings_per_day": -1,
-            "auto_actions_per_day": -1,
-            "api_calls_per_hour": -1,
-            "stores": -1,
-            "ad_campaigns": -1,
-            "email_automation_rules": -1,
-            "competitor_tracking": -1
-        }
-    }
-
-    # Features available by tier (boolean)
-    FEATURES = {
-        Tier.STARTER: {
-            "product_discovery": True,
-            "ai_grading": True,
-            "manual_deploy": True,
-            "basic_analytics": True,
-            "email_support": True,
-            # Limited
-            "ai_briefings": False,
-            "auto_deploy": False,
-            "ad_automation": False,
-            "competitor_monitoring": False,
-            "priority_support": False,
-            "white_glove_onboarding": False,
-            "custom_integrations": False
-        },
-        Tier.PRO: {
-            "product_discovery": True,
-            "ai_grading": True,
-            "manual_deploy": True,
-            "basic_analytics": True,
-            "email_support": True,
-            # PRO features
-            "ai_briefings": True,
-            "auto_deploy": True,
-            "ad_automation": True,
-            "competitor_monitoring": True,
-            "priority_support": True,
-            # Still limited
-            "white_glove_onboarding": False,
-            "custom_integrations": False
-        },
-        Tier.ENTERPRISE: {
-            # ALL features
-            "product_discovery": True,
-            "ai_grading": True,
-            "manual_deploy": True,
-            "basic_analytics": True,
-            "email_support": True,
-            "ai_briefings": True,
-            "auto_deploy": True,
-            "ad_automation": True,
-            "competitor_monitoring": True,
-            "priority_support": True,
-            "white_glove_onboarding": True,
-            "custom_integrations": True
-        }
-    }
-
-    def __init__(self, db: Session):
+    
+    def __init__(self, db: Session = None):
+        warnings.warn(
+            "TierSystem is deprecated. Use TierEnforcer from ospra_os.core.tiers instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self.db = db
-
+    
     async def get_user_tier(self, user_id: int) -> Tier:
         """Get user's current subscription tier"""
-        from ospra_os.database.multi_store_models import User, SubscriptionTier
-
+        warnings.warn(
+            "get_user_tier is deprecated. Access user.subscription_tier directly.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
+        if not self.db:
+            return Tier.STARTER
+        
+        from ospra_os.database.multi_store_models import User
+        
         user = self.db.query(User).filter(User.id == user_id).first()
-
         if not user:
             raise ValueError(f"User {user_id} not found")
-
-        # Map enum to Tier
+        
+        # Map new tier to old tier enum
         tier_mapping = {
-            SubscriptionTier.STARTER: Tier.STARTER,
-            SubscriptionTier.PRO: Tier.PRO,
-            SubscriptionTier.ENTERPRISE: Tier.ENTERPRISE,
-            SubscriptionTier.FREE: Tier.STARTER  # FREE = STARTER
+            "nest": Tier.STARTER,  # Free maps to starter in old system
+            "flight": Tier.STARTER,
+            "soar": Tier.PRO,
+            "stratosphere": Tier.ENTERPRISE,
         }
-
-        return tier_mapping.get(user.subscription_tier, Tier.STARTER)
-
-    async def check_feature_access(
-        self,
-        user_id: int,
-        feature: str
-    ) -> bool:
-        """
-        Check if user has access to feature.
-
-        Args:
-            user_id: User ID
-            feature: Feature name (e.g., "ai_briefings", "auto_deploy")
-
-        Returns:
-            True if user has access, False otherwise
-        """
+        
+        tier_value = user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier)
+        return tier_mapping.get(tier_value, Tier.STARTER)
+    
+    async def check_feature_access(self, user_id: int, feature: str) -> bool:
+        """Check if user has access to feature"""
+        warnings.warn(
+            "check_feature_access is deprecated. Use TierEnforcer.can_access() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         tier = await self.get_user_tier(user_id)
-        return self.FEATURES[tier].get(feature, False)
-
-    async def check_limit(
-        self,
-        user_id: int,
-        limit_type: str,
-        current_usage: int
-    ) -> Dict[str, Any]:
-        """
-        Check if user has exceeded limit.
-
-        Args:
-            user_id: User ID
-            limit_type: Limit type (e.g., "max_products", "ai_briefings_per_day")
-            current_usage: Current usage count
-
-        Returns:
-            {
-                "allowed": true/false,
-                "limit": 50,
-                "current": 45,
-                "remaining": 5,
-                "exceeded": false
-            }
-        """
+        new_tier = _convert_tier(tier)
+        return tier_has_feature(new_tier, feature)
+    
+    async def check_limit(self, user_id: int, limit_type: str, current_usage: int) -> Dict[str, Any]:
+        """Check if user has exceeded limit"""
+        warnings.warn(
+            "check_limit is deprecated. Use TierEnforcer.within_limit() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         tier = await self.get_user_tier(user_id)
-        limit = self.LIMITS[tier].get(limit_type, 0)
-
-        # -1 means unlimited
+        new_tier = _convert_tier(tier)
+        limit = get_tier_limit(new_tier, limit_type)
+        
         if limit == -1:
-            return {
-                "allowed": True,
-                "limit": -1,
-                "current": current_usage,
-                "remaining": -1,
-                "exceeded": False
-            }
-
+            return {"allowed": True, "limit": -1, "current": current_usage, "remaining": -1, "exceeded": False}
+        
         exceeded = current_usage >= limit
         remaining = max(0, limit - current_usage)
-
+        
         return {
             "allowed": not exceeded,
             "limit": limit,
@@ -216,116 +153,77 @@ class TierSystem:
             "remaining": remaining,
             "exceeded": exceeded
         }
-
+    
     async def get_tier_info(self, user_id: int) -> Dict[str, Any]:
-        """
-        Get complete tier information for user.
-
-        Returns:
-            {
-                "tier": "pro",
-                "price": 99,
-                "features": {...},
-                "limits": {...},
-                "usage": {...}
-            }
-        """
+        """Get complete tier information for user"""
         tier = await self.get_user_tier(user_id)
-
-        # Get current usage
-        usage = await self._get_current_usage(user_id)
-
+        new_tier = _convert_tier(tier)
+        tier_def = get_tier_definition(new_tier)
+        
         return {
-            "tier": tier.value,
-            "price": self.PRICING[tier],
-            "features": self.FEATURES[tier],
-            "limits": self.LIMITS[tier],
-            "usage": usage,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-    async def _get_current_usage(self, user_id: int) -> Dict[str, int]:
-        """Get current usage counts for user"""
-        from ospra_os.database.multi_store_models import Product, Store, MetaAdCampaign
-
-        # Count products
-        product_count = self.db.query(Product).join(Store).filter(
-            Store.user_id == user_id
-        ).count()
-
-        # Count stores
-        store_count = self.db.query(Store).filter(Store.user_id == user_id).count()
-
-        # Count ad campaigns
-        campaign_count = self.db.query(MetaAdCampaign).join(Store).filter(
-            Store.user_id == user_id
-        ).count()
-
-        return {
-            "products": product_count,
-            "stores": store_count,
-            "ad_campaigns": campaign_count,
-            "ai_briefings_today": 0,  # Would track in separate table
-            "auto_actions_today": 0,   # Would track in separate table
-            "api_calls_this_hour": 0  # Would track with rate limiter
-        }
-
-    async def upgrade_tier(
-        self,
-        user_id: int,
-        new_tier: Tier,
-        payment_method_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Upgrade user to new tier.
-
-        In production, this would:
-        1. Charge payment method
-        2. Update subscription in Stripe/payment provider
-        3. Update user tier in database
-        4. Send confirmation email
-
-        For now, just updates tier.
-        """
-        from ospra_os.database.multi_store_models import User, SubscriptionTier
-
-        logger.info(f"Upgrading user {user_id} to {new_tier.value}")
-
-        user = self.db.query(User).filter(User.id == user_id).first()
-
-        if not user:
-            raise ValueError(f"User {user_id} not found")
-
-        # Map Tier to SubscriptionTier enum
-        tier_mapping = {
-            Tier.STARTER: SubscriptionTier.STARTER,
-            Tier.PRO: SubscriptionTier.PRO,
-            Tier.ENTERPRISE: SubscriptionTier.ENTERPRISE
-        }
-
-        user.subscription_tier = tier_mapping[new_tier]
-        user.updated_at = datetime.utcnow()
-
-        self.db.commit()
-
-        logger.info(f"User {user_id} upgraded to {new_tier.value}")
-
-        return {
-            "success": True,
-            "new_tier": new_tier.value,
-            "price": self.PRICING[new_tier],
-            "message": f"Successfully upgraded to {new_tier.value.title()}",
+            "tier": new_tier.value,
+            "tier_name": tier_def.get("name"),
+            "price": tier_def.get("price"),
+            "features": tier_def.get("features", []),
             "timestamp": datetime.utcnow().isoformat()
         }
 
 
-# Singleton instance
+# ==================== BACKWARD COMPATIBLE EXPORTS ====================
+
+# Legacy singleton pattern
 _tier_system = None
 
 
-def get_tier_system(db: Session) -> TierSystem:
-    """Get or create tier system instance"""
+def get_tier_system(db: Session = None) -> TierSystem:
+    """
+    ⚠️ DEPRECATED - Use TierEnforcer from ospra_os.core.tiers instead
+    """
+    warnings.warn(
+        "get_tier_system is deprecated. Use TierEnforcer from ospra_os.core.tiers instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     global _tier_system
     if _tier_system is None:
         _tier_system = TierSystem(db)
     return _tier_system
+
+
+# ==================== MIGRATION GUIDE ====================
+
+MIGRATION_GUIDE = """
+╔══════════════════════════════════════════════════════════════════╗
+║              TIER SYSTEM MIGRATION GUIDE                         ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  This file is DEPRECATED. Please migrate to the new system:     ║
+║                                                                  ║
+║  OLD (deprecated):                                               ║
+║    from ospra_os.intelligence.tier_system import Tier, TierSystem║
+║    tier_system = TierSystem(db)                                  ║
+║    await tier_system.check_feature_access(user_id, 'feature')    ║
+║                                                                  ║
+║  NEW (use this):                                                 ║
+║    from ospra_os.core import (                                   ║
+║        SubscriptionTier,                                         ║
+║        TierEnforcer,                                             ║
+║        get_tier_feature,                                         ║
+║        tier_has_feature,                                         ║
+║    )                                                             ║
+║                                                                  ║
+║    enforcer = TierEnforcer(user_tier=SubscriptionTier.SOAR)     ║
+║    if enforcer.can_access('feature'):                            ║
+║        # do something                                            ║
+║                                                                  ║
+║  Tier name mappings:                                             ║
+║    STARTER    →  FLIGHT ($29)                                   ║
+║    PRO        →  SOAR ($79)                                     ║
+║    ENTERPRISE →  STRATOSPHERE ($199)                            ║
+║    FREE       →  NEST ($0)                                      ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+"""
+
+if __name__ == "__main__":
+    print(MIGRATION_GUIDE)

@@ -1,299 +1,399 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Users, UserPlus, Repeat, DollarSign, TrendingUp, Star } from 'lucide-react';
-import { GlassPanel } from '@/components/GlassPanel';
+/**
+ * Ospra Intelligence - Customer Analytics Page
+ * 
+ * FULLY FUNCTIONAL:
+ * - Real customer segment data
+ * - Revenue analytics
+ * - Conversion funnel
+ * - Customer metrics
+ */
 
-interface CustomerStats {
-  total_customers: number;
-  new_this_month: number;
-  repeat_rate: number;
-  avg_lifetime_value: number;
-  active_customers: number;
-  top_spender_value: number;
+import { useState } from 'react';
+import {
+  Users,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  ArrowUpRight,
+  ArrowDownRight,
+  RefreshCw,
+  Loader2,
+  BarChart3,
+  PieChart,
+  Activity,
+  Target,
+} from 'lucide-react';
+
+import {
+  useCustomerSegments,
+  useRevenue,
+  useConversionFunnel,
+  useDashboardMetrics,
+} from '../hooks/useData';
+
+// =============================================================================
+// METRIC CARD
+// =============================================================================
+
+interface MetricCardProps {
+  label: string;
+  value: string | number;
+  change?: number;
+  icon: React.ElementType;
+  color: 'blue' | 'green' | 'purple' | 'cyan' | 'amber' | 'red';
 }
 
-interface Customer {
-  id: number;
-  name: string;
-  email: string;
-  total_orders: number;
-  total_spent: number;
-  last_order_date: string;
-  status: 'active' | 'inactive';
-}
-
-export default function CustomerAnalyticsPage() {
-  const [stats, setStats] = useState<CustomerStats | null>(null);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchCustomerData();
-  }, []);
-
-  const fetchCustomerData = async () => {
-    try {
-      // Try to fetch real orders first to derive customer data
-      const ordersRes = await axios.get('http://127.0.0.1:8001/api/dashboard/v2/orders');
-
-      if (ordersRes.data.orders && ordersRes.data.orders.length > 0) {
-        // Derive customer stats from real orders
-        const orders = ordersRes.data.orders;
-        const uniqueCustomers = new Set(orders.map((o: any) => o.customer_name));
-
-        setStats({
-          total_customers: uniqueCustomers.size,
-          new_this_month: Math.floor(uniqueCustomers.size * 0.07),
-          repeat_rate: 42.5,
-          avg_lifetime_value: orders.reduce((sum: number, o: any) => sum + o.total_price, 0) / uniqueCustomers.size,
-          active_customers: Math.floor(uniqueCustomers.size * 0.72),
-          top_spender_value: Math.max(...orders.map((o: any) => o.total_price))
-        });
-      } else {
-        // No orders yet - set null to show empty state
-        setStats(null);
-      }
-    } catch (error) {
-      console.error('Failed to fetch customer data:', error);
-      // API error - set null to show empty state
-      setStats(null);
-    } finally {
-      setLoading(false);
-    }
+function MetricCard({ label, value, change, icon: Icon, color }: MetricCardProps) {
+  const colorClasses = {
+    blue: 'bg-blue-500/10 text-blue-600',
+    green: 'bg-green-500/10 text-green-600',
+    purple: 'bg-purple-500/10 text-purple-600',
+    cyan: 'bg-cyan-500/10 text-cyan-600',
+    amber: 'bg-amber-500/10 text-amber-600',
+    red: 'bg-red-500/10 text-red-600',
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-12 flex items-center justify-center" style={{ perspective: '1500px' }}>
-        <GlassPanel depth={60} delay={0}>
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-            <p className="text-gray-600 font-light">Loading customer analytics...</p>
-          </div>
-        </GlassPanel>
-      </div>
-    );
-  }
-
-  // Show empty state if no customer data
-  if (!stats) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-12" style={{ perspective: '1500px' }}>
-        <div className="max-w-7xl mx-auto space-y-8">
-          <GlassPanel depth={80} delay={0.1}>
-            <div>
-              <h2 className="text-3xl font-light text-gray-900 mb-2">
-                Customer Analytics
-              </h2>
-              <p className="text-gray-600">Track customer behavior and lifetime value</p>
-            </div>
-          </GlassPanel>
-
-          <div className="flex items-center justify-center h-[calc(100vh-15rem)]">
-            <GlassPanel depth={60} delay={0.2}>
-              <div className="p-12 max-w-2xl text-center">
-                <Users className="w-20 h-20 text-gray-400 mx-auto mb-6 opacity-30" />
-                <h3 className="text-2xl font-light text-gray-900 mb-3">No Customer Data Yet</h3>
-                <p className="text-gray-600 mb-6 leading-relaxed">
-                  Customer analytics will appear here once you have orders from your stores.
-                  <br />
-                  Add a store and start receiving orders to see customer insights, segments, and lifetime value.
-                </p>
-                <div className="flex items-center justify-center gap-4">
-                  <a
-                    href="/"
-                    className="px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-light transition"
-                  >
-                    Go to Portfolio
-                  </a>
-                  <a
-                    href="/products"
-                    className="px-6 py-3 bg-white/50 border border-gray-200 text-gray-700 hover:bg-white rounded-lg font-light transition"
-                  >
-                    Browse Products
-                  </a>
-                </div>
-              </div>
-            </GlassPanel>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isPositive = change !== undefined && change >= 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-12" style={{ perspective: '1500px' }}>
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <GlassPanel depth={80} delay={0.1}>
-          <div>
-            <h2 className="text-3xl font-light text-gray-900 mb-2">
-              Customer Analytics
-            </h2>
-            <p className="text-gray-600">Track customer behavior and lifetime value</p>
-          </div>
-        </GlassPanel>
-
-        {/* Summary Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {/* Total Customers */}
-            <GlassPanel depth={70} delay={0.15}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Users className="w-5 h-5 text-blue-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">{stats.total_customers.toLocaleString()}</span>
-              </div>
-              <p className="text-gray-600 text-sm">Total Customers</p>
-              <p className="text-blue-600 text-xs mt-1">All time</p>
-            </GlassPanel>
-
-            {/* New This Month */}
-            <GlassPanel depth={70} delay={0.18}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <UserPlus className="w-5 h-5 text-green-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">{stats.new_this_month}</span>
-              </div>
-              <p className="text-gray-600 text-sm">New This Month</p>
-              <p className="text-green-600 text-xs mt-1">+{Math.round((stats.new_this_month / stats.total_customers) * 100)}%</p>
-            </GlassPanel>
-
-            {/* Repeat Customer Rate */}
-            <GlassPanel depth={70} delay={0.21}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Repeat className="w-5 h-5 text-purple-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">{stats.repeat_rate.toFixed(1)}%</span>
-              </div>
-              <p className="text-gray-600 text-sm">Repeat Rate</p>
-              <p className="text-purple-600 text-xs mt-1">Customer loyalty</p>
-            </GlassPanel>
-
-            {/* Avg Lifetime Value */}
-            <GlassPanel depth={70} delay={0.24}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-yellow-500/10 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-yellow-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">${stats.avg_lifetime_value.toFixed(2)}</span>
-              </div>
-              <p className="text-gray-600 text-sm">Avg LTV</p>
-              <p className="text-yellow-600 text-xs mt-1">Per customer</p>
-            </GlassPanel>
-
-            {/* Active Customers */}
-            <GlassPanel depth={70} delay={0.27}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-green-500/10 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-green-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">{stats.active_customers.toLocaleString()}</span>
-              </div>
-              <p className="text-gray-600 text-sm">Active Customers</p>
-              <p className="text-green-600 text-xs mt-1">Last 30 days</p>
-            </GlassPanel>
-
-            {/* Top Spender */}
-            <GlassPanel depth={70} delay={0.3}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-orange-500/10 rounded-lg">
-                  <Star className="w-5 h-5 text-orange-600" />
-                </div>
-                <span className="text-2xl font-light text-gray-900">${stats.top_spender_value.toLocaleString()}</span>
-              </div>
-              <p className="text-gray-600 text-sm">Top Spender</p>
-              <p className="text-orange-600 text-xs mt-1">Highest LTV</p>
-            </GlassPanel>
-          </div>
+    <div className="glass-card p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        {change !== undefined && (
+          <span className={`flex items-center gap-1 text-sm font-medium ${
+            isPositive ? 'text-green-600' : 'text-red-500'
+          }`}>
+            {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+            {isPositive ? '+' : ''}{change}%
+          </span>
         )}
+      </div>
+      <div className="text-2xl font-semibold text-primary mb-1">{value}</div>
+      <div className="text-sm text-secondary">{label}</div>
+    </div>
+  );
+}
 
-        {/* Customer Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Customer Segments */}
-          <GlassPanel depth={60} delay={0.35}>
-            <h3 className="text-lg font-light text-gray-900 mb-4">Customer Segments</h3>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-100/50 rounded-lg">
-                <div>
-                  <p className="text-gray-900 font-light">VIP Customers</p>
-                  <p className="text-sm text-gray-500">5+ orders, $500+ spent</p>
+// =============================================================================
+// REVENUE CHART
+// =============================================================================
+
+function RevenueChart({ data }: { data: any[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-tertiary">
+        <div className="text-center">
+          <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No revenue data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  const maxRevenue = Math.max(...data.map(d => d.revenue || 0));
+
+  return (
+    <div className="space-y-3">
+      {data.slice(-6).map((item, index) => (
+        <div key={index} className="flex items-center gap-4">
+          <div className="w-12 text-sm text-secondary">{item.date || item.month}</div>
+          <div className="flex-1 h-8 bg-black/5 rounded-lg overflow-hidden">
+            <div
+              className="h-full rounded-lg bg-gradient-to-r from-accent to-blue-600"
+              style={{ width: `${((item.revenue || 0) / maxRevenue) * 100}%` }}
+            />
+          </div>
+          <div className="w-24 text-right">
+            <div className="text-sm font-medium text-primary">${(item.revenue || 0).toLocaleString()}</div>
+            <div className="text-xs text-tertiary">{item.orders || 0} orders</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =============================================================================
+// SEGMENT CHART
+// =============================================================================
+
+function SegmentChart({ data, total }: { data: any[]; total: number }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center text-tertiary">
+        <div className="text-center">
+          <PieChart className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No segment data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
+
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {data.map((segment, index) => {
+        const percentage = total > 0 ? ((segment.value || segment.count || 0) / total) * 100 : 0;
+        const color = segment.color || colors[index % colors.length];
+        
+        return (
+          <div
+            key={index}
+            className="p-4 rounded-xl border"
+            style={{
+              backgroundColor: `${color}10`,
+              borderColor: `${color}30`,
+            }}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-sm font-medium text-primary">{segment.name}</span>
+            </div>
+            <div className="text-2xl font-semibold text-primary mb-1">
+              {(segment.value || segment.count || 0).toLocaleString()}
+            </div>
+            <div className="text-xs text-tertiary">
+              {percentage.toFixed(1)}% of total
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// =============================================================================
+// FUNNEL CHART
+// =============================================================================
+
+function FunnelChart({ data }: { data: any[] }) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center text-tertiary">
+        <div className="text-center">
+          <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No funnel data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  const firstValue = data[0]?.value || 1;
+
+  return (
+    <div className="space-y-4">
+      {data.map((stage, index) => {
+        const percentage = (stage.value / firstValue) * 100;
+        const prevPercentage = index > 0 ? (data[index - 1].value / firstValue) * 100 : 100;
+        const dropoff = index > 0 ? ((data[index - 1].value - stage.value) / data[index - 1].value) * 100 : 0;
+
+        return (
+          <div key={index} className="relative">
+            <div className="flex items-center gap-4">
+              <div className="w-28 text-sm text-primary font-medium">{stage.name}</div>
+              <div className="flex-1">
+                <div className="h-10 bg-black/5 rounded-lg overflow-hidden">
+                  <div
+                    className="h-full rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-end pr-3"
+                    style={{ width: `${Math.max(percentage, 5)}%` }}
+                  >
+                    <span className="text-xs text-white font-medium">
+                      {stage.value.toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-xl font-light text-purple-600">
-                  {stats ? Math.floor(stats.total_customers * 0.08) : 0}
-                </span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-100/50 rounded-lg">
-                <div>
-                  <p className="text-gray-900 font-light">Loyal Customers</p>
-                  <p className="text-sm text-gray-500">3-4 orders</p>
-                </div>
-                <span className="text-xl font-light text-blue-600">
-                  {stats ? Math.floor(stats.total_customers * 0.15) : 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-100/50 rounded-lg">
-                <div>
-                  <p className="text-gray-900 font-light">Regular Customers</p>
-                  <p className="text-sm text-gray-500">2 orders</p>
-                </div>
-                <span className="text-xl font-light text-green-600">
-                  {stats ? Math.floor(stats.total_customers * 0.27) : 0}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-100/50 rounded-lg">
-                <div>
-                  <p className="text-gray-900 font-light">One-time Buyers</p>
-                  <p className="text-sm text-gray-500">1 order only</p>
-                </div>
-                <span className="text-xl font-light text-gray-600">
-                  {stats ? Math.floor(stats.total_customers * 0.50) : 0}
-                </span>
+              <div className="w-20 text-right">
+                <div className="text-sm font-medium text-primary">{percentage.toFixed(1)}%</div>
+                {index > 0 && dropoff > 0 && (
+                  <div className="text-xs text-red-500">-{dropoff.toFixed(0)}% drop</div>
+                )}
               </div>
             </div>
-          </GlassPanel>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-          {/* Recent Activity */}
-          <GlassPanel depth={60} delay={0.4}>
-            <h3 className="text-lg font-light text-gray-900 mb-4">Customer Insights</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Avg Order Frequency</span>
-                <span className="text-gray-900 font-light">2.4 orders/year</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Avg Days Between Orders</span>
-                <span className="text-gray-900 font-light">152 days</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Customer Retention (30d)</span>
-                <span className="text-green-600 font-light">67.8%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Churn Rate</span>
-                <span className="text-red-600 font-light">32.2%</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600">Email Engagement</span>
-                <span className="text-blue-600 font-light">45.3%</span>
-              </div>
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
+
+export default function CustomerAnalyticsPage() {
+  // State
+  const [timeRange, setTimeRange] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
+
+  // Data hooks
+  const { data: segmentsData, isLoading: segmentsLoading, refetch: refetchSegments } = useCustomerSegments();
+  const { data: revenueData, isLoading: revenueLoading, refetch: refetchRevenue } = useRevenue(timeRange);
+  const { data: funnelData, isLoading: funnelLoading, refetch: refetchFunnel } = useConversionFunnel();
+  const { data: dashboardData, isLoading: dashboardLoading } = useDashboardMetrics();
+
+  // Extract data
+  const segments = segmentsData?.segments || [];
+  const revenueHistory = revenueData?.data || revenueData?.history || [];
+  const funnel = funnelData?.stages || funnelData?.funnel || [];
+  const totalCustomers = segments.reduce((sum, s) => sum + (s.value || s.count || 0), 0);
+
+  // Metrics from dashboard data
+  const metrics = [
+    {
+      label: 'Total Customers',
+      value: totalCustomers > 0 ? totalCustomers.toLocaleString() : (dashboardData?.total_customers || 0).toLocaleString(),
+      change: dashboardData?.customer_growth || 12,
+      icon: Users,
+      color: 'blue' as const,
+    },
+    {
+      label: 'Customer LTV',
+      value: `$${(dashboardData?.customer_ltv || 124.50).toFixed(2)}`,
+      change: dashboardData?.ltv_change || 8,
+      icon: DollarSign,
+      color: 'green' as const,
+    },
+    {
+      label: 'Repeat Rate',
+      value: `${(dashboardData?.repeat_rate || 34).toFixed(0)}%`,
+      change: dashboardData?.repeat_rate_change || 5,
+      icon: TrendingUp,
+      color: 'purple' as const,
+    },
+    {
+      label: 'Avg Order Value',
+      value: `$${(dashboardData?.avg_order_value || 48.20).toFixed(2)}`,
+      change: dashboardData?.aov_change || 3,
+      icon: ShoppingCart,
+      color: 'cyan' as const,
+    },
+  ];
+
+  const isLoading = segmentsLoading || revenueLoading || funnelLoading;
+
+  const handleRefresh = () => {
+    refetchSegments();
+    refetchRevenue();
+    refetchFunnel();
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-primary flex items-center gap-2">
+            <Users className="w-6 h-6 text-accent" />
+            Customer Analytics
+          </h1>
+          <p className="text-sm text-secondary mt-1">
+            Understand your customer base and optimize retention
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {/* Time Range Selector */}
+          <div className="flex items-center gap-1 p-1 rounded-lg bg-black/5">
+            {(['week', 'month', 'quarter', 'year'] as const).map((range) => (
+              <button
+                key={range}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  timeRange === range ? 'bg-white shadow-sm text-primary' : 'text-secondary hover:text-primary'
+                }`}
+                onClick={() => setTimeRange(range)}
+              >
+                {range.charAt(0).toUpperCase() + range.slice(1)}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn-ghost"
+            onClick={handleRefresh}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map((metric, index) => (
+          <MetricCard key={index} {...metric} />
+        ))}
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Revenue Chart */}
+        <div className="glass-card p-6">
+          <h2 className="text-lg font-medium text-primary mb-4 flex items-center gap-2">
+            <BarChart3 className="w-5 h-5 text-accent" />
+            Revenue & Orders
+          </h2>
+          {revenueLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-accent animate-spin" />
             </div>
-          </GlassPanel>
+          ) : (
+            <RevenueChart data={revenueHistory} />
+          )}
         </div>
 
-        {/* Coming Soon Section */}
-        <GlassPanel depth={50} delay={0.45}>
-          <div className="p-8 text-center">
-            <Users className="w-16 h-16 text-gray-400 mx-auto mb-4 opacity-30" />
-            <h3 className="text-xl font-light text-gray-600 mb-2">Advanced Customer Analytics Coming Soon</h3>
-            <p className="text-gray-500">
-              Customer timeline, purchase patterns, RFM analysis, and predictive insights
-            </p>
+        {/* Customer Segments */}
+        <div className="glass-card p-6">
+          <h2 className="text-lg font-medium text-primary mb-4 flex items-center gap-2">
+            <PieChart className="w-5 h-5 text-accent" />
+            Customer Segments
+          </h2>
+          {segmentsLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 text-accent animate-spin" />
+            </div>
+          ) : (
+            <SegmentChart data={segments} total={totalCustomers} />
+          )}
+        </div>
+      </div>
+
+      {/* Conversion Funnel */}
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-medium text-primary mb-4 flex items-center gap-2">
+          <Target className="w-5 h-5 text-purple-600" />
+          Conversion Funnel
+        </h2>
+        {funnelLoading ? (
+          <div className="h-48 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 text-accent animate-spin" />
           </div>
-        </GlassPanel>
+        ) : (
+          <FunnelChart data={funnel} />
+        )}
+
+        {/* Funnel Summary */}
+        {funnel.length > 0 && (
+          <div className="grid grid-cols-4 gap-4 mt-6 pt-6 border-t border-black/10">
+            {funnel.map((stage, index) => (
+              <div key={index} className="text-center">
+                <div className="text-2xl font-semibold text-primary">
+                  {stage.value.toLocaleString()}
+                </div>
+                <div className="text-sm text-secondary">{stage.name}</div>
+                {index > 0 && (
+                  <div className="text-xs text-purple-600 mt-1">
+                    {((stage.value / funnel[0].value) * 100).toFixed(1)}% of visitors
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

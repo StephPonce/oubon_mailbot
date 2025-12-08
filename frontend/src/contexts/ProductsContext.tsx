@@ -1,72 +1,60 @@
-import { createContext, useContext, useState } from 'react';
-import type { ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface Product {
   id: string;
   name: string;
-  image_url?: string;
+  image: string;
+  score: number;
   price: number;
-  cost?: number;
-  trend_score?: number;
-  velocity_score?: number;
-  score?: number;
-  sales_rank?: number;
-  orders?: number;
-  competition_score?: number;
-  profit_margin?: number;
-  estimated_profit?: number;
-  supplier_url?: string;
-  niche?: string;
-  discovered_at?: string;
-  commission_rate?: number;
-  tier?: string;
-  rating?: number;
-  original_price?: number;
-  aliexpress_cost?: number;
-  shipping_cost?: number;
-  source?: string;
+  cost: number;
+  profit: number;
+  profitMargin: number;
+  trend: 'up' | 'down' | 'stable';
+  trendValue: string;
+  source: string;
+  niche: string;
+  niches: string[];
+  saturationLevel: 'low' | 'medium' | 'high';
+  salesVelocity: number;
+  socialMentions: number;
+  aiReason: string;
+  lastUpdated: string;
+  rank: number;
+  previousRank: number;
 }
 
 interface ProductsContextType {
   products: Product[];
-  setProducts: (products: Product[]) => void;
-  dataSource: string;
-  setDataSource: (source: string) => void;
-  lastRefresh: Date | null;
-  setLastRefresh: (date: Date | null) => void;
-  currentNiche: string;
-  setCurrentNiche: (niche: string) => void;
-  clearProducts: () => void;
+  isLoading: boolean;
+  selectedProduct: Product | null;
+  setSelectedProduct: (product: Product | null) => void;
+  refreshProducts: () => Promise<void>;
 }
 
 const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
 
 export function ProductsProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [dataSource, setDataSource] = useState('');
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
-  const [currentNiche, setCurrentNiche] = useState('smart_home');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  const clearProducts = () => {
-    setProducts([]);
-    setDataSource('');
-    setLastRefresh(null);
+  const refreshProducts = async () => {
+    setIsLoading(true);
+    // Simulate API call
+    setTimeout(() => {
+      setProducts([]);
+      setIsLoading(false);
+    }, 1000);
   };
 
   return (
-    <ProductsContext.Provider
-      value={{
-        products,
-        setProducts,
-        dataSource,
-        setDataSource,
-        lastRefresh,
-        setLastRefresh,
-        currentNiche,
-        setCurrentNiche,
-        clearProducts,
-      }}
-    >
+    <ProductsContext.Provider value={{ 
+      products, 
+      isLoading, 
+      selectedProduct, 
+      setSelectedProduct,
+      refreshProducts 
+    }}>
       {children}
     </ProductsContext.Provider>
   );
@@ -75,7 +63,9 @@ export function ProductsProvider({ children }: { children: ReactNode }) {
 export function useProducts() {
   const context = useContext(ProductsContext);
   if (!context) {
-    throw new Error('useProducts must be used within ProductsProvider');
+    throw new Error('useProducts must be used within a ProductsProvider');
   }
   return context;
 }
+
+export default ProductsContext;

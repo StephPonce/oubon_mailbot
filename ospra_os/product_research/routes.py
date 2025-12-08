@@ -44,13 +44,14 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
     Find and rank product candidates.
 
     Sources available:
-    - google_trends: Google Trends (no API key needed)
+    - google_trends: Google Trends (no API key needed) - TREND DATA ONLY
     - meta: Facebook/Instagram (requires META_ACCESS_TOKEN)
     - twitter: Twitter/X (requires X_API_KEY)
-    - reddit: Reddit (requires REDDIT_CLIENT_ID)
     - aliexpress: AliExpress (requires ALIEXPRESS_API_KEY)
     - dhgate: DHgate (requires DHGATE_API_KEY)
     - cjdropshipping: CJ Dropshipping (requires CJDROPSHIPPING_TOKEN)
+
+    NOTE: For mass discovery, use UnifiedProductDiscoveryV2 directly (Apify + AliExpress)
 
     Example:
         {
@@ -75,10 +76,11 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
         twitter_key = getattr(settings, "X_API_KEY", None)
         connectors.append(TwitterConnector(api_key=twitter_key))
 
-    if "reddit" in request.sources:
-        reddit_id = getattr(settings, "REDDIT_CLIENT_ID", None)
-        reddit_secret = getattr(settings, "REDDIT_SECRET", None)
-        connectors.append(RedditConnector(client_id=reddit_id, client_secret=reddit_secret))
+    # Reddit removed per user request (2025-12-07)
+    # if "reddit" in request.sources:
+    #     reddit_id = getattr(settings, "REDDIT_CLIENT_ID", None)
+    #     reddit_secret = getattr(settings, "REDDIT_SECRET", None)
+    #     connectors.append(RedditConnector(client_id=reddit_id, client_secret=reddit_secret))
 
     if "aliexpress" in request.sources:
         ali_key = getattr(settings, "ALIEXPRESS_API_KEY", None)

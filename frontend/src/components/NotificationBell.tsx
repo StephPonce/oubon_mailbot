@@ -17,18 +17,47 @@ export const NotificationBell: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // ... (all logic remains the same)
+  // Fetch notifications from backend
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('http://localhost:8001/api/notifications/recent?limit=50');
+
+      // Transform backend response to frontend format
+      const transformed: Notification[] = response.data.map((n: any) => ({
+        id: `${n.customer_id}-${n.timestamp}`,
+        title: n.customer_name || 'Notification',
+        message: n.message || `${n.type} for ${n.customer_email}`,
+        severity: n.priority === 'HIGH' ? 'error' : n.priority === 'MEDIUM' ? 'warning' : 'info',
+        is_read: false, // Backend doesn't track read status yet
+        created_at: n.timestamp,
+      }));
+
+      setNotifications(transformed);
+      setUnreadCount(transformed.filter(n => !n.is_read).length);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      // Silently fail - show empty state
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch on mount and when dropdown opens
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 60000); // Refresh every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const markAllRead = async () => {
-    // Placeholder for API call
-    console.log('Mark all read');
-    // ... update state or refetch notifications
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnreadCount(0);
   };
 
   const markAsRead = async (id: string) => {
-    // Placeholder for API call
-    console.log(`Marking ${id} as read`);
-    // ... update state or refetch notifications
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
   const formatTime = (dateString: string): string => {

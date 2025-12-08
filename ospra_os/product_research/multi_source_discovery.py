@@ -23,18 +23,14 @@ except ImportError:
 try:
     from ospra_os.product_research.connectors.apify import (
         TikTokShopScraper,
-        AmazonBestsellersScraper,
-        RedditSentimentScraper,
-        ShopifyCompetitorScraper,
-        AliExpressScraper
+        AmazonBestsellersScraper
+        # Removed 2025-12-07: RedditSentimentScraper, ShopifyCompetitorScraper, AliExpressScraper
+        # Use official APIs instead: AliExpress Affiliate API, X/Twitter API, Shopify API
     )
     HAS_APIFY = True
 except ImportError:
     TikTokShopScraper = None
     AmazonBestsellersScraper = None
-    RedditSentimentScraper = None
-    ShopifyCompetitorScraper = None
-    AliExpressScraper = None
     HAS_APIFY = False
 
 try:
@@ -196,41 +192,14 @@ class MultiSourceDiscovery:
             print(f"⚠️  Failed to initialize Amazon Bestsellers scraper: {e}")
             self.amazon_bestsellers = None
 
-        # Try to initialize Reddit scraper via Apify
-        try:
-            self.reddit = RedditSentimentScraper()
-            if self.reddit.is_available():
-                print("✅ Reddit sentiment scraper initialized via Apify")
-            else:
-                print("⚠️  Apify not configured - skipping Reddit scraping")
-                self.reddit = None
-        except Exception as e:
-            print(f"⚠️  Failed to initialize Reddit scraper: {e}")
-            self.reddit = None
-
-        # Try to initialize Shopify competitor scraper via Apify
-        try:
-            self.shopify_competitor = ShopifyCompetitorScraper()
-            if self.shopify_competitor.is_available():
-                print("✅ Shopify competitor scraper initialized via Apify")
-            else:
-                print("⚠️  Apify not configured - skipping Shopify scraping")
-                self.shopify_competitor = None
-        except Exception as e:
-            print(f"⚠️  Failed to initialize Shopify scraper: {e}")
-            self.shopify_competitor = None
-
-        # Try to initialize AliExpress scraper via Apify (for dropshipping URLs)
-        try:
-            self.aliexpress_scraper = AliExpressScraper()
-            if self.aliexpress_scraper.is_available():
-                print("✅ AliExpress scraper initialized via Apify (dropship URLs)")
-            else:
-                print("⚠️  Apify not configured - skipping AliExpress scraping")
-                self.aliexpress_scraper = None
-        except Exception as e:
-            print(f"⚠️  Failed to initialize AliExpress scraper: {e}")
-            self.aliexpress_scraper = None
+        # REMOVED 2025-12-07: Reddit, Shopify, AliExpress Apify scrapers
+        # Use official APIs instead:
+        # - Reddit → X/Twitter API (via xAI) + TikTok API
+        # - Shopify → Official Shopify Admin API
+        # - AliExpress → Official AliExpress Affiliate API
+        self.reddit = None
+        self.shopify_competitor = None
+        self.aliexpress_scraper = None
 
         # Try to initialize xAI Twitter discovery
         try:
@@ -244,15 +213,16 @@ class MultiSourceDiscovery:
             self.xai_twitter = None
 
         # Initialize cross-reference engine if all required scrapers are available
+        # Updated 2025-12-07: Use xAI Twitter instead of Reddit
         self.cross_ref = None
-        if HAS_CROSS_REF and self.amazon_bestsellers and self.tiktok and self.reddit:
+        if HAS_CROSS_REF and self.amazon_bestsellers and self.tiktok and self.xai_twitter:
             try:
                 self.cross_ref = CrossReferenceEngine(
                     self.amazon_bestsellers,
                     self.tiktok,
-                    self.reddit
+                    self.xai_twitter  # Use xAI Twitter instead of Reddit
                 )
-                print("✅ Cross-reference engine initialized")
+                print("✅ Cross-reference engine initialized (with xAI Twitter)")
             except Exception as e:
                 print(f"⚠️  Failed to initialize cross-reference engine: {e}")
                 self.cross_ref = None
@@ -260,7 +230,7 @@ class MultiSourceDiscovery:
             if not HAS_CROSS_REF:
                 print("⚠️  Cross-reference engine unavailable (module not found)")
             else:
-                print("⚠️  Cross-reference engine unavailable (missing scrapers)")
+                print("⚠️  Cross-reference engine unavailable (missing scrapers: Amazon, TikTok, or xAI Twitter)")
 
     async def discover_all_niches(
         self,

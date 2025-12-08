@@ -278,12 +278,73 @@ Only include products that are ACTUALLY trending on Twitter right now."""
             print(f"   ❌ xAI Twitter discovery failed: {e}")
             return []
     
+    async def analyze_product_sentiment(
+        self,
+        product_name: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze Twitter/X sentiment for a specific product.
+
+        This is the PRIMARY method for product sentiment analysis.
+        Replaces Reddit sentiment analysis.
+
+        Args:
+            product_name: Product name to analyze
+
+        Returns:
+            {
+                "product": str,
+                "sentiment": "positive" | "negative" | "neutral" | "mixed",
+                "sentiment_score": float (-1.0 to 1.0),
+                "buzz_level": "viral" | "high" | "moderate" | "low",
+                "tweet_count": int,
+                "engagement": {
+                    "total_likes": int,
+                    "total_retweets": int,
+                    "total_replies": int
+                },
+                "common_praise": List[str],
+                "common_complaints": List[str],
+                "purchase_intent": {
+                    "bought_it": int,
+                    "want_to_buy": int,
+                    "recommending": int
+                },
+                "sample_tweets": List[str],  # Top 3 sample tweets
+                "recommendation": str
+            }
+        """
+        result = await self.get_product_sentiment(product_name, include_tweets=True)
+
+        # Add buzz_level calculation
+        if "tweet_count" in result:
+            tweet_count = result["tweet_count"]
+            if tweet_count >= 1000:
+                result["buzz_level"] = "viral"
+            elif tweet_count >= 100:
+                result["buzz_level"] = "high"
+            elif tweet_count >= 10:
+                result["buzz_level"] = "moderate"
+            else:
+                result["buzz_level"] = "low"
+
+        # Add sample_tweets (top 3) if not already present
+        if "sample_tweets" not in result:
+            result["sample_tweets"] = []
+
+        return result
+
     async def get_product_sentiment(
         self,
         product_name: str,
         include_tweets: bool = True
     ) -> Dict[str, Any]:
-        """Get Twitter sentiment for a specific product."""
+        """
+        Get Twitter sentiment for a specific product.
+
+        Note: Use analyze_product_sentiment() for the standard API.
+        This method is kept for backwards compatibility.
+        """
         if not self.is_available():
             return {"error": "xAI not available"}
         

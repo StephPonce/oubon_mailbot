@@ -1,13 +1,9 @@
 """
 OSPRA INTELLIGENCE - LemonSqueezy Payment Integration
 =====================================================
-Sky/Flight themed subscription tiers: Nest → Flight → Soar → Stratosphere
 
-Theme: Journey from grounded to the stars
-- 🪺 Nest: Grounded, watching, learning (Free)
-- ✈️ Flight: Taken off, building momentum ($29)
-- 🦅 Soar: High altitude, seeing what others can't ($79)
-- 🌌 Stratosphere: Edge of space, first to everything ($199)
+Handles payment processing via LemonSqueezy.
+Tier definitions imported from ospra_os.core.tiers (single source of truth).
 """
 import os
 import hmac
@@ -15,8 +11,18 @@ import hashlib
 import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
-from enum import Enum
 import httpx
+
+# Import tiers from single source of truth
+from ospra_os.core.tiers import (
+    SubscriptionTier,
+    TIER_DEFINITIONS,
+    TIER_HIERARCHY,
+    get_tier_definition,
+    get_tier_feature,
+    get_pricing_table,
+    compare_tiers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,170 +38,15 @@ LS_VARIANT_FLIGHT = os.getenv("LS_VARIANT_FLIGHT")  # $29/mo
 LS_VARIANT_SOAR = os.getenv("LS_VARIANT_SOAR")      # $79/mo
 LS_VARIANT_STRATOSPHERE = os.getenv("LS_VARIANT_STRATOSPHERE")  # $199/mo
 
-# Legacy support
-LS_VARIANT_STARTER = os.getenv("LS_VARIANT_STARTER") or LS_VARIANT_FLIGHT
-LS_VARIANT_PRO = os.getenv("LS_VARIANT_PRO") or LS_VARIANT_SOAR
-LS_VARIANT_ELITE = os.getenv("LS_VARIANT_ELITE") or LS_VARIANT_STRATOSPHERE
+# LemonSqueezy Checkout URLs (direct links)
+LS_CHECKOUT_FLIGHT = os.getenv("LS_CHECKOUT_FLIGHT", "https://ospra.lemonsqueezy.com/buy/7f817d94-cf31-4ab6-9ff4-54de583f7920")
+LS_CHECKOUT_SOAR = os.getenv("LS_CHECKOUT_SOAR", "https://ospra.lemonsqueezy.com/buy/e1f7dd88-9c08-4486-ac77-be77af8bf976")
+LS_CHECKOUT_STRATOSPHERE = os.getenv("LS_CHECKOUT_STRATOSPHERE", "https://ospra.lemonsqueezy.com/buy/5d7d273d-f3df-470a-8827-40c3cd975cfc")
 
 API_BASE = "https://api.lemonsqueezy.com/v1"
 
 
-# ==================== TIER DEFINITIONS ====================
-
-class SubscriptionTier(str, Enum):
-    """
-    Ospra tier naming: Sky/flight theme - grounded to stars
-    
-    The journey of an Osprey:
-    🪺 Nest → Just hatched, learning the world
-    ✈️ Flight → First flight, building confidence  
-    🦅 Soar → Mastery, riding thermals effortlessly
-    🌌 Stratosphere → Beyond limits, touching the stars
-    """
-    NEST = "nest"                    # Free - Grounded, learning
-    FLIGHT = "flight"                # $29 - Taken off, momentum
-    SOAR = "soar"                    # $79 - High altitude, seeing far
-    STRATOSPHERE = "stratosphere"    # $199 - Edge of space, first to see
-
-
-# Tier hierarchy for comparison (higher = better)
-TIER_HIERARCHY = {
-    SubscriptionTier.NEST: 0,
-    SubscriptionTier.FLIGHT: 1,
-    SubscriptionTier.SOAR: 2,
-    SubscriptionTier.STRATOSPHERE: 3,
-}
-
-
-# Complete tier definitions with features and limits
-TIER_DEFINITIONS = {
-    SubscriptionTier.NEST: {
-        "name": "Nest",
-        "tagline": "Start grounded. Learn the landscape.",
-        "emoji": "🪺",
-        "price": 0,
-        "color": "#8B7355",  # Earthy brown
-        "product_freshness_days": 30,  # Only see 30+ day old products
-        "store_limit": 1,
-        "products_per_week": 5,
-        "ai_analysis": "basic",  # Basic scoring only
-        "email_automation": False,
-        "saturation_visibility": False,
-        "api_access": False,
-        "team_members": 1,
-        "support": "community",
-        "features": [
-            "Mature products (30+ days trending)",
-            "1 e-commerce store",
-            "5 product discoveries per week",
-            "Basic AI scoring",
-            "Community support"
-        ],
-        "limitations": [
-            "Products already well-known",
-            "No email automation",
-            "No saturation data",
-            "No API access"
-        ]
-    },
-    
-    SubscriptionTier.FLIGHT: {
-        "name": "Flight",
-        "tagline": "You've taken off. Momentum is building.",
-        "emoji": "✈️",
-        "price": 29,
-        "color": "#87CEEB",  # Sky blue
-        "product_freshness_days": 14,  # See 14+ day products
-        "store_limit": 3,
-        "products_per_week": 25,
-        "ai_analysis": "full",  # Full Claude insights
-        "email_automation": "templates",  # Smart templates only
-        "saturation_visibility": "basic",  # See if >50 users have it
-        "api_access": False,
-        "team_members": 1,
-        "support": "email_48hr",
-        "features": [
-            "Growth-phase products (14+ days)",
-            "3 e-commerce stores",
-            "25 product discoveries per week",
-            "Full AI analysis & insights",
-            "Smart email templates",
-            "Basic saturation alerts",
-            "Email support (48hr)"
-        ],
-        "limitations": [
-            "No early-spike products",
-            "No full email automation",
-            "No API access"
-        ]
-    },
-    
-    SubscriptionTier.SOAR: {
-        "name": "Soar",
-        "tagline": "Rise above the noise. See what others can't.",
-        "emoji": "🦅",
-        "price": 79,
-        "color": "#0EA5E9",  # Bright blue
-        "product_freshness_days": 7,  # See 7+ day products (early spike!)
-        "store_limit": 10,
-        "products_per_week": -1,  # Unlimited
-        "ai_analysis": "deep",  # Deep analysis + competitor intel
-        "email_automation": "full",  # Full AI-powered
-        "saturation_visibility": "full",  # Exact user counts
-        "api_access": True,
-        "team_members": 1,
-        "support": "priority_24hr",
-        "popular": True,  # Mark as most popular
-        "features": [
-            "Early-spike products (7+ days) 🔥",
-            "10 e-commerce stores",
-            "Unlimited product discoveries",
-            "Deep AI analysis + competitor intel",
-            "Full AI-powered email automation",
-            "Full saturation visibility",
-            "API access",
-            "Priority support (24hr)"
-        ],
-        "limitations": [
-            "No day-0 discovery access",
-            "No team features"
-        ]
-    },
-    
-    SubscriptionTier.STRATOSPHERE: {
-        "name": "Stratosphere",
-        "tagline": "Beyond the clouds. First to see. First to sell.",
-        "emoji": "🌌",
-        "price": 199,
-        "color": "#7C3AED",  # Purple (space)
-        "product_freshness_days": 0,  # See products IMMEDIATELY
-        "store_limit": -1,  # Unlimited
-        "products_per_week": -1,  # Unlimited
-        "ai_analysis": "custom",  # Custom AI training
-        "email_automation": "custom",  # Full + custom workflows
-        "saturation_visibility": "predictive",  # Predictive alerts
-        "api_access": True,
-        "api_rate_limit": -1,  # Unlimited
-        "team_members": 5,
-        "support": "dedicated",
-        "first_access": True,  # First 50 to see new products
-        "features": [
-            "Discovery products (0+ days) - FIRST ACCESS 🚀",
-            "Among first 50 to see emerging products",
-            "Unlimited e-commerce stores",
-            "Unlimited product discoveries",
-            "Custom AI trained on YOUR niche",
-            "Full email automation + custom workflows",
-            "Predictive saturation alerts",
-            "Unlimited API + webhooks",
-            "Up to 5 team members",
-            "Dedicated success manager",
-            "White-glove onboarding"
-        ],
-        "limitations": []
-    }
-}
-
+# ==================== VARIANT MAPPING ====================
 
 # Map variant IDs to tiers
 VARIANT_TO_TIER = {}
@@ -224,31 +75,14 @@ def get_variant_for_tier(tier: SubscriptionTier) -> Optional[str]:
     return variant_map.get(tier)
 
 
-def compare_tiers(tier_a: SubscriptionTier, tier_b: SubscriptionTier) -> int:
-    """
-    Compare two tiers.
-    Returns: -1 if a < b, 0 if equal, 1 if a > b
-    """
-    a_level = TIER_HIERARCHY.get(tier_a, 0)
-    b_level = TIER_HIERARCHY.get(tier_b, 0)
-    
-    if a_level < b_level:
-        return -1
-    elif a_level > b_level:
-        return 1
-    return 0
-
-
-def tier_has_feature(tier: SubscriptionTier, feature: str) -> bool:
-    """Check if a tier has a specific feature"""
-    tier_def = TIER_DEFINITIONS.get(tier, {})
-    return tier_def.get(feature, False)
-
-
-def get_tier_limit(tier: SubscriptionTier, limit_name: str) -> int:
-    """Get a specific limit for a tier (-1 = unlimited)"""
-    tier_def = TIER_DEFINITIONS.get(tier, {})
-    return tier_def.get(limit_name, 0)
+def get_checkout_url_for_tier(tier: SubscriptionTier) -> Optional[str]:
+    """Get direct checkout URL for a tier"""
+    checkout_map = {
+        SubscriptionTier.FLIGHT: LS_CHECKOUT_FLIGHT,
+        SubscriptionTier.SOAR: LS_CHECKOUT_SOAR,
+        SubscriptionTier.STRATOSPHERE: LS_CHECKOUT_STRATOSPHERE,
+    }
+    return checkout_map.get(tier)
 
 
 # ==================== LEMONSQUEEZY CLIENT ====================
@@ -328,7 +162,7 @@ class LemonSqueezyClient:
         if not LEMONSQUEEZY_STORE_ID:
             return None, "LEMONSQUEEZY_STORE_ID not configured"
         
-        tier_info = TIER_DEFINITIONS[tier]
+        tier_info = get_tier_definition(tier)
         
         data = {
             "data": {
@@ -391,7 +225,7 @@ class LemonSqueezyClient:
         
         attrs = result.get("data", {}).get("attributes", {})
         tier = get_tier_from_variant(str(attrs.get("variant_id")))
-        tier_info = TIER_DEFINITIONS.get(tier, {})
+        tier_info = get_tier_definition(tier)
         
         return {
             "id": result.get("data", {}).get("id"),
@@ -595,29 +429,7 @@ async def handle_webhook_event(event: Dict) -> Dict:
     return result
 
 
-# ==================== PRICING TABLE ====================
-
-def get_pricing_table() -> List[Dict]:
-    """Get formatted pricing table for display"""
-    return [
-        {
-            "tier": tier.value,
-            "name": info["name"],
-            "emoji": info["emoji"],
-            "tagline": info["tagline"],
-            "price": info["price"],
-            "price_display": f"${info['price']}/month" if info["price"] > 0 else "Free",
-            "color": info["color"],
-            "features": info["features"],
-            "limitations": info.get("limitations", []),
-            "popular": info.get("popular", False),
-            "product_freshness": f"{info['product_freshness_days']}+ days",
-            "stores": "Unlimited" if info["store_limit"] == -1 else info["store_limit"],
-            "products_per_week": "Unlimited" if info["products_per_week"] == -1 else info["products_per_week"]
-        }
-        for tier, info in TIER_DEFINITIONS.items()
-    ]
-
+# ==================== DISPLAY HELPERS ====================
 
 def get_setup_instructions() -> str:
     return """

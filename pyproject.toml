@@ -46,6 +46,9 @@ dependencies = [
     "facebook-business>=24.0.0",
     "beautifulsoup4>=4.14.2",
     "schedule>=1.2.2",
+    "rembg>=2.0.69",
+    "pillow>=12.0.0",
+    "onnxruntime>=1.23.2",
 ]
 
 [project.optional-dependencies]

@@ -57,7 +57,7 @@ async def health_check():
 
 @router.get("/products")
 async def get_products(
-    niche: str = Query("smart_home", description="Product niche"),
+    niche: Optional[str] = Query(None, description="Product niche (optional - returns all if not specified)"),
     min_velocity: Optional[int] = Query(None, ge=0, le=100),
     max_velocity: Optional[int] = Query(None, ge=0, le=100),
     per_page: int = Query(20, ge=1, le=100)

@@ -2,16 +2,20 @@
 Product Discovery Engine - Complete workflow for finding winning products.
 
 This module implements the full product discovery pipeline:
-1. Search Reddit for trending products
+1. Search X/Twitter for trending products (via xAI Grok)
 2. Validate with Google Trends
 3. Find sourcing on AliExpress (when OAuth available)
 4. Score and rank candidates
 5. Return top products with priority labels
+
+UPDATED 2025-12-07:
+- Replaced Reddit sentiment with X/Twitter via xAI Grok
+- Better real-time data and viral product detection
 """
 
 from typing import List, Dict, Optional
 from datetime import datetime
-from .connectors.social.reddit import RedditConnector
+from .connectors.social.xai_twitter import XAITwitterDiscovery
 from .connectors.trends.google_trends import GoogleTrendsConnector
 from .connectors.suppliers.aliexpress import AliExpressConnector
 from .connectors.base import ProductCandidate
@@ -42,8 +46,7 @@ class ProductDiscoveryEngine:
 
     def __init__(
         self,
-        reddit_client_id: Optional[str] = None,
-        reddit_secret: Optional[str] = None,
+        xai_api_key: Optional[str] = None,
         aliexpress_api_key: Optional[str] = None,
         aliexpress_app_secret: Optional[str] = None,
     ):
@@ -51,15 +54,15 @@ class ProductDiscoveryEngine:
         Initialize discovery engine with API credentials.
 
         Args:
-            reddit_client_id: Reddit app client ID
-            reddit_secret: Reddit app secret
+            xai_api_key: xAI API key for Twitter/X sentiment analysis (via Grok)
             aliexpress_api_key: AliExpress app key (optional)
             aliexpress_app_secret: AliExpress app secret (optional)
+
+        DEPRECATED:
+            reddit_client_id, reddit_secret - Use X/Twitter via xAI instead
         """
-        self.reddit = RedditConnector(
-            client_id=reddit_client_id,
-            client_secret=reddit_secret
-        )
+        # Use X/Twitter via xAI Grok instead of Reddit
+        self.twitter = XAITwitterDiscovery(api_key=xai_api_key)
         self.google_trends = GoogleTrendsConnector()
         self.aliexpress = AliExpressConnector(
             api_key=aliexpress_api_key,
@@ -79,7 +82,7 @@ class ProductDiscoveryEngine:
         niche: str,
         max_results: int = 15,
         min_score: float = 5.0,
-        include_reddit: bool = True,
+        include_twitter: bool = True,
         include_trends: bool = True,
         include_aliexpress: bool = False,  # Default False since OAuth may not be ready
     ) -> Dict:
@@ -90,7 +93,7 @@ class ProductDiscoveryEngine:
             niche: Product niche/category (e.g., "smart home", "fitness gear")
             max_results: Maximum products to return
             min_score: Minimum score threshold (0-10)
-            include_reddit: Include Reddit community validation
+            include_twitter: Include X/Twitter viral product detection (via xAI Grok)
             include_trends: Include Google Trends data
             include_aliexpress: Include AliExpress sourcing (requires OAuth)
 
@@ -112,22 +115,34 @@ class ProductDiscoveryEngine:
         start_time = datetime.now()
         all_candidates = []
 
-        # Step 1: Search Reddit for trending products
-        if include_reddit and self.reddit.is_available():
-            print(f"🔍 Step 1: Searching Reddit for '{niche}'...")
+        # Step 1: Search X/Twitter for viral products (via xAI Grok)
+        if include_twitter and self.twitter.is_available():
+            print(f"🐦 Step 1: Searching X/Twitter for '{niche}' (via xAI Grok)...")
             try:
-                reddit_products = await self.reddit.search(
-                    niche,
-                    subreddits=self._get_subreddits_for_niche(niche),
-                    time_filter="month",
-                    limit=25
+                twitter_products = await self.twitter.discover_viral_products(
+                    niche=niche,
+                    max_products=25,
+                    time_range="24h"
                 )
-                all_candidates.extend(reddit_products)
-                print(f"   ✅ Found {len(reddit_products)} products on Reddit\n")
+                # Convert TwitterProduct objects to ProductCandidate
+                for tp in twitter_products:
+                    candidate = ProductCandidate(
+                        name=tp.name,
+                        url=tp.url or "",
+                        price=tp.price,
+                        source="twitter_xai",
+                        trend_score=tp.viral_score,
+                        search_volume=tp.tweet_count,
+                        social_mentions=tp.tweet_count,
+                        engagement_rate=tp.engagement_rate,
+                        sentiment=tp.sentiment_score
+                    )
+                    all_candidates.append(candidate)
+                print(f"   ✅ Found {len(twitter_products)} viral products on X/Twitter\n")
             except Exception as e:
-                print(f"   ❌ Reddit search failed: {e}\n")
+                print(f"   ❌ X/Twitter search failed: {e}\n")
         else:
-            print("   ⏭️  Reddit search skipped (not configured)\n")
+            print("   ⏭️  X/Twitter search skipped (xAI not configured)\n")
 
         # Step 2: Check Google Trends for validation
         if include_trends:
@@ -230,7 +245,7 @@ class ProductDiscoveryEngine:
 
         validation = {
             "product_name": product_name,
-            "reddit_mentions": 0,
+            "twitter_mentions": 0,
             "trends_score": None,
             "sourcing_available": False,
             "overall_score": 0.0,
@@ -238,24 +253,27 @@ class ProductDiscoveryEngine:
             "recommendation": "",
         }
 
-        # Check Reddit community interest
-        if self.reddit.is_available():
+        # Check X/Twitter sentiment and viral potential (via xAI Grok)
+        if self.twitter.is_available():
             try:
-                print("   Checking Reddit mentions...")
-                reddit_results = await self.reddit.search(product_name, limit=15)
+                print("   Checking X/Twitter sentiment (via xAI Grok)...")
+                sentiment_data = await self.twitter.analyze_product_sentiment(product_name)
 
-                if reddit_results:
-                    validation["reddit_mentions"] = len(reddit_results)
-                    avg_score = sum(p.trend_score or 0 for p in reddit_results) / len(reddit_results)
-
-                    validation["reddit_data"] = {
-                        "mentions": len(reddit_results),
-                        "avg_engagement_score": round(avg_score, 2),
-                        "top_post_url": reddit_results[0].url if reddit_results else None,
+                if sentiment_data and "error" not in sentiment_data:
+                    validation["twitter_mentions"] = sentiment_data.get("tweet_count", 0)
+                    validation["twitter_data"] = {
+                        "mentions": sentiment_data.get("tweet_count", 0),
+                        "sentiment": sentiment_data.get("sentiment", "neutral"),
+                        "sentiment_score": sentiment_data.get("sentiment_score", 0),
+                        "buzz_level": sentiment_data.get("buzz_level", "low"),
+                        "engagement": sentiment_data.get("engagement", {}),
+                        "purchase_intent": sentiment_data.get("purchase_intent", {}),
+                        "sample_tweets": sentiment_data.get("sample_tweets", [])[:3],
                     }
-                    print(f"   ✅ Found {len(reddit_results)} mentions on Reddit")
+                    print(f"   ✅ Found {validation['twitter_mentions']} mentions on X/Twitter")
+                    print(f"   Sentiment: {sentiment_data.get('sentiment', 'N/A')} ({sentiment_data.get('sentiment_score', 0):.2f})")
             except Exception as e:
-                print(f"   ⚠️  Reddit check failed: {e}")
+                print(f"   ⚠️  X/Twitter check failed: {e}")
 
         # Check Google Trends
         try:
@@ -294,14 +312,24 @@ class ProductDiscoveryEngine:
         # Calculate overall score based on validation data
         score = 0.0
 
-        # Reddit mentions (max 4 points)
-        if validation["reddit_mentions"] >= 10:
-            score += 4.0
-        elif validation["reddit_mentions"] >= 5:
+        # X/Twitter mentions + sentiment (max 5 points)
+        twitter_mentions = validation["twitter_mentions"]
+        twitter_data = validation.get("twitter_data", {})
+        sentiment_score = twitter_data.get("sentiment_score", 0)
+
+        if twitter_mentions >= 100:
             score += 3.0
-        elif validation["reddit_mentions"] >= 2:
+        elif twitter_mentions >= 50:
+            score += 2.5
+        elif twitter_mentions >= 10:
             score += 2.0
-        elif validation["reddit_mentions"] >= 1:
+        elif twitter_mentions >= 1:
+            score += 1.0
+
+        # Sentiment bonus (up to 2 points)
+        if sentiment_score > 0.5:
+            score += 2.0
+        elif sentiment_score > 0:
             score += 1.0
 
         # Trends score (max 3 points)
