@@ -8,11 +8,38 @@ from typing import Optional, List, Dict
 import logging
 from datetime import datetime
 
-from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
-from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
-from ospra_os.intelligence.product_enrichment import enrich_product
-from ospra_os.intelligence.self_learning import SelfLearningEngine
-from ospra_os.integrations.shopify.client import ShopifyClient
+logger = logging.getLogger(__name__)
+
+# Optional intelligence module imports (fail gracefully if unavailable)
+try:
+    from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
+except ImportError as e:
+    logger.warning(f"ProductIntelligenceEngine not available: {e}")
+    ProductIntelligenceEngine = None
+
+try:
+    from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
+except ImportError as e:
+    logger.warning(f"TrendAnalyzer not available: {e}")
+    TrendAnalyzer = None
+
+try:
+    from ospra_os.intelligence.product_enrichment import enrich_product
+except ImportError as e:
+    logger.warning(f"enrich_product not available: {e}")
+    enrich_product = None
+
+try:
+    from ospra_os.intelligence.self_learning import SelfLearningEngine
+except ImportError as e:
+    logger.warning(f"SelfLearningEngine not available: {e}")
+    SelfLearningEngine = None
+
+try:
+    from ospra_os.integrations.shopify.client import ShopifyClient
+except ImportError as e:
+    logger.warning(f"ShopifyClient not available: {e}")
+    ShopifyClient = None
 
 # Optional background jobs import
 try:
@@ -20,23 +47,36 @@ try:
 except ImportError:
     get_scheduler = start_background_jobs = stop_background_jobs = None
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/dashboard/v2", tags=["Dashboard V2"])
 
-# Initialize services
+# Initialize services (only if classes were successfully imported)
 try:
-    product_discovery = ProductIntelligenceEngine()
-    claude_analyzer = TrendAnalyzer()
-    logger.info("✅ Real-time services initialized")
+    if ProductIntelligenceEngine is not None:
+        product_discovery = ProductIntelligenceEngine()
+    else:
+        product_discovery = None
+
+    if TrendAnalyzer is not None:
+        claude_analyzer = TrendAnalyzer()
+    else:
+        claude_analyzer = None
+
+    if product_discovery and claude_analyzer:
+        logger.info("✅ Real-time services initialized")
+    else:
+        logger.warning("⚠️  Some services not available (missing dependencies)")
 except Exception as e:
     logger.error(f"❌ Failed to initialize services: {e}")
     product_discovery = None
     claude_analyzer = None
 
 try:
-    shopify_client = ShopifyClient()
-    logger.info("✅ Shopify client initialized")
+    if ShopifyClient is not None:
+        shopify_client = ShopifyClient()
+        logger.info("✅ Shopify client initialized")
+    else:
+        shopify_client = None
+        logger.warning("Shopify client class not available")
 except (ValueError, Exception) as e:
     logger.warning(f"Shopify client not available: {e}")
     shopify_client = None
