@@ -21,7 +21,8 @@ import {
   LogOut,
   Eye,
   Bot,
-  ShoppingBag
+  ShoppingBag,
+  Megaphone
 } from 'lucide-react';
 
 // Import all pages
@@ -37,6 +38,7 @@ import ABTestingPage from '../pages/ABTestingPage';
 import SystemHealthPage from '../pages/SystemHealthPage';
 import AutoDeploymentPage from '../pages/AutoDeploymentPage';
 import ShopifyPage from '../pages/ShopifyPage';
+import AdsPage from '../pages/AdsPage';
 import { ErrorBoundary } from './ErrorBoundary';
 
 // Navigation items with routes
@@ -54,6 +56,7 @@ const operationsNavItems = [
   { id: 'auto-deploy', path: '/auto-deploy', icon: Bot, label: 'Auto-Deployment', badge: 'New' },
   { id: 'customers', path: '/customers', icon: Users, label: 'Customer Analytics' },
   { id: 'email', path: '/email', icon: Mail, label: 'Email Automation' },
+  { id: 'ads', path: '/ads', icon: Megaphone, label: 'Advertising' },
   { id: 'testing', path: '/testing', icon: FlaskConical, label: 'A/B Testing' },
   { id: 'health', path: '/health', icon: Activity, label: 'System Health' },
 ];
@@ -278,6 +281,7 @@ function AppRoutes() {
       <Route path="/auto-deploy" element={<AutoDeploymentPage />} />
       <Route path="/customers" element={<CustomerAnalyticsPage />} />
       <Route path="/email" element={<EmailDashboard />} />
+      <Route path="/ads" element={<AdsPage />} />
       <Route path="/testing" element={<ABTestingPage />} />
       <Route path="/health" element={<SystemHealthPage />} />
       <Route path="/subscription" element={<SubscriptionPage />} />

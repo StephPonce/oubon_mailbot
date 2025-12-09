@@ -419,6 +419,16 @@ except Exception as e:
     intelligence_core_router = None
     _HAS_INTELLIGENCE_CORE = False
 
+# Learning System router (Self-Learning AI, Feedback, Insights)
+try:
+    from ospra_os.learning.learning_routes import router as learning_router  # type: ignore
+    _HAS_LEARNING = True
+    print("✅ Learning System router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Learning System router not loaded: {e}")
+    learning_router = None
+    _HAS_LEARNING = False
+
 # Inventory Forecasting router
 try:
     from ospra_os.inventory.routes import router as inventory_router  # type: ignore
@@ -753,6 +763,14 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  Auto-deploy scheduler failed to start: {e}")
 
+    # Start Learning Summary background jobs
+    try:
+        from ospra_os.learning.summary_jobs import setup_summary_jobs
+        setup_summary_jobs()
+        print("✅ Learning summary jobs started (nightly at 3:00 AM UTC)")
+    except Exception as e:
+        print(f"⚠️  Learning summary jobs failed to start: {e}")
+
     # Log startup completion with timing
     startup_duration = time.time() - startup_start
     print(f"✅ Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -779,6 +797,16 @@ async def shutdown_event():
     except Exception as e:
         logger.error(f"Error stopping background jobs: {e}")
         print(f"⚠️  Error stopping background jobs: {e}")
+
+    # Stop learning summary jobs
+    try:
+        from ospra_os.learning.summary_jobs import shutdown_summary_jobs
+        shutdown_summary_jobs()
+        logger.info("✅ Learning summary jobs stopped")
+        print("✅ Learning summary jobs stopped")
+    except Exception as e:
+        logger.error(f"Error stopping summary jobs: {e}")
+        print(f"⚠️  Error stopping summary jobs: {e}")
 
     # Stop realtime momentum updater
     try:
@@ -930,6 +958,9 @@ if _HAS_UNIFIED_DISCOVERY and unified_discovery_router:
 
 if _HAS_INTELLIGENCE_CORE and intelligence_core_router:
     app.include_router(intelligence_core_router)  # exposes /api/intelligence/*
+
+if _HAS_LEARNING and learning_router:
+    app.include_router(learning_router)  # exposes /api/learning/*
 
 if _HAS_INVENTORY and inventory_router:
     app.include_router(inventory_router)  # exposes /api/inventory/*
@@ -4989,11 +5020,12 @@ async def get_live_trending_products(
     """
     try:
         from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
-        from ospra_os.dashboard.routes import get_products as get_live_products
+        from ospra_os.database.product_history import ProductHistoryDB
 
-        # Get live product data from dashboard
-        response = await get_live_products(niche="smart_home", per_page=limit)
-        products_data = response.get("products", [])
+        # Get live product data directly from database
+        db = ProductHistoryDB()
+        products_data = db.get_all_products(niche=None)  # Get all niches for trends
+        products_data = products_data[:limit * 2]  # Get more for filtering
 
         # Calculate momentum for each product
         tracker = get_momentum_tracker()
@@ -5038,11 +5070,12 @@ async def get_biggest_movers(
     """
     try:
         from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
-        from ospra_os.dashboard.routes import get_products as get_live_products
+        from ospra_os.database.product_history import ProductHistoryDB
 
-        # Get live products with momentum
-        response = await get_live_products(niche="smart_home", per_page=50)
-        products_data = response.get("products", [])
+        # Get live products with momentum directly from database
+        db = ProductHistoryDB()
+        products_data = db.get_all_products(niche=None)
+        products_data = products_data[:50]  # Get more for filtering
         tracker = get_momentum_tracker()
 
         trending = await tracker.get_trending_products(
@@ -5085,11 +5118,12 @@ async def get_breakout_products(settings: Settings = Depends(get_settings)):
     """
     try:
         from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
-        from ospra_os.dashboard.routes import get_products as get_live_products
+        from ospra_os.database.product_history import ProductHistoryDB
 
-        # Get live products
-        response = await get_live_products(niche="smart_home", per_page=100)
-        products_data = response.get("products", [])
+        # Get live products directly from database
+        db = ProductHistoryDB()
+        products_data = db.get_all_products(niche=None)
+        products_data = products_data[:100]  # Get more for filtering
         tracker = get_momentum_tracker()
 
         trending = await tracker.get_trending_products(
@@ -5192,13 +5226,13 @@ async def get_momentum_heatmap(
     """
     try:
         from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
-        from ospra_os.dashboard.routes import get_products as get_live_products
+        from ospra_os.database.product_history import ProductHistoryDB
 
-        # Get live products
+        # Get live products directly from database
         total_cells = rows * cols
-        response = await get_live_products(niche="smart_home", per_page=total_cells)
-        products_data = response.get("products", [])
-        products_data = response.get("products", [])
+        db = ProductHistoryDB()
+        products_data = db.get_all_products(niche=None)
+        products_data = products_data[:total_cells]
 
         # Calculate momentum
         tracker = get_momentum_tracker()
@@ -5235,37 +5269,118 @@ async def get_momentum_heatmap(
 async def get_top_rankings(
     limit: int = 20,
     store_id: Optional[int] = None,
+    niche: Optional[str] = None,
     settings: Settings = Depends(get_settings)
 ):
     """
-    Get current top ranked products
+    Get current top ranked products from product_history database
 
     Query params:
     - limit: Number of products to return (default: 20)
-    - store_id: Filter by store (optional)
+    - store_id: Filter by store (optional) - DEPRECATED
+    - niche: Filter by niche (optional)
 
     Returns: Top products with rankings and scores
     """
     try:
         from datetime import datetime, timedelta
-        from ospra_os.intelligence.ranking_engine import RankingEngine
-        from ospra_os.database.multi_store_models import get_multi_store_session
+        import sqlite3
+        import json
 
-        db_url = settings.database_url or "sqlite:///./oubon_store.db"
-        session = get_multi_store_session(db_url)
-        engine = RankingEngine(session)
+        # Connect to product_history database
+        db_path = "data/product_history.db"
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
 
-        rankings = await engine.get_current_rankings(limit=limit, store_id=store_id)
+        # Build query
+        query = """
+            SELECT
+                id,
+                name,
+                niche,
+                price,
+                cost,
+                score,
+                profit_margin,
+                estimated_profit,
+                rating,
+                orders,
+                velocity_score,
+                image_url,
+                aliexpress_url,
+                source,
+                description,
+                last_updated
+            FROM products
+        """
+
+        params = []
+        if niche:
+            query += " WHERE niche = ?"
+            params.append(niche)
+
+        query += " ORDER BY score DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        # Helper to determine tier
+        def get_tier(rank: int):
+            if 1 <= rank <= 3:
+                return {"name": "ELITE", "emoji": "🏆", "color": "#FFD700"}
+            elif 4 <= rank <= 10:
+                return {"name": "TOP", "emoji": "🥇", "color": "#C0C0C0"}
+            elif 11 <= rank <= 20:
+                return {"name": "RISING", "emoji": "🥈", "color": "#CD7F32"}
+            else:
+                return {"name": "UNRANKED", "emoji": "📊", "color": "#808080"}
+
+        # Format rankings
+        rankings = []
+        for idx, row in enumerate(rows, start=1):
+            rankings.append({
+                "rank": idx,
+                "tier": get_tier(idx),
+                "product_id": row["id"],
+                "product_name": row["name"],
+                "composite_score": float(row["score"]) if row["score"] else 0.0,
+                "score_breakdown": {
+                    "ai_score": float(row["score"]) if row["score"] else 0.0,
+                    "velocity_score": float(row["velocity_score"]) if row["velocity_score"] else 0.0,
+                    "profit_margin": float(row["profit_margin"]) if row["profit_margin"] else 0.0,
+                    "rating": float(row["rating"]) if row["rating"] else 0.0,
+                },
+                "niche": row["niche"],
+                "price": float(row["price"]) if row["price"] else 0.0,
+                "cost": float(row["cost"]) if row["cost"] else 0.0,
+                "profit_margin": float(row["profit_margin"]) if row["profit_margin"] else 0.0,
+                "estimated_profit": float(row["estimated_profit"]) if row["estimated_profit"] else 0.0,
+                "rating": float(row["rating"]) if row["rating"] else 0.0,
+                "orders": int(row["orders"]) if row["orders"] else 0,
+                "image_url": row["image_url"],
+                "aliexpress_url": row["aliexpress_url"],
+                "source": row["source"],
+                "last_updated": row["last_updated"],
+                # Movement indicators (placeholder - would need historical data)
+                "rank_change": 0,
+                "rank_direction": "stable"
+            })
 
         return {
             "success": True,
             "rankings": rankings,
+            "total_count": len(rankings),
             "last_updated": datetime.utcnow().isoformat(),
-            "next_update": (datetime.utcnow() + timedelta(days=1)).replace(hour=3, minute=0).isoformat()
+            "next_update": (datetime.utcnow() + timedelta(hours=1)).isoformat()
         }
 
     except Exception as e:
         logger.error(f"Rankings error: {e}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e),

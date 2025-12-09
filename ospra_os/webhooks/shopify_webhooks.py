@@ -110,6 +110,65 @@ async def process_new_order(order_data: dict):
 
             db.save_order(order_record)
 
+            # Record learning event for this sale
+            try:
+                from datetime import datetime
+                from ospra_os.database.multi_store_models import SessionLocal
+                from ospra_os.learning.hybrid_learning_engine import LearningEvent
+
+                # Extract product metadata
+                product_id = str(item.get('product_id', ''))
+                niche = "unknown"  # TODO: Lookup niche from product database
+
+                # Try to get niche from product tags or type
+                if 'product' in item:
+                    product = item['product']
+                    tags = product.get('tags', '').lower()
+                    product_type = product.get('product_type', '').lower()
+
+                    # Simple niche detection from tags/type
+                    if 'home' in tags or 'smart' in tags:
+                        niche = "smart_home"
+                    elif 'fitness' in tags or 'gym' in tags:
+                        niche = "fitness"
+                    elif 'kitchen' in tags or 'cooking' in tags:
+                        niche = "kitchen"
+                    elif 'tech' in tags or 'gadget' in tags:
+                        niche = "tech"
+                    elif 'beauty' in tags or 'skincare' in tags:
+                        niche = "beauty"
+
+                # Create learning event
+                learning_db = SessionLocal()
+                try:
+                    event = LearningEvent(
+                        user_id=1,  # TODO: Get actual user_id from store mapping
+                        event_type="sale",
+                        product_id=product_id,
+                        details={
+                            "product_name": product_name,
+                            "niche": niche,
+                            "price": price,
+                            "quantity": quantity,
+                            "revenue": total_price,
+                            "order_id": shopify_order_id,
+                            "order_number": order_number,
+                            "customer_email": customer_email,
+                            "source": "shopify_webhook",
+                            "currency": order_data.get('currency', 'USD'),
+                            "sale_timestamp": datetime.utcnow().isoformat()
+                        },
+                        timestamp=datetime.utcnow()
+                    )
+                    learning_db.add(event)
+                    learning_db.commit()
+                    logger.info(f"📊 Learning event recorded for product {product_id}")
+                finally:
+                    learning_db.close()
+            except Exception as e:
+                # Don't fail order processing if learning recording fails
+                logger.warning(f"Failed to record learning event: {e}")
+
             # Create notification
             db.create_notification(
                 notification_type='order',

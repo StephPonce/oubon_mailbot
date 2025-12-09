@@ -195,6 +195,47 @@ async def deploy_product(
                 "error": "WooCommerce credentials not configured"
             }
 
+    # Record learning event for successful deployments
+    if len([p for p, r in results.items() if r.get("success", False)]) > 0:
+        try:
+            from datetime import datetime
+            from ospra_os.database.multi_store_models import SessionLocal
+            from ospra_os.learning.hybrid_learning_engine import LearningEvent
+
+            # Extract product metadata
+            product_data = request.product_data
+            niche = product_data.get("category", "unknown")
+            price = product_data.get("price", 0)
+            product_name = product_data.get("name", "Unknown Product")
+
+            # Create learning event
+            db = SessionLocal()
+            try:
+                event = LearningEvent(
+                    user_id=1,  # TODO: Get actual user_id from request
+                    event_type="product_deployed",
+                    details={
+                        "product_id": request.product_id,
+                        "product_name": product_name,
+                        "niche": niche,
+                        "price": float(price) if price else 0.0,
+                        "platforms": list(results.keys()),
+                        "successful_platforms": [p for p, r in results.items() if r.get("success", False)],
+                        "source": "deployment_api",
+                        # Store AI score if available
+                        "predicted_score": product_data.get("ai_score", product_data.get("score", None)),
+                        "deployment_timestamp": datetime.utcnow().isoformat()
+                    }
+                )
+                db.add(event)
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            # Don't fail deployment if learning recording fails
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to record learning event: {e}")
+
     # Summary
     successful_platforms = [
         platform for platform, result in results.items()

@@ -12,6 +12,7 @@ import {
   abTestingAPI,
   systemAPI,
   intelligenceAPI,
+  rankingsAPI,
 } from '../services/api';
 import type {
   Product,
@@ -370,6 +371,25 @@ export function useEmailStats() {
   );
 }
 
+export function useEmailMetrics() {
+  return useQuery(
+    'email-metrics',
+    async () => {
+      const [stats, performance, recent] = await Promise.all([
+        emailAPI.getStats(),
+        emailAPI.getPerformanceMetrics(),
+        emailAPI.getAll().then(emails => emails.slice(0, 5))
+      ]);
+      return {
+        stats,
+        performance,
+        recentEmails: recent
+      };
+    },
+    { refetchInterval: 30000 } // Auto-refresh every 30 seconds
+  );
+}
+
 // ============================================
 // A/B TESTING HOOKS
 // ============================================
@@ -524,6 +544,17 @@ export function useOiChat() {
     sendMessage,
     clearMessages,
   };
+}
+
+// ============================================
+// RANKINGS HOOKS
+// ============================================
+export function useTop20Rankings(niche?: string) {
+  return useQuery(
+    `top-20-rankings-${niche || 'all'}`,
+    () => rankingsAPI.getTop(20, niche),
+    { refetchInterval: 300000 } // Refresh every 5 minutes
+  );
 }
 
 export default useQuery;

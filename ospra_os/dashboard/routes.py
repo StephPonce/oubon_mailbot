@@ -128,11 +128,11 @@ async def get_products(
         # Get products from database
         products = db.get_all_products(niche=niche)
 
-        # Apply velocity filters
+        # Apply velocity filters (handle None values properly)
         if min_velocity is not None:
-            products = [p for p in products if p['velocity_score'] >= min_velocity]
+            products = [p for p in products if (p.get('velocity_score') or 0) >= min_velocity]
         if max_velocity is not None:
-            products = [p for p in products if p['velocity_score'] <= max_velocity]
+            products = [p for p in products if (p.get('velocity_score') or 0) <= max_velocity]
 
         # Limit results
         products = products[:per_page]
@@ -249,14 +249,16 @@ async def claude_chat(request: dict):
     try:
         message = request.get("message")
         context = request.get("context")
-        
+        user_id = request.get("user_id", 1)  # Default to user 1 if not provided
+
         if not message:
             raise HTTPException(
                 status_code=400,
                 detail="Message is required"
             )
-        
-        response = claude_analyzer.chat_response(message, context)
+
+        # Pass user_id to enable learning context
+        response = claude_analyzer.chat_response(message, context, user_id=user_id)
         
         return {
             "response": response,
@@ -405,17 +407,17 @@ async def get_analytics_summary():
         db = ProductHistoryDB()
         products = db.get_all_products()
         
-        # Calculate stats
-        high_velocity = [p for p in products if p.get("velocity_score", 0) >= 70]
-        medium_velocity = [p for p in products if 40 <= p.get("velocity_score", 0) < 70]
-        low_velocity = [p for p in products if p.get("velocity_score", 0) < 40]
+        # Calculate stats (handle None values properly)
+        high_velocity = [p for p in products if (p.get("velocity_score") or 0) >= 70]
+        medium_velocity = [p for p in products if 40 <= (p.get("velocity_score") or 0) < 70]
+        low_velocity = [p for p in products if (p.get("velocity_score") or 0) < 40]
         
         return {
             "total_products": len(products),
             "high_velocity_products": len(high_velocity),
             "medium_velocity_products": len(medium_velocity),
             "low_velocity_products": len(low_velocity),
-            "average_velocity": sum(p.get("velocity_score", 0) for p in products) / len(products) if products else 0,
+            "average_velocity": sum((p.get("velocity_score") or 0) for p in products) / len(products) if products else 0,
             "data_source": "DATABASE",
             "timestamp": datetime.now().isoformat()
         }

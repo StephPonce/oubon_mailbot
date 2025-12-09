@@ -403,13 +403,17 @@ Format your response as JSON:
 
         return hashtags[:8]  # Max 8 hashtags
 
-    def chat_response(self, message: str, context: Optional[Dict] = None) -> str:
+    def chat_response(self, message: str, context: Optional[Dict] = None, user_id: Optional[int] = None) -> str:
         """
-        Generate a conversational response using Claude AI
+        Generate a conversational response using Claude AI with smart context building.
+
+        Now uses the scalable memory system to provide unlimited historical knowledge
+        without hitting token limits.
 
         Args:
             message: User's question/message
             context: Optional context about current product, niche, etc.
+            user_id: Optional user ID for personalized learning context
 
         Returns:
             Claude's response as a string
@@ -419,21 +423,40 @@ Format your response as JSON:
 
         try:
             # Build system prompt with context
-            system_prompt = """You are an expert e-commerce and dropshipping advisor specializing in product selection and market analysis.
+            system_prompt = """You are Ospra, the Chief Operating Officer of the user's e-commerce business. You speak with the authority and clarity of a seasoned executive who respects their CEO's time.
 
-You help users:
-- Analyze product opportunities
-- Understand market trends
-- Evaluate profit potential
-- Identify winning products
-- Optimize pricing and positioning
+Communication Style:
+- Direct and concise - get to the point
+- Use data to support insights, not decorate them
+- Organize information with clear hierarchy
+- NO decorative emoji - Do not use 🎧, 📹, 🔥, 💡, 🚀, 📊, 💰, or any product/category emoji
+- ONLY use ✓ and ⚠ when marking status or warnings
+- Speak in complete sentences, not bullet-point fragments
+- When presenting options, be clear about your recommendation and why
 
-Provide concise, actionable insights based on data and market signals."""
+Format Guidelines:
+- Use headers sparingly and only for major sections
+- Bold for emphasis on key metrics or actions only
+- Present numbers cleanly: "$45,678" not "**$45,678** 💰"
+- Product names are plain text: "Smart Home Security Camera" NOT "🔥 Smart Home Security Camera 📹"
+- If listing items, use clean numbered lists or brief paragraphs
+- End with a clear next step or question when appropriate
 
-            # Add context to user message if provided
-            user_message = message
+You have access to:
+- Real-time store analytics and revenue data
+- Product performance metrics
+- Market trends and competitor analysis
+- Email/support queue status
+- Advertising performance
+
+Your role is to surface what matters, recommend actions, and help the CEO make informed decisions quickly. You're not here to impress - you're here to help run a profitable business."""
+
+            # Build user message with context
+            context_str = ""
+
+            # Add current product context if provided (immediate context)
             if context:
-                context_str = "\n\n**Current Context:**\n"
+                context_str += "\n\n**Current Context:**\n"
                 if 'product_name' in context:
                     context_str += f"Product: {context['product_name']}\n"
                 if 'product_price' in context:
@@ -445,7 +468,65 @@ Provide concise, actionable insights based on data and market signals."""
                 if 'niche' in context:
                     context_str += f"Niche: {context['niche']}\n"
 
-                user_message = context_str + "\n" + message
+            # Add smart learning context if user_id provided (scalable memory system)
+            if user_id:
+                try:
+                    from ospra_os.learning.context_builder import build_claude_context
+                    from ospra_os.database.multi_store_models import SessionLocal
+
+                    db = SessionLocal()
+                    try:
+                        # Use smart context builder - automatically selects relevant data based on query
+                        learning_context = build_claude_context(user_id, message, db)
+                        context_str += "\n\n" + learning_context
+                    finally:
+                        db.close()
+
+                except ImportError:
+                    logger.warning("Smart context builder not available - falling back to basic context")
+                    # Fallback to old method if context_builder not available
+                    try:
+                        from ospra_os.learning.hybrid_learning_engine import get_learning_engine
+
+                        engine = get_learning_engine()
+
+                        # Get personal learning insights (Soar+ tiers)
+                        try:
+                            personal = engine.session.query(engine.PersonalLearningWeights).filter_by(user_id=user_id).first()
+
+                            if personal and personal.learning_cycles > 0:
+                                context_str += "\n**Your Store's Performance History:**\n"
+                                context_str += f"- Products analyzed: {personal.sales_analyzed}\n"
+
+                                if personal.best_performing_niches:
+                                    niches = personal.best_performing_niches[:3] if isinstance(personal.best_performing_niches, list) else []
+                                    if niches:
+                                        context_str += f"- Best performing niches: {', '.join(niches)}\n"
+
+                                if personal.optimal_price_range and isinstance(personal.optimal_price_range, dict):
+                                    min_price = personal.optimal_price_range.get('min', 0)
+                                    max_price = personal.optimal_price_range.get('max', 0)
+                                    if min_price > 0 and max_price > 0:
+                                        context_str += f"- Optimal price range: ${min_price:.0f}-${max_price:.0f}\n"
+                        except:
+                            pass  # Personal weights not available
+                    except Exception as e:
+                        logger.warning(f"Could not fetch fallback learning context: {e}")
+
+                except Exception as e:
+                    logger.warning(f"Could not fetch smart context: {e}")
+                    # Continue without learning context
+
+            user_message = context_str + "\n" + message if context_str else message
+
+            # DEBUG: Print what Claude receives
+            print("=" * 80)
+            print("🔍 CLAUDE RECEIVES THIS CONTEXT:")
+            print("=" * 80)
+            print(f"System Prompt: {system_prompt[:200]}...")
+            print("-" * 80)
+            print(f"User Message with Context:\n{user_message}")
+            print("=" * 80)
 
             # Call Claude API
             response = self.claude_client.messages.create(

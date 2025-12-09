@@ -450,3 +450,122 @@ async def get_scheduler_status():
         'active_campaigns': campaign_status['active'],
         'paused_campaigns': campaign_status['paused']
     }
+
+
+class GenerateAdCopyRequest(BaseModel):
+    """Request to generate AI-powered ad copy"""
+    product_id: int
+    product_name: str
+    product_description: str
+    platform: str = 'meta'
+    tone: Optional[str] = None
+    variations: int = 1
+
+
+@router.post("/generate-copy")
+async def generate_ad_copy(request: GenerateAdCopyRequest):
+    """
+    Generate AI-powered ad copy for a product.
+
+    Parameters:
+    - product_id: Product ID
+    - product_name: Name of the product
+    - product_description: Product description
+    - platform: Platform to generate for (meta, tiktok, google)
+    - tone: Optional tone override
+    - variations: Number of variations to generate (1-3)
+
+    Example:
+        POST /api/ads/generate-copy
+        {
+            "product_id": 123,
+            "product_name": "Smart LED Bulbs",
+            "product_description": "WiFi-enabled color changing bulbs with app control",
+            "platform": "meta",
+            "variations": 2
+        }
+    """
+    try:
+        from ospra_os.advertising.creative_generator import AdCreativeGenerator
+
+        # Initialize generator
+        generator = AdCreativeGenerator()
+
+        try:
+            # Generate ad copy
+            creative = await generator.generate_ad_copy(
+                platform=request.platform,
+                product_name=request.product_name,
+                product_description=request.product_description,
+                variations=request.variations
+            )
+        except Exception as ai_error:
+            # Fallback to demo mode if AI provider is not available
+            if "API key not found" in str(ai_error):
+                # Generate demo creative based on product info
+                platform_emojis = {
+                    'meta': '📱',
+                    'tiktok': '🎵',
+                    'google': '🔍'
+                }
+
+                creative = {
+                    'variations': []
+                }
+
+                for i in range(request.variations):
+                    variation = {
+                        'headline': f"{platform_emojis.get(request.platform, '✨')} {request.product_name[:35]}",
+                        'primary_text': request.product_description[:120] + "..." if len(request.product_description) > 120 else request.product_description,
+                        'description': f"Discover amazing deals on {request.product_name}. Limited time offer!",
+                        'cta': "Shop Now",
+                        'selling_angle': f"Transform your lifestyle with {request.product_name}"
+                    }
+                    creative['variations'].append(variation)
+
+                creative['demo_mode'] = True
+                creative['note'] = "Demo mode: Add AI_PROVIDER and API keys to .env for AI-generated copy"
+            else:
+                raise ai_error
+
+        return {
+            'success': True,
+            'product_id': request.product_id,
+            'platform': request.platform,
+            'creative': creative
+        }
+
+    except Exception as e:
+        # Check if this is an API key error - if so, return demo mode
+        if "API key not found" in str(e):
+            # Generate demo creative
+            platform_emojis = {
+                'meta': '📱',
+                'tiktok': '🎵',
+                'google': '🔍'
+            }
+
+            creative = {
+                'variations': [],
+                'demo_mode': True,
+                'note': "Demo mode: Add AI_PROVIDER and API keys to .env for AI-generated copy"
+            }
+
+            for i in range(request.variations):
+                variation = {
+                    'headline': f"{platform_emojis.get(request.platform, '✨')} {request.product_name[:35]}",
+                    'primary_text': request.product_description[:120] + "..." if len(request.product_description) > 120 else request.product_description,
+                    'description': f"Discover amazing deals on {request.product_name}. Limited time offer!",
+                    'cta': "Shop Now",
+                    'selling_angle': f"Transform your lifestyle with {request.product_name}"
+                }
+                creative['variations'].append(variation)
+
+            return {
+                'success': True,
+                'product_id': request.product_id,
+                'platform': request.platform,
+                'creative': creative
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"Ad copy generation failed: {str(e)}")

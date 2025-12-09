@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Package, 
-  DollarSign, 
+import {
+  TrendingUp,
+  TrendingDown,
+  Package,
+  DollarSign,
   ShoppingCart,
   Zap,
   ArrowUpRight,
@@ -19,18 +19,28 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
-  Loader2
+  Loader2,
+  Download,
+  FileText,
+  PieChart,
+  Globe,
+  MapPin,
+  TrendingUpIcon,
+  Play,
+  Pause,
+  ArrowRight
 } from 'lucide-react';
 
 // Import hooks and charts
-import { 
-  useDashboardMetrics, 
-  useProductRecommendations, 
+import {
+  useDashboardMetrics,
+  useProductRecommendations,
   useOiInsights,
   useSystemHealth
 } from '../hooks/useData';
 import { useRealtimeAnalytics } from '../services/websocket';
 import { RevenueChart, TrendSparkline } from '../components/charts';
+import { EmailOverview } from '../components/dashboard/EmailOverview';
 
 // Types
 interface MetricData {
@@ -69,6 +79,40 @@ interface SystemStatus {
   name: string;
   status: 'online' | 'processing' | 'warning' | 'offline';
   detail: string;
+}
+
+interface ProductPerformance {
+  id: string;
+  name: string;
+  revenue: number;
+  units_sold: number;
+  profit: number;
+  roas: number;
+  status: 'active' | 'paused' | 'low-stock';
+  niche: string;
+  image?: string;
+}
+
+interface ChannelData {
+  name: string;
+  revenue: number;
+  percentage: number;
+  roi: number;
+  color: string;
+}
+
+interface GeographicData {
+  country: string;
+  revenue: number;
+  customers: number;
+  orders: number;
+}
+
+interface ProjectionData {
+  period: string;
+  value: number;
+  confidence_low: number;
+  confidence_high: number;
 }
 
 // Metric Card Component - CLEAN WHITE GLASS
@@ -305,6 +349,306 @@ function QuickActionsPanel() {
   );
 }
 
+// Product Performance Table
+function ProductPerformanceTable({ products }: { products: ProductPerformance[] }) {
+  const getStatusColor = (status: string) => {
+    if (status === 'active') return 'bg-green-500/10 text-green-600 border-green-500/20';
+    if (status === 'paused') return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
+    return 'bg-red-500/10 text-red-600 border-red-500/20';
+  };
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <BarChart3 className="w-5 h-5 text-accent" />
+          <h2 className="text-lg font-medium text-primary">Product Performance</h2>
+        </div>
+        <button className="btn-ghost text-sm">
+          Export
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-black/10">
+              <th className="text-left py-3 px-4 text-sm font-medium text-secondary">Product</th>
+              <th className="text-right py-3 px-4 text-sm font-medium text-secondary">Revenue</th>
+              <th className="text-right py-3 px-4 text-sm font-medium text-secondary">Units Sold</th>
+              <th className="text-right py-3 px-4 text-sm font-medium text-secondary">Profit</th>
+              <th className="text-right py-3 px-4 text-sm font-medium text-secondary">ROAS</th>
+              <th className="text-center py-3 px-4 text-sm font-medium text-secondary">Status</th>
+              <th className="text-center py-3 px-4 text-sm font-medium text-secondary">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id} className="border-b border-black/5 hover:bg-black/5 transition-colors">
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    {product.image && (
+                      <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover" />
+                    )}
+                    <div>
+                      <div className="text-sm font-medium text-primary">{product.name}</div>
+                      <div className="text-xs text-tertiary">{product.niche}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="text-right py-3 px-4 text-sm font-medium text-primary">${product.revenue.toLocaleString()}</td>
+                <td className="text-right py-3 px-4 text-sm text-secondary">{product.units_sold}</td>
+                <td className="text-right py-3 px-4 text-sm font-medium text-green-600">${product.profit.toLocaleString()}</td>
+                <td className="text-right py-3 px-4 text-sm font-medium text-primary">{product.roas.toFixed(2)}x</td>
+                <td className="text-center py-3 px-4">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border ${getStatusColor(product.status)}`}>
+                    {product.status}
+                  </span>
+                </td>
+                <td className="text-center py-3 px-4">
+                  <div className="flex items-center justify-center gap-2">
+                    <button className="p-1.5 rounded-lg hover:bg-black/10 text-tertiary">
+                      <Play className="w-4 h-4" />
+                    </button>
+                    <button className="p-1.5 rounded-lg hover:bg-black/10 text-tertiary">
+                      <Pause className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// AI Weekly Briefing
+function AIWeeklyBriefing({ data }: { data: any }) {
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <FileText className="w-5 h-5 text-purple-600" />
+          <h2 className="text-lg font-medium text-primary">Ospra's Weekly Briefing</h2>
+        </div>
+        <button className="btn-primary text-sm">
+          Generate PDF
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-blue-500/8 border border-blue-500/15">
+          <div className="flex items-start gap-3 mb-3">
+            <Brain className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-primary mb-2">Key Insights This Week</h3>
+              <ul className="space-y-2 text-sm text-secondary">
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span>Revenue is up 23% this week, driven by LED strip sales in smart home niche</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span>Kitchen gadgets niche showing declining engagement - consider pausing ad spend</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <span>3 products need restocking within 7 days to avoid stockouts</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <span>New competitor detected in fitness accessories - monitor pricing</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-green-500/8 border border-green-500/15">
+          <h3 className="text-sm font-medium text-primary mb-2 flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-green-600" />
+            Recommended Actions
+          </h3>
+          <div className="space-y-2 text-sm text-secondary">
+            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/30">
+              <span>Launch Meta ad campaign for LED strips</span>
+              <button className="text-xs text-accent hover:text-accent-hover font-medium">Start Campaign</button>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/30">
+              <span>Reorder inventory for top 3 products</span>
+              <button className="text-xs text-accent hover:text-accent-hover font-medium">View Products</button>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-lg hover:bg-white/30">
+              <span>Review kitchen niche profitability</span>
+              <button className="text-xs text-accent hover:text-accent-hover font-medium">Open Analysis</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Revenue Projections
+function RevenueProjections({ projections }: { projections: ProjectionData[] }) {
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-5 h-5 text-green-600" />
+          <h2 className="text-lg font-medium text-primary">Revenue Projections</h2>
+        </div>
+        <div className="text-xs text-tertiary">Based on current trends & seasonality</div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        {projections.map((proj, index) => (
+          <div key={index} className="p-4 rounded-xl bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/20">
+            <div className="text-xs text-tertiary mb-1">{proj.period}</div>
+            <div className="text-2xl font-semibold text-primary mb-2">${proj.value.toLocaleString()}</div>
+            <div className="text-xs text-secondary">
+              Range: ${proj.confidence_low.toLocaleString()} - ${proj.confidence_high.toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="p-4 rounded-xl bg-purple-500/8 border border-purple-500/15">
+        <div className="flex items-start gap-3">
+          <Brain className="w-5 h-5 text-purple-600 mt-0.5" />
+          <div className="flex-1 text-sm text-secondary">
+            <p className="mb-2">
+              <span className="font-medium text-primary">Projection Assumptions:</span>
+            </p>
+            <ul className="space-y-1">
+              <li>• Current conversion rate of 2.3% maintained</li>
+              <li>• Seasonal uptick expected in Q4 (+15%)</li>
+              <li>• Ad spend efficiency improving by 5% month-over-month</li>
+              <li>• New product launches contributing $2-3K monthly</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Channel Breakdown
+function ChannelBreakdown({ channels }: { channels: ChannelData[] }) {
+  const total = channels.reduce((sum, ch) => sum + ch.revenue, 0);
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <PieChart className="w-5 h-5 text-cyan-600" />
+          <h2 className="text-lg font-medium text-primary">Revenue by Channel</h2>
+        </div>
+        <div className="text-sm text-secondary">Total: ${total.toLocaleString()}</div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Pie Chart Visualization */}
+        <div className="flex items-center justify-center">
+          <div className="relative w-48 h-48">
+            {channels.map((channel, index) => {
+              const startAngle = channels.slice(0, index).reduce((sum, ch) => sum + ch.percentage * 3.6, 0);
+              const endAngle = startAngle + (channel.percentage * 3.6);
+
+              return (
+                <div
+                  key={channel.name}
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: `conic-gradient(${channel.color} ${startAngle}deg, ${channel.color} ${endAngle}deg, transparent ${endAngle}deg)`,
+                  }}
+                />
+              );
+            })}
+            <div className="absolute inset-8 rounded-full bg-white flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-2xl font-semibold text-primary">{channels.length}</div>
+                <div className="text-xs text-tertiary">Channels</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Channel Details */}
+        <div className="space-y-3">
+          {channels.map((channel) => (
+            <div key={channel.name} className="p-4 rounded-xl border border-black/10 hover:border-black/20 transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: channel.color }} />
+                  <span className="text-sm font-medium text-primary">{channel.name}</span>
+                </div>
+                <span className="text-sm font-semibold text-primary">${channel.revenue.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs text-secondary">
+                <span>{channel.percentage.toFixed(1)}% of total</span>
+                <span className="text-green-600 font-medium">{channel.roi.toFixed(2)}x ROI</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Geographic Distribution
+function GeographicDistribution({ locations }: { locations: GeographicData[] }) {
+  const total = locations.reduce((sum, loc) => sum + loc.revenue, 0);
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Globe className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-medium text-primary">Top Markets</h2>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {locations.map((location, index) => {
+          const percentage = (location.revenue / total) * 100;
+
+          return (
+            <div key={location.country} className="p-4 rounded-xl border border-black/10">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-primary">{location.country}</div>
+                    <div className="text-xs text-tertiary">{location.customers} customers • {location.orders} orders</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-semibold text-primary">${location.revenue.toLocaleString()}</div>
+                  <div className="text-xs text-secondary">{percentage.toFixed(1)}%</div>
+                </div>
+              </div>
+              <div className="w-full h-2 bg-black/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"
+                  style={{ width: `${percentage}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Loading Skeleton
 function DashboardSkeleton() {
   return (
@@ -338,6 +682,36 @@ export default function PortfolioDashboard() {
   const [recommendations, setRecommendations] = useState<ProductRecommendation[]>([]);
   const [insights, setInsights] = useState<AIInsight[]>([]);
   const [systems, setSystems] = useState<SystemStatus[]>([]);
+
+  // New sections data
+  const [productPerformance] = useState<ProductPerformance[]>([
+    { id: '1', name: 'LED Strip Lights 16ft', revenue: 4850, units_sold: 97, profit: 1940, roas: 4.2, status: 'active', niche: 'Smart Home' },
+    { id: '2', name: 'Wireless Phone Charger', revenue: 3200, units_sold: 128, profit: 1120, roas: 3.5, status: 'active', niche: 'Tech Accessories' },
+    { id: '3', name: 'Portable Blender', revenue: 2750, units_sold: 55, profit: 1375, roas: 5.0, status: 'active', niche: 'Kitchen' },
+    { id: '4', name: 'Yoga Mat Premium', revenue: 1890, units_sold: 63, profit: 756, roas: 2.1, status: 'low-stock', niche: 'Fitness' },
+    { id: '5', name: 'Pet Water Fountain', revenue: 1450, units_sold: 29, profit: 580, roas: 1.8, status: 'paused', niche: 'Pet Supplies' },
+  ]);
+
+  const [projections] = useState<ProjectionData[]>([
+    { period: 'Next 7 Days', value: 12500, confidence_low: 10800, confidence_high: 14200 },
+    { period: 'Next 30 Days', value: 48000, confidence_low: 42000, confidence_high: 54000 },
+    { period: 'Next 90 Days', value: 152000, confidence_low: 135000, confidence_high: 170000 },
+  ]);
+
+  const [channels] = useState<ChannelData[]>([
+    { name: 'Organic Search', revenue: 5200, percentage: 36.6, roi: 8.5, color: '#10b981' },
+    { name: 'Meta Ads', revenue: 4100, percentage: 28.9, roi: 4.2, color: '#3b82f6' },
+    { name: 'TikTok Ads', revenue: 3200, percentage: 22.5, roi: 3.8, color: '#a855f7' },
+    { name: 'Email Marketing', revenue: 1700, percentage: 12.0, roi: 12.1, color: '#f59e0b' },
+  ]);
+
+  const [geoData] = useState<GeographicData[]>([
+    { country: 'United States', revenue: 8500, customers: 245, orders: 387 },
+    { country: 'United Kingdom', revenue: 3200, customers: 98, orders: 156 },
+    { country: 'Canada', revenue: 2100, customers: 67, orders: 94 },
+    { country: 'Australia', revenue: 1350, customers: 42, orders: 58 },
+    { country: 'Germany', revenue: 990, customers: 28, orders: 41 },
+  ]);
 
   // Transform API data - use real 0 values from database
   useEffect(() => {
@@ -503,6 +877,9 @@ export default function PortfolioDashboard() {
 
         {/* Right Sidebar */}
         <div className="space-y-6">
+          {/* Email Automation Overview */}
+          <EmailOverview delay={400} />
+
           {/* AI Insights */}
           <div className="glass-card-static p-5">
             <div className="flex items-center gap-2 mb-4">
@@ -523,6 +900,23 @@ export default function PortfolioDashboard() {
           {/* Quick Actions */}
           <QuickActionsPanel />
         </div>
+      </div>
+
+      {/* Product Performance Table */}
+      {productPerformance.length > 0 && (
+        <ProductPerformanceTable products={productPerformance} />
+      )}
+
+      {/* AI Weekly Briefing & Revenue Projections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <AIWeeklyBriefing data={{}} />
+        <RevenueProjections projections={projections} />
+      </div>
+
+      {/* Channel Breakdown & Geographic Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChannelBreakdown channels={channels} />
+        <GeographicDistribution locations={geoData} />
       </div>
     </div>
   );

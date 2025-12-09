@@ -10,6 +10,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   Brain,
   X,
@@ -394,13 +396,15 @@ export default function OspraChat() {
                         {/* Assistant Message Content */}
                         {message.role === 'assistant' && (
                           <div
-                            className="p-3 rounded-xl text-sm text-primary"
+                            className="ospra-message p-3 rounded-xl text-sm text-primary"
                             style={{
                               background: 'rgba(255, 255, 255, 0.5)',
                               border: '1px solid rgba(0, 0, 0, 0.05)',
                             }}
                           >
-                            {message.content}
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {message.content}
+                            </ReactMarkdown>
                           </div>
                         )}
 
@@ -442,13 +446,15 @@ export default function OspraChat() {
                       animate={{ opacity: 1, y: 0 }}
                     >
                       <div
-                        className="max-w-[85%] p-3 rounded-xl text-sm text-primary"
+                        className="ospra-message max-w-[85%] p-3 rounded-xl text-sm text-primary"
                         style={{
                           background: 'rgba(255, 255, 255, 0.5)',
                           border: '1px solid rgba(0, 0, 0, 0.05)',
                         }}
                       >
-                        {streamingContent}
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {streamingContent}
+                        </ReactMarkdown>
                         <span className="inline-block w-1 h-4 ml-1 bg-accent animate-pulse" />
                       </div>
                     </motion.div>

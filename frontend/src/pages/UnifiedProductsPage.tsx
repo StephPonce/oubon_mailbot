@@ -39,6 +39,7 @@ import {
 } from '../hooks/useData';
 import { productsAPI } from '../services/api';
 import type { Product, ProductFilters } from '../services/api';
+import { Top20Rankings } from '../components/rankings/Top20Rankings';
 
 // =============================================================================
 // CONSTANTS & UTILITIES
@@ -862,6 +863,11 @@ export default function UnifiedProductsPage() {
           </div>
         </div>
       )}
+
+      {/* Top 20 Rankings Section */}
+      <div className="mb-6">
+        <Top20Rankings niche={filters.niches?.[0]} />
+      </div>
 
       {/* Products Grid/List */}
       {productsError && products.length === 0 ? (

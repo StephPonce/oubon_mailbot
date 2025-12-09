@@ -453,6 +453,24 @@ export const emailAPI = {
     return response.data;
   },
 
+  // GET /api/emails/stats/weekly (✅ exists)
+  getWeeklyStats: async () => {
+    const response = await api.get('/api/emails/stats/weekly');
+    return response.data;
+  },
+
+  // GET /api/emails/stats/categories (✅ exists)
+  getCategories: async (days = 7) => {
+    const response = await api.get('/api/emails/stats/categories', { params: { days } });
+    return response.data;
+  },
+
+  // GET /api/emails/stats/performance (✅ exists)
+  getPerformanceMetrics: async () => {
+    const response = await api.get('/api/emails/stats/performance');
+    return response.data;
+  },
+
   // POST /api/emails/messages/{id}/reply (✅ exists via frontend_compat)
   reply: async (emailId: string, message: string) => {
     const response = await api.post(`/api/emails/messages/${emailId}/reply`, { message });
@@ -786,6 +804,19 @@ export const imageEnhanceAPI = {
   // POST /api/images/enhance-batch (✅ exists)
   enhanceBatch: async (products: ImageEnhanceRequest[]): Promise<BatchEnhanceResult> => {
     const response = await api.post('/api/images/enhance-batch', { products });
+    return response.data;
+  },
+};
+
+// ============================================
+// RANKINGS API
+// ============================================
+export const rankingsAPI = {
+  // GET /api/rankings/top (✅ exists)
+  getTop: async (limit: number = 20, niche?: string) => {
+    const params: any = { limit };
+    if (niche) params.niche = niche;
+    const response = await api.get('/api/rankings/top', { params });
     return response.data;
   },
 };
