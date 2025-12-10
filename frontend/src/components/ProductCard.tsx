@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Flame, BarChart2, Layers } from 'lucide-react';
 import { ImageEnhanceModal } from './ImageEnhanceModal';
 import { DeployPreviewModal } from './DeployPreviewModal';
+import { ExplainTooltip } from './ui/ExplainTooltip';
 import type { DeployResult } from '../services/api';
 
 interface Product {
@@ -175,6 +176,59 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     return 'bg-amber-500/90';
   };
 
+  // Generate rationale for the recommendation
+  const generateRationale = () => {
+    const factors = [];
+    const parts = [];
+    let confidenceBoost = 0;
+
+    // Velocity analysis
+    if (velocity > 80) {
+      factors.push({ label: "Exceptional demand velocity", value: 15, icon: "trend" as const });
+      parts.push("selling rapidly");
+      confidenceBoost += 15;
+    } else if (velocity > 60) {
+      factors.push({ label: "Strong demand", value: 10, icon: "trend" as const });
+      parts.push("steady sales");
+      confidenceBoost += 10;
+    }
+
+    // Margin analysis
+    if (margin > 50) {
+      factors.push({ label: "Excellent margins", value: 20, icon: "success" as const });
+      parts.push(`${margin}% profit margin`);
+      confidenceBoost += 20;
+    } else if (margin > 30) {
+      factors.push({ label: "Healthy margins", value: 12, icon: "success" as const });
+      parts.push(`${margin}% margin`);
+      confidenceBoost += 12;
+    }
+
+    // Rating analysis
+    if (product.rating && product.rating >= 4.5) {
+      factors.push({ label: "Excellent reviews", value: 10, icon: "success" as const });
+      parts.push(`${product.rating}★ rating`);
+      confidenceBoost += 10;
+    }
+
+    // Orders analysis
+    if (product.orders && product.orders > 1000) {
+      factors.push({ label: "High sales volume", value: 12, icon: "success" as const });
+      parts.push(`${product.orders}+ sales`);
+      confidenceBoost += 12;
+    }
+
+    const rationaleText = parts.length > 0
+      ? `This product shows ${parts.slice(0, 3).join(", ")}. ${score >= 8 ? "Strong buy signal." : score >= 6 ? "Good potential." : "Consider testing."}`
+      : "Meets baseline criteria for dropshipping.";
+
+    const confidence = Math.min(95, Math.max(40, Math.round(score * 10 + confidenceBoost)));
+
+    return { rationale: rationaleText, confidence, factors: factors.slice(0, 4) };
+  };
+
+  const explanation = generateRationale();
+
   return (
     <div className={`relative bg-white border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-200'} rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300`}>
 
@@ -222,10 +276,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
 
-        {/* Score Badge (top right) */}
+        {/* Score Badge (top right) with Explain Tooltip */}
         <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl backdrop-blur-md ${getScoreColor()} shadow-lg`}>
-          <div className="text-white font-bold text-lg text-center">{score.toFixed(1)}</div>
-          <div className="flex gap-0.5 mt-1">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="text-white font-bold text-lg text-center">{score.toFixed(1)}</div>
+            <ExplainTooltip
+              rationale={explanation.rationale}
+              confidence={explanation.confidence}
+              factors={explanation.factors}
+              position="bottom"
+            />
+          </div>
+          <div className="flex gap-0.5">
             {[...Array(10)].map((_, i) => (
               <div
                 key={i}

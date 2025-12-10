@@ -34,6 +34,80 @@ import {
 } from '../hooks/useData';
 import { nichesAPI, intelligenceAPI } from '../services/api';
 import type { Niche } from '../services/api';
+import { ExplainTooltip } from '../components/ui/ExplainTooltip';
+
+// =============================================================================
+// RATIONALE GENERATOR
+// =============================================================================
+
+function generateNicheRationale(niche: Niche) {
+  const score = niche.score || niche.overall_score || 0;
+  const saturation = niche.saturation || niche.saturation_level || 'medium';
+  const growth = niche.growth_rate || 0;
+  const avgProfit = niche.avg_profit || 0;
+  const competition = niche.competition_level || 'medium';
+  const productCount = niche.product_count || 0;
+
+  const factors = [];
+  const parts = [];
+  let confidenceBoost = 0;
+
+  // Saturation analysis
+  if (saturation === 'low') {
+    factors.push({ label: "Low competition opportunity", value: 15, icon: "success" as const });
+    parts.push("low market saturation");
+    confidenceBoost += 15;
+  } else if (saturation === 'medium') {
+    factors.push({ label: "Moderate competition", value: 5, icon: "trend" as const });
+    parts.push("moderate competition");
+    confidenceBoost += 5;
+  } else {
+    factors.push({ label: "High competition", value: -10, icon: "warning" as const });
+    parts.push("high saturation market");
+    confidenceBoost -= 10;
+  }
+
+  // Growth analysis
+  if (growth > 10) {
+    factors.push({ label: "Rapid growth trend", value: 15, icon: "trend" as const });
+    parts.push(`${growth}% growth momentum`);
+    confidenceBoost += 15;
+  } else if (growth > 0) {
+    factors.push({ label: "Positive growth", value: 8, icon: "success" as const });
+    parts.push("upward trend");
+    confidenceBoost += 8;
+  } else if (growth < -5) {
+    factors.push({ label: "Declining interest", value: -12, icon: "warning" as const });
+    parts.push("declining trend");
+    confidenceBoost -= 12;
+  }
+
+  // Profit analysis
+  if (avgProfit > 30) {
+    factors.push({ label: "Excellent profit margins", value: 12, icon: "success" as const });
+    parts.push(`$${avgProfit.toFixed(0)} average profit`);
+    confidenceBoost += 12;
+  } else if (avgProfit > 15) {
+    factors.push({ label: "Good profit potential", value: 8, icon: "success" as const });
+    parts.push("solid margins");
+    confidenceBoost += 8;
+  }
+
+  // Product count analysis
+  if (productCount > 50) {
+    factors.push({ label: "Proven product diversity", value: 8, icon: "success" as const });
+    parts.push(`${productCount} validated products`);
+    confidenceBoost += 8;
+  }
+
+  const rationaleText = parts.length > 0
+    ? `This niche shows ${parts.slice(0, 3).join(", ")}. ${score >= 8 ? "Strong opportunity for market entry." : score >= 6 ? "Good potential with moderate risk." : "Consider testing with caution."}`
+    : "Meets baseline criteria for niche exploration.";
+
+  const confidence = Math.min(95, Math.max(35, Math.round(score * 10 + confidenceBoost)));
+
+  return { rationale: rationaleText, confidence, factors: factors.slice(0, 4) };
+}
 
 // =============================================================================
 // NICHE CARD
@@ -67,12 +141,24 @@ function NicheCard({ niche, onExplore, onAnalyze, isAnalyzing }: NicheCardProps)
     return 'bg-red-500';
   };
 
+  const explanation = generateNicheRationale(niche);
+
   return (
     <div className="glass-card p-5 hover:shadow-lg transition-all">
       <div className="flex items-center gap-6">
-        {/* Score */}
-        <div className={`w-16 h-16 rounded-xl flex items-center justify-center font-bold text-xl text-white ${getScoreColor(score)}`}>
-          {score.toFixed(1)}
+        {/* Score with Explain Tooltip */}
+        <div className="relative">
+          <div className={`w-16 h-16 rounded-xl flex items-center justify-center font-bold text-xl text-white ${getScoreColor(score)}`}>
+            {score.toFixed(1)}
+          </div>
+          <div className="absolute -top-1 -right-1">
+            <ExplainTooltip
+              rationale={explanation.rationale}
+              confidence={explanation.confidence}
+              factors={explanation.factors}
+              position="right"
+            />
+          </div>
         </div>
 
         {/* Info */}
@@ -387,16 +473,28 @@ export default function NicheAnalysisPage() {
             <span className="text-sm font-medium text-primary">Top Recommendation</span>
           </div>
           {(() => {
-            const bestNiche = [...(niches || [])].sort((a, b) => 
+            const bestNiche = [...(niches || [])].sort((a, b) =>
               (b.score || b.overall_score || 0) - (a.score || a.overall_score || 0)
             )[0];
-            
-            return bestNiche ? (
+
+            if (!bestNiche) return null;
+
+            const bestNicheExplanation = generateNicheRationale(bestNiche);
+
+            return (
               <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <span className="text-primary font-medium">{bestNiche.name}</span>
-                  <span className="text-secondary"> - Score: {(bestNiche.score || bestNiche.overall_score || 0).toFixed(1)}</span>
-                  <span className="text-tertiary ml-2">({bestNiche.saturation || bestNiche.saturation_level} saturation)</span>
+                <div className="flex-1 flex items-center gap-2">
+                  <div>
+                    <span className="text-primary font-medium">{bestNiche.name}</span>
+                    <span className="text-secondary"> - Score: {(bestNiche.score || bestNiche.overall_score || 0).toFixed(1)}</span>
+                    <span className="text-tertiary ml-2">({bestNiche.saturation || bestNiche.saturation_level} saturation)</span>
+                  </div>
+                  <ExplainTooltip
+                    rationale={bestNicheExplanation.rationale}
+                    confidence={bestNicheExplanation.confidence}
+                    factors={bestNicheExplanation.factors}
+                    position="bottom"
+                  />
                 </div>
                 <button
                   className="btn-primary text-sm"
@@ -405,7 +503,7 @@ export default function NicheAnalysisPage() {
                   Explore
                 </button>
               </div>
-            ) : null;
+            );
           })()}
         </div>
       )}

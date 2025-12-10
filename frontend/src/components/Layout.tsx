@@ -22,7 +22,9 @@ import {
   Eye,
   Bot,
   ShoppingBag,
-  Megaphone
+  Megaphone,
+  Store,
+  Boxes
 } from 'lucide-react';
 
 // Import all pages
@@ -39,11 +41,19 @@ import SystemHealthPage from '../pages/SystemHealthPage';
 import AutoDeploymentPage from '../pages/AutoDeploymentPage';
 import ShopifyPage from '../pages/ShopifyPage';
 import AdsPage from '../pages/AdsPage';
+import StoresPage from '../pages/StoresPage';
+import NewSettingsPage from '../pages/NewSettingsPage';
+import { InventoryPage } from '../pages/InventoryPage';
+import ActionsQueuePage from '../pages/ActionsQueuePage';
 import { ErrorBoundary } from './ErrorBoundary';
+import StoreSwitcher from './StoreSwitcher';
+import OspraChat from './OspraChat';
+import { VoiceCommand } from './VoiceCommand';
 
 // Navigation items with routes
 const mainNavItems = [
   { id: 'dashboard', path: '/', icon: LayoutDashboard, label: 'Command Center' },
+  { id: 'actions', path: '/actions', icon: Zap, label: 'Pending Actions', badge: '3' },
   { id: 'products', path: '/products', icon: Package, label: 'Product Discovery' },
   { id: 'trends', path: '/trends', icon: TrendingUp, label: 'Live Trends', badge: 'Live' },
   { id: 'intelligence', path: '/intelligence', icon: Brain, label: 'Ospra Intelligence' },
@@ -53,7 +63,8 @@ const mainNavItems = [
 
 const operationsNavItems = [
   { id: 'shopify', path: '/shopify', icon: ShoppingBag, label: 'Shopify Store' },
-  { id: 'auto-deploy', path: '/auto-deploy', icon: Bot, label: 'Auto-Deployment', badge: 'New' },
+  { id: 'inventory', path: '/inventory', icon: Boxes, label: 'Inventory', badge: 'New' },
+  { id: 'auto-deploy', path: '/auto-deploy', icon: Bot, label: 'Auto-Deployment' },
   { id: 'customers', path: '/customers', icon: Users, label: 'Customer Analytics' },
   { id: 'email', path: '/email', icon: Mail, label: 'Email Automation' },
   { id: 'ads', path: '/ads', icon: Megaphone, label: 'Advertising' },
@@ -62,6 +73,7 @@ const operationsNavItems = [
 ];
 
 const bottomNavItems = [
+  { id: 'stores', path: '/stores', icon: Store, label: 'Stores' },
   { id: 'subscription', path: '/subscription', icon: CreditCard, label: 'Subscription' },
   { id: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
 ];
@@ -257,6 +269,12 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Store Switcher */}
+        <StoreSwitcher />
+
+        {/* Voice Commands */}
+        <VoiceCommand />
+
         {/* Notifications */}
         <button className="relative p-2 rounded-xl hover:bg-black/5 text-secondary">
           <Bell className="w-5 h-5" />
@@ -272,20 +290,23 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<PortfolioDashboard />} />
+      <Route path="/actions" element={<ActionsQueuePage />} />
       <Route path="/products" element={<UnifiedProductsPage />} />
       <Route path="/trends" element={<LiveTrendsPage />} />
       <Route path="/intelligence" element={<IntelligencePage />} />
       <Route path="/niches" element={<NicheAnalysisPage />} />
       <Route path="/competitors" element={<CompetitiveIntelPage />} />
       <Route path="/shopify" element={<ShopifyPage />} />
+      <Route path="/inventory" element={<InventoryPage />} />
       <Route path="/auto-deploy" element={<AutoDeploymentPage />} />
       <Route path="/customers" element={<CustomerAnalyticsPage />} />
       <Route path="/email" element={<EmailDashboard />} />
       <Route path="/ads" element={<AdsPage />} />
       <Route path="/testing" element={<ABTestingPage />} />
       <Route path="/health" element={<SystemHealthPage />} />
+      <Route path="/stores" element={<StoresPage />} />
       <Route path="/subscription" element={<SubscriptionPage />} />
-      <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/settings" element={<NewSettingsPage />} />
       {/* Redirect any unknown routes to dashboard */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -482,6 +503,9 @@ export default function Layout() {
           </ErrorBoundary>
         </main>
       </div>
+
+      {/* Global AI Chat - Available everywhere */}
+      <OspraChat />
     </div>
   );
 }

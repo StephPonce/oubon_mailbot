@@ -39,11 +39,12 @@ export function ProtectedRoute({ children, requireTier }: ProtectedRouteProps) {
   // Check tier requirement
   if (requireTier && user) {
     const tierOrder = ['nest', 'flight', 'soar', 'stratosphere'];
-    const userTierIndex = tierOrder.indexOf(user.subscription_tier);
-    const requiredTierIndex = tierOrder.indexOf(requireTier);
+    const userTier = user.subscription_tier?.toLowerCase() || 'nest';
+    const userTierIndex = tierOrder.indexOf(userTier);
+    const requiredTierIndex = tierOrder.indexOf(requireTier.toLowerCase());
 
     if (userTierIndex < requiredTierIndex) {
-      return <Navigate to="/subscription" state={{ 
+      return <Navigate to="/subscription" state={{
         requiredTier: requireTier,
         message: `This feature requires ${requireTier.charAt(0).toUpperCase() + requireTier.slice(1)} tier or higher`
       }} replace />;

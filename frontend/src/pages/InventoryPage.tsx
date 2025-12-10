@@ -1,6 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Package, AlertTriangle, TrendingDown, ShoppingCart, RefreshCw, Filter, Search, X } from 'lucide-react';
+import {
+  Package,
+  AlertTriangle,
+  TrendingDown,
+  ShoppingCart,
+  RefreshCw,
+  Filter,
+  Search,
+  X,
+  TrendingUp,
+  DollarSign,
+  ArrowUp,
+  Settings,
+  Truck,
+  Copy,
+  Check,
+  Minus
+} from 'lucide-react';
 import { GlassPanel } from '../components/GlassPanel';
+import { useInventory } from '../hooks/queries/useAnalytics';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 interface InventoryProduct {
   product_id: string;
@@ -58,30 +80,73 @@ interface InventoryResponse {
 }
 
 export const InventoryPage = () => {
-  const [inventory, setInventory] = useState<InventoryProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Use TanStack Query hook for inventory data
+  const { data: inventoryData, isLoading: loading, refetch } = useInventory();
+  const queryClient = useQueryClient();
+
   const [filter, setFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [restockProduct, setRestockProduct] = useState<InventoryProduct | null>(null);
 
-  useEffect(() => {
-    fetchInventory();
-  }, []);
+  // Auto-rules state
+  const [autoRules, setAutoRules] = useState({
+    autoPauseOutOfStock: true,
+    autoAdjustPrices: false,
+    alertThreshold: 10,
+    dailySync: true,
+    maintainMargin: 30
+  });
 
-  const fetchInventory = async () => {
-    setLoading(true);
-    try {
-      // Use Shopify real inventory data instead of mock data
-      const response = await fetch('http://localhost:8001/api/inventory/shopify/products');
-      const data: InventoryResponse = await response.json();
+  // Extract inventory products from query data
+  const inventory = (inventoryData?.products || []) as InventoryProduct[];
+
+  // Sync inventory mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(`${API_URL}/api/inventory/shopify/sync`);
+      return response.data;
+    },
+    onSuccess: (data) => {
       if (data.success) {
-        setInventory(data.products);
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
       }
-    } catch (error) {
-      console.error('Failed to fetch inventory:', error);
-    } finally {
-      setLoading(false);
-    }
+    },
+    onError: (error) => {
+      console.error('Failed to sync inventory:', error);
+    },
+  });
+
+  const syncInventory = () => {
+    syncMutation.mutate();
+  };
+
+  const handleRestock = (product: InventoryProduct) => {
+    setRestockProduct(product);
+    setShowRestockModal(true);
+  };
+
+  // Restock order mutation
+  const restockMutation = useMutation({
+    mutationFn: async (orderData: any) => {
+      const response = await axios.post(`${API_URL}/api/inventory/restock-orders`, orderData);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        setShowRestockModal(false);
+        setRestockProduct(null);
+        queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      }
+    },
+    onError: (error) => {
+      console.error('Failed to create restock order:', error);
+    },
+  });
+
+  const createRestockOrder = (orderData: any) => {
+    restockMutation.mutate(orderData);
   };
 
   const getStatusColor = (status: string) => {
@@ -137,12 +202,12 @@ export const InventoryPage = () => {
             <p className="text-gray-400">Monitor stock levels, velocity, and reorder recommendations</p>
           </div>
           <button
-            onClick={fetchInventory}
-            disabled={loading}
+            onClick={syncInventory}
+            disabled={syncMutation.isPending}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? 'Syncing...' : 'Sync Shopify'}
           </button>
         </GlassPanel>
 
@@ -193,8 +258,101 @@ export const InventoryPage = () => {
           </GlassPanel>
         </div>
 
+        {/* Low Stock Alerts Panel */}
+        {stats.critical + stats.low > 0 && (
+          <GlassPanel className="p-6" delay={0.4}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-400" />
+                Low Stock Alerts ({stats.critical + stats.low})
+              </h2>
+            </div>
+
+            <div className="space-y-3">
+              {inventory
+                .filter(p => p.current_status.status === 'LOW' || p.current_status.status === 'CRITICAL')
+                .slice(0, 5)
+                .map((product) => {
+                  const daysUntilStockout = product.forecast.days_of_stock;
+                  return (
+                    <div key={product.product_id} className="flex items-center justify-between p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="flex-1">
+                        <div className="font-medium text-white">{product.product_name}</div>
+                        <div className="text-sm text-gray-400 mt-1">
+                          Current Stock: <span className="font-medium text-yellow-400">{product.current_status.stock_level} units</span>
+                          {' • '}
+                          Velocity: {product.velocity.daily_average.toFixed(1)} units/day
+                          {' • '}
+                          <span className="text-orange-400 font-medium">
+                            {daysUntilStockout < 999 ? `${Math.floor(daysUntilStockout)} days until stockout` : 'No stockout risk'}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRestock(product)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors"
+                      >
+                        <Truck className="w-4 h-4" />
+                        Reorder
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+          </GlassPanel>
+        )}
+
+        {/* Price Monitor Section */}
+        <GlassPanel className="p-6" delay={0.5}>
+          <h2 className="text-xl font-semibold text-white flex items-center gap-2 mb-4">
+            <DollarSign className="w-5 h-5 text-green-400" />
+            Price Monitor
+          </h2>
+          <div className="text-sm text-gray-400 mb-4">
+            Supplier price changes detected in the last 7 days
+          </div>
+
+          <div className="space-y-3">
+            {/* Mock price change - replace with real data */}
+            <div className="flex items-center justify-between p-4 bg-orange-500/10 rounded-lg border border-orange-500/20">
+              <div className="flex-1">
+                <div className="font-medium text-white">LED Strip Lights</div>
+                <div className="flex items-center gap-4 mt-2 text-sm">
+                  <div>
+                    <span className="text-gray-400">Old Price:</span>
+                    <span className="ml-2 line-through text-gray-300">$4.50</span>
+                  </div>
+                  <ArrowUp className="w-4 h-4 text-orange-400" />
+                  <div>
+                    <span className="text-gray-400">New Price:</span>
+                    <span className="ml-2 font-medium text-orange-400">$5.20</span>
+                  </div>
+                  <div className="px-2 py-1 rounded bg-orange-500/20 text-orange-400 text-xs font-medium">
+                    +15.6%
+                  </div>
+                  <div className="text-gray-400">
+                    Margin impact: <span className="text-orange-400 font-medium">-7%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm transition-colors">
+                  Update My Price
+                </button>
+                <button className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm transition-colors">
+                  Ignore
+                </button>
+              </div>
+            </div>
+
+            <div className="text-center text-sm text-gray-400 py-4">
+              No other price changes detected
+            </div>
+          </div>
+        </GlassPanel>
+
         {/* Filters and Search */}
-        <GlassPanel className="p-4" delay={0.4}>
+        <GlassPanel className="p-4" delay={0.6}>
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1">

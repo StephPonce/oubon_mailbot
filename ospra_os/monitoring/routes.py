@@ -35,12 +35,48 @@ class ResolveRequest(BaseModel):
 async def get_overall_health():
     """
     1. GET /api/health
-    Returns: Overall system health status
+    Returns: Overall system health status with service details
     """
-    return {
-        "status": await health_monitor.get_overall_status(),
-        "timestamp": health_monitor.uptime_start.isoformat()
+    from datetime import datetime
+
+    integrations = await health_monitor.check_all_integrations()
+    overall_status = await health_monitor.get_overall_status()
+
+    # Identify which services are degraded/disconnected
+    critical_issues = []
+    warnings = []
+
+    for name, status in integrations.items():
+        if status['status'] == 'DISCONNECTED':
+            # Skip if not configured (optional service)
+            if 'not configured' not in status.get('error', '').lower():
+                critical_issues.append(f"{name}: {status.get('error', 'Connection failed')}")
+        elif status['status'] == 'DEGRADED':
+            warnings.append(f"{name}: {status.get('error', 'Performance issues')}")
+
+    # Build service summary
+    services = {}
+    for name, status in integrations.items():
+        services[name] = {
+            "healthy": status['status'] in ['CONNECTED', 'HEALTHY'],
+            "status": status['status'],
+            "message": status.get('error') or status.get('note') or "Connected"
+        }
+
+    response = {
+        "status": overall_status,
+        "timestamp": datetime.utcnow().isoformat(),
+        "uptime_since": health_monitor.uptime_start.isoformat(),
+        "services": services
     }
+
+    # Add issues if any
+    if critical_issues:
+        response["critical_issues"] = critical_issues
+    if warnings:
+        response["warnings"] = warnings
+
+    return response
 
 
 @router.get("/detailed")

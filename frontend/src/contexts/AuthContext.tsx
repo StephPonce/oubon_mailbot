@@ -1,10 +1,13 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authAPI } from '../services/api';
 
 interface User {
   id: number;
   email: string;
   name: string;
-  tier: string;
+  subscription_tier: string;
+  created_at?: string;
+  last_login?: string;
 }
 
 interface AuthContextType {
@@ -14,6 +17,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  tier: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,43 +27,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth token
-    const storedUser = localStorage.getItem('ospra_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    // Check for stored auth token on mount
+    const token = localStorage.getItem('ospra_token');
+    if (token) {
+      fetchUser();
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
+  const fetchUser = async () => {
+    try {
+      const response = await authAPI.getProfile();
+      setUser(response.user);
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      // Clear invalid token
+      localStorage.removeItem('ospra_token');
+      localStorage.removeItem('ospra_user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const login = async (email: string, password: string) => {
-    // Simulate API call
-    const mockUser: User = {
-      id: 1,
-      email,
-      name: email.split('@')[0],
-      tier: 'stratosphere',
-    };
-    
-    localStorage.setItem('ospra_user', JSON.stringify(mockUser));
-    setUser(mockUser);
+    const response = await authAPI.login(email, password);
+
+    // Store tokens
+    localStorage.setItem('ospra_token', response.access_token);
+    if (response.refresh_token) {
+      localStorage.setItem('ospra_refresh_token', response.refresh_token);
+    }
+
+    // Set user from response
+    setUser(response.user);
   };
 
   const register = async (email: string, password: string, name: string) => {
-    // Simulate API call
-    const mockUser: User = {
-      id: 1,
-      email,
-      name,
-      tier: 'nest',
-    };
-    
-    localStorage.setItem('ospra_user', JSON.stringify(mockUser));
-    setUser(mockUser);
+    const response = await authAPI.register(email, password, name);
+
+    // Store tokens
+    localStorage.setItem('ospra_token', response.access_token);
+    if (response.refresh_token) {
+      localStorage.setItem('ospra_refresh_token', response.refresh_token);
+    }
+
+    // Set user from response
+    setUser(response.user);
   };
 
   const logout = () => {
+    // Call logout endpoint (fire and forget)
+    authAPI.logout().catch(() => {});
+
+    // Clear local storage
+    localStorage.removeItem('ospra_token');
+    localStorage.removeItem('ospra_refresh_token');
     localStorage.removeItem('ospra_user');
+
+    // Clear user state
     setUser(null);
+
+    // Redirect to auth page
+    window.location.href = '/auth';
   };
 
   return (
@@ -70,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      tier: user?.subscription_tier || 'nest',
     }}>
       {children}
     </AuthContext.Provider>

@@ -115,30 +115,27 @@ export interface Niche {
 // AUTH API (✅ All endpoints exist)
 // ============================================
 export const authAPI = {
-  // POST /auth/token (OAuth2 compatible)
+  // POST /api/auth/login
   login: async (email: string, password: string) => {
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
-
-    // No fallback - let auth errors propagate
-    const response = await api.post('/auth/token', formData, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    });
+    const response = await api.post('/api/auth/login', { email, password });
     return response.data;
   },
 
-  // POST /auth/register
+  // POST /api/auth/register
   register: async (email: string, password: string, name: string) => {
-    // No fallback - let registration errors propagate
-    const response = await api.post('/auth/register', { email, password, name });
+    const response = await api.post('/api/auth/register', { email, password, name });
     return response.data;
   },
 
-  // GET /auth/me
+  // GET /api/auth/me
   getProfile: async () => {
-    // No fallback - let auth errors propagate
-    const response = await api.get('/auth/me');
+    const response = await api.get('/api/auth/me');
+    return response.data;
+  },
+
+  // POST /api/auth/logout
+  logout: async () => {
+    const response = await api.post('/api/auth/logout');
     return response.data;
   },
 };

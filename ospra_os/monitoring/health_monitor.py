@@ -73,10 +73,14 @@ class HealthMonitor:
             if name in critical_integrations and status['status'] == 'DISCONNECTED'
         ]
 
-        # Optional integrations being down is just degraded
+        # Optional integrations being down is degraded ONLY if configured
+        # Don't degrade for unconfigured optional services
         disconnected_optional = [
             name for name, status in integrations.items()
-            if name not in critical_integrations and status['status'] == 'DISCONNECTED'
+            if name not in critical_integrations
+            and status['status'] == 'DISCONNECTED'
+            and status.get('error') != f"{name.replace('_', ' ').title()} credentials not configured"
+            and 'not configured' not in status.get('error', '').lower()
         ]
 
         failed_jobs = [job for job in jobs if job['status'] == 'FAILED']

@@ -179,6 +179,7 @@ class User(Base):
     product_recommendations = relationship("UserProductRecommendation", back_populates="user", cascade="all, delete-orphan")
     email_accounts = relationship("UserEmailAccount", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("Email", back_populates="user", cascade="all, delete-orphan")
+    actions = relationship("Action", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier='{self.subscription_tier}')>"
@@ -233,6 +234,7 @@ class Store(Base):
     user = relationship("User", back_populates="stores")
     products = relationship("Product", back_populates="store", cascade="all, delete-orphan")
     deployments = relationship("ProductDeployment", back_populates="store", cascade="all, delete-orphan")
+    actions = relationship("Action", back_populates="store", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<Store(id={self.id}, name='{self.store_name}', platform='{self.platform}')>"
@@ -1484,8 +1486,78 @@ class ABTestAssignment(Base):
         return f"<ABTestAssignment(test_id={self.test_id}, variant_id={self.variant_id}, visitor='{self.visitor_id}')>"
 
 
+# ============================================================================
+# AUTO-PILOT SETTINGS & LOGS
+# ============================================================================
+
+class UserSettings(Base):
+    """User settings for auto-pilot and other preferences"""
+    __tablename__ = "user_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+
+    # Auto-pilot settings
+    auto_pilot_enabled = Column(Boolean, default=False)
+    auto_pilot_threshold = Column(Float, default=85.0)  # 0-100 confidence threshold
+
+    # Granular control per action type (JSON)
+    # Example: {"deploy_product": {"enabled": True, "threshold": 90}, ...}
+    auto_pilot_rules = Column(JSON, default=dict)
+
+    # Notifications
+    notify_on_auto_execute = Column(Boolean, default=True)
+    daily_summary_email = Column(Boolean, default=True)
+
+    # Safety limits
+    daily_auto_execute_limit = Column(Integer, default=20)  # Max auto-executions per day
+    max_auto_spend = Column(Float, default=500.0)  # Max $ impact per day
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationship
+    user = relationship("User", back_populates="settings")
+
+    def __repr__(self):
+        return f"<UserSettings(user_id={self.user_id}, auto_pilot={self.auto_pilot_enabled})>"
+
+
+class AutoPilotLog(Base):
+    """Log of auto-pilot decisions and executions"""
+    __tablename__ = "auto_pilot_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action_id = Column(Integer, ForeignKey("actions.id"), nullable=False)
+
+    # Decision details
+    confidence = Column(Float)
+    threshold_used = Column(Float)
+
+    # Execution result
+    executed = Column(Boolean, default=False)
+    skipped_reason = Column(String(255), nullable=True)  # "below_threshold", "daily_limit", etc.
+
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    user = relationship("User")
+    action = relationship("Action")
+
+    __table_args__ = (
+        Index('idx_autopilot_user_created', 'user_id', 'created_at'),
+    )
+
+    def __repr__(self):
+        return f"<AutoPilotLog(action_id={self.action_id}, executed={self.executed})>"
+
+
 print("✅ Intelligence models added")
 print("✅ A/B Testing models added")
+print("✅ Auto-Pilot models added")
 
 
 # ============================================================================

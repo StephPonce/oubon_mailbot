@@ -299,6 +299,16 @@ except Exception as e:
     shopify_deployment_router = None
     _HAS_SHOPIFY_DEPLOYMENT = False
 
+# Meta Ads router (Real API integration - No demo data)
+try:
+    from ospra_os.integrations.meta.routes import router as meta_ads_router  # type: ignore
+    _HAS_META_ADS = True
+    print("✅ Meta Ads router loaded successfully (Real API only)")
+except Exception as e:
+    print(f"⚠️  Meta Ads router not loaded: {e}")
+    meta_ads_router = None
+    _HAS_META_ADS = False
+
 # Deployment router (Unified Product Deployment with AI)
 try:
     from ospra_os.api.deployment_routes import router as deployment_router  # type: ignore
@@ -458,6 +468,56 @@ except Exception as e:
     print(f"⚠️  Image Processing router not loaded: {e}")
     image_router = None
     _HAS_IMAGE_PROCESSING = False
+
+# AI Chat router (Claude chat with learning context)
+try:
+    from ospra_os.api.ai_chat_routes import router as ai_chat_router  # type: ignore
+    _HAS_AI_CHAT = True
+    print("✅ AI Chat router loaded successfully")
+except Exception as e:
+    print(f"⚠️  AI Chat router not loaded: {e}")
+    ai_chat_router = None
+    _HAS_AI_CHAT = False
+
+# Actions Queue router (AI-generated actions that require approval)
+try:
+    from ospra_os.api.actions_routes import router as actions_router  # type: ignore
+    _HAS_ACTIONS = True
+    print("✅ Actions Queue router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Actions Queue router not loaded: {e}")
+    actions_router = None
+    _HAS_ACTIONS = False
+
+# Daily Brief router (Personalized morning summaries with AI actions)
+try:
+    from ospra_os.api.daily_brief_routes import router as daily_brief_router  # type: ignore
+    _HAS_DAILY_BRIEF = True
+    print("✅ Daily Brief router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Daily Brief router not loaded: {e}")
+    daily_brief_router = None
+    _HAS_DAILY_BRIEF = False
+
+# Auto-Pilot router (Autonomous action execution - GROK RECOMMENDATION #7)
+try:
+    from ospra_os.api.auto_pilot_routes import router as auto_pilot_router  # type: ignore
+    _HAS_AUTO_PILOT = True
+    print("✅ Auto-Pilot router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Auto-Pilot router not loaded: {e}")
+    auto_pilot_router = None
+    _HAS_AUTO_PILOT = False
+
+# Voice Commands router (Whisper API integration - GROK RECOMMENDATION #9)
+try:
+    from ospra_os.api.voice_routes import router as voice_router  # type: ignore
+    _HAS_VOICE = True
+    print("✅ Voice Commands router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Voice Commands router not loaded: {e}")
+    voice_router = None
+    _HAS_VOICE = False
 
 # Import GmailClient for the OAuth callback
 try:
@@ -905,6 +965,10 @@ if _HAS_SHOPIFY_OAUTH and shopify_oauth_router:
 if _HAS_SHOPIFY_DEPLOYMENT and shopify_deployment_router:
     app.include_router(shopify_deployment_router)  # exposes /api/shopify/* (AI-powered deployment)
 
+# Meta Ads Router (Real API only - No demo data)
+if _HAS_META_ADS and meta_ads_router:
+    app.include_router(meta_ads_router)  # exposes /api/meta/* (Real Meta Ads API)
+
 if _HAS_ADVERTISING and advertising_router:
     app.include_router(advertising_router)  # exposes /api/ads/*
 
@@ -970,6 +1034,21 @@ if _HAS_ABTESTING and abtesting_router:
 
 if _HAS_IMAGE_PROCESSING and image_router:
     app.include_router(image_router)  # exposes /api/images/*
+
+if _HAS_AI_CHAT and ai_chat_router:
+    app.include_router(ai_chat_router)  # exposes /api/ai/chat and /api/claude/chat
+
+if _HAS_ACTIONS and actions_router:
+    app.include_router(actions_router)  # exposes /api/actions/* (AI action queue)
+
+if _HAS_DAILY_BRIEF and daily_brief_router:
+    app.include_router(daily_brief_router)  # exposes /api/daily-brief (Personalized morning summaries)
+
+if _HAS_AUTO_PILOT and auto_pilot_router:
+    app.include_router(auto_pilot_router)  # exposes /api/auto-pilot/* (Autonomous action execution)
+
+if _HAS_VOICE and voice_router:
+    app.include_router(voice_router)  # exposes /api/voice/* (Voice commands with Whisper API)
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
