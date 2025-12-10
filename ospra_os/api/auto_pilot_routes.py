@@ -12,8 +12,9 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 
 from ospra_os.database.multi_store_models import (
-    User, UserSettings, AutoPilotLog, Action, get_db
+    User, UserSettings, AutoPilotLog, get_db
 )
+from ospra_os.database.action_models import Action
 from ospra_os.actions.auto_pilot import AutoPilotEngine
 from ospra_os.auth.jwt_auth import get_current_user
 

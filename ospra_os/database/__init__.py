@@ -33,6 +33,7 @@ from .multi_store_models import (
     ProductDeployment,
     AIUsage,
     UserSettings,
+    CrossStoreLearning,
 
     # Enums
     SubscriptionTier,
@@ -41,6 +42,7 @@ from .multi_store_models import (
     DeploymentStatus,
     AIProvider,
     TaskType,
+    StoreStatus,
 
     # Functions (backwards compatible)
     init_multi_store_db,
@@ -54,11 +56,11 @@ __all__ = [
     # Connection utilities
     "get_engine",
     "get_session",
-    "get_session_context", 
+    "get_session_context",
     "get_db",
     "init_database",
     "check_database_connection",
-    
+
     # Base
     "Base",
 
@@ -69,6 +71,7 @@ __all__ = [
     "ProductDeployment",
     "AIUsage",
     "UserSettings",
+    "CrossStoreLearning",
 
     # Enums
     "SubscriptionTier",
@@ -77,6 +80,7 @@ __all__ = [
     "DeploymentStatus",
     "AIProvider",
     "TaskType",
+    "StoreStatus",
 
     # Functions (backwards compatible)
     "init_multi_store_db",

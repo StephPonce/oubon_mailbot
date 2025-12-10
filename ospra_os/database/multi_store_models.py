@@ -52,6 +52,15 @@ class Platform(str, enum.Enum):
     EBAY = "ebay"
 
 
+class StoreStatus(str, enum.Enum):
+    """Store connection and operational status"""
+    SETUP = "setup"           # Initial setup in progress
+    ACTIVE = "active"         # Connected and operational
+    PAUSED = "paused"         # Temporarily paused by user
+    DISCONNECTED = "disconnected"  # API connection lost
+    ERROR = "error"           # Configuration or API error
+
+
 class ProductStatus(str, enum.Enum):
     """Product lifecycle status"""
     DISCOVERED = "discovered"      # Found by intelligence engine
@@ -222,9 +231,12 @@ class Store(Base):
     rank_position = Column(Integer, nullable=True)
     rank_change = Column(Integer, default=0)  # +5, -2, etc.
 
-    # Status
-    is_active = Column(Boolean, default=True)
+    # Status (GROK #11: Multi-Store Support)
+    status = Column(SQLEnum(StoreStatus), default=StoreStatus.SETUP, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)  # Kept for backward compatibility
+    pending_actions_count = Column(Integer, default=0, nullable=False)
     last_sync = Column(DateTime, nullable=True)
+    sync_error = Column(Text, nullable=True)  # Last sync error message
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -235,13 +247,95 @@ class Store(Base):
     products = relationship("Product", back_populates="store", cascade="all, delete-orphan")
     deployments = relationship("ProductDeployment", back_populates="store", cascade="all, delete-orphan")
     actions = relationship("Action", back_populates="store", cascade="all, delete-orphan")
+    cross_store_learnings_source = relationship("CrossStoreLearning", foreign_keys="CrossStoreLearning.source_store_id", back_populates="source_store", cascade="all, delete-orphan")
+    cross_store_learnings_target = relationship("CrossStoreLearning", foreign_keys="CrossStoreLearning.target_store_id", back_populates="target_store", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Store(id={self.id}, name='{self.store_name}', platform='{self.platform}')>"
+        return f"<Store(id={self.id}, name='{self.store_name}', platform='{self.platform}', status='{self.status}')>"
 
     def get_credentials(self):
         """Helper to access credentials safely"""
         return self.credentials if isinstance(self.credentials, dict) else json.loads(self.credentials)
+
+
+# ============================================================================
+# CROSS-STORE LEARNING MODEL (GROK #11)
+# ============================================================================
+
+class CrossStoreLearning(Base):
+    """
+    Track learnings from one store that can be applied to another.
+
+    Example: "Yoga mats convert at 4.2% in Store A (Fitness First),
+    recommend for Store B (Health Hub) if niche matches."
+    """
+    __tablename__ = "cross_store_learnings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Source and Target Stores
+    source_store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+    target_store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+
+    # Learning Type
+    learning_type = Column(String(50), nullable=False, index=True)
+    # Types: "product_performance", "pricing_strategy", "niche_affinity", "audience_insight"
+
+    # Product-specific learning (optional)
+    product_id = Column(Integer, ForeignKey("products.id"), nullable=True, index=True)
+    product_name = Column(String(512), nullable=True)
+    product_category = Column(String(255), nullable=True)
+
+    # Performance Metrics from Source Store
+    source_conversion_rate = Column(Float, nullable=True)  # 4.2%
+    source_revenue = Column(Float, nullable=True)  # $5,420
+    source_orders = Column(Integer, nullable=True)  # 127 orders
+    source_avg_order_value = Column(Float, nullable=True)  # $42.68
+
+    # Niche Applicability
+    applicable_niches = Column(JSON, default=list)  # ["fitness", "wellness", "yoga"]
+    niche_match_score = Column(Float, default=0.0)  # 0-100, how well this applies to target store
+
+    # Insight & Recommendation
+    insight = Column(Text, nullable=False)  # "Yoga mats convert exceptionally well in fitness stores"
+    recommendation = Column(Text, nullable=False)  # "Add yoga mats to Health Hub - projected 3.8% conversion"
+    confidence_score = Column(Float, default=0.0)  # 0-100, confidence in this recommendation
+
+    # Projected Impact on Target Store
+    projected_conversion_rate = Column(Float, nullable=True)
+    projected_monthly_revenue = Column(Float, nullable=True)
+    projected_roi = Column(Float, nullable=True)  # Return on investment %
+
+    # Action Status
+    status = Column(String(50), default="pending", index=True)
+    # Statuses: "pending", "applied", "testing", "successful", "failed", "dismissed"
+    applied_at = Column(DateTime, nullable=True)
+    dismissed_at = Column(DateTime, nullable=True)
+    dismissal_reason = Column(Text, nullable=True)
+
+    # Actual Performance (if applied)
+    actual_conversion_rate = Column(Float, nullable=True)
+    actual_revenue = Column(Float, nullable=True)
+    actual_orders = Column(Integer, nullable=True)
+
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    source_store = relationship("Store", foreign_keys=[source_store_id], back_populates="cross_store_learnings_source")
+    target_store = relationship("Store", foreign_keys=[target_store_id], back_populates="cross_store_learnings_target")
+    product = relationship("Product", foreign_keys=[product_id])
+
+    # Composite indexes for efficient queries
+    __table_args__ = (
+        Index('idx_cross_learning_source_target', 'source_store_id', 'target_store_id'),
+        Index('idx_cross_learning_type_status', 'learning_type', 'status'),
+        Index('idx_cross_learning_target_status', 'target_store_id', 'status'),
+    )
+
+    def __repr__(self):
+        return f"<CrossStoreLearning(source_store={self.source_store_id}, target_store={self.target_store_id}, type='{self.learning_type}', status='{self.status}')>"
 
 
 # ============================================================================
@@ -701,6 +795,15 @@ class UserSettings(Base):
     notify_new_products = Column(Boolean, default=True)
     notify_price_drops = Column(Boolean, default=False)
     notify_trend_spikes = Column(Boolean, default=True)
+
+    # Auto-Pilot Settings
+    auto_pilot_enabled = Column(Boolean, default=False)
+    auto_pilot_threshold = Column(Float, default=85.0)  # 0-100 confidence threshold
+    auto_pilot_rules = Column(JSON, default=dict)  # Per-action type rules
+    notify_on_auto_execute = Column(Boolean, default=True)
+    daily_summary_email = Column(Boolean, default=True)
+    daily_auto_execute_limit = Column(Integer, default=20)  # Max auto-executions per day
+    max_auto_spend = Column(Float, default=500.0)  # Max $ impact per day
 
     # Dashboard Settings
     default_currency = Column(String(10), default="USD")
@@ -1487,41 +1590,8 @@ class ABTestAssignment(Base):
 
 
 # ============================================================================
-# AUTO-PILOT SETTINGS & LOGS
+# AUTO-PILOT LOGS
 # ============================================================================
-
-class UserSettings(Base):
-    """User settings for auto-pilot and other preferences"""
-    __tablename__ = "user_settings"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-
-    # Auto-pilot settings
-    auto_pilot_enabled = Column(Boolean, default=False)
-    auto_pilot_threshold = Column(Float, default=85.0)  # 0-100 confidence threshold
-
-    # Granular control per action type (JSON)
-    # Example: {"deploy_product": {"enabled": True, "threshold": 90}, ...}
-    auto_pilot_rules = Column(JSON, default=dict)
-
-    # Notifications
-    notify_on_auto_execute = Column(Boolean, default=True)
-    daily_summary_email = Column(Boolean, default=True)
-
-    # Safety limits
-    daily_auto_execute_limit = Column(Integer, default=20)  # Max auto-executions per day
-    max_auto_spend = Column(Float, default=500.0)  # Max $ impact per day
-
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-    # Relationship
-    user = relationship("User", back_populates="settings")
-
-    def __repr__(self):
-        return f"<UserSettings(user_id={self.user_id}, auto_pilot={self.auto_pilot_enabled})>"
 
 
 class AutoPilotLog(Base):

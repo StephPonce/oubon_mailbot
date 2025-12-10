@@ -1,14 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Store, ChevronDown, Check, Plus } from 'lucide-react';
+import { Store, ChevronDown, Check, Plus, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { apiClient } from '@/lib/api';
 
 interface StoreData {
   id: number;
   store_name: string;
+  store_url: string;
   platform: string;
+  status: 'setup' | 'active' | 'paused' | 'disconnected' | 'error';
+  niche: string | null;
+  pending_actions_count: number;
+  total_revenue: number;
   monthly_revenue: number;
-  is_active: boolean;
-  product_count: number;
+  total_orders: number;
+  conversion_rate: number;
+  total_products: number;
+  last_sync: string | null;
+  sync_error: string | null;
+  created_at: string;
 }
 
 interface StoreSwitcherProps {
@@ -40,19 +50,25 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
 
   const fetchStores = async () => {
     try {
-      const response = await fetch('http://localhost:8001/api/portfolio/rankings');
-      if (response.ok) {
-        const data = await response.json();
-        setStores(data);
+      const data = await apiClient.get<StoreData[]>('/api/stores');
+      setStores(data);
 
-        // Set first store as active (rank 1)
-        const primaryStore = data.find((s: StoreData) => s.is_active);
-        if (primaryStore) {
-          setActiveStore(primaryStore);
+      // Get active store from localStorage, or use first active store
+      const savedStoreId = localStorage.getItem('activeStoreId');
+      let primaryStore: StoreData | undefined;
 
-          // Store in localStorage
-          localStorage.setItem('activeStoreId', primaryStore.id.toString());
-        }
+      if (savedStoreId) {
+        primaryStore = data.find((s: StoreData) => s.id.toString() === savedStoreId);
+      }
+
+      // Fallback to first active store
+      if (!primaryStore) {
+        primaryStore = data.find((s: StoreData) => s.status === 'active');
+      }
+
+      if (primaryStore) {
+        setActiveStore(primaryStore);
+        localStorage.setItem('activeStoreId', primaryStore.id.toString());
       }
     } catch (error) {
       console.error('Failed to fetch stores:', error);
@@ -61,30 +77,20 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
     }
   };
 
-  const switchStore = async (store: StoreData) => {
-    try {
-      const response = await fetch(`http://localhost:8001/api/portfolio/stores/${store.id}/switch`, {
-        method: 'POST',
-      });
+  const switchStore = (store: StoreData) => {
+    setActiveStore(store);
+    setIsOpen(false);
 
-      if (response.ok) {
-        setActiveStore(store);
-        setIsOpen(false);
+    // Store in localStorage
+    localStorage.setItem('activeStoreId', store.id.toString());
 
-        // Store in localStorage
-        localStorage.setItem('activeStoreId', store.id.toString());
-
-        // Notify parent
-        if (onStoreChange) {
-          onStoreChange(store.id);
-        }
-
-        // Refresh page to update all data
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error('Failed to switch store:', error);
+    // Notify parent
+    if (onStoreChange) {
+      onStoreChange(store.id);
     }
+
+    // Refresh page to update all data with new store context
+    window.location.reload();
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -142,12 +148,22 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors min-w-[180px]"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/5 hover:bg-black/10 transition-colors min-w-[200px]"
       >
         {getPlatformIcon(activeStore.platform)}
 
         <div className="flex-1 text-left">
-          <div className="text-sm font-medium text-primary">{activeStore.store_name}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-primary">{activeStore.store_name}</span>
+            {activeStore.status === 'error' && (
+              <AlertCircle className="w-3 h-3 text-red-500" />
+            )}
+            {activeStore.pending_actions_count > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-600 text-[10px] font-medium">
+                {activeStore.pending_actions_count}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-tertiary capitalize">{activeStore.platform}</div>
         </div>
 
@@ -175,9 +191,31 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
                     {activeStore.id === store.id && (
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
                     )}
+                    {store.status === 'error' && (
+                      <AlertCircle className="w-3 h-3 text-red-500" />
+                    )}
+                    {store.pending_actions_count > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-600 text-[10px] font-medium">
+                        {store.pending_actions_count}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-xs text-tertiary capitalize">
-                    {store.platform} • {store.product_count} products • ${store.monthly_revenue.toLocaleString()}/mo
+                  <div className="text-xs text-tertiary capitalize flex items-center gap-1">
+                    <span>{store.platform}</span>
+                    <span>•</span>
+                    <span className={`
+                      ${store.status === 'active' ? 'text-green-600' : ''}
+                      ${store.status === 'paused' ? 'text-yellow-600' : ''}
+                      ${store.status === 'error' ? 'text-red-600' : ''}
+                      ${store.status === 'setup' ? 'text-blue-600' : ''}
+                      ${store.status === 'disconnected' ? 'text-gray-600' : ''}
+                    `}>
+                      {store.status}
+                    </span>
+                    <span>•</span>
+                    <span>{store.total_products} products</span>
+                    <span>•</span>
+                    <span>${store.monthly_revenue.toLocaleString()}/mo</span>
                   </div>
                 </div>
 

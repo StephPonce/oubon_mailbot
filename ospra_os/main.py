@@ -519,6 +519,16 @@ except Exception as e:
     voice_router = None
     _HAS_VOICE = False
 
+# Store Management router (Multi-Store Selector - GROK RECOMMENDATION #11)
+try:
+    from ospra_os.api.store_routes import router as store_router  # type: ignore
+    _HAS_STORES = True
+    print("✅ Store Management router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Store Management router not loaded: {e}")
+    store_router = None
+    _HAS_STORES = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -1049,6 +1059,9 @@ if _HAS_AUTO_PILOT and auto_pilot_router:
 
 if _HAS_VOICE and voice_router:
     app.include_router(voice_router)  # exposes /api/voice/* (Voice commands with Whisper API)
+
+if _HAS_STORES and store_router:
+    app.include_router(store_router)  # exposes /api/stores/* (Multi-store management & cross-store learning - GROK #11)
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)

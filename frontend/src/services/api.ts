@@ -818,4 +818,6 @@ export const rankingsAPI = {
   },
 };
 
+// Export as both default and named export for backwards compatibility
 export default api;
+export const apiClient = api;
