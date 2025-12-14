@@ -128,17 +128,17 @@ function NicheCard({ niche, onExplore, onAnalyze, isAnalyzing }: NicheCardProps)
 
   const getSaturationColor = (level: string) => {
     switch (level) {
-      case 'low': return 'text-green-600 bg-green-500/10 border-green-500/20';
+      case 'low': return 'text-green-600 bg-green-500/100/10 border-green-500/20';
       case 'medium': return 'text-amber-600 bg-amber-500/10 border-amber-500/20';
-      case 'high': return 'text-red-600 bg-red-500/10 border-red-500/20';
+      case 'high': return 'text-red-600 bg-red-500/100/10 border-red-500/20';
       default: return 'text-secondary bg-black/5 border-black/10';
     }
   };
 
   const getScoreColor = (s: number) => {
-    if (s >= 8) return 'bg-green-500';
+    if (s >= 8) return 'bg-green-500/100';
     if (s >= 6) return 'bg-amber-500';
-    return 'bg-red-500';
+    return 'bg-red-500/100';
   };
 
   const explanation = generateNicheRationale(niche);
@@ -255,7 +255,7 @@ function NicheDetailModal({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-xl flex items-center justify-center font-bold text-xl text-white ${
-                score >= 8 ? 'bg-green-500' : score >= 6 ? 'bg-amber-500' : 'bg-red-500'
+                score >= 8 ? 'bg-green-500/100' : score >= 6 ? 'bg-amber-500' : 'bg-red-500/100'
               }`}>
                 {score.toFixed(1)}
               </div>

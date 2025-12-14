@@ -115,24 +115,24 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200">
+        <div className="flex items-start justify-between p-6 border-b border-white/10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-indigo-600" />
               AI Deployment Preview
             </h2>
-            <p className="text-gray-500 mt-1">Review AI-generated content before deploying</p>
+            <p className="text-tertiary mt-1">Review AI-generated content before deploying</p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-tertiary" />
           </button>
         </div>
 
         {/* Product Info */}
-        <div className="p-6 border-b border-gray-200 bg-gray-50">
+        <div className="p-6 border-b border-white/10  ">
           <div className="flex items-start gap-4">
             {product.image_url && (
               <img
@@ -142,7 +142,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
               />
             )}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
+              <h3 className="text-lg font-semibold text-primary">{product.name}</h3>
               <div className="flex items-center gap-3 mt-2">
                 {product.niche && (
                   <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">
@@ -150,7 +150,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   </span>
                 )}
                 {product.cost && (
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-secondary">
                     Cost: ${product.cost.toFixed(2)}
                   </span>
                 )}
@@ -160,14 +160,14 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
         </div>
 
         {/* AI Settings */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-white/10">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 mb-4"
+            className="flex items-center gap-2 text-secondary hover:text-primary mb-4"
           >
             <Settings className="w-4 h-4" />
             <span className="font-medium">AI Settings</span>
-            <span className="text-xs text-gray-500">(Click to {showAdvanced ? 'hide' : 'show'})</span>
+            <span className="text-xs text-tertiary">(Click to {showAdvanced ? 'hide' : 'show'})</span>
           </button>
 
           {showAdvanced && (
@@ -177,7 +177,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.ai_content}
                   onChange={(e) => setAiSettings({ ...aiSettings, ai_content: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">Generate AI Content</span>
               </label>
@@ -187,7 +187,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.ai_images}
                   onChange={(e) => setAiSettings({ ...aiSettings, ai_images: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">Enhance Images</span>
               </label>
@@ -197,7 +197,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.ai_pricing}
                   onChange={(e) => setAiSettings({ ...aiSettings, ai_pricing: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">AI Pricing</span>
               </label>
@@ -207,7 +207,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.ai_seo}
                   onChange={(e) => setAiSettings({ ...aiSettings, ai_seo: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">SEO Optimization</span>
               </label>
@@ -217,7 +217,7 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.publish}
                   onChange={(e) => setAiSettings({ ...aiSettings, publish: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">Auto-Publish (vs Draft)</span>
               </label>
@@ -227,32 +227,32 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
                   type="checkbox"
                   checked={aiSettings.add_branding}
                   onChange={(e) => setAiSettings({ ...aiSettings, add_branding: e.target.checked })}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm">Add Branding</span>
               </label>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Target Margin (%)</label>
+                <label className="block text-sm text-secondary mb-1">Target Margin (%)</label>
                 <input
                   type="number"
                   min="10"
                   max="90"
                   value={aiSettings.target_margin * 100}
                   onChange={(e) => setAiSettings({ ...aiSettings, target_margin: Number(e.target.value) / 100 })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1">Max Images</label>
+                <label className="block text-sm text-secondary mb-1">Max Images</label>
                 <input
                   type="number"
                   min="1"
                   max="10"
                   value={aiSettings.max_images}
                   onChange={(e) => setAiSettings({ ...aiSettings, max_images: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-white/10 rounded-lg px-3 py-2 text-sm"
                 />
               </div>
             </div>
@@ -281,8 +281,8 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
 
         {/* Error Display */}
         {error && (
-          <div className="p-6 border-b border-gray-200">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+          <div className="p-6 border-b border-white/10">
+            <div className="p-4 bg-red-500/10 border border-red-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-red-800">
                 <p className="font-medium">Error</p>
@@ -305,23 +305,23 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
 
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-500 uppercase">Title</label>
-                    <p className="mt-1 text-gray-900 font-medium">{preview.content_generated.title}</p>
+                    <label className="text-xs font-medium text-tertiary uppercase">Title</label>
+                    <p className="mt-1 text-primary font-medium">{preview.content_generated.title}</p>
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-gray-500 uppercase">Description</label>
-                    <p className="mt-1 text-gray-700 text-sm whitespace-pre-wrap">
+                    <label className="text-xs font-medium text-tertiary uppercase">Description</label>
+                    <p className="mt-1 text-secondary text-sm whitespace-pre-wrap">
                       {preview.content_generated.description}
                     </p>
                   </div>
 
                   {preview.content_generated.tags && preview.content_generated.tags.length > 0 && (
                     <div>
-                      <label className="text-xs font-medium text-gray-500 uppercase">SEO Tags</label>
+                      <label className="text-xs font-medium text-tertiary uppercase">SEO Tags</label>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {preview.content_generated.tags.map((tag, idx) => (
-                          <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                          <span key={idx} className="text-xs bg-gray-100 text-secondary px-2 py-1 rounded-full">
                             {tag}
                           </span>
                         ))}
@@ -334,14 +334,14 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
 
             {/* Pricing */}
             {preview.price && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2 text-green-700 mb-2">
+              <div className="p-4 bg-green-500/100/10 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-green-400 mb-2">
                   <DollarSign className="w-5 h-5" />
                   <h3 className="font-semibold">AI-Generated Pricing</h3>
                 </div>
                 <p className="text-2xl font-bold text-green-600">${preview.price}</p>
                 {product.cost && (
-                  <p className="text-sm text-green-700 mt-1">
+                  <p className="text-sm text-green-400 mt-1">
                     Margin: {(((Number(preview.price) - product.cost) / Number(preview.price)) * 100).toFixed(1)}%
                   </p>
                 )}
@@ -387,8 +387,8 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
 
             {/* Success Indicator */}
             {preview.success && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2 text-blue-700">
+              <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                <div className="flex items-center gap-2 text-cyan-400">
                   <CheckCircle className="w-5 h-5" />
                   <p className="font-medium">Preview generated successfully!</p>
                 </div>
@@ -401,10 +401,10 @@ export const AIDeploymentPreview: React.FC<AIDeploymentPreviewProps> = ({
         )}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between p-6 border-t border-white/10  ">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+            className="px-4 py-2 border border-white/10 rounded-lg hover:  transition"
           >
             Cancel
           </button>

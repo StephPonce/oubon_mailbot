@@ -104,13 +104,13 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-white/20">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200">
+        <div className="flex items-start justify-between p-6 border-b border-white/10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-purple-600" />
               AI Image Enhancement
             </h2>
-            <p className="text-gray-500 mt-1 text-sm">
+            <p className="text-tertiary mt-1 text-sm">
               Remove background and enhance product image with AI
             </p>
           </div>
@@ -118,32 +118,32 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-tertiary" />
           </button>
         </div>
 
         {/* Product Info */}
-        <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+        <div className="p-6 border-b border-white/10 bg-gradient-to-r from-purple-50 to-indigo-50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white rounded-lg shadow-sm">
               <Sparkles className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="font-medium text-gray-900">{product.name}</p>
-              <p className="text-sm text-gray-600">Product ID: {product.id}</p>
+              <p className="font-medium text-primary">{product.name}</p>
+              <p className="text-sm text-secondary">Product ID: {product.id}</p>
             </div>
           </div>
         </div>
 
         {/* Cost Info Banner */}
-        <div className="p-4 bg-blue-50 border-b border-blue-100">
+        <div className="p-4 bg-cyan-500/10 border-b border-blue-100">
           <div className="flex items-center gap-3">
             <DollarSign className="w-5 h-5 text-blue-600" />
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-blue-900">
                 Enhancement Cost: ${ENHANCEMENT_COST.toFixed(2)}
               </p>
-              <p className="text-xs text-blue-700 mt-0.5">
+              <p className="text-xs text-cyan-400 mt-0.5">
                 Powered by DALL-E 3 + rembg background removal
               </p>
             </div>
@@ -152,7 +152,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                 <p className="text-sm font-medium text-blue-900">
                   {processingTime.toFixed(1)}s
                 </p>
-                <p className="text-xs text-blue-700">Processing time</p>
+                <p className="text-xs text-cyan-400">Processing time</p>
               </div>
             )}
           </div>
@@ -174,10 +174,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                 )}
               </div>
 
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-primary mb-2">
                 Ready to enhance your product image?
               </h3>
-              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              <p className="text-secondary mb-6 max-w-md mx-auto">
                 Our AI will remove the background and enhance the image quality
                 for better product presentation.
               </p>
@@ -193,8 +193,8 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
               )}
 
               {!product.image_url && (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg max-w-md mx-auto">
-                  <p className="text-sm text-yellow-800 flex items-center gap-2">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg max-w-md mx-auto">
+                  <p className="text-sm text-amber-300 flex items-center gap-2">
                     <Info className="w-4 h-4" />
                     No image available for this product
                   </p>
@@ -206,10 +206,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
           {loading && (
             <div className="text-center py-16">
               <Loader2 className="w-16 h-16 animate-spin text-purple-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-primary mb-2">
                 Enhancing your image...
               </h3>
-              <p className="text-gray-600">
+              <p className="text-secondary">
                 This may take a few seconds. Our AI is working its magic!
               </p>
               <div className="mt-6 max-w-md mx-auto">
@@ -221,7 +221,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
           )}
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg mb-6">
+            <div className="p-4 bg-red-500/10 border border-red-200 rounded-lg mb-6">
               <p className="text-sm text-red-800 flex items-center gap-2">
                 <X className="w-4 h-4" />
                 {error}
@@ -238,7 +238,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
                     showComparison === 'original'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-secondary hover:bg-gray-200'
                   }`}
                 >
                   Original
@@ -248,7 +248,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
                     showComparison === 'split'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-secondary hover:bg-gray-200'
                   }`}
                 >
                   <ArrowLeftRight className="w-4 h-4" />
@@ -259,7 +259,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 ${
                     showComparison === 'enhanced'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-secondary hover:bg-gray-200'
                   }`}
                 >
                   <Sparkles className="w-4 h-4" />
@@ -272,10 +272,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                 {showComparison === 'split' && (
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-3">
-                      <p className="text-sm font-medium text-gray-700 text-center">
+                      <p className="text-sm font-medium text-secondary text-center">
                         Original
                       </p>
-                      <div className="aspect-square bg-white rounded-lg shadow-md overflow-hidden border-2 border-gray-200">
+                      <div className="aspect-square bg-white rounded-lg shadow-md overflow-hidden border-2 border-white/10">
                         <img
                           src={product.image_url}
                           alt="Original"
@@ -284,7 +284,7 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
                       </div>
                       <button
                         onClick={() => handleDownload(product.image_url!, `${product.id}-original.jpg`)}
-                        className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition"
+                        className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-secondary flex items-center justify-center gap-2 transition"
                       >
                         <Download className="w-4 h-4" />
                         Download
@@ -315,10 +315,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
 
                 {showComparison === 'original' && (
                   <div className="max-w-2xl mx-auto">
-                    <p className="text-sm font-medium text-gray-700 text-center mb-3">
+                    <p className="text-sm font-medium text-secondary text-center mb-3">
                       Original Image
                     </p>
-                    <div className="aspect-square bg-white rounded-lg shadow-md overflow-hidden border-2 border-gray-200">
+                    <div className="aspect-square bg-white rounded-lg shadow-md overflow-hidden border-2 border-white/10">
                       <img
                         src={product.image_url}
                         alt="Original"
@@ -349,15 +349,15 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
               <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-100">
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-sm text-gray-600">Background</p>
+                    <p className="text-sm text-secondary">Background</p>
                     <p className="text-lg font-semibold text-purple-600">Removed</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Quality</p>
+                    <p className="text-sm text-secondary">Quality</p>
                     <p className="text-lg font-semibold text-purple-600">Enhanced</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Format</p>
+                    <p className="text-sm text-secondary">Format</p>
                     <p className="text-lg font-semibold text-purple-600">PNG</p>
                   </div>
                 </div>
@@ -368,10 +368,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
 
         {/* Footer Actions */}
         {enhancedUrl && (
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between p-6 border-t border-white/10  ">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700"
+              className="px-5 py-2.5 border border-white/10 rounded-lg hover:  transition font-medium text-secondary"
             >
               Keep Original
             </button>
@@ -386,10 +386,10 @@ export const ImageEnhanceModal: React.FC<ImageEnhanceModalProps> = ({
         )}
 
         {!enhancedUrl && !loading && (
-          <div className="flex items-center justify-end p-6 border-t border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-end p-6 border-t border-white/10  ">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700"
+              className="px-5 py-2.5 border border-white/10 rounded-lg hover:  transition font-medium text-secondary"
             >
               Close
             </button>

@@ -10,6 +10,10 @@ Tier Enforcement:
 - FLIGHT ($29): 100 results, no enrichment
 - SOAR ($79): 500 results, enrichment enabled
 - STRATOSPHERE ($199): unlimited results, enrichment + auto-ordering
+
+UPDATED: GROK RECOMMENDATION #14 - Multi-Tenant Isolation
+- Uses tenant-scoped database for automatic data isolation
+- Tenant context for user identification and tier enforcement
 """
 import os
 import json
@@ -39,10 +43,11 @@ from ospra_os.core.usage_tracking import (
     get_tracker,
     get_enforcer,
 )
-from ospra_os.database.multi_store_models import SessionLocal, User
 
-# Import authentication
-from ospra_os.auth.jwt_auth import get_current_user, get_current_user_optional
+# Import tenant-scoped database
+from ospra_os.tenancy import get_tenant_db, get_tenant
+from ospra_os.tenancy.queries import TenantScopedSession
+from ospra_os.tenancy.context import TenantContext
 
 
 router = APIRouter(prefix="/api/aliexpress/products", tags=["aliexpress-products"])
@@ -780,7 +785,8 @@ async def search_products_affiliate(
     page_size: int = Query(20, ge=1, le=50),
     page_no: int = Query(1, ge=1),
     sort: str = Query("SALE_PRICE_ASC", description="Sort order (SALE_PRICE_ASC, SALE_PRICE_DESC, LAST_VOLUME_ASC, LAST_VOLUME_DESC)"),
-    current_user: User = Depends(get_current_user)
+    tenant: TenantContext = Depends(get_tenant),
+    tenant_db: TenantScopedSession = Depends(get_tenant_db)
 ):
     """
     Search for products using Affiliate API
@@ -798,14 +804,15 @@ async def search_products_affiliate(
     - ?keywords=phone
     - ?keywords=smart+watch&sort=LAST_VOLUME_DESC
     - ?category_ids=509,1511
-    
+
     **Requires Authentication**: JWT token in Authorization header
+    **Tenant-isolated**: Usage tracked per user
     """
-    # Extract user info from authenticated user
-    user_id = current_user.id
-    
+    # Extract user info from tenant context
+    user_id = tenant.user_id
+
     # Convert subscription_tier string to enum (default to NEST if not set)
-    tier_str = current_user.subscription_tier or "nest"
+    tier_str = tenant.subscription_tier or "nest"
     tier_map = {
         "nest": SubscriptionTier.NEST,
         "flight": SubscriptionTier.FLIGHT,
@@ -832,62 +839,57 @@ async def search_products_affiliate(
             }
         )
 
-    # Check daily search limit using UsageTracker
-    db = SessionLocal()
-    try:
-        usage_enforcer = TierUsageEnforcer(db)
-        can_search = usage_enforcer.can_perform(user_id, "aliexpress_search")
-        
-        if not can_search.get("allowed", True):
-            tier_info = get_tier_definition(user_tier)
-            raise HTTPException(
-                status_code=403,
-                detail={
-                    "error": "daily_search_limit_exceeded",
-                    "message": f"You've reached your daily search limit ({can_search.get('limit', 'N/A')} searches/day for {tier_info['name']} tier).",
-                    "current_tier": user_tier.value,
-                    "current_usage": can_search.get("current", 0),
-                    "limit": can_search.get("limit", 0),
-                    "remaining": can_search.get("remaining", 0),
-                    "resets": "midnight UTC",
-                    "upgrade_to": can_search.get("upgrade_suggestion", "soar"),
-                }
-            )
-        
-        # Execute the search
-        result = await api.affiliate_product_query(
-            keywords=keywords,
-            category_ids=category_ids,
-            page_size=page_size,
-            page_no=page_no,
-            sort=sort
+    # Check daily search limit using UsageTracker (using tenant_db)
+    usage_enforcer = TierUsageEnforcer(tenant_db.raw_session)
+    can_search = usage_enforcer.can_perform(user_id, "aliexpress_search")
+
+    if not can_search.get("allowed", True):
+        tier_info = get_tier_definition(user_tier)
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "daily_search_limit_exceeded",
+                "message": f"You've reached your daily search limit ({can_search.get('limit', 'N/A')} searches/day for {tier_info['name']} tier).",
+                "current_tier": user_tier.value,
+                "current_usage": can_search.get("current", 0),
+                "limit": can_search.get("limit", 0),
+                "remaining": can_search.get("remaining", 0),
+                "resets": "midnight UTC",
+                "upgrade_to": can_search.get("upgrade_suggestion", "soar"),
+            }
         )
-        
-        # Record the usage after successful search
-        usage_enforcer.record_action(
-            user_id=user_id,
-            action="aliexpress_search",
-            event_data={"keywords": keywords, "page_size": page_size, "results": result.get("count", 0)}
-        )
-        
-        # Add usage info to response
-        result["usage"] = {
-            "searches_today": can_search.get("current", 0) + 1,
-            "daily_limit": can_search.get("limit", "unlimited"),
-            "remaining": max(0, can_search.get("remaining", 0) - 1) if can_search.get("limit") != -1 else "unlimited"
-        }
-        
-        # Add user info to response
-        result["user"] = {
-            "id": current_user.id,
-            "email": current_user.email,
-            "tier": user_tier.value
-        }
-        
-        return result
-        
-    finally:
-        db.close()
+
+    # Execute the search
+    result = await api.affiliate_product_query(
+        keywords=keywords,
+        category_ids=category_ids,
+        page_size=page_size,
+        page_no=page_no,
+        sort=sort
+    )
+
+    # Record the usage after successful search
+    usage_enforcer.record_action(
+        user_id=user_id,
+        action="aliexpress_search",
+        event_data={"keywords": keywords, "page_size": page_size, "results": result.get("count", 0)}
+    )
+
+    # Add usage info to response
+    result["usage"] = {
+        "searches_today": can_search.get("current", 0) + 1,
+        "daily_limit": can_search.get("limit", "unlimited"),
+        "remaining": max(0, can_search.get("remaining", 0) - 1) if can_search.get("limit") != -1 else "unlimited"
+    }
+
+    # Add user info to response
+    result["user"] = {
+        "id": tenant.user_id,
+        "email": tenant.user_id,  # Email not in tenant context, use user_id
+        "tier": user_tier.value
+    }
+
+    return result
 
 
 @router.get("/product/{product_id}")
@@ -914,7 +916,8 @@ async def hybrid_product_discovery(
     page_no: int = Query(1, ge=1),
     sort: str = Query("SALE_PRICE_ASC", description="Sort order"),
     enrich: bool = Query(False, description="Enrich with Dropshipping API details (slower)"),
-    current_user: User = Depends(get_current_user)
+    tenant: TenantContext = Depends(get_tenant),
+    tenant_db: TenantScopedSession = Depends(get_tenant_db)
 ):
     """
     🔥 HYBRID DISCOVERY: Best of both APIs
@@ -936,14 +939,15 @@ async def hybrid_product_discovery(
     - ?keywords=smart+watch (fast, affiliate only)
     - ?keywords=smart+watch&enrich=true (with enrichment, requires Soar tier)
     - ?keywords=headphones&sort=LAST_VOLUME_DESC&enrich=true
-    
+
     **Requires Authentication**: JWT token in Authorization header
+    **Tenant-isolated**: Usage tracked per user
     """
-    # Extract user info from authenticated user
-    user_id = current_user.id
-    
+    # Extract user info from tenant context
+    user_id = tenant.user_id
+
     # Convert subscription_tier string to enum (default to NEST if not set)
-    tier_str = current_user.subscription_tier or "nest"
+    tier_str = tenant.subscription_tier or "nest"
     tier_map = {
         "nest": SubscriptionTier.NEST,
         "flight": SubscriptionTier.FLIGHT,
@@ -1052,13 +1056,12 @@ async def hybrid_product_discovery(
         
         # Add user info to response
         result["user"] = {
-            "id": current_user.id,
-            "email": current_user.email,
+            "id": tenant.user_id,
+            "email": tenant.user_id,  # Email not in tenant context, use user_id
             "tier": user_tier.value
         }
-        
+
         return result
-        
     finally:
         db.close()
 

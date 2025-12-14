@@ -8,6 +8,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { ExplainTooltip } from '../components/ui/ExplainTooltip';
+import { EmptyState } from '../components/ui/EmptyState';
 
 // Action types
 type ActionType =
@@ -50,9 +51,9 @@ const actionIcons: Record<ActionType, typeof Package> = {
   restock_alert: AlertTriangle,
 };
 
-// Color mapping (using existing design tokens)
-const actionColors: Record<ActionType, string> = {
-  deploy_product: 'blue',
+// Color mapping for icons
+const actionIconColors: Record<ActionType, string> = {
+  deploy_product: 'cyan',
   adjust_price: 'amber',
   pause_ad: 'orange',
   resume_ad: 'green',
@@ -75,12 +76,12 @@ function ActionCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = actionIcons[action.type];
-  const color = actionColors[action.type];
+  const color = actionIconColors[action.type];
 
   const getConfidenceBadge = (confidence: number) => {
-    if (confidence >= 85) return 'bg-green-500/10 text-green-600 border-green-500/20';
-    if (confidence >= 70) return 'bg-amber-500/10 text-amber-600 border-amber-500/20';
-    return 'bg-red-500/10 text-red-600 border-red-500/20';
+    if (confidence >= 85) return 'bg-success/10 text-success border-success/20';
+    if (confidence >= 70) return 'bg-warning/10 text-warning border-warning/20';
+    return 'bg-error/10 text-error border-error/20';
   };
 
   return (
@@ -89,7 +90,7 @@ function ActionCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="glass-card p-4 hover:shadow-md transition-all"
+      className="glass-card p-4 hover:shadow-lg transition-all"
     >
       {/* Main Row */}
       <div className="flex items-center gap-4">
@@ -103,7 +104,7 @@ function ActionCard({
           <img
             src={action.product_image}
             alt=""
-            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-black/5"
+            className="w-12 h-12 rounded-lg object-cover flex-shrink-0 border border-white/10"
           />
         )}
 
@@ -117,7 +118,7 @@ function ActionCard({
           </div>
           <p className="text-sm text-secondary truncate">{action.description}</p>
           {action.estimated_impact && (
-            <p className="text-xs text-green-600 mt-1">{action.estimated_impact}</p>
+            <p className="text-xs text-success mt-1">{action.estimated_impact}</p>
           )}
         </div>
 
@@ -132,7 +133,7 @@ function ActionCard({
         {/* Expand Button */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="p-2 text-secondary hover:text-primary hover:bg-black/5 rounded-lg transition-colors"
+          className="p-2 text-secondary hover:text-primary hover:bg-white/5 rounded-lg transition-colors"
         >
           <ChevronDown className={`w-5 h-5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
         </button>
@@ -141,21 +142,21 @@ function ActionCard({
         <div className="flex items-center gap-2">
           <button
             onClick={() => onSkip(action.id)}
-            className="p-2 rounded-lg text-secondary hover:text-red-600 hover:bg-red-500/10 transition-all"
+            className="p-2 rounded-lg text-secondary hover:text-error hover:bg-error/10 transition-all"
             title="Skip"
           >
             <XCircle className="w-5 h-5" />
           </button>
           <button
             onClick={() => onEdit(action.id)}
-            className="p-2 rounded-lg text-secondary hover:text-amber-600 hover:bg-amber-500/10 transition-all"
+            className="p-2 rounded-lg text-secondary hover:text-warning hover:bg-warning/10 transition-all"
             title="Edit"
           >
             <Edit3 className="w-5 h-5" />
           </button>
           <button
             onClick={() => onApprove(action.id)}
-            className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition-all flex items-center gap-2"
+            className="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition-all flex items-center gap-2"
           >
             <CheckCircle className="w-4 h-4" />
             Approve
@@ -170,7 +171,7 @@ function ActionCard({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="mt-4 pt-4 border-t border-black/5"
+            className="mt-4 pt-4 border-t border-white/10"
           >
             <div className="grid grid-cols-2 gap-6">
               {/* Payload Details */}
@@ -197,7 +198,7 @@ function ActionCard({
                   {action.factors.map((factor, i) => (
                     <div key={i} className="flex justify-between text-sm">
                       <span className="text-secondary">{factor.label}</span>
-                      <span className={factor.value > 0 ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                      <span className={factor.value > 0 ? 'text-success font-medium' : 'text-error font-medium'}>
                         {factor.value > 0 ? '+' : ''}{factor.value}%
                       </span>
                     </div>
@@ -325,7 +326,7 @@ export default function ActionsQueuePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-primary flex items-center gap-3">
-            <Zap className="w-6 h-6 text-blue-500" />
+            <Zap className="w-6 h-6 text-accent" />
             Pending Actions
           </h1>
           <p className="text-sm text-secondary mt-1">
@@ -338,7 +339,7 @@ export default function ActionsQueuePage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as ActionType | 'all')}
-            className="px-4 py-2 bg-white border border-black/10 rounded-lg text-primary text-sm focus:outline-none focus:border-blue-500"
+            className="px-4 py-2 bg-black/20 border border-white/10 rounded-lg text-primary text-sm focus:outline-none focus:border-accent"
           >
             <option value="all">All Actions</option>
             <option value="deploy_product">Deploy Product</option>
@@ -352,7 +353,7 @@ export default function ActionsQueuePage() {
           <button
             onClick={handleApproveAll}
             disabled={isApproving || pendingActions.filter(a => a.confidence >= 85).length === 0}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 text-white rounded-lg font-medium transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-white/10 disabled:text-tertiary text-white rounded-lg font-medium transition-all flex items-center gap-2"
           >
             {isApproving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -368,19 +369,19 @@ export default function ActionsQueuePage() {
       <div className="grid grid-cols-4 gap-4">
         <div className="glass-card p-4">
           <div className="text-xs text-tertiary mb-1">Pending</div>
-          <div className="text-2xl font-bold text-blue-500">{actions.filter(a => a.status === 'pending').length}</div>
+          <div className="text-2xl font-bold text-info">{actions.filter(a => a.status === 'pending').length}</div>
         </div>
         <div className="glass-card p-4">
           <div className="text-xs text-tertiary mb-1">Approved Today</div>
-          <div className="text-2xl font-bold text-green-500">{actions.filter(a => a.status === 'approved').length}</div>
+          <div className="text-2xl font-bold text-success">{actions.filter(a => a.status === 'approved').length}</div>
         </div>
         <div className="glass-card p-4">
           <div className="text-xs text-tertiary mb-1">Skipped</div>
-          <div className="text-2xl font-bold text-gray-400">{actions.filter(a => a.status === 'skipped').length}</div>
+          <div className="text-2xl font-bold text-tertiary">{actions.filter(a => a.status === 'skipped').length}</div>
         </div>
         <div className="glass-card p-4">
           <div className="text-xs text-tertiary mb-1">Avg Confidence</div>
-          <div className="text-2xl font-bold text-amber-500">
+          <div className="text-2xl font-bold text-warning">
             {Math.round(pendingActions.reduce((sum, a) => sum + a.confidence, 0) / (pendingActions.length || 1))}%
           </div>
         </div>
@@ -388,7 +389,7 @@ export default function ActionsQueuePage() {
 
       {/* Actions List */}
       <div className="space-y-3">
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence>
           {pendingActions.length > 0 ? (
             pendingActions.map(action => (
               <ActionCard
@@ -400,15 +401,11 @@ export default function ActionsQueuePage() {
               />
             ))
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="glass-card p-12 text-center"
-            >
-              <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-              <h3 className="text-xl font-medium text-primary mb-2">All caught up!</h3>
-              <p className="text-secondary">No pending actions. Ospra will notify you when decisions need approval.</p>
-            </motion.div>
+            <EmptyState
+              Icon={CheckCircle}
+              title="All caught up!"
+              message="No pending actions. Ospra will notify you when decisions need approval."
+            />
           )}
         </AnimatePresence>
       </div>

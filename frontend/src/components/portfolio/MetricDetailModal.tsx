@@ -41,7 +41,7 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-500/10 rounded-xl">
+            <div className="p-3 bg-cyan-500/100/10 rounded-xl">
               <Icon className="w-8 h-8 text-blue-400" />
             </div>
             <div>
@@ -51,7 +51,7 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition"
+            className="p-2 rounded-full hover:bg-white/10 text-tertiary hover:text-white transition"
           >
             <X className="w-6 h-6" />
           </button>
@@ -64,13 +64,13 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
               key={index}
               className="bg-gray-800/50 rounded-xl p-4 border border-gray-700"
             >
-              <p className="text-sm text-gray-400 mb-2">{detail.label}</p>
+              <p className="text-sm text-tertiary mb-2">{detail.label}</p>
               <div className="flex items-center justify-between">
                 <p className="text-xl font-semibold text-white">{detail.value}</p>
                 {detail.trend && detail.change !== undefined && (
                   <div className={`flex items-center gap-1 ${
                     detail.trend === 'up' ? 'text-green-400' :
-                    detail.trend === 'down' ? 'text-red-400' : 'text-gray-400'
+                    detail.trend === 'down' ? 'text-red-400' : 'text-tertiary'
                   }`}>
                     {detail.trend === 'up' ? (
                       <TrendingUp className="w-4 h-4" />
@@ -90,7 +90,7 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         {/* Simple Bar Chart */}
         {chartData && chartData.length > 0 && (
           <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700">
-            <h3 className="text-sm font-medium text-gray-400 mb-4 flex items-center gap-2">
+            <h3 className="text-sm font-medium text-tertiary mb-4 flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Last 7 Days Trend
             </h3>
@@ -111,7 +111,7 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500">{item.label}</span>
+                    <span className="text-xs text-tertiary">{item.label}</span>
                   </div>
                 );
               })}
@@ -123,7 +123,7 @@ const MetricDetailModal: React.FC<MetricDetailModalProps> = ({
         <div className="mt-6 pt-6 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition"
+            className="w-full px-6 py-3 bg-blue-600 hover:bg-cyan-500/100 text-white rounded-lg font-semibold transition"
           >
             Close
           </button>

@@ -46,7 +46,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate, onAddStore }) =
     <div>
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-200">Quick Actions</h2>
-        <p className="text-sm text-gray-400 mt-1">Common tasks and shortcuts.</p>
+        <p className="text-sm text-tertiary mt-1">Common tasks and shortcuts.</p>
       </div>
 
       <div className="space-y-3">
@@ -60,15 +60,15 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate, onAddStore }) =
               <div className="p-2 bg-gray-800/70 rounded-lg">
                 <action.icon className="w-5 h-5 text-brand-blue" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-200">
                   {action.title}
                 </h3>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-tertiary">
                   {action.description}
                 </p>
               </div>
-              <ArrowRight className="w-5 h-5 text-gray-500 group-hover:text-gray-300 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-5 h-5 text-tertiary group-hover:text-gray-300 group-hover:translate-x-1 transition-transform" />
             </div>
           </button>
         ))}
@@ -78,7 +78,7 @@ const QuickActions: React.FC<QuickActionsProps> = ({ onNavigate, onAddStore }) =
         <a
           href="#"
           onClick={(e) => { e.preventDefault(); onNavigate?.('settings'); }}
-          className="text-sm font-medium text-gray-400 hover:text-brand-blue transition flex items-center gap-2"
+          className="text-sm font-medium text-tertiary hover:text-brand-blue transition flex items-center gap-2"
         >
           <Settings className="w-4 h-4" />
           View all settings

@@ -107,13 +107,13 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* ============ HEADER ============ */}
-        <div className="relative p-6 border-b border-gray-200">
+        <div className="relative p-6 border-b border-white/10">
           {/* Close Button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-tertiary" />
           </button>
 
           {/* Product Info */}
@@ -136,7 +136,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
 
             {/* Title & Niche */}
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-bold text-gray-900 leading-tight mb-2">
+              <h2 className="text-xl font-bold text-primary leading-tight mb-2">
                 {product.name}
               </h2>
               <div className="flex items-center gap-2">
@@ -144,66 +144,66 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
                   <Package className="w-3 h-3" />
                   {formatNiche(product.niche)}
                 </span>
-                <span className="text-xs text-gray-500">via AliExpress</span>
+                <span className="text-xs text-tertiary">via AliExpress</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* ============ METRICS GRID ============ */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-white/10">
           <div className="grid grid-cols-4 gap-4">
             {/* Customer Price */}
-            <div className="text-center p-4 bg-gray-50 rounded-xl">
+            <div className="text-center p-4   rounded-xl">
               <div className="flex justify-center mb-2">
-                <DollarSign className="w-5 h-5 text-gray-600" />
+                <DollarSign className="w-5 h-5 text-secondary" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-primary">
                 ${customerPrice.toFixed(2)}
               </div>
-              <div className="text-xs text-gray-500 mt-1">Sell Price</div>
+              <div className="text-xs text-tertiary mt-1">Sell Price</div>
             </div>
 
             {/* Your Cost */}
-            <div className="text-center p-4 bg-gray-50 rounded-xl">
+            <div className="text-center p-4   rounded-xl">
               <div className="flex justify-center mb-2">
-                <ShoppingBag className="w-5 h-5 text-gray-600" />
+                <ShoppingBag className="w-5 h-5 text-secondary" />
               </div>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-2xl font-bold text-primary">
                 ${yourCost.toFixed(2)}
               </div>
-              <div className="text-xs text-gray-500 mt-1">Your Cost</div>
+              <div className="text-xs text-tertiary mt-1">Your Cost</div>
             </div>
 
             {/* Profit */}
-            <div className={`text-center p-4 rounded-xl ${isProfitable ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div className={`text-center p-4 rounded-xl ${isProfitable ? 'bg-green-500/100/10' : 'bg-red-500/10'}`}>
               <div className="flex justify-center mb-2">
                 <TrendingUp className={`w-5 h-5 ${isProfitable ? 'text-green-600' : 'text-red-600'}`} />
               </div>
               <div className={`text-2xl font-bold ${isProfitable ? 'text-green-600' : 'text-red-600'}`}>
                 ${profit.toFixed(2)}
               </div>
-              <div className="text-xs text-gray-500 mt-1">Est. Profit</div>
+              <div className="text-xs text-tertiary mt-1">Est. Profit</div>
             </div>
 
             {/* Margin */}
-            <div className={`text-center p-4 rounded-xl ${margin >= 30 ? 'bg-blue-50' : 'bg-yellow-50'}`}>
+            <div className={`text-center p-4 rounded-xl ${margin >= 30 ? 'bg-cyan-500/10' : 'bg-amber-500/10'}`}>
               <div className="flex justify-center mb-2">
                 <Percent className={`w-5 h-5 ${margin >= 30 ? 'text-blue-600' : 'text-yellow-600'}`} />
               </div>
               <div className={`text-2xl font-bold ${margin >= 30 ? 'text-blue-600' : 'text-yellow-600'}`}>
                 {margin.toFixed(0)}%
               </div>
-              <div className="text-xs text-gray-500 mt-1">Margin</div>
+              <div className="text-xs text-tertiary mt-1">Margin</div>
             </div>
           </div>
 
           {/* Velocity Bar */}
-          <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+          <div className="mt-4 p-4   rounded-xl">
             <div className="flex justify-between items-center mb-2">
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-gray-700">Market Velocity</span>
+                <span className="text-sm font-medium text-secondary">Market Velocity</span>
               </div>
               <span className="text-lg font-bold text-purple-600">{velocity}/100</span>
             </div>
@@ -217,7 +217,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
 
           {/* Warning if not profitable */}
           {!isProfitable && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-200 rounded-xl flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-red-800">Low Profit Margin</p>
@@ -230,7 +230,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
         </div>
 
         {/* ============ AI ANALYSIS SECTION ============ */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-white/10">
           {!analysis && !loading && (
             <button
               onClick={analyzeProduct}
@@ -244,12 +244,12 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
           {loading && (
             <div className="flex items-center justify-center gap-3 py-8">
               <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-              <span className="text-gray-600 font-medium">Claude is analyzing this product...</span>
+              <span className="text-secondary font-medium">Claude is analyzing this product...</span>
             </div>
           )}
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+            <div className="p-4 bg-red-500/10 border border-red-200 rounded-xl text-center">
               <p className="text-red-600">{error}</p>
               <button
                 onClick={analyzeProduct}
@@ -265,17 +265,17 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
               {/* AI Score Hero */}
               <div className="flex items-center justify-between p-6 bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl">
                 <div>
-                  <p className="text-gray-400 text-sm">AI Score</p>
+                  <p className="text-tertiary text-sm">AI Score</p>
                   <div className="flex items-baseline gap-1">
                     <span className="text-5xl font-bold text-white">{analysis.score || 0}</span>
-                    <span className="text-2xl text-gray-500">/10</span>
+                    <span className="text-2xl text-tertiary">/10</span>
                   </div>
                 </div>
                 <div className={`px-4 py-2 rounded-lg font-bold ${
-                  analysis.recommendation === 'STRONG_BUY' ? 'bg-green-500 text-white' :
-                  analysis.recommendation === 'BUY' ? 'bg-blue-500 text-white' :
-                  analysis.recommendation === 'HOLD' ? 'bg-yellow-500 text-gray-900' :
-                  'bg-red-500 text-white'
+                  analysis.recommendation === 'STRONG_BUY' ? 'bg-green-500/100 text-white' :
+                  analysis.recommendation === 'BUY' ? 'bg-cyan-500/100 text-white' :
+                  analysis.recommendation === 'HOLD' ? 'bg-amber-500/100 text-primary' :
+                  'bg-red-500/100 text-white'
                 }`}>
                   {analysis.recommendation?.replace('_', ' ') || 'PENDING'}
                 </div>
@@ -284,12 +284,12 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
               {/* Reasoning */}
               {analysis.reasoning?.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">✨ Why This Product Wins</h4>
+                  <h4 className="font-semibold text-primary mb-3">✨ Why This Product Wins</h4>
                   <div className="space-y-2">
                     {analysis.reasoning.map((reason: string, i: number) => (
-                      <div key={i} className="flex gap-2 p-3 bg-green-50 rounded-lg">
+                      <div key={i} className="flex gap-2 p-3 bg-green-500/100/10 rounded-lg">
                         <span className="text-green-500">✓</span>
-                        <p className="text-sm text-gray-700">{reason}</p>
+                        <p className="text-sm text-secondary">{reason}</p>
                       </div>
                     ))}
                   </div>
@@ -299,12 +299,12 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
               {/* Risks */}
               {analysis.risks?.length > 0 && (
                 <div>
-                  <h4 className="font-semibold text-gray-900 mb-3">⚠️ Risks to Consider</h4>
+                  <h4 className="font-semibold text-primary mb-3">⚠️ Risks to Consider</h4>
                   <div className="space-y-2">
                     {analysis.risks.map((risk: string, i: number) => (
-                      <div key={i} className="flex gap-2 p-3 bg-yellow-50 rounded-lg">
+                      <div key={i} className="flex gap-2 p-3 bg-amber-500/10 rounded-lg">
                         <span className="text-yellow-500">!</span>
-                        <p className="text-sm text-gray-700">{risk}</p>
+                        <p className="text-sm text-secondary">{risk}</p>
                       </div>
                     ))}
                   </div>
@@ -315,8 +315,8 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
         </div>
 
         {/* ============ ACTION FOOTER ============ */}
-        <div className="p-6 bg-gray-50 flex gap-3">
-          <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2">
+        <div className="p-6   flex gap-3">
+          <button className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-semibold transition flex items-center justify-center gap-2">
             <ShoppingBag className="w-5 h-5" />
             Deploy to Shopify
           </button>
@@ -325,7 +325,7 @@ export default function ProductModal({ product, onClose }: ProductModalProps) {
               href={supplierUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="px-6 py-3 border border-gray-300 hover:border-gray-400 rounded-xl font-medium transition flex items-center gap-2"
+              className="px-6 py-3 border border-white/10 hover:border-gray-400 rounded-xl font-medium transition flex items-center gap-2"
             >
               <ExternalLink className="w-5 h-5" />
               AliExpress

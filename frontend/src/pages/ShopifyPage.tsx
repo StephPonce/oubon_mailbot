@@ -148,31 +148,31 @@ export const ShopifyPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-12 flex items-center justify-center">
+      <div className="min-h-screen   p-12 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading Shopify data...</p>
+          <p className="text-secondary">Loading Shopify data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-12">
+    <div className="min-h-screen   p-12">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-light text-gray-900 flex items-center gap-3">
+            <h1 className="text-3xl font-light text-primary flex items-center gap-3">
               <ShoppingBag className="w-8 h-8 text-indigo-600" />
               Shopify Store
             </h1>
-            <p className="text-gray-500 mt-1">Manage your products and deploy from Ospra Intelligence</p>
+            <p className="text-tertiary mt-1">Manage your products and deploy from Ospra Intelligence</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={loadData}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-white/10 rounded-lg hover:  transition flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -192,19 +192,19 @@ export const ShopifyPage = () => {
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3">
               <div className={`w-3 h-3 rounded-full ${
-                status?.connection === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                status?.connection === 'active' ? 'bg-green-500/100 animate-pulse' : 'bg-red-500/100'
               }`} />
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-primary">
                 {status?.connection === 'active' ? 'Connected' : 'Not Connected'}
               </span>
             </div>
-            <div className="text-gray-400">|</div>
-            <div className="text-gray-600">
+            <div className="text-tertiary">|</div>
+            <div className="text-secondary">
               Store: <span className="text-indigo-600 font-medium">{status?.store_name || 'N/A'}</span>
             </div>
             {status?.store_domain && (
               <>
-                <div className="text-gray-400">|</div>
+                <div className="text-tertiary">|</div>
                 <a 
                   href={`https://${status.store_domain}`}
                   target="_blank"
@@ -226,8 +226,8 @@ export const ShopifyPage = () => {
                 <Package className="w-8 h-8 text-indigo-500" />
                 <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Products</span>
               </div>
-              <p className="text-3xl font-bold text-gray-900">{analytics.total_products}</p>
-              <p className="text-sm text-gray-500">Total Products</p>
+              <p className="text-3xl font-bold text-primary">{analytics.total_products}</p>
+              <p className="text-sm text-tertiary">Total Products</p>
             </GlassPanel>
 
             <GlassPanel className="p-6">
@@ -235,8 +235,8 @@ export const ShopifyPage = () => {
                 <TrendingUp className="w-8 h-8 text-emerald-500" />
                 <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Inventory</span>
               </div>
-              <p className="text-3xl font-bold text-gray-900">{analytics.total_inventory.toLocaleString()}</p>
-              <p className="text-sm text-gray-500">Units in Stock</p>
+              <p className="text-3xl font-bold text-primary">{analytics.total_inventory.toLocaleString()}</p>
+              <p className="text-sm text-tertiary">Units in Stock</p>
             </GlassPanel>
 
             <GlassPanel className="p-6">
@@ -244,8 +244,8 @@ export const ShopifyPage = () => {
                 <DollarSign className="w-8 h-8 text-amber-500" />
                 <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Value</span>
               </div>
-              <p className="text-3xl font-bold text-gray-900">${analytics.estimated_value.toLocaleString()}</p>
-              <p className="text-sm text-gray-500">Estimated Value</p>
+              <p className="text-3xl font-bold text-primary">${analytics.estimated_value.toLocaleString()}</p>
+              <p className="text-sm text-tertiary">Estimated Value</p>
             </GlassPanel>
 
             <GlassPanel className="p-6">
@@ -253,28 +253,28 @@ export const ShopifyPage = () => {
                 <CheckCircle className="w-8 h-8 text-purple-500" />
                 <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Ospra</span>
               </div>
-              <p className="text-3xl font-bold text-gray-900">{analytics.ospra_tracked}</p>
-              <p className="text-sm text-gray-500">Ospra Tracked</p>
+              <p className="text-3xl font-bold text-primary">{analytics.ospra_tracked}</p>
+              <p className="text-sm text-tertiary">Ospra Tracked</p>
             </GlassPanel>
           </div>
         )}
 
         {/* Products Grid */}
         <GlassPanel className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Store Products</h2>
+          <h2 className="text-xl font-semibold text-primary mb-6">Store Products</h2>
           
           {products.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+            <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-lg">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No products in your store yet.</p>
-              <p className="text-sm text-gray-400 mt-1">Deploy your first product to get started!</p>
+              <p className="text-tertiary">No products in your store yet.</p>
+              <p className="text-sm text-tertiary mt-1">Deploy your first product to get started!</p>
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-4">
               {products.map((product) => (
                 <div 
                   key={product.id}
-                  className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:border-indigo-300 hover:shadow-lg transition group"
+                  className="bg-white border border-white/10 rounded-lg overflow-hidden hover:border-indigo-300 hover:shadow-lg transition group"
                 >
                   <div className="aspect-square bg-gray-100 relative">
                     {product.image_url ? (
@@ -290,16 +290,16 @@ export const ShopifyPage = () => {
                     )}
                     <button
                       onClick={() => handleDelete(product.id)}
-                      className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
+                      className="absolute top-2 right-2 p-2 bg-red-500/100 text-white rounded-lg opacity-0 group-hover:opacity-100 transition hover:bg-red-600"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                   <div className="p-4">
-                    <h3 className="font-medium text-gray-900 truncate">{product.title}</h3>
+                    <h3 className="font-medium text-primary truncate">{product.title}</h3>
                     <div className="flex items-center justify-between mt-2">
                       <span className="text-lg font-bold text-indigo-600">${product.price}</span>
-                      <span className="text-sm text-gray-500">{product.inventory_quantity} in stock</span>
+                      <span className="text-sm text-tertiary">{product.inventory_quantity} in stock</span>
                     </div>
                     {product.ospra_tracked && (
                       <span className="inline-flex items-center gap-1 text-xs text-green-600 mt-2">
@@ -318,7 +318,7 @@ export const ShopifyPage = () => {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <h2 className="text-xl font-bold text-primary flex items-center gap-2">
                   <Rocket className="w-5 h-5 text-indigo-600" />
                   Deploy Product to Shopify
                 </h2>
@@ -327,7 +327,7 @@ export const ShopifyPage = () => {
                     setShowDeployModal(false);
                     setDeployResult(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-tertiary hover:text-secondary"
                 >
                   <XCircle className="w-6 h-6" />
                 </button>
@@ -336,15 +336,15 @@ export const ShopifyPage = () => {
               {deployResult && (
                 <div className={`mb-6 p-4 rounded-lg ${
                   deployResult.success 
-                    ? 'bg-green-50 border border-green-200' 
-                    : 'bg-red-50 border border-red-200'
+                    ? 'bg-green-500/100/10 border border-green-200' 
+                    : 'bg-red-500/10 border border-red-200'
                 }`}>
                   {deployResult.success ? (
                     <div>
                       <p className="font-semibold text-green-800 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5" /> Deployed Successfully!
                       </p>
-                      <p className="text-sm text-green-700 mt-1">Price: ${deployResult.price}</p>
+                      <p className="text-sm text-green-400 mt-1">Price: ${deployResult.price}</p>
                       {deployResult.shopify_url && (
                         <a 
                           href={deployResult.shopify_url}
@@ -366,7 +366,7 @@ export const ShopifyPage = () => {
 
               <form onSubmit={handleDeploy} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Product Name *
                   </label>
                   <input
@@ -375,12 +375,12 @@ export const ShopifyPage = () => {
                     value={deployForm.name}
                     onChange={(e) => setDeployForm({ ...deployForm, name: e.target.value })}
                     placeholder="Smart LED Strip Lights"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Niche / Category
                   </label>
                   <input
@@ -388,12 +388,12 @@ export const ShopifyPage = () => {
                     value={deployForm.niche}
                     onChange={(e) => setDeployForm({ ...deployForm, niche: e.target.value })}
                     placeholder="smart home"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Supplier Cost ($)
                   </label>
                   <input
@@ -402,12 +402,12 @@ export const ShopifyPage = () => {
                     value={deployForm.supplier_cost}
                     onChange={(e) => setDeployForm({ ...deployForm, supplier_cost: e.target.value })}
                     placeholder="8.50"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Supplier URL (AliExpress)
                   </label>
                   <input
@@ -415,12 +415,12 @@ export const ShopifyPage = () => {
                     value={deployForm.supplier_url}
                     onChange={(e) => setDeployForm({ ...deployForm, supplier_url: e.target.value })}
                     placeholder="https://aliexpress.com/item/..."
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-secondary mb-1">
                     Image URL
                   </label>
                   <input
@@ -428,7 +428,7 @@ export const ShopifyPage = () => {
                     value={deployForm.image_url}
                     onChange={(e) => setDeployForm({ ...deployForm, image_url: e.target.value })}
                     placeholder="https://..."
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
@@ -438,9 +438,9 @@ export const ShopifyPage = () => {
                     id="generateAI"
                     checked={deployForm.generate_ai_description}
                     onChange={(e) => setDeployForm({ ...deployForm, generate_ai_description: e.target.checked })}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <label htmlFor="generateAI" className="text-sm text-gray-700">
+                  <label htmlFor="generateAI" className="text-sm text-secondary">
                     Generate AI description (Claude)
                   </label>
                 </div>
@@ -452,7 +452,7 @@ export const ShopifyPage = () => {
                       setShowDeployModal(false);
                       setDeployResult(null);
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                    className="flex-1 px-4 py-2 border border-white/10 rounded-lg hover:  transition"
                   >
                     Cancel
                   </button>

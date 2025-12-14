@@ -63,7 +63,7 @@ function sanitizeImageUrl(url?: string, productName?: string): string {
 // ProductCardSkeleton Component - Loading state
 export const ProductCardSkeleton: React.FC = () => {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm animate-pulse">
+    <div className="bg-white border border-white/10 rounded-xl overflow-hidden shadow-sm animate-pulse">
       {/* Image skeleton */}
       <div className="h-[200px] bg-gray-200" />
 
@@ -76,7 +76,7 @@ export const ProductCardSkeleton: React.FC = () => {
         <div className="h-4 bg-gray-200 rounded w-1/3" />
 
         {/* Metrics row skeleton */}
-        <div className="flex justify-between py-3 border-y border-gray-200">
+        <div className="flex justify-between py-3 border-y border-white/10">
           <div className="text-center space-y-2">
             <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
             <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
@@ -120,7 +120,7 @@ const MetricPill: React.FC<{
         <span>{icon}</span>
         <span>{value}</span>
       </div>
-      <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+      <div className="text-xs text-tertiary mt-0.5">{label}</div>
     </div>
   );
 };
@@ -171,8 +171,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   // Get score color
   const getScoreColor = () => {
-    if (score >= 8) return 'bg-green-500/90';
-    if (score >= 6) return 'bg-blue-500/90';
+    if (score >= 8) return 'bg-green-500/100/90';
+    if (score >= 6) return 'bg-cyan-500/100/90';
     return 'bg-amber-500/90';
   };
 
@@ -230,7 +230,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const explanation = generateRationale();
 
   return (
-    <div className={`relative bg-white border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-gray-200'} rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300`}>
+    <div className={`relative bg-white border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-white/10'} rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300`}>
 
       {/* Selection Checkbox */}
       {onToggleSelect && (
@@ -240,7 +240,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             checked={isSelected}
             onChange={() => onToggleSelect(product.id)}
             onClick={(e) => e.stopPropagation()}
-            className="w-5 h-5 rounded-md bg-white/90 backdrop-blur-sm border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="w-5 h-5 rounded-md bg-white/90 backdrop-blur-sm border-white/10 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
           />
         </div>
       )}
@@ -305,10 +305,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Product Name & Niche */}
         <div>
-          <h3 className="font-bold text-gray-900 text-base line-clamp-2 mb-2">
+          <h3 className="font-bold text-primary text-base line-clamp-2 mb-2">
             {product.name}
           </h3>
-          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+          <span className="text-xs text-tertiary bg-gray-100 px-2 py-0.5 rounded-full">
             {product.niche?.replace(/_/g, ' ') || 'General'}
           </span>
         </div>
@@ -316,7 +316,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* ========================================
             METRICS ROW (compact, scannable)
         ======================================== */}
-        <div className="flex justify-between items-center py-3 border-y border-gray-200">
+        <div className="flex justify-between items-center py-3 border-y border-white/10">
           <MetricPill
             icon="💰"
             value={`$${profit.toFixed(0)}`}
@@ -343,7 +343,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex gap-2 pt-2">
           <button
             onClick={() => onAnalyze(product)}
-            className="flex-1 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
+            className="flex-1 py-2.5 text-sm font-medium text-secondary bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
           >
             <BarChart2 className="w-4 h-4" />
             Analyze
@@ -369,9 +369,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Deployment Status (if deployed) */}
         {deploymentStatus?.deployed && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-green-50 border border-green-200">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs text-green-700 font-medium flex-1">
+          <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/100/10 border border-green-200">
+            <div className="w-2 h-2 rounded-full bg-green-500/100 animate-pulse" />
+            <span className="text-xs text-green-400 font-medium flex-1">
               Live on Shopify
             </span>
             {deploymentStatus.shopify_url && (
@@ -379,7 +379,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 href={deploymentStatus.shopify_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-green-600 hover:text-green-700 font-medium"
+                className="text-xs text-green-600 hover:text-green-400 font-medium"
               >
                 View →
               </a>

@@ -24,7 +24,8 @@ import {
   ShoppingBag,
   Megaphone,
   Store,
-  Boxes
+  Boxes,
+  BookOpen
 } from 'lucide-react';
 
 // Import all pages
@@ -45,6 +46,7 @@ import StoresPage from '../pages/StoresPage';
 import NewSettingsPage from '../pages/NewSettingsPage';
 import { InventoryPage } from '../pages/InventoryPage';
 import ActionsQueuePage from '../pages/ActionsQueuePage';
+import TemplateVaultPage from '../pages/TemplateVaultPage';
 import { ErrorBoundary } from './ErrorBoundary';
 import StoreSwitcher from './StoreSwitcher';
 import OspraChat from './OspraChat';
@@ -59,6 +61,7 @@ const mainNavItems = [
   { id: 'intelligence', path: '/intelligence', icon: Brain, label: 'Ospra Intelligence' },
   { id: 'niches', path: '/niches', icon: Target, label: 'Niche Analysis' },
   { id: 'competitors', path: '/competitors', icon: Eye, label: 'Competitors' },
+  { id: 'templates', path: '/templates', icon: BookOpen, label: 'Template Vault', badge: 'New' },
 ];
 
 const operationsNavItems = [
@@ -104,7 +107,7 @@ function NavSection({ title, items, activePath, onSelect }: {
               <item.icon className="w-[18px] h-[18px]" />
               <span className="flex-1 text-left">{item.label}</span>
               {'badge' in item && item.badge && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/20 text-green-600 border border-green-500/30">
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-500/100/20 text-green-600 border border-green-500/30">
                   {item.badge}
                 </span>
               )}
@@ -296,6 +299,7 @@ function AppRoutes() {
       <Route path="/intelligence" element={<IntelligencePage />} />
       <Route path="/niches" element={<NicheAnalysisPage />} />
       <Route path="/competitors" element={<CompetitiveIntelPage />} />
+      <Route path="/templates" element={<TemplateVaultPage />} />
       <Route path="/shopify" element={<ShopifyPage />} />
       <Route path="/inventory" element={<InventoryPage />} />
       <Route path="/auto-deploy" element={<AutoDeploymentPage />} />

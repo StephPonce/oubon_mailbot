@@ -83,7 +83,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
       >
         <div className="flex items-center gap-3">
           <RefreshCw className="w-5 h-5 animate-spin text-purple-400" />
-          <p className="text-sm text-gray-400">Generating your daily brief...</p>
+          <p className="text-sm text-tertiary">Generating your daily brief...</p>
         </div>
       </motion.div>
     );
@@ -113,9 +113,9 @@ export function DailyBrief({ className }: DailyBriefProps) {
   }
 
   const urgencyColors = {
-    high: 'bg-red-500/20 text-red-300 border-red-500/30',
-    medium: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    low: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    high: 'bg-red-500/100/20 text-red-300 border-red-500/30',
+    medium: 'bg-amber-500/100/20 text-yellow-300 border-yellow-500/30',
+    low: 'bg-cyan-500/100/20 text-blue-300 border-blue-500/30',
   };
 
   return (
@@ -133,7 +133,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">{brief.greeting}</h2>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-tertiary">
               {new Date(brief.timestamp).toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'long',
@@ -148,7 +148,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
           <div className="px-3 py-1.5 rounded-lg bg-purple-500/20 text-purple-300 text-xs font-medium border border-purple-500/30">
             {brief.pending_actions.count} Actions
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-blue-500/20 text-blue-300 text-xs font-medium border border-blue-500/30">
+          <div className="px-3 py-1.5 rounded-lg bg-cyan-500/100/20 text-blue-300 text-xs font-medium border border-blue-500/30">
             {brief.performance.health_score.toFixed(0)}% Health
           </div>
         </div>
@@ -167,7 +167,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-2 mb-2">
             <Target className="w-4 h-4 text-purple-400" />
-            <p className="text-xs text-gray-400">Pending</p>
+            <p className="text-xs text-tertiary">Pending</p>
           </div>
           <p className="text-2xl font-bold text-white">{brief.pending_actions.count}</p>
           <p className="text-xs text-purple-300 mt-1">
@@ -179,7 +179,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-2 mb-2">
             <TrendingUp className="w-4 h-4 text-green-400" />
-            <p className="text-xs text-gray-400">Opportunities</p>
+            <p className="text-xs text-tertiary">Opportunities</p>
           </div>
           <p className="text-2xl font-bold text-white">{brief.opportunities.count}</p>
           <p className="text-xs text-green-300 mt-1">
@@ -191,7 +191,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
         <div className="p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center gap-2 mb-2">
             <AlertCircle className="w-4 h-4 text-blue-400" />
-            <p className="text-xs text-gray-400">Health</p>
+            <p className="text-xs text-tertiary">Health</p>
           </div>
           <p className="text-2xl font-bold text-white">
             {brief.performance.health_score.toFixed(0)}%
@@ -205,7 +205,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
       {/* Priority Items */}
       {brief.priorities.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          <h3 className="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">
             Today's Priorities
           </h3>
           {brief.priorities.slice(0, 3).map((priority, index) => (
@@ -214,7 +214,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
               className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
             >
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={cn(
                       "px-2 py-0.5 rounded text-[10px] font-medium border uppercase",
@@ -226,7 +226,7 @@ export function DailyBrief({ className }: DailyBriefProps) {
                       {priority.title}
                     </p>
                   </div>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-tertiary">
                     {priority.description}
                   </p>
                 </div>

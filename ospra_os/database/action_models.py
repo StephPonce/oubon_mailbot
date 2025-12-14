@@ -12,7 +12,7 @@ from sqlalchemy import (
     ForeignKey, JSON, Boolean, Enum as SQLEnum
 )
 from sqlalchemy.orm import relationship
-from .multi_store_models import Base
+from .base import Base
 
 
 class AIActionType(str, enum.Enum):

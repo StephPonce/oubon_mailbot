@@ -31,13 +31,13 @@ export default function RevenueChart({ data, loading = false }: RevenueChartProp
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
         ) : data.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
+          <div className="text-center py-12 text-tertiary">
             No revenue data available
           </div>
         ) : (
           <div className="relative h-64">
             {/* Y-axis labels */}
-            <div className="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between text-xs text-gray-500">
+            <div className="absolute left-0 top-0 bottom-0 w-16 flex flex-col justify-between text-xs text-tertiary">
               <span>${maxRevenue.toFixed(0)}</span>
               <span>${(maxRevenue * 0.5).toFixed(0)}</span>
               <span>$0</span>
@@ -62,7 +62,7 @@ export default function RevenueChart({ data, loading = false }: RevenueChartProp
                       </div>
                     </div>
                     {/* Date label */}
-                    <span className="text-xs text-gray-500 rotate-0 text-center">
+                    <span className="text-xs text-tertiary rotate-0 text-center">
                       {formatDate(point.date)}
                     </span>
                   </div>
@@ -77,7 +77,7 @@ export default function RevenueChart({ data, loading = false }: RevenueChartProp
           <div className="flex items-center justify-center gap-4 pt-4 border-t border-gray-800">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-gradient-to-t from-blue-600 to-blue-400 rounded"></div>
-              <span className="text-xs text-gray-400">Revenue</span>
+              <span className="text-xs text-tertiary">Revenue</span>
             </div>
           </div>
         )}

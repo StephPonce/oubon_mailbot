@@ -126,8 +126,8 @@ export default function SubscriptionPage() {
     <div className="p-8 max-w-6xl mx-auto space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Subscription & Billing</h1>
-        <p className="text-gray-500 mt-1">Manage your plan, usage, and billing settings</p>
+        <h1 className="text-3xl font-bold text-primary">Subscription & Billing</h1>
+        <p className="text-tertiary mt-1">Manage your plan, usage, and billing settings</p>
       </div>
 
       {/* Current Plan Card */}
@@ -158,7 +158,7 @@ export default function SubscriptionPage() {
             {tier !== 'stratosphere' && (
               <button
                 onClick={() => setShowUpgradeModal(true)}
-                className="px-6 py-3 bg-white text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition flex items-center justify-center gap-2"
+                className="px-6 py-3 bg-white text-primary font-semibold rounded-xl hover:bg-gray-100 transition flex items-center justify-center gap-2"
               >
                 <Zap className="w-5 h-5" />
                 Upgrade Plan
@@ -207,8 +207,8 @@ export default function SubscriptionPage() {
               <Clock className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Usage This Period</h3>
-              <p className="text-sm text-gray-500">Track your activity against your plan limits</p>
+              <h3 className="text-lg font-semibold text-primary">Usage This Period</h3>
+              <p className="text-sm text-tertiary">Track your activity against your plan limits</p>
             </div>
           </div>
         </div>
@@ -222,7 +222,7 @@ export default function SubscriptionPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
       >
-        <h3 className="text-xl font-semibold text-gray-900 mb-4">Compare Plans</h3>
+        <h3 className="text-xl font-semibold text-primary mb-4">Compare Plans</h3>
         
         <div className="grid md:grid-cols-4 gap-4">
           {pricing.map((plan, index) => {
@@ -240,12 +240,12 @@ export default function SubscriptionPage() {
                   relative bg-white rounded-xl border-2 p-5 transition-all
                   ${isCurrentPlan 
                     ? 'border-blue-500 shadow-lg shadow-blue-500/10' 
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-white/10 hover:border-white/10'
                   }
                 `}
               >
                 {isCurrentPlan && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-500/100 text-white text-xs font-bold px-3 py-1 rounded-full">
                     CURRENT
                   </div>
                 )}
@@ -254,13 +254,13 @@ export default function SubscriptionPage() {
                   <PlanIcon className="w-6 h-6 text-white" />
                 </div>
                 
-                <h4 className="text-lg font-bold text-gray-900">{plan.name}</h4>
-                <p className="text-sm text-gray-500 mb-2">{plan.tagline}</p>
-                <div className="text-2xl font-bold text-gray-900 mb-4">{plan.price_display}</div>
+                <h4 className="text-lg font-bold text-primary">{plan.name}</h4>
+                <p className="text-sm text-tertiary mb-2">{plan.tagline}</p>
+                <div className="text-2xl font-bold text-primary mb-4">{plan.price_display}</div>
                 
                 <ul className="space-y-2 mb-6">
                   {plan.features?.slice(0, 4).map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                    <li key={i} className="flex items-start gap-2 text-sm text-secondary">
                       <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                       <span>{feature}</span>
                     </li>
@@ -275,7 +275,7 @@ export default function SubscriptionPage() {
                       w-full py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 transition
                       ${plan.tier === 'soar' 
                         ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-gray-100 text-secondary hover:bg-gray-200'
                       }
                     `}
                   >
@@ -307,31 +307,31 @@ export default function SubscriptionPage() {
             <CreditCard className="w-5 h-5 text-green-600" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Billing Information</h3>
-            <p className="text-sm text-gray-500">Manage your payment methods and view history</p>
+            <h3 className="text-lg font-semibold text-primary">Billing Information</h3>
+            <p className="text-sm text-tertiary">Manage your payment methods and view history</p>
           </div>
         </div>
         
         <div className="space-y-4">
-          <button className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+          <button className="w-full flex items-center justify-between p-4   rounded-xl hover:bg-gray-100 transition">
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-gray-400" />
-              <span className="font-medium text-gray-700">Update Payment Method</span>
+              <Shield className="w-5 h-5 text-tertiary" />
+              <span className="font-medium text-secondary">Update Payment Method</span>
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            <ChevronRight className="w-5 h-5 text-tertiary" />
           </button>
           
-          <button className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+          <button className="w-full flex items-center justify-between p-4   rounded-xl hover:bg-gray-100 transition">
             <div className="flex items-center gap-3">
-              <CreditCard className="w-5 h-5 text-gray-400" />
-              <span className="font-medium text-gray-700">View Billing History</span>
+              <CreditCard className="w-5 h-5 text-tertiary" />
+              <span className="font-medium text-secondary">View Billing History</span>
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-400" />
+            <ChevronRight className="w-5 h-5 text-tertiary" />
           </button>
         </div>
         
-        <div className="mt-6 p-4 bg-blue-50 rounded-xl">
-          <div className="flex items-center gap-2 text-sm text-blue-700">
+        <div className="mt-6 p-4 bg-cyan-500/10 rounded-xl">
+          <div className="flex items-center gap-2 text-sm text-cyan-400">
             <Shield className="w-4 h-4" />
             <span>Payments are securely processed by LemonSqueezy</span>
           </div>

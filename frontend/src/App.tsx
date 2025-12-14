@@ -9,15 +9,6 @@ import { useOspraStore } from './store/ospra.store';
 import './index.css';
 
 export default function App() {
-  const { isOnboarded, onboardingStep, setShowWelcomeModal } = useOspraStore();
-
-  // Trigger welcome modal for fresh users
-  useEffect(() => {
-    if (!isOnboarded && onboardingStep === 0) {
-      setShowWelcomeModal(true);
-    }
-  }, [isOnboarded, onboardingStep, setShowWelcomeModal]);
-
   // WebSocket disabled - backend doesn't have /ws endpoint yet
   useEffect(() => {
     // Uncomment when backend WebSocket is implemented:

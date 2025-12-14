@@ -6,7 +6,7 @@ Verifies database tables, service, and API endpoints
 import asyncio
 import sys
 from datetime import datetime, timedelta
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Base,
     ProductSaturation,
     ProductVelocity

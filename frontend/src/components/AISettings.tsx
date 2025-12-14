@@ -215,8 +215,8 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
   const getProviderColorClass = (color: string, type: 'bg' | 'text' | 'border') => {
     const colors: Record<string, Record<string, string>> = {
       purple: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500/50' },
-      green: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/50' },
-      blue: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500/50' },
+      green: { bg: 'bg-green-500/100/20', text: 'text-green-400', border: 'border-green-500/50' },
+      blue: { bg: 'bg-cyan-500/100/20', text: 'text-blue-400', border: 'border-blue-500/50' },
       orange: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/50' }
     };
     return colors[color]?.[type] || colors.blue[type];
@@ -232,7 +232,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
           <Brain className="w-8 h-8 text-blue-400" />
           AI Provider Settings
         </h1>
-        <p className="text-gray-400">
+        <p className="text-tertiary">
           Choose your preferred AI provider and manage API credentials
         </p>
       </div>
@@ -245,19 +245,19 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-gray-900/50 rounded-lg p-4">
-            <p className="text-sm text-gray-500 uppercase mb-1">Total Tokens</p>
+            <p className="text-sm text-tertiary uppercase mb-1">Total Tokens</p>
             <p className="text-2xl font-bold text-white">
               {usageStats.currentMonth.totalTokens.toLocaleString()}
             </p>
           </div>
           <div className="bg-gray-900/50 rounded-lg p-4">
-            <p className="text-sm text-gray-500 uppercase mb-1">Total Cost</p>
+            <p className="text-sm text-tertiary uppercase mb-1">Total Cost</p>
             <p className="text-2xl font-bold text-white">
               ${usageStats.currentMonth.totalCost.toFixed(2)}
             </p>
           </div>
           <div className="bg-gray-900/50 rounded-lg p-4">
-            <p className="text-sm text-gray-500 uppercase mb-1">Avg Cost/Day</p>
+            <p className="text-sm text-tertiary uppercase mb-1">Avg Cost/Day</p>
             <p className="text-2xl font-bold text-white">
               ${(usageStats.currentMonth.totalCost / 30).toFixed(2)}
             </p>
@@ -269,8 +269,8 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
       {savings && savings.savings !== 0 && (
         <div className={`rounded-lg border p-4 ${
           savings.savings > 0
-            ? 'bg-green-500/10 border-green-500/50'
-            : 'bg-red-500/10 border-red-500/50'
+            ? 'bg-green-500/100/10 border-green-500/50'
+            : 'bg-red-500/100/10 border-red-500/50'
         }`}>
           <div className="flex items-center gap-3">
             {savings.savings > 0 ? (
@@ -309,12 +309,12 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               className={`relative p-5 rounded-lg border text-left transition-all ${
                 selectedProvider === provider.id && !provider.comingSoon
                   ? 'bg-gray-900 text-white shadow-lg border-gray-900'
-                  : 'bg-white/50 border-gray-200 hover:bg-gray-200/50 text-gray-900'
+                  : 'bg-white/50 border-white/10 hover:bg-gray-200/50 text-primary'
               } ${provider.comingSoon ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               {/* Recommended Badge */}
               {provider.recommended && (
-                <div className="absolute top-2 right-2 px-2 py-1 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center gap-1">
+                <div className="absolute top-2 right-2 px-2 py-1 bg-cyan-500/100 text-white text-xs font-bold rounded-full flex items-center gap-1">
                   <Sparkles className="w-3 h-3" />
                   Recommended
                 </div>
@@ -338,14 +338,14 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               <div className="flex items-start gap-3 mb-3 mt-4">
                 <div className="text-3xl">{provider.icon}</div>
                 <div>
-                  <h3 className={`font-light text-lg ${selectedProvider === provider.id ? 'text-white' : 'text-gray-900'}`}>{provider.displayName}</h3>
-                  <p className={`text-sm ${selectedProvider === provider.id ? 'text-gray-300' : 'text-gray-600'}`}>{provider.name}</p>
+                  <h3 className={`font-light text-lg ${selectedProvider === provider.id ? 'text-white' : 'text-primary'}`}>{provider.displayName}</h3>
+                  <p className={`text-sm ${selectedProvider === provider.id ? 'text-gray-300' : 'text-secondary'}`}>{provider.name}</p>
                 </div>
               </div>
 
               {/* Pricing */}
               <div className="mb-3 p-2 bg-gray-800 rounded">
-                <p className="text-xs text-gray-500 uppercase">Pricing</p>
+                <p className="text-xs text-tertiary uppercase">Pricing</p>
                 <p className="text-lg font-bold text-white">
                   ${provider.costPer1k.toFixed(5)}/1K tokens
                 </p>
@@ -354,13 +354,13 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               {/* Ratings */}
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <div>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <p className="text-xs text-tertiary flex items-center gap-1">
                     <Zap className="w-3 h-3" /> Speed
                   </p>
                   <p className="text-sm">{getRatingStars(provider.speedRating)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                  <p className="text-xs text-tertiary flex items-center gap-1">
                     <Brain className="w-3 h-3" /> Quality
                   </p>
                   <p className="text-sm">{getRatingStars(provider.qualityRating)}</p>
@@ -369,7 +369,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
               {/* Best For */}
               <div>
-                <p className="text-xs text-gray-500 uppercase mb-1">Best for:</p>
+                <p className="text-xs text-tertiary uppercase mb-1">Best for:</p>
                 <div className="flex flex-wrap gap-1">
                   {provider.bestFor.slice(0, 2).map((use, idx) => (
                     <span
@@ -399,7 +399,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               <Key className="w-5 h-5 text-yellow-400" />
               Custom API Key (Advanced)
             </h2>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-tertiary mt-1">
               Use your own API key for the selected provider
             </p>
           </div>
@@ -417,11 +417,11 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
         {useCustomKey && (
           <div className="space-y-4">
             {/* Security Notice */}
-            <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
+            <div className="bg-cyan-500/100/10 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
               <Shield className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-blue-400 mb-1">Your API key is secure</p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-tertiary">
                   Your API key will be encrypted using AES-256 encryption and stored securely. We never share or log your API keys.
                 </p>
               </div>
@@ -433,7 +433,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
                 API Key for {AI_PROVIDERS.find(p => p.id === selectedProvider)?.displayName}
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-tertiary" />
                 <input
                   type={showApiKey ? 'text' : 'password'}
                   value={customApiKey}
@@ -450,9 +450,9 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
                     className="p-2 hover:bg-gray-700 rounded transition"
                   >
                     {showApiKey ? (
-                      <EyeOff className="w-4 h-4 text-gray-400" />
+                      <EyeOff className="w-4 h-4 text-tertiary" />
                     ) : (
-                      <Eye className="w-4 h-4 text-gray-400" />
+                      <Eye className="w-4 h-4 text-tertiary" />
                     )}
                   </button>
                 </div>
@@ -494,7 +494,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
             {/* Cost Comparison */}
             <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">With your own API key:</p>
+              <p className="text-sm text-tertiary mb-2">With your own API key:</p>
               <ul className="space-y-1 text-sm text-gray-300">
                 <li className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-green-400" />
@@ -516,11 +516,11 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
 
       {/* Warning for Quality Downgrade */}
       {selectedProvider !== 'claude' && originalProvider === 'claude' && (
-        <div className="bg-yellow-500/10 border border-yellow-500/50 rounded-lg p-4 flex items-start gap-3">
+        <div className="bg-amber-500/100/10 border border-yellow-500/50 rounded-lg p-4 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-yellow-400 mb-1">Quality Notice</p>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-tertiary">
               Switching from Claude Sonnet 4 may result in lower quality product descriptions and analysis.
               Consider testing the output quality before making this permanent.
             </p>
@@ -538,11 +538,11 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-700">
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Provider</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-400">Cost/1K</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-400">Speed</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-gray-400">Quality</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-gray-400">Est. Monthly Cost*</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary">Provider</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-tertiary">Cost/1K</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-tertiary">Speed</th>
+                <th className="text-center py-3 px-4 text-sm font-medium text-tertiary">Quality</th>
+                <th className="text-left py-3 px-4 text-sm font-medium text-tertiary">Est. Monthly Cost*</th>
               </tr>
             </thead>
             <tbody>
@@ -552,7 +552,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
                   <tr
                     key={provider.id}
                     className={`border-b border-gray-700/50 ${
-                      selectedProvider === provider.id ? 'bg-blue-500/10' : ''
+                      selectedProvider === provider.id ? 'bg-cyan-500/100/10' : ''
                     }`}
                   >
                     <td className="py-3 px-4">
@@ -560,7 +560,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
                         <span className="text-xl">{provider.icon}</span>
                         <span className="text-white font-medium">{provider.displayName}</span>
                         {provider.recommended && (
-                          <span className="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full">
+                          <span className="text-xs px-2 py-0.5 bg-cyan-500/100 text-white rounded-full">
                             Recommended
                           </span>
                         )}
@@ -583,7 +583,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
               })}
             </tbody>
           </table>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-tertiary mt-2">
             * Based on your current monthly usage of {usageStats.currentMonth.totalTokens.toLocaleString()} tokens
           </p>
         </div>
@@ -593,7 +593,7 @@ const AISettings: React.FC<AISettingsProps> = ({ onSave }) => {
       <div className="flex items-center justify-between bg-gray-800 rounded-lg border border-gray-700 p-6">
         <div>
           <p className="text-white font-medium">Ready to save your preferences?</p>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-tertiary mt-1">
             {hasChanges
               ? 'You have unsaved changes'
               : 'No changes to save'

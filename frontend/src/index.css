@@ -9,84 +9,87 @@
    ============================================================================ */
 
 :root {
-  /* ========== CORE COLORS ========== */
-  --text-primary: #1D1D1F;
-  --text-secondary: #6E6E73;
-  --text-tertiary: #86868B;
-  --text-quaternary: #AEAEB2;
-  
-  /* Apple Blue - ONLY accent color */
-  --accent: #0071E3;
-  --accent-hover: #0077ED;
-  --accent-soft: rgba(0, 113, 227, 0.1);
-  --accent-rgb: 0, 113, 227;
-  
-  /* Status Colors - for icons/badges ONLY */
-  --success: #34C759;
-  --warning: #FF9500;
-  --error: #FF3B30;
-  --info: #007AFF;
-  
-  /* ========== LIQUID GLASS SYSTEM ========== */
-  /* These values are from Apple's iOS 26 design specs */
-  
-  --glass-bg: rgba(255, 255, 255, 0.35);
-  --glass-bg-elevated: rgba(255, 255, 255, 0.55);
-  --glass-bg-solid: rgba(255, 255, 255, 0.75);
-  --glass-blur: 40px;
+  /* ========== CORE COLORS - DARK MODE DEFAULT (Ospra Vision Pro) ========== */
+  --text-primary: #ffffff;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6E6E73;
+  --text-quaternary: #48484A;
+
+  /* Cyan/Teal accents for Ospra brand */
+  --accent: #06b6d4;
+  --accent-hover: #14b8a6;
+  --accent-soft: rgba(6, 182, 212, 0.15);
+  --accent-rgb: 6, 182, 212;
+
+  /* Secondary accent - Purple/Blue */
+  --accent-secondary: #8b5cf6;
+  --accent-secondary-rgb: 139, 92, 246;
+
+  /* Status Colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #06b6d4;
+
+  /* ========== GLASSMORPHISM SYSTEM (Dark Theme) ========== */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.08);
+  --glass-bg-solid: rgba(26, 26, 46, 0.85);
+  --glass-blur: 20px;
   --glass-saturation: 180%;
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-border-subtle: rgba(0, 0, 0, 0.06);
-  
-  /* Shadows for floating effect */
-  --glass-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.08),
-    0 2px 8px rgba(0, 0, 0, 0.04);
-  --glass-shadow-hover: 
-    0 16px 48px rgba(0, 0, 0, 0.12),
-    0 4px 12px rgba(0, 0, 0, 0.06);
-  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  --glass-inner-shadow: inset 0 0 20px -5px rgba(255, 255, 255, 0.5);
-  
-  /* Rainbow Refraction Gradient */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-border-subtle: rgba(255, 255, 255, 0.05);
+
+  /* Shadows with color glow */
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(6, 182, 212, 0.1);
+  --glass-shadow-hover:
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(6, 182, 212, 0.2);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-inner-shadow: inset 0 0 20px -5px rgba(255, 255, 255, 0.05);
+
+  /* Rainbow Refraction Gradient (darker for dark theme) */
   --refraction-gradient: linear-gradient(
     135deg,
-    rgba(255, 120, 120, 0.35) 0%,
-    rgba(255, 200, 120, 0.25) 20%,
-    rgba(120, 255, 200, 0.3) 40%,
-    rgba(120, 200, 255, 0.35) 60%,
-    rgba(200, 120, 255, 0.3) 80%,
-    rgba(255, 120, 200, 0.25) 100%
+    rgba(6, 182, 212, 0.4) 0%,
+    rgba(139, 92, 246, 0.4) 50%,
+    rgba(236, 72, 153, 0.4) 100%
   );
-  
-  /* Border Radius - Apple's signature curves */
+
+  /* Border Radius */
   --radius-sm: 12px;
   --radius-md: 20px;
   --radius-lg: 28px;
   --radius-xl: 36px;
-  
+
   /* Transitions */
   --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* ========== DARK MODE ========== */
-[data-theme="dark"] {
-  --text-primary: #F5F5F7;
-  --text-secondary: #A1A1A6;
-  --text-tertiary: #6E6E73;
-  --text-quaternary: #48484A;
-  
-  --glass-bg: rgba(255, 255, 255, 0.08);
-  --glass-bg-elevated: rgba(255, 255, 255, 0.12);
-  --glass-bg-solid: rgba(40, 40, 45, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-subtle: rgba(255, 255, 255, 0.06);
-  
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --glass-shadow-hover: 0 16px 48px rgba(0, 0, 0, 0.5);
-  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  --glass-inner-shadow: inset 0 0 20px -5px rgba(255, 255, 255, 0.1);
+/* ========== LIGHT MODE (Optional override) ========== */
+[data-theme="light"] {
+  --text-primary: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --text-tertiary: #86868B;
+  --text-quaternary: #AEAEB2;
+
+  --glass-bg: rgba(255, 255, 255, 0.35);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.55);
+  --glass-bg-solid: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-border-subtle: rgba(0, 0, 0, 0.06);
+
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.04);
+  --glass-shadow-hover:
+    0 16px 48px rgba(0, 0, 0, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.06);
+  --glass-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --glass-inner-shadow: inset 0 0 20px -5px rgba(255, 255, 255, 0.5);
 }
 
 /* ============================================================================
@@ -118,23 +121,22 @@ body {
   inset: 0;
   z-index: -10;
   background:
-    /* Colorful blobs that will show through glass */
+    /* Colorful glowing orbs - Ospra brand colors */
+    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(6, 182, 212, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 15%, rgba(139, 92, 246, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 50% at 15% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse 70% 60% at 85% 75%, rgba(236, 72, 153, 0.08) 0%, transparent 50%),
+    /* Dark base gradient (#0a0a0f to #1a1a2e) */
+    linear-gradient(145deg, #0a0a0f 0%, #16161f 40%, #1a1a2e 100%);
+}
+
+[data-theme="light"] .app-background {
+  background:
     radial-gradient(ellipse 80% 60% at 10% 20%, rgba(120, 180, 255, 0.18) 0%, transparent 55%),
     radial-gradient(ellipse 70% 50% at 90% 15%, rgba(200, 140, 255, 0.15) 0%, transparent 50%),
     radial-gradient(ellipse 60% 50% at 15% 80%, rgba(140, 255, 200, 0.12) 0%, transparent 50%),
     radial-gradient(ellipse 70% 60% at 85% 75%, rgba(255, 180, 140, 0.1) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(180, 200, 255, 0.08) 0%, transparent 40%),
-    /* Base gradient */
     linear-gradient(145deg, #F5F5F7 0%, #EAEAEF 40%, #E5E5EA 100%);
-}
-
-[data-theme="dark"] .app-background {
-  background:
-    radial-gradient(ellipse 80% 60% at 10% 20%, rgba(80, 140, 255, 0.2) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 90% 15%, rgba(160, 100, 255, 0.18) 0%, transparent 50%),
-    radial-gradient(ellipse 60% 50% at 15% 80%, rgba(100, 220, 180, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 60% at 85% 75%, rgba(255, 140, 100, 0.12) 0%, transparent 50%),
-    linear-gradient(145deg, #000000 0%, #0A0A0C 40%, #141416 100%);
 }
 
 /* ============================================================================

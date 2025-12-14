@@ -113,11 +113,15 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
     completeOnboardingStep,
     setUserName,
     isOnboarded,
+    setOnboarded,
     onboardingStep,
   } = useOspraStore();
 
-  // Show modal on mount if user is not onboarded and at step 0
+  // Show modal ONCE on initial app load if user is not onboarded
+  // This prevents the modal from re-appearing on every page navigation
   useEffect(() => {
+    // Only show if user has never been onboarded
+    // Note: isOnboarded is persisted in localStorage via Zustand persist middleware
     if (!isOnboarded && onboardingStep === 0) {
       // Small delay for smoother initial load
       const timer = setTimeout(() => {
@@ -125,23 +129,25 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [isOnboarded, onboardingStep, setShowWelcomeModal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const handleGetStarted = () => {
     completeOnboardingStep('welcome');
     setOnboardingStep(1);
     setShowWelcomeModal(false);
-    
+    setOnboarded(true); // Mark as onboarded immediately
+
     // Set a default name for now (will be updated in setup wizard)
     setUserName('there');
-    
+
     onComplete?.();
   };
 
   const handleSkip = () => {
     setShowWelcomeModal(false);
-    // Don't mark as onboarded, just close the modal
-    // User can restart onboarding by clearing localStorage or from settings
+    setOnboarded(true); // Mark as onboarded when skipped
+    // This ensures the modal never shows again
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -174,38 +180,38 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
             exit="exit"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Glass Card Container */}
+            {/* Glass Card Container - Dark Glassmorphism */}
             <div
               className="relative overflow-hidden rounded-[28px]"
               style={{
-                background: 'rgba(255, 255, 255, 0.85)',
-                backdropFilter: 'blur(40px) saturate(180%)',
-                WebkitBackdropFilter: 'blur(40px) saturate(180%)',
-                border: '1px solid rgba(255, 255, 255, 0.5)',
-                boxShadow: '0 24px 80px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(24px) saturate(200%)',
+                WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 24px 80px rgba(0, 0, 0, 0.6), 0 0 24px rgba(6, 182, 212, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
               }}
             >
-              {/* Rainbow Refraction Border */}
+              {/* Rainbow Refraction Border - Ospra Colors */}
               <div
                 className="absolute inset-[-1px] rounded-[28px] pointer-events-none"
                 style={{
                   padding: '1.5px',
-                  background: 'linear-gradient(135deg, rgba(255,120,120,0.4) 0%, rgba(255,200,120,0.3) 20%, rgba(120,255,200,0.35) 40%, rgba(120,200,255,0.4) 60%, rgba(200,120,255,0.35) 80%, rgba(255,120,200,0.3) 100%)',
+                  background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(139, 92, 246, 0.4) 50%, rgba(236, 72, 153, 0.4) 100%)',
                   WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                   mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
                   WebkitMaskComposite: 'xor',
                   maskComposite: 'exclude',
-                  opacity: 0.7,
+                  opacity: 0.6,
                 }}
               />
 
               {/* Close Button */}
               <button
                 onClick={handleSkip}
-                className="absolute top-4 right-4 p-2 rounded-xl hover:bg-black/5 transition-colors z-10"
+                className="absolute top-4 right-4 p-2 rounded-xl hover:bg-white/10 transition-colors z-10"
                 aria-label="Close"
               >
-                <X className="w-5 h-5 text-[var(--text-tertiary)]" />
+                <X className="w-5 h-5 text-[var(--text-secondary)]" />
               </button>
 
               {/* Content */}
@@ -215,14 +221,14 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
                   <motion.div
                     className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
                     style={{
-                      background: 'linear-gradient(135deg, #0071E3 0%, #5856D6 100%)',
-                      boxShadow: '0 8px 24px rgba(0, 113, 227, 0.3)',
+                      background: 'linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%)',
+                      boxShadow: '0 8px 24px rgba(6, 182, 212, 0.4), 0 0 30px rgba(139, 92, 246, 0.2)',
                     }}
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
-                    transition={{ 
-                      type: 'spring', 
-                      damping: 15, 
+                    transition={{
+                      type: 'spring',
+                      damping: 15,
                       stiffness: 200,
                       delay: 0.1,
                     }}
@@ -254,7 +260,7 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
                   {capabilities.map((item, index) => (
                     <motion.div
                       key={item.title}
-                      className="flex items-start gap-4 p-3 rounded-xl transition-colors hover:bg-black/[0.03]"
+                      className="flex items-start gap-4 p-3 rounded-xl transition-colors hover:bg-white/5"
                       custom={index}
                       variants={itemVariants}
                       initial="hidden"
@@ -263,16 +269,16 @@ export default function WelcomeModal({ onComplete }: WelcomeModalProps) {
                       <div
                         className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
                         style={{
-                          background: 'rgba(0, 113, 227, 0.1)',
+                          background: 'rgba(6, 182, 212, 0.15)',
                         }}
                       >
-                        <item.icon className="w-5 h-5 text-[var(--accent)]" />
+                        <item.icon className="w-5 h-5" style={{ color: '#06b6d4' }} />
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                           {item.title}
                         </h3>
-                        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
                           {item.description}
                         </p>
                       </div>

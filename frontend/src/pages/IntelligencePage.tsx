@@ -178,7 +178,7 @@ function InsightCard({ insight, onAction }: InsightCardProps) {
         <div className={`p-2 rounded-lg bg-white/50 text-${config.color}-600`}>
           <Icon className="w-4 h-4" />
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h4 className="text-sm font-medium text-primary">{insight.title}</h4>
           <p className="text-xs text-secondary mt-1">{insight.description}</p>
           {insight.action && onAction && (

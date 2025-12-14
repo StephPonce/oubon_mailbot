@@ -52,15 +52,15 @@ function ServiceCard({ name, status, detail, latency, icon, onRefresh, isRefresh
   const getStatusConfig = (s: string) => {
     switch (s) {
       case 'online':
-        return { color: 'text-green-600', bg: 'bg-green-500', label: 'Online', Icon: CheckCircle2 };
+        return { color: 'text-green-600', bg: 'bg-green-500/100', label: 'Online', Icon: CheckCircle2 };
       case 'processing':
-        return { color: 'text-blue-600', bg: 'bg-blue-500', label: 'Processing', Icon: Activity };
+        return { color: 'text-blue-600', bg: 'bg-cyan-500/100', label: 'Processing', Icon: Activity };
       case 'warning':
         return { color: 'text-amber-600', bg: 'bg-amber-500', label: 'Warning', Icon: AlertCircle };
       case 'offline':
-        return { color: 'text-red-600', bg: 'bg-red-500', label: 'Offline', Icon: XCircle };
+        return { color: 'text-red-600', bg: 'bg-red-500/100', label: 'Offline', Icon: XCircle };
       default:
-        return { color: 'text-gray-500', bg: 'bg-gray-500', label: 'Unknown', Icon: Activity };
+        return { color: 'text-tertiary', bg: ' 0', label: 'Unknown', Icon: Activity };
     }
   };
 
@@ -70,7 +70,7 @@ function ServiceCard({ name, status, detail, latency, icon, onRefresh, isRefresh
     <div className="glass-card p-5">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-xl ${status === 'online' ? 'bg-green-500/10' : status === 'warning' ? 'bg-amber-500/10' : 'bg-black/5'}`}>
+          <div className={`p-3 rounded-xl ${status === 'online' ? 'bg-green-500/100/10' : status === 'warning' ? 'bg-amber-500/10' : 'bg-black/5'}`}>
             {icon}
           </div>
           <div>
@@ -205,9 +205,9 @@ export default function SystemHealthPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${
-            overallStatus === 'good' ? 'bg-green-500/10 border border-green-500/20' :
+            overallStatus === 'good' ? 'bg-green-500/100/10 border border-green-500/20' :
             overallStatus === 'warning' ? 'bg-amber-500/10 border border-amber-500/20' :
-            'bg-red-500/10 border border-red-500/20'
+            'bg-red-500/100/10 border border-red-500/20'
           }`}>
             {overallStatus === 'good' ? (
               <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -318,7 +318,7 @@ export default function SystemHealthPage() {
             <div>
               <div className="text-xs text-tertiary mb-1">Status</div>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${healthData ? 'bg-green-500' : 'bg-red-500'}`} />
+                <div className={`w-2 h-2 rounded-full ${healthData ? 'bg-green-500/100' : 'bg-red-500/100'}`} />
                 <span className={`text-sm font-medium ${healthData ? 'text-green-600' : 'text-red-500'}`}>
                   {healthData ? 'Connected' : 'Disconnected'}
                 </span>

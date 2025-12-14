@@ -9,7 +9,7 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({ children, maxWidth = '
   const maxWidthClass = maxWidth === 'full' ? '' : `max-w-${maxWidth} mx-auto`;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-12" style={{ perspective: '1500px' }}>
+    <div className="min-h-screen   p-12" style={{ perspective: '1500px' }}>
       <div className={`${maxWidthClass} space-y-8`}>
         {children}
       </div>

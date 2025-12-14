@@ -146,38 +146,38 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">
+            <h2 className="text-3xl font-bold text-primary mb-3">
               Product Deployed Successfully!
             </h2>
-            <p className="text-gray-600 mb-6">
+            <p className="text-secondary mb-6">
               Your product has been {deploymentSuccess.published ? 'published' : 'saved as draft'} to your Shopify store
             </p>
 
             {/* Deployment Details */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+            <div className="  rounded-lg p-4 mb-6 text-left">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase font-medium">Product Title</p>
-                  <p className="text-sm font-semibold text-gray-900 mt-1">{editedTitle}</p>
+                  <p className="text-xs text-tertiary uppercase font-medium">Product Title</p>
+                  <p className="text-sm font-semibold text-primary mt-1">{editedTitle}</p>
                 </div>
                 {editedPrice && (
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">Price</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">${editedPrice}</p>
+                    <p className="text-xs text-tertiary uppercase font-medium">Price</p>
+                    <p className="text-sm font-semibold text-primary mt-1">${editedPrice}</p>
                   </div>
                 )}
                 {deploymentSuccess.ai_costs && (
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">AI Cost</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
+                    <p className="text-xs text-tertiary uppercase font-medium">AI Cost</p>
+                    <p className="text-sm font-semibold text-primary mt-1">
                       ${deploymentSuccess.ai_costs.total.toFixed(2)}
                     </p>
                   </div>
                 )}
                 {deploymentSuccess.processing_time_seconds && (
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">Processing Time</p>
-                    <p className="text-sm font-semibold text-gray-900 mt-1">
+                    <p className="text-xs text-tertiary uppercase font-medium">Processing Time</p>
+                    <p className="text-sm font-semibold text-primary mt-1">
                       {deploymentSuccess.processing_time_seconds.toFixed(1)}s
                     </p>
                   </div>
@@ -213,7 +213,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
 
             <button
               onClick={onClose}
-              className="mt-4 w-full px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700"
+              className="mt-4 w-full px-6 py-3 border border-white/10 rounded-lg hover:  transition font-medium text-secondary"
             >
               Close
             </button>
@@ -227,19 +227,19 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full my-8">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-200 sticky top-0 bg-white rounded-t-xl z-10">
+        <div className="flex items-start justify-between p-6 border-b border-white/10 sticky top-0 bg-white rounded-t-xl z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-indigo-600" />
               Deploy to Shopify - AI Preview
             </h2>
-            <p className="text-gray-500 mt-1">Review and edit AI-generated content before deploying</p>
+            <p className="text-tertiary mt-1">Review and edit AI-generated content before deploying</p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-tertiary" />
           </button>
         </div>
 
@@ -247,10 +247,10 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
         {loading && (
           <div className="p-12 text-center">
             <Loader2 className="w-16 h-16 animate-spin text-indigo-600 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-primary mb-2">
               Generating AI Preview...
             </h3>
-            <p className="text-gray-600">
+            <p className="text-secondary">
               Our AI is creating optimized content for your product
             </p>
           </div>
@@ -259,7 +259,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
         {/* Error Display */}
         {error && (
           <div className="p-6">
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <div className="p-4 bg-red-500/10 border border-red-200 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-red-800">
                 <p className="font-medium">Error</p>
@@ -279,7 +279,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
         {preview && !loading && (
           <div className="max-h-[calc(90vh-200px)] overflow-y-auto">
             {/* Product Info */}
-            <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
+            <div className="p-6 border-b border-white/10 bg-gradient-to-r from-indigo-50 to-purple-50">
               <div className="flex items-start gap-4">
                 {product.image_url && (
                   <img
@@ -288,8 +288,8 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                     className="w-24 h-24 rounded-lg object-cover shadow-md"
                   />
                 )}
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold text-primary">{product.name}</h3>
                   <div className="flex items-center gap-3 mt-2">
                     {product.niche && (
                       <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-medium">
@@ -297,7 +297,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                       </span>
                     )}
                     {product.cost && (
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-secondary">
                         Supplier Cost: ${product.cost.toFixed(2)}
                       </span>
                     )}
@@ -310,14 +310,14 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
               {/* Editable Title */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Edit2 className="w-4 h-4 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Product Title</label>
+                  <Edit2 className="w-4 h-4 text-tertiary" />
+                  <label className="text-sm font-medium text-secondary">Product Title</label>
                 </div>
                 <input
                   type="text"
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="Enter product title"
                 />
               </div>
@@ -325,41 +325,41 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
               {/* Editable Description */}
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-gray-500" />
-                  <label className="text-sm font-medium text-gray-700">Product Description</label>
+                  <FileText className="w-4 h-4 text-tertiary" />
+                  <label className="text-sm font-medium text-secondary">Product Description</label>
                 </div>
                 <textarea
                   value={editedDescription}
                   onChange={(e) => setEditedDescription(e.target.value)}
                   rows={6}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 text-primary focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   placeholder="Enter product description"
                 />
               </div>
 
               {/* SEO Preview */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="  border border-white/10 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Tag className="w-4 h-4 text-gray-600" />
-                  <h3 className="font-semibold text-gray-900">SEO Preview</h3>
+                  <Tag className="w-4 h-4 text-secondary" />
+                  <h3 className="font-semibold text-primary">SEO Preview</h3>
                 </div>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">Meta Title</p>
+                    <p className="text-xs text-tertiary uppercase font-medium">Meta Title</p>
                     <p className="text-sm text-indigo-600 font-medium mt-1">{editedTitle}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 uppercase font-medium">Meta Description</p>
-                    <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                    <p className="text-xs text-tertiary uppercase font-medium">Meta Description</p>
+                    <p className="text-sm text-secondary mt-1 line-clamp-2">
                       {editedDescription.substring(0, 160)}...
                     </p>
                   </div>
                   {editedTags.length > 0 && (
                     <div>
-                      <p className="text-xs text-gray-500 uppercase font-medium">Tags</p>
+                      <p className="text-xs text-tertiary uppercase font-medium">Tags</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {editedTags.map((tag, idx) => (
-                          <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full">
+                          <span key={idx} className="text-xs bg-gray-100 text-secondary px-2 py-1 rounded-full">
                             {tag}
                           </span>
                         ))}
@@ -371,14 +371,14 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
 
               {/* Pricing */}
               {editedPrice && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="bg-green-500/100/10 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <DollarSign className="w-4 h-4 text-green-600" />
                     <h3 className="font-semibold text-green-900">Pricing</h3>
                   </div>
                   <div className="flex items-center gap-4">
                     <div>
-                      <label className="text-xs text-green-700 font-medium">Selling Price</label>
+                      <label className="text-xs text-green-400 font-medium">Selling Price</label>
                       <input
                         type="number"
                         step="0.01"
@@ -389,7 +389,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                     </div>
                     {product.cost && (
                       <div>
-                        <p className="text-xs text-green-700 font-medium">Profit Margin</p>
+                        <p className="text-xs text-green-400 font-medium">Profit Margin</p>
                         <p className="text-lg font-bold text-green-600 mt-1">
                           {(((Number(editedPrice) - product.cost) / Number(editedPrice)) * 100).toFixed(1)}%
                         </p>
@@ -397,7 +397,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                     )}
                     {product.cost && (
                       <div>
-                        <p className="text-xs text-green-700 font-medium">Profit</p>
+                        <p className="text-xs text-green-400 font-medium">Profit</p>
                         <p className="text-lg font-bold text-green-600 mt-1">
                           ${(Number(editedPrice) - product.cost).toFixed(2)}
                         </p>
@@ -448,22 +448,22 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
               <div>
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center gap-2 text-gray-700 hover:text-gray-900 mb-3 font-medium"
+                  className="flex items-center gap-2 text-secondary hover:text-primary mb-3 font-medium"
                 >
                   <Settings className="w-4 h-4" />
                   <span>AI Settings</span>
-                  <span className="text-xs text-gray-500">({showAdvanced ? 'Hide' : 'Show'})</span>
+                  <span className="text-xs text-tertiary">({showAdvanced ? 'Hide' : 'Show'})</span>
                 </button>
 
                 {showAdvanced && (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="  border border-white/10 rounded-lg p-4">
                     <div className="grid grid-cols-2 gap-4">
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={aiSettings.ai_content}
                           onChange={(e) => setAiSettings({ ...aiSettings, ai_content: e.target.checked })}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-sm">Generate AI Content</span>
                       </label>
@@ -473,7 +473,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                           type="checkbox"
                           checked={aiSettings.ai_images}
                           onChange={(e) => setAiSettings({ ...aiSettings, ai_images: e.target.checked })}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-sm">Enhance Images</span>
                       </label>
@@ -483,7 +483,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                           type="checkbox"
                           checked={aiSettings.publish}
                           onChange={(e) => setAiSettings({ ...aiSettings, publish: e.target.checked })}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-sm">Auto-Publish (vs Draft)</span>
                       </label>
@@ -493,7 +493,7 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
                           type="checkbox"
                           checked={aiSettings.add_branding}
                           onChange={(e) => setAiSettings({ ...aiSettings, add_branding: e.target.checked })}
-                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-sm">Add Branding</span>
                       </label>
@@ -507,10 +507,10 @@ export const DeployPreviewModal: React.FC<DeployPreviewModalProps> = ({
 
         {/* Footer Actions */}
         {preview && !loading && (
-          <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50 sticky bottom-0 rounded-b-xl">
+          <div className="flex items-center justify-between p-6 border-t border-white/10   sticky bottom-0 rounded-b-xl">
             <button
               onClick={onClose}
-              className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-white transition font-medium text-gray-700"
+              className="px-6 py-2.5 border border-white/10 rounded-lg hover:bg-white transition font-medium text-secondary"
             >
               Cancel
             </button>

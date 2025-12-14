@@ -19,13 +19,19 @@ requests
 jinja2
 slack_sdk
 email-validator
-apscheduler
+# apscheduler  # DEPRECATED - Replaced by Celery + Redis (GROK #13)
 pytrends
 aiosqlite
 pytz
 praw
 aiohttp
 beautifulsoup4
+
+# Celery + Redis Task Queue (GROK RECOMMENDATION #13)
+celery[redis]==5.3.4  # Distributed task queue
+redis==4.5.4  # Redis client (compatible with Celery 5.3.4)
+flower==2.0.1  # Task monitoring dashboard
+kombu==5.3.4  # Messaging library
 
 # Ospra OS Intelligence System
 pillow>=10.1.0  # Image processing for DALL-E + optimization

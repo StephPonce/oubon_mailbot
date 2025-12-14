@@ -13,16 +13,19 @@ Endpoints:
 - GET /api/stores/{store_id}/insights - Get cross-store recommendations
 - POST /api/stores/insights/{learning_id}/apply - Apply a learning
 - POST /api/stores/insights/{learning_id}/dismiss - Dismiss a learning
+
+UPDATED: GROK RECOMMENDATION #14 - Multi-Tenant Isolation
+- Uses tenant-scoped database for automatic data isolation
+- Audit logging for compliance tracking
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 
-from ospra_os.database import get_db
-from ospra_os.database.multi_store_models import User
-from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.tenancy import get_tenant_db, get_tenant, log_success, log_failure
+from ospra_os.tenancy.queries import TenantScopedSession
+from ospra_os.tenancy.context import TenantContext
 from ospra_os.services.store_service import StoreService
 
 
@@ -95,32 +98,34 @@ class InsightResponse(BaseModel):
 
 @router.get("", response_model=List[StoreResponse])
 async def list_stores(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     List all stores for the current user.
 
     Returns stores with status, metrics, and pending actions count.
+    **Tenant-isolated**: Automatically filtered to current user.
     """
-    service = StoreService(db)
-    stores = service.get_user_stores(current_user.id)
+    service = StoreService(tenant_db.raw_session)
+    stores = service.get_user_stores(tenant.user_id)
     return stores
 
 
 @router.get("/{store_id}", response_model=StoreResponse)
 async def get_store(
     store_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Get detailed information for a specific store.
 
     Requires store ownership.
+    **Tenant-isolated**: Can only access own stores.
     """
-    service = StoreService(db)
-    store = service.get_store(store_id, current_user.id)
+    service = StoreService(tenant_db.raw_session)
+    store = service.get_store(store_id, tenant.user_id)
 
     if not store:
         raise HTTPException(
@@ -134,28 +139,53 @@ async def get_store(
 @router.post("", response_model=Dict[str, Any], status_code=status.HTTP_201_CREATED)
 async def create_store(
     store_data: StoreCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    request: Request,
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Create a new store for the current user.
 
     Supports Shopify, Amazon, and WooCommerce platforms.
     New stores start in 'setup' status.
+    **Tenant-isolated**: Store automatically assigned to current user.
+    **Audit logged**: Store creation tracked for compliance.
     """
-    service = StoreService(db)
+    service = StoreService(tenant_db.raw_session)
 
     try:
         new_store = service.create_store(
-            user_id=current_user.id,
+            user_id=tenant.user_id,
             store_name=store_data.store_name,
             store_url=store_data.store_url,
             platform=store_data.platform,
             credentials=store_data.credentials,
             niche=store_data.niche,
         )
+
+        # Audit log for compliance
+        log_success(
+            db=tenant_db.raw_session,
+            action="store.create",
+            resource_type="Store",
+            resource_id=new_store.get("id"),
+            request=request,
+            metadata={
+                "store_name": store_data.store_name,
+                "platform": store_data.platform,
+                "niche": store_data.niche
+            }
+        )
+
         return new_store
     except ValueError as e:
+        log_failure(
+            db=tenant_db.raw_session,
+            action="store.create",
+            resource_type="Store",
+            request=request,
+            error_message=str(e)
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
@@ -166,19 +196,22 @@ async def create_store(
 async def update_store_status(
     store_id: int,
     status_update: StoreStatusUpdate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    request: Request,
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Update store status.
 
     Valid statuses: active, paused, disconnected, error, setup
+    **Tenant-isolated**: Can only update own stores.
+    **Audit logged**: Status changes tracked for compliance.
     """
-    service = StoreService(db)
+    service = StoreService(tenant_db.raw_session)
 
     updated_store = service.update_store_status(
         store_id=store_id,
-        user_id=current_user.id,
+        user_id=tenant.user_id,
         status=status_update.status,
         sync_error=status_update.sync_error
     )
@@ -189,6 +222,19 @@ async def update_store_status(
             detail="Store not found or access denied"
         )
 
+    # Audit log
+    log_success(
+        db=tenant_db.raw_session,
+        action="store.status_update",
+        resource_type="Store",
+        resource_id=store_id,
+        request=request,
+        metadata={
+            "new_status": status_update.status,
+            "sync_error": status_update.sync_error
+        }
+    )
+
     return updated_store
 
 
@@ -198,8 +244,8 @@ async def update_store_status(
 
 @router.post("/generate-learnings", response_model=Dict[str, int])
 async def generate_cross_store_learnings(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Generate cross-store learning insights.
@@ -210,9 +256,10 @@ async def generate_cross_store_learnings(
 
     Example: "Yoga mats convert at 4.2% in Fitness First,
              recommend for Health Hub."
+    **Tenant-isolated**: Only analyzes your own stores.
     """
-    service = StoreService(db)
-    learnings_count = service.generate_cross_store_learnings(current_user.id)
+    service = StoreService(tenant_db.raw_session)
+    learnings_count = service.generate_cross_store_learnings(tenant.user_id)
 
     return {
         "learnings_generated": learnings_count
@@ -223,8 +270,8 @@ async def generate_cross_store_learnings(
 async def get_cross_store_insights(
     store_id: int,
     limit: int = 10,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Get cross-store learning insights for a specific store.
@@ -232,11 +279,12 @@ async def get_cross_store_insights(
     Returns recommendations from other stores with matching niches.
     Insights show projected conversion rates and revenue based on
     performance in source stores.
+    **Tenant-isolated**: Only sees insights from your own stores.
     """
-    service = StoreService(db)
+    service = StoreService(tenant_db.raw_session)
 
     # Verify store ownership
-    store = service.get_store(store_id, current_user.id)
+    store = service.get_store(store_id, tenant.user_id)
     if not store:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -245,7 +293,7 @@ async def get_cross_store_insights(
 
     insights = service.get_cross_store_insights(
         store_id=store_id,
-        user_id=current_user.id,
+        user_id=tenant.user_id,
         limit=limit
     )
 
@@ -255,20 +303,23 @@ async def get_cross_store_insights(
 @router.post("/insights/{learning_id}/apply", response_model=Dict[str, Any])
 async def apply_cross_store_learning(
     learning_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    request: Request,
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Mark a cross-store learning as applied.
 
     This indicates the user has implemented the recommendation
     (e.g., added the product to their target store).
+    **Tenant-isolated**: Can only apply your own learnings.
+    **Audit logged**: Application tracked for analytics.
     """
-    service = StoreService(db)
+    service = StoreService(tenant_db.raw_session)
 
     result = service.apply_cross_store_learning(
         learning_id=learning_id,
-        user_id=current_user.id
+        user_id=tenant.user_id
     )
 
     if not result:
@@ -277,26 +328,38 @@ async def apply_cross_store_learning(
             detail="Learning not found or access denied"
         )
 
+    # Audit log
+    log_success(
+        db=tenant_db.raw_session,
+        action="store.learning_applied",
+        resource_type="CrossStoreLearning",
+        resource_id=learning_id,
+        request=request
+    )
+
     return result
 
 
 @router.post("/insights/{learning_id}/dismiss", response_model=Dict[str, Any])
 async def dismiss_cross_store_learning(
     learning_id: int,
+    request: Request,
     reason: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    tenant_db: TenantScopedSession = Depends(get_tenant_db),
+    tenant: TenantContext = Depends(get_tenant)
 ):
     """
     Dismiss a cross-store learning recommendation.
 
     Optionally provide a reason for dismissal (e.g., "Product not relevant to niche").
+    **Tenant-isolated**: Can only dismiss your own learnings.
+    **Audit logged**: Dismissal tracked for improving recommendations.
     """
-    service = StoreService(db)
+    service = StoreService(tenant_db.raw_session)
 
     result = service.dismiss_cross_store_learning(
         learning_id=learning_id,
-        user_id=current_user.id,
+        user_id=tenant.user_id,
         reason=reason
     )
 
@@ -305,6 +368,16 @@ async def dismiss_cross_store_learning(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Learning not found or access denied"
         )
+
+    # Audit log
+    log_success(
+        db=tenant_db.raw_session,
+        action="store.learning_dismissed",
+        resource_type="CrossStoreLearning",
+        resource_id=learning_id,
+        request=request,
+        metadata={"reason": reason}
+    )
 
     return result
 

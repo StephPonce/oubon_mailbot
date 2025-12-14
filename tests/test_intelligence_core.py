@@ -17,7 +17,7 @@ from unittest.mock import Mock, AsyncMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ospra_os.database.multi_store_models import Base, Product, ProductStatus
+from ospra_os.database import Base, Product, ProductStatus
 from ospra_os.intelligence.unified_context import UnifiedContextBuilder
 from ospra_os.intelligence.briefing_engine import BriefingEngine
 from ospra_os.intelligence.grade_reasoning import GradeReasoningEngine

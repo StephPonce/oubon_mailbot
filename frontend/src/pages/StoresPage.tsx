@@ -61,7 +61,7 @@ interface SubscriptionTier {
 }
 
 const TIERS: Record<string, SubscriptionTier> = {
-  NEST: { name: 'Nest', store_limit: 1, icon: <Store className="w-5 h-5" />, color: 'text-gray-600' },
+  NEST: { name: 'Nest', store_limit: 1, icon: <Store className="w-5 h-5" />, color: 'text-secondary' },
   FLIGHT: { name: 'Flight', store_limit: 1, icon: <Zap className="w-5 h-5" />, color: 'text-blue-600' },
   SOAR: { name: 'Soar', store_limit: 5, icon: <Rocket className="w-5 h-5" />, color: 'text-purple-600' },
   STRATOSPHERE: { name: 'Stratosphere', store_limit: Infinity, icon: <Crown className="w-5 h-5" />, color: 'text-yellow-600' }
@@ -155,7 +155,7 @@ export default function StoresPage() {
   const getPlatformIcon = (platform: string) => {
     const platformLower = platform.toLowerCase();
     if (platformLower === 'shopify') {
-      return <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+      return <div className="w-10 h-10 rounded-lg bg-green-500/100/10 flex items-center justify-center">
         <span className="text-green-600 text-lg font-bold">S</span>
       </div>;
     } else if (platformLower === 'amazon') {
@@ -167,7 +167,7 @@ export default function StoresPage() {
         <span className="text-purple-600 text-lg font-bold">W</span>
       </div>;
     }
-    return <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+    return <div className="w-10 h-10 rounded-lg bg-cyan-500/100/10 flex items-center justify-center">
       <Store className="w-5 h-5 text-blue-600" />
     </div>;
   };
@@ -175,7 +175,7 @@ export default function StoresPage() {
   const getStatusBadge = (store: StoreData) => {
     if (store.is_active) {
       return (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/10 text-green-700">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-500/100/10 text-green-400">
           <CheckCircle className="w-3.5 h-3.5" />
           <span className="text-xs font-medium">Active</span>
         </div>
@@ -210,7 +210,7 @@ export default function StoresPage() {
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
             canAddStore
               ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-gray-300 text-tertiary cursor-not-allowed'
           }`}
         >
           <Plus className="w-4 h-4" />
@@ -246,7 +246,7 @@ export default function StoresPage() {
             <div className="h-2 bg-white rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ${
-                  usagePercent >= 100 ? 'bg-red-500' : usagePercent >= 75 ? 'bg-amber-500' : 'bg-blue-500'
+                  usagePercent >= 100 ? 'bg-red-500/100' : usagePercent >= 75 ? 'bg-amber-500' : 'bg-cyan-500/100'
                 }`}
                 style={{ width: `${Math.min(usagePercent, 100)}%` }}
               />
@@ -259,7 +259,7 @@ export default function StoresPage() {
           <div className="mt-4 p-3 bg-white rounded-lg border border-amber-200">
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-primary">Store limit reached</p>
                 <p className="text-xs text-tertiary mt-1">
                   Upgrade to connect more stores and unlock advanced features
@@ -282,7 +282,7 @@ export default function StoresPage() {
                 className={`p-3 rounded-lg border transition-all ${
                   userTier === key
                     ? 'bg-white border-blue-300 shadow-sm'
-                    : 'bg-white/50 border-gray-200 hover:border-blue-200'
+                    : 'bg-white/50 border-white/10 hover:border-cyan-500/20'
                 }`}
               >
                 <div className={`${tier.color} mb-2`}>{tier.icon}</div>
@@ -402,7 +402,7 @@ export default function StoresPage() {
                   <div className={`text-xs font-medium ${
                     store.rank_change > 0 ? 'text-green-600' :
                     store.rank_change < 0 ? 'text-red-600' :
-                    'text-gray-500'
+                    'text-tertiary'
                   }`}>
                     {store.rank_change_label}
                   </div>
@@ -428,7 +428,7 @@ export default function StoresPage() {
                   ) : (
                     <button
                       onClick={() => handleActivateStore(store.id)}
-                      className="p-2 bg-green-500/10 hover:bg-green-500/20 text-green-700 rounded-lg transition-colors"
+                      className="p-2 bg-green-500/100/10 hover:bg-green-500/100/20 text-green-400 rounded-lg transition-colors"
                       title="Activate store"
                     >
                       <Play className="w-4 h-4" />
@@ -437,7 +437,7 @@ export default function StoresPage() {
                   {store.rank_position !== 1 && (
                     <button
                       onClick={() => handleMakePrimary(store.id)}
-                      className="p-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 rounded-lg transition-colors"
+                      className="p-2 bg-amber-500/100/10 hover:bg-amber-500/100/20 text-yellow-700 rounded-lg transition-colors"
                       title="Make primary"
                     >
                       <Star className="w-4 h-4" />
@@ -445,7 +445,7 @@ export default function StoresPage() {
                   )}
                   <button
                     onClick={() => handleDeleteStore(store.id)}
-                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-700 rounded-lg transition-colors"
+                    className="p-2 bg-red-500/100/10 hover:bg-red-500/100/20 text-red-700 rounded-lg transition-colors"
                     title="Disconnect store"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -503,10 +503,10 @@ function AddStoreModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
   });
 
   const platforms = [
-    { id: 'shopify', name: 'Shopify', icon: 'S', color: 'bg-green-500', available: true },
+    { id: 'shopify', name: 'Shopify', icon: 'S', color: 'bg-green-500/100', available: true },
     { id: 'amazon', name: 'Amazon', icon: 'A', color: 'bg-orange-500', available: false },
     { id: 'woocommerce', name: 'WooCommerce', icon: 'W', color: 'bg-purple-500', available: false },
-    { id: 'etsy', name: 'Etsy', icon: 'E', color: 'bg-red-500', available: false },
+    { id: 'etsy', name: 'Etsy', icon: 'E', color: 'bg-red-500/100', available: false },
   ];
 
   const handleConnectShopify = async () => {
@@ -570,8 +570,8 @@ function AddStoreModal({ onClose, onSuccess }: { onClose: () => void; onSuccess:
                     disabled={!platform.available}
                     className={`p-6 rounded-xl border-2 transition-all ${
                       platform.available
-                        ? 'border-black/10 hover:border-blue-300 hover:bg-blue-50 cursor-pointer'
-                        : 'border-black/5 bg-gray-50 cursor-not-allowed opacity-50'
+                        ? 'border-black/10 hover:border-blue-300 hover:bg-cyan-500/10 cursor-pointer'
+                        : 'border-black/5   cursor-not-allowed opacity-50'
                     }`}
                   >
                     <div className={`w-12 h-12 ${platform.color} rounded-lg flex items-center justify-center text-white text-2xl font-bold mb-3 mx-auto`}>
@@ -823,7 +823,7 @@ function StoreSettingsModal({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:bg-gray-300"
+              className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors disabled:bg-gray-300"
             >
               {saving ? 'Saving...' : 'Save Changes'}
             </button>

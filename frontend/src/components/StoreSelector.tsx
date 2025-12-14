@@ -51,7 +51,7 @@ const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string
     border: 'border-orange-500/50'
   },
   woocommerce: {
-    bg: 'bg-blue-500/20',
+    bg: 'bg-cyan-500/100/20',
     text: 'text-blue-400',
     border: 'border-blue-500/50'
   },
@@ -61,7 +61,7 @@ const PLATFORM_COLORS: Record<string, { bg: string; text: string; border: string
     border: 'border-pink-500/50'
   },
   ebay: {
-    bg: 'bg-yellow-500/20',
+    bg: 'bg-amber-500/100/20',
     text: 'text-yellow-400',
     border: 'border-yellow-500/50'
   }
@@ -113,8 +113,8 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
   const getPlatformBadge = (platform: string) => {
     const platformKey = platform.toLowerCase();
     const colors = PLATFORM_COLORS[platformKey] || {
-      bg: 'bg-gray-500/20',
-      text: 'text-gray-400',
+      bg: ' 0/20',
+      text: 'text-tertiary',
       border: 'border-gray-500/50'
     };
 
@@ -146,7 +146,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
           {/* Store Dropdown */}
           <div className="flex-1 max-w-md">
-            <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">
+            <label className="block text-xs font-medium text-tertiary mb-2 uppercase tracking-wider">
               Active Store
             </label>
             <div className="relative">
@@ -161,7 +161,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                       {activeStore ? activeStore.store_name : 'All Stores (Portfolio View)'}
                     </div>
                     {activeStore && (
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className="text-xs text-tertiary mt-0.5">
                         ID: {activeStore.id}
                       </div>
                     )}
@@ -173,7 +173,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                   )}
                 </div>
                 <ChevronDown
-                  className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                  className={`w-5 h-5 text-tertiary transition-transform duration-200 ${
                     isDropdownOpen ? 'rotate-180' : ''
                   }`}
                 />
@@ -185,7 +185,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                   {/* Search */}
                   <div className="p-3 border-b border-gray-700">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-tertiary" />
                       <input
                         type="text"
                         placeholder="Search stores..."
@@ -197,7 +197,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                       {searchQuery && (
                         <button
                           onClick={() => setSearchQuery('')}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-tertiary hover:text-gray-300"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -211,18 +211,18 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                     <button
                       onClick={() => handleSelectStore(null)}
                       className={`w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors border-b border-gray-700/50 ${
-                        !activeStore ? 'bg-blue-500/10' : ''
+                        !activeStore ? 'bg-cyan-500/100/10' : ''
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                           <StoreIcon className="w-5 h-5 text-white" />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <div className="font-medium text-white">All Stores</div>
-                          <div className="text-xs text-gray-400">Portfolio View</div>
+                          <div className="text-xs text-tertiary">Portfolio View</div>
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-tertiary">
                           {stores.length} {stores.length === 1 ? 'store' : 'stores'}
                         </div>
                       </div>
@@ -235,12 +235,12 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                           key={store.id}
                           onClick={() => handleSelectStore(store)}
                           className={`w-full px-4 py-3 text-left hover:bg-gray-700/50 transition-colors border-b border-gray-700/50 last:border-b-0 ${
-                            activeStore?.id === store.id ? 'bg-blue-500/10' : ''
+                            activeStore?.id === store.id ? 'bg-cyan-500/100/10' : ''
                           }`}
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center">
-                              <StoreIcon className="w-5 h-5 text-gray-400" />
+                              <StoreIcon className="w-5 h-5 text-tertiary" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
@@ -249,7 +249,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                                 </span>
                                 {getPlatformBadge(store.platform)}
                               </div>
-                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                              <div className="flex items-center gap-3 mt-1 text-xs text-tertiary">
                                 <span>${store.monthly_revenue.toLocaleString()}/mo</span>
                                 <span>•</span>
                                 <span>{store.active_products} products</span>
@@ -262,7 +262,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                         </button>
                       ))
                     ) : (
-                      <div className="px-4 py-8 text-center text-gray-500">
+                      <div className="px-4 py-8 text-center text-tertiary">
                         <StoreIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No stores found</p>
                         {searchQuery && (
@@ -297,7 +297,7 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
               className={`w-full flex justify-between items-center px-3 py-2 rounded-lg font-light text-sm transition ${
                 selectedPlatform === platform.id
                   ? 'bg-gray-900 text-white shadow-lg'
-                  : 'text-gray-700 hover:bg-gray-200/50'
+                  : 'text-secondary hover:bg-gray-200/50'
               }`}
             >
               <Filter className="w-4 h-4" />
@@ -319,29 +319,29 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
         {activeStore && (
           <div className="mt-4 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">
+              <h3 className="text-sm font-medium text-tertiary uppercase tracking-wider">
                 Current Store Stats
               </h3>
               {getPlatformBadge(activeStore.platform)}
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-green-500/10 rounded-lg">
+                <div className="p-2 bg-green-500/100/10 rounded-lg">
                   <DollarSign className="w-4 h-4 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Monthly Revenue</p>
+                  <p className="text-xs text-tertiary">Monthly Revenue</p>
                   <p className="text-sm font-bold text-white">
                     ${activeStore.monthly_revenue.toLocaleString()}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
+                <div className="p-2 bg-cyan-500/100/10 rounded-lg">
                   <Package className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Active Products</p>
+                  <p className="text-xs text-tertiary">Active Products</p>
                   <p className="text-sm font-bold text-white">
                     {activeStore.active_products}/{activeStore.product_count}
                   </p>
@@ -352,18 +352,18 @@ const StoreSelector: React.FC<StoreSelectorProps> = ({
                   <TrendingUp className="w-4 h-4 text-purple-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Conversion Rate</p>
+                  <p className="text-xs text-tertiary">Conversion Rate</p>
                   <p className="text-sm font-bold text-white">
                     {activeStore.conversion_rate.toFixed(2)}%
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-yellow-500/10 rounded-lg">
+                <div className="p-2 bg-amber-500/100/10 rounded-lg">
                   <DollarSign className="w-4 h-4 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Total Revenue</p>
+                  <p className="text-xs text-tertiary">Total Revenue</p>
                   <p className="text-sm font-bold text-white">
                     ${activeStore.total_revenue.toLocaleString()}
                   </p>

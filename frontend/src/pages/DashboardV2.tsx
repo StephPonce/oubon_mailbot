@@ -131,7 +131,7 @@ export default function DashboardV2() {
           {products?.products?.slice(0, 5).map((product: any, index: number) => (
             <div
               key={product.id || index}
-              className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+              className="flex items-center justify-between p-4 rounded-lg border border-white/10 dark:border-gray-700"
             >
               <div className="flex items-center space-x-4">
                 {product.image && (
@@ -167,7 +167,7 @@ export default function DashboardV2() {
             {Object.entries(health.services || {}).map(([service, status]: [string, any]) => (
               <div key={service} className="flex items-center space-x-2">
                 <div className={`h-3 w-3 rounded-full ${
-                  status.status === 'CONNECTED' ? 'bg-green-500' : 'bg-gray-400'
+                  status.status === 'CONNECTED' ? 'bg-green-500/100' : 'bg-gray-400'
                 }`} />
                 <Text>{service}</Text>
               </div>

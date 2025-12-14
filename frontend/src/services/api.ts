@@ -146,7 +146,11 @@ export const authAPI = {
 export const productsAPI = {
   // GET /api/dashboard/v2/products
   getAll: async (filters?: ProductFilters) => {
-    const response = await api.get('/api/dashboard/v2/products', { params: filters });
+    // Clean up undefined values from filters to avoid sending "undefined" strings
+    const cleanFilters = filters ? Object.fromEntries(
+      Object.entries(filters).filter(([_, value]) => value !== undefined)
+    ) : {};
+    const response = await api.get('/api/dashboard/v2/products', { params: cleanFilters });
     return response.data;
   },
 

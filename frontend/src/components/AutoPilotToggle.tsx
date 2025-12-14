@@ -205,17 +205,17 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
           <div className="flex items-center space-x-3">
             <div className={cn(
               'w-10 h-10 rounded-lg flex items-center justify-center',
-              status.enabled ? 'bg-green-500/20' : 'bg-gray-700'
+              status.enabled ? 'bg-green-500/100/20' : 'bg-gray-700'
             )}>
               {status.enabled ? (
                 <Zap className="w-5 h-5 text-green-400" />
               ) : (
-                <ZapOff className="w-5 h-5 text-gray-400" />
+                <ZapOff className="w-5 h-5 text-tertiary" />
               )}
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">Auto-Pilot Mode</h3>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-tertiary">
                 {status.enabled
                   ? `Active - Auto-executing actions ≥${status.threshold}% confidence`
                   : 'Disabled - All actions require manual approval'
@@ -243,8 +243,8 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
               className={cn(
                 'px-6 py-2 rounded-lg font-medium transition-colors',
                 status.enabled
-                  ? 'bg-red-500/20 text-red-300 hover:bg-red-500/30 border border-red-500/30'
-                  : 'bg-green-500/20 text-green-300 hover:bg-green-500/30 border border-green-500/30'
+                  ? 'bg-red-500/100/20 text-red-300 hover:bg-red-500/100/30 border border-red-500/30'
+                  : 'bg-green-500/100/20 text-green-300 hover:bg-green-500/100/30 border border-green-500/30'
               )}
             >
               {saving ? 'Updating...' : status.enabled ? 'Disable' : 'Enable'}
@@ -258,7 +258,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <CheckCircle className="w-4 h-4 text-green-400" />
-            <p className="text-sm text-gray-400">Auto-Executed Today</p>
+            <p className="text-sm text-tertiary">Auto-Executed Today</p>
           </div>
           <p className="text-2xl font-bold text-white">{status.today.executed}</p>
         </div>
@@ -266,7 +266,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-4 h-4 text-yellow-400" />
-            <p className="text-sm text-gray-400">Skipped Today</p>
+            <p className="text-sm text-tertiary">Skipped Today</p>
           </div>
           <p className="text-2xl font-bold text-white">{status.today.skipped}</p>
         </div>
@@ -274,7 +274,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
         <div className="space-y-1">
           <div className="flex items-center space-x-2">
             <Shield className="w-4 h-4 text-blue-400" />
-            <p className="text-sm text-gray-400">Remaining Limit</p>
+            <p className="text-sm text-tertiary">Remaining Limit</p>
           </div>
           <p className="text-2xl font-bold text-white">{status.today.remaining_limit}</p>
         </div>
@@ -287,7 +287,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
           <div className="space-y-2">
             {Object.entries(status.skip_breakdown).map(([reason, count]) => (
               <div key={reason} className="flex items-center justify-between text-sm">
-                <span className="text-gray-400">{getSkipReasonLabel(reason)}</span>
+                <span className="text-tertiary">{getSkipReasonLabel(reason)}</span>
                 <span className="text-white font-medium">{count}</span>
               </div>
             ))}
@@ -307,7 +307,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
             <div className="p-6 space-y-6 bg-gray-900/50">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-semibold text-white">Auto-Pilot Settings</h4>
-                <Info className="w-4 h-4 text-gray-400" />
+                <Info className="w-4 h-4 text-tertiary" />
               </div>
 
               {/* Confidence Threshold */}
@@ -326,7 +326,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
                   onChange={(e) => setThreshold(Number(e.target.value))}
                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-tertiary">
                   Actions with confidence ≥ {threshold}% will be auto-executed
                 </p>
               </div>
@@ -347,7 +347,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
                   onChange={(e) => setDailyLimit(Number(e.target.value))}
                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                 />
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-tertiary">
                   Maximum number of actions to auto-execute per day
                 </p>
               </div>
@@ -368,7 +368,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
                   onChange={(e) => setMaxSpend(Number(e.target.value))}
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-tertiary">
                   Maximum $ impact from auto-executed actions per day
                 </p>
               </div>
@@ -412,7 +412,7 @@ export function AutoPilotToggle({ className, onStatusChange }: AutoPilotTogglePr
                   whileTap={{ scale: 0.95 }}
                   onClick={saveSettings}
                   disabled={saving}
-                  className="px-6 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors disabled:opacity-50"
+                  className="px-6 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium transition-colors disabled:opacity-50"
                 >
                   {saving ? 'Saving...' : 'Save Settings'}
                 </motion.button>

@@ -105,7 +105,7 @@ export default function AuthPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20 mb-4">
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/100/10 border border-red-500/20 mb-4">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
               <span className="text-sm text-red-400">{error}</span>
             </div>

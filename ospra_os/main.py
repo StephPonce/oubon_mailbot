@@ -22,8 +22,26 @@ from typing import Optional, List, Dict
 from pydantic import BaseModel
 import logging
 
+# Multi-Tenant Isolation (GROK RECOMMENDATION #14)
+from ospra_os.tenancy.middleware import TenantMiddleware, StoreContextMiddleware
+
+# Observability (TECHNICAL FIX T5)
+try:
+    from ospra_os.observability import setup_logging, setup_sentry, get_logger
+    from ospra_os.observability.middleware import RequestLoggingMiddleware
+    from ospra_os.observability.exception_handlers import register_exception_handlers
+    _HAS_OBSERVABILITY = True
+    print("✅ Observability system loaded successfully")
+except Exception as e:
+    print(f"⚠️  Observability system not loaded: {e}")
+    _HAS_OBSERVABILITY = False
+    # Fallback to standard logging
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    get_logger = logging.getLogger
+
 # Initialize logger
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__) if _HAS_OBSERVABILITY else logging.getLogger(__name__)
 
 # New integrations - Platform Adapters, AI, Deployment, Auto-Discovery
 try:
@@ -170,13 +188,13 @@ except Exception as e:
     email_sync_router = None
     _HAS_EMAIL_SYNC = False
 
-# Email Automation Settings router (Manage rules, templates, labels)
+# Email Automation router (Smart replies, inbox processing, analytics)
 try:
-    from ospra_os.email_automation.automation_routes import router as email_automation_router  # type: ignore
+    from ospra_os.api.email_automation_routes import router as email_automation_router  # type: ignore
     _HAS_EMAIL_AUTOMATION = True
-    print("✅ Email Automation Settings router loaded successfully")
+    print("✅ Email Automation router loaded successfully (/api/email-automation/*)")
 except Exception as e:
-    print(f"⚠️  Email Automation Settings router not loaded: {e}")
+    print(f"⚠️  Email Automation router not loaded: {e}")
     email_automation_router = None
     _HAS_EMAIL_AUTOMATION = False
 
@@ -529,6 +547,78 @@ except Exception as e:
     store_router = None
     _HAS_STORES = False
 
+# Template Vault router (Action Template Marketplace - GROK RECOMMENDATION #12)
+try:
+    from ospra_os.api.template_routes import router as template_router  # type: ignore
+    _HAS_TEMPLATES = True
+    print("✅ Template Vault router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Template Vault router not loaded: {e}")
+    template_router = None
+    _HAS_TEMPLATES = False
+
+# Task Monitoring router (Celery Task Queue - GROK RECOMMENDATION #13)
+try:
+    from ospra_os.api.task_routes import router as task_router  # type: ignore
+    _HAS_TASKS = True
+    print("✅ Task Monitoring router loaded successfully")
+except Exception as e:
+    print(f"⚠️  Task Monitoring router not loaded: {e}")
+    task_router = None
+    _HAS_TASKS = False
+
+# ML System router (GROK RECOMMENDATION #15 - Llama Fine-Tuning for 70% Cost Savings)
+try:
+    from ospra_os.api.ml_routes import router as ml_router  # type: ignore
+    _HAS_ML = True
+    print("✅ ML System router loaded successfully (Cost-optimized AI)")
+except Exception as e:
+    print(f"⚠️  ML System router not loaded: {e}")
+    ml_router = None
+    _HAS_ML = False
+
+# Amazon FBA router (GROK RECOMMENDATION #16 - Amazon FBA Multi-Marketplace Integration)
+try:
+    from ospra_os.api.amazon_routes import router as amazon_router  # type: ignore
+    _HAS_AMAZON = True
+    print("✅ Amazon FBA router loaded successfully (Multi-Marketplace)")
+except Exception as e:
+    print(f"⚠️  Amazon FBA router not loaded: {e}")
+    amazon_router = None
+    _HAS_AMAZON = False
+
+# Federated Learning router (GROK RECOMMENDATION #18 - Privacy-Preserving Collective Intelligence)
+try:
+    from ospra_os.federated.routes import get_federated_router
+    federated_router = get_federated_router()
+    _HAS_FEDERATED = True
+    print("✅ Federated Learning router loaded successfully (Privacy-Preserving)")
+except Exception as e:
+    print(f"⚠️  Federated Learning router not loaded: {e}")
+    federated_router = None
+    _HAS_FEDERATED = False
+
+# White-Label SaaS router (GROK RECOMMENDATION #19 - Agency Rebrand B2B2C)
+try:
+    from ospra_os.whitelabel.routes import get_whitelabel_router
+    whitelabel_router = get_whitelabel_router()
+    _HAS_WHITELABEL = True
+    print("✅ White-Label SaaS router loaded successfully (Agency Rebrand B2B2C)")
+except Exception as e:
+    print(f"⚠️  White-Label SaaS router not loaded: {e}")
+    whitelabel_router = None
+    _HAS_WHITELABEL = False
+
+# Feedback Loop router (G4: Complete Feedback Loop - AI learns from real sales data)
+try:
+    from ospra_os.api.feedback_routes import router as feedback_router  # type: ignore
+    _HAS_FEEDBACK = True
+    print("✅ Feedback Loop router loaded successfully (G4: AI learns from sales)")
+except Exception as e:
+    print(f"⚠️  Feedback Loop router not loaded: {e}")
+    feedback_router = None
+    _HAS_FEEDBACK = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -538,6 +628,36 @@ except Exception as e:
     GmailClient = None
 
 app = FastAPI(title="OspraOS API", version="0.1")
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OBSERVABILITY SETUP (TECHNICAL FIX T5)
+# Must be configured BEFORE other middleware for proper request tracking
+# ═══════════════════════════════════════════════════════════════════════════
+if _HAS_OBSERVABILITY:
+    settings = get_settings()
+
+    # Setup structured logging
+    setup_logging(
+        log_level=settings.LOG_LEVEL,
+        log_format=settings.LOG_FORMAT
+    )
+
+    # Setup Sentry error tracking
+    if settings.SENTRY_DSN:
+        setup_sentry(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.SENTRY_ENVIRONMENT,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE
+        )
+
+    # Register exception handlers
+    register_exception_handlers(app)
+
+    # Add request logging middleware
+    app.add_middleware(RequestLoggingMiddleware)
+
+    logger.info("✅ Observability initialized successfully")
 
 # CORS middleware - Allow frontend to connect
 app.add_middleware(
@@ -571,6 +691,13 @@ app.add_middleware(
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
+# Multi-Tenant Isolation (GROK RECOMMENDATION #14)
+# IMPORTANT: These middleware run AFTER auth, extracting tenant context from JWT
+# Order matters: Tenant middleware must come after CORS/Proxy but before routes
+app.add_middleware(StoreContextMiddleware)  # Extract store_id from query params/headers
+app.add_middleware(TenantMiddleware)  # Extract tenant_id from JWT token
+print("✅ Tenant isolation middleware registered (GROK #14)")
+
 # Mount static files for product images (only if directory exists)
 import os
 from pathlib import Path
@@ -592,6 +719,45 @@ def health_check_immediate():
     """Immediate health check that responds before full initialization."""
     return {"status": "ok", "service": "Ospra Intelligence Platform"}
 
+@app.get("/health/celery")
+def celery_health():
+    """
+    Check Celery worker and task queue health.
+
+    Returns:
+    - healthy: Workers are running and responding
+    - no_workers: No workers detected (Celery not started)
+    - error: Unable to inspect Celery (Redis unavailable or config issue)
+    """
+    if not _HAS_TASKS:
+        return {"status": "disabled", "message": "Celery tasks not loaded"}
+
+    try:
+        from ospra_os.celery_app import celery_app
+        inspect = celery_app.control.inspect()
+        active = inspect.active()
+
+        if active:
+            active_count = sum(len(tasks) for tasks in active.values())
+            return {
+                "status": "healthy",
+                "workers": list(active.keys()),
+                "active_tasks": active_count,
+                "message": f"{len(active)} worker(s) online, {active_count} active task(s)"
+            }
+        else:
+            return {
+                "status": "no_workers",
+                "workers": [],
+                "message": "No Celery workers detected. Start workers with: celery -A ospra_os.celery_app worker"
+            }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Unable to connect to Celery. Ensure Redis is running: docker-compose up redis -d"
+        }
+
 # ---------------------------------------------------------------
 # Startup Event - Initialize DBs and Scheduler
 # ---------------------------------------------------------------
@@ -600,6 +766,13 @@ async def startup_event():
     """Initialize databases and start background scheduler."""
     import time
     import asyncio
+    import os
+
+    # Skip startup initialization in test mode
+    if os.getenv("APP_ENV") == "testing":
+        print("🧪 Test mode detected - skipping startup initialization")
+        return
+
     startup_start = time.time()
     print(f"🚀 Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
@@ -674,13 +847,17 @@ async def startup_event():
     except Exception as e:
         print(f"⚠️  Schedule processor failed to start: {e}")
 
-    # Start background email checker
-    try:
-        from app.scheduler import start_scheduler
-        start_scheduler()
-        print("✅ Background scheduler started")
-    except Exception as e:
-        print(f"⚠️  Scheduler failed to start: {e}")
+    # DEPRECATED: APScheduler replaced by Celery Beat (GROK #13)
+    # Background email checking is now handled by Celery tasks
+    # See: ospra_os/tasks/email_tasks.py
+    # To enable: Use Celery Beat scheduler instead
+    # try:
+    #     from app.scheduler import start_scheduler
+    #     start_scheduler()
+    #     print("✅ Background scheduler started")
+    # except Exception as e:
+    #     print(f"⚠️  Scheduler failed to start: {e}")
+    print("ℹ️  Email scheduling managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start product monitoring in background thread
     try:
@@ -807,13 +984,17 @@ async def startup_event():
         import traceback
         traceback.print_exc()
 
-    # Start customer analytics scheduler
-    try:
-        from ospra_os.jobs.scheduler import start_scheduler as start_customer_scheduler
-        start_customer_scheduler()
-        print("✅ Customer analytics scheduler started")
-    except Exception as e:
-        print(f"⚠️  Customer analytics scheduler failed to start: {e}")
+    # DEPRECATED: APScheduler replaced by Celery Beat (GROK #13)
+    # Customer analytics jobs are now handled by Celery tasks
+    # See: ospra_os/tasks/analytics_tasks.py and ospra_os/tasks/learning_tasks.py
+    # To enable: Use Celery Beat scheduler instead
+    # try:
+    #     from ospra_os.jobs.scheduler import start_scheduler as start_customer_scheduler
+    #     start_customer_scheduler()
+    #     print("✅ Customer analytics scheduler started")
+    # except Exception as e:
+    #     print(f"⚠️  Customer analytics scheduler failed to start: {e}")
+    print("ℹ️  Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start AliExpress token refresh scheduler
     try:
@@ -1062,6 +1243,27 @@ if _HAS_VOICE and voice_router:
 
 if _HAS_STORES and store_router:
     app.include_router(store_router)  # exposes /api/stores/* (Multi-store management & cross-store learning - GROK #11)
+
+if _HAS_TEMPLATES and template_router:
+    app.include_router(template_router)  # exposes /api/templates/* (Action template marketplace - GROK #12)
+
+if _HAS_TASKS and task_router:
+    app.include_router(task_router)  # exposes /api/tasks/* (Celery task monitoring - GROK #13)
+
+if _HAS_ML and ml_router:
+    app.include_router(ml_router)  # exposes /api/ml/* (Cost-optimized AI - GROK #15)
+
+if _HAS_AMAZON and amazon_router:
+    app.include_router(amazon_router)  # exposes /api/amazon/* (Multi-Marketplace FBA - GROK #16)
+
+if _HAS_FEDERATED and federated_router:
+    app.include_router(federated_router)  # exposes /api/federated/* (Privacy-Preserving Collective Intelligence - GROK #18)
+
+if _HAS_WHITELABEL and whitelabel_router:
+    app.include_router(whitelabel_router)  # exposes /api/whitelabel/* (Agency Rebrand B2B2C - GROK #19)
+
+if _HAS_FEEDBACK and feedback_router:
+    app.include_router(feedback_router)  # exposes /api/feedback/* (G4: AI learns from real sales)
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)

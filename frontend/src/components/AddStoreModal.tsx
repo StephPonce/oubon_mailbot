@@ -291,7 +291,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-white mb-2">Select Your Platform</h3>
-              <p className="text-sm text-gray-400">Choose the e-commerce platform for your store</p>
+              <p className="text-sm text-tertiary">Choose the e-commerce platform for your store</p>
             </div>
 
             <div className="space-y-3">
@@ -301,20 +301,20 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
                   onClick={() => handleChange('platform', platform.id)}
                   className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
                     formData.platform === platform.id
-                      ? 'border-blue-500 bg-blue-500/10'
+                      ? 'border-blue-500 bg-cyan-500/100/10'
                       : 'border-gray-700 bg-gray-800 hover:border-gray-600'
                   }`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="text-3xl">{platform.icon}</div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-white">{platform.name}</h4>
                         {formData.platform === platform.id && (
                           <Check className="w-5 h-5 text-blue-400" />
                         )}
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">{platform.description}</p>
+                      <p className="text-sm text-tertiary mt-1">{platform.description}</p>
                     </div>
                   </div>
                 </button>
@@ -335,7 +335,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-medium text-white mb-2">Store Details</h3>
-              <p className="text-sm text-gray-400">Tell us about your store</p>
+              <p className="text-sm text-tertiary">Tell us about your store</p>
             </div>
 
             {/* Store Name */}
@@ -344,7 +344,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
                 Store Name <span className="text-red-400">*</span>
               </label>
               <div className="relative">
-                <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-tertiary" />
                 <input
                   type="text"
                   value={formData.store_name}
@@ -363,10 +363,10 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
             {/* Store URL (Optional) */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Store URL <span className="text-gray-500">(optional)</span>
+                Store URL <span className="text-tertiary">(optional)</span>
               </label>
               <div className="relative">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-tertiary" />
                 <input
                   type="url"
                   value={formData.store_url}
@@ -449,7 +449,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
                 {formData.platform === 'amazon' && 'Amazon Credentials'}
                 {formData.platform === 'woocommerce' && 'WooCommerce Credentials'}
               </h3>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-tertiary">
                 Enter your API credentials to connect
               </p>
             </div>
@@ -457,9 +457,9 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
             {/* Shopify Credentials */}
             {formData.platform === 'shopify' && (
               <>
-                <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="mb-6 p-4 bg-cyan-500/100/10 border border-blue-500/30 rounded-lg">
                   <h4 className="text-white font-medium mb-2">🔐 Secure OAuth 2.0 Connection (Recommended)</h4>
-                  <p className="text-sm text-gray-400 mb-4">
+                  <p className="text-sm text-tertiary mb-4">
                     Connect your Shopify store securely using OAuth 2.0. You'll be redirected to Shopify to authorize access.
                   </p>
 
@@ -504,7 +504,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
                     <div className="w-full border-t border-gray-700"></div>
                   </div>
                   <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">OR use manual credentials</span>
+                    <span className="px-2 bg-gray-900 text-tertiary">OR use manual credentials</span>
                   </div>
                 </div>
 
@@ -734,14 +734,14 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
 
               {/* Test Status */}
               {testStatus === 'success' && (
-                <div className="mt-3 p-3 bg-green-500/10 border border-green-500/50 rounded-lg flex items-center gap-2 text-green-400">
+                <div className="mt-3 p-3 bg-green-500/100/10 border border-green-500/50 rounded-lg flex items-center gap-2 text-green-400">
                   <Check className="w-5 h-5" />
                   <span className="text-sm font-medium">{testMessage}</span>
                 </div>
               )}
 
               {testStatus === 'error' && (
-                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
+                <div className="mt-3 p-3 bg-red-500/100/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
                   <AlertCircle className="w-5 h-5" />
                   <span className="text-sm font-medium">{testMessage}</span>
                 </div>
@@ -769,7 +769,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
         <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-white">Add New Store</h2>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-tertiary mt-1">
               Step {currentStep} of 3
             </p>
           </div>
@@ -777,7 +777,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
             onClick={onClose}
             className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5 text-tertiary" />
           </button>
         </div>
 
@@ -788,14 +788,14 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
               <React.Fragment key={step}>
                 <div
                   className={`flex-1 h-2 rounded-full transition-all ${
-                    step <= currentStep ? 'bg-blue-500' : 'bg-gray-700'
+                    step <= currentStep ? 'bg-cyan-500/100' : 'bg-gray-700'
                   }`}
                 />
                 {step < 3 && <div className="w-2" />}
               </React.Fragment>
             ))}
           </div>
-          <div className="flex justify-between mt-2 text-xs text-gray-400">
+          <div className="flex justify-between mt-2 text-xs text-tertiary">
             <span>Platform</span>
             <span>Details</span>
             <span>Credentials</span>
@@ -812,7 +812,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
-            className="px-4 py-2 text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 text-tertiary hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <ChevronLeft className="w-5 h-5" />
             Back
@@ -822,7 +822,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
             {currentStep < 3 ? (
               <button
                 onClick={handleNext}
-                className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
+                className="px-6 py-2 bg-cyan-500/100 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium flex items-center gap-2"
               >
                 Next
                 <ChevronRight className="w-5 h-5" />
@@ -852,7 +852,7 @@ const AddStoreModal: React.FC<AddStoreModalProps> = ({ onClose, onSuccess }) => 
         {/* Submit Error */}
         {errors.submit && (
           <div className="px-6 pb-4">
-            <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
+            <div className="p-3 bg-red-500/100/10 border border-red-500/50 rounded-lg flex items-center gap-2 text-red-400">
               <AlertCircle className="w-5 h-5" />
               <span className="text-sm font-medium">{errors.submit}</span>
             </div>

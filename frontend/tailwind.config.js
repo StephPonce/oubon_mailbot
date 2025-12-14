@@ -23,35 +23,41 @@ export default {
         sans: ['SF Pro Display', 'Inter', ...defaultTheme.fontFamily.sans],
       },
       colors: {
-        // Primary text colors matching CSS variables
-        'primary': '#1D1D1F',
-        'secondary': '#6E6E73',
-        'tertiary': '#86868B',
-        'quaternary': '#AEAEB2',
-        
-        // Accent color
-        'accent': '#0071E3',
-        'accent-hover': '#0077ED',
-        
-        // Legacy names
-        'brand-blue': '#0071E3',
-        'glass-white': 'rgba(255, 255, 255, 0.1)',
-        'glass-white-hover': 'rgba(255, 255, 255, 0.2)',
-        'gray-950': '#0d1117',
-        'gray-900': '#161b22',
-        'gray-800': '#1c2128',
+        // Ospra Dark Theme - Primary text colors
+        'primary': '#F5F5F7',
+        'secondary': '#A1A1A6',
+        'tertiary': '#6E6E73',
+        'quaternary': '#48484A',
+
+        // Ospra Accent colors - Cyan/Teal
+        'accent': '#06b6d4',
+        'accent-hover': '#14b8a6',
+        'accent-secondary': '#8b5cf6',
+
+        // Dark mode backgrounds
+        'bg-dark': '#0a0a0f',
+        'bg-dark-elevated': '#16161f',
+        'bg-dark-layer': '#1a1a2e',
+
+        // Legacy names for compatibility
+        'brand-blue': '#06b6d4',
+        'glass-white': 'rgba(255, 255, 255, 0.05)',
+        'glass-white-hover': 'rgba(255, 255, 255, 0.08)',
+        'gray-950': '#0a0a0f',
+        'gray-900': '#16161f',
+        'gray-800': '#1a1a2e',
         'gray-700': '#2d333b',
-        'gray-300': '#d0d7de',
-        'gray-200': '#f0f6fc',
-        
+        'gray-300': '#6E6E73',
+        'gray-200': '#A1A1A6',
+
         // Status colors
-        'success': '#34C759',
-        'warning': '#FF9500',
-        'error': '#FF3B30',
-        'info': '#007AFF',
-        'success-green': '#34C759',
-        'warning-yellow': '#FF9500',
-        'error-red': '#FF3B30',
+        'success': '#10b981',
+        'warning': '#f59e0b',
+        'error': '#ef4444',
+        'info': '#06b6d4',
+        'success-green': '#10b981',
+        'warning-yellow': '#f59e0b',
+        'error-red': '#ef4444',
       },
       textColor: {
         'primary': 'var(--text-primary)',

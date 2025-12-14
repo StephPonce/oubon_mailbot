@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # Redis - Message broker and result backend
+  redis:
+    image: redis:7-alpine
+    container_name: ospra-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ospra-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # FastAPI Application
+  api:
+    build: .
+    container_name: ospra-api
+    ports:
+      - "8001:8001"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/ospra.db}
+      - PYTHONUNBUFFERED=1
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001
+    volumes:
+      - ./data:/app/data
+      - ./.secrets:/app/.secrets
+    networks:
+      - ospra-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+  # Celery Workers - Task execution (scalable)
+  celery_worker:
+    build: .
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/ospra.db}
+      - PYTHONUNBUFFERED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A ospra_os.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
+    volumes:
+      - ./data:/app/data
+      - ./.secrets:/app/.secrets
+    networks:
+      - ospra-network
+    restart: unless-stopped
+    deploy:
+      replicas: 3  # Scale to 3 workers for production
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+
+  # Celery Beat - Task scheduler (singleton)
+  celery_beat:
+    build: .
+    container_name: ospra-beat
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./data/ospra.db}
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A ospra_os.celery_app beat --loglevel=info
+    volumes:
+      - ./data:/app/data
+      - ./.secrets:/app/.secrets
+    networks:
+      - ospra-network
+    restart: unless-stopped
+    deploy:
+      replicas: 1  # Only one beat scheduler
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Flower - Task monitoring dashboard
+  flower:
+    build: .
+    container_name: ospra-flower
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-ospra123}
+      - FLOWER_PERSISTENT=True
+      - FLOWER_DB=/app/data/flower.db
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A ospra_os.celery_app flower --port=5555 --persistent=True --db=/app/data/flower.db
+    volumes:
+      - ./data:/app/data
+    networks:
+      - ospra-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  ospra-network:
+    driver: bridge

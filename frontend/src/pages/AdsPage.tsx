@@ -208,12 +208,12 @@ export default function AdsPage() {
         </div>
 
         {/* Not Connected Card */}
-        <div className="glass-card p-8 border-2 border-dashed border-gray-300">
+        <div className="glass-card p-8 border-2 border-dashed border-white/10">
           <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-50 rounded-lg">
+            <div className="p-3 bg-cyan-500/10 rounded-lg">
               <Settings className="w-8 h-8 text-blue-600" />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h2 className="text-xl font-semibold text-primary mb-2">
                 Connect Meta Ads Account
               </h2>
@@ -221,7 +221,7 @@ export default function AdsPage() {
                 {metaStatus?.message || 'Meta Ads not configured. Add credentials to get started.'}
               </p>
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <div className="  rounded-lg p-4 mb-4">
                 <h3 className="text-sm font-semibold text-primary mb-2">Setup Instructions:</h3>
                 <ol className="text-sm text-secondary space-y-2 list-decimal list-inside">
                   <li>Go to Facebook Business Manager (business.facebook.com)</li>
@@ -253,12 +253,12 @@ export default function AdsPage() {
         </div>
 
         {/* Info Card */}
-        <div className="glass-card p-4 bg-blue-50 border-l-4 border-blue-500">
+        <div className="glass-card p-4 bg-cyan-500/10 border-l-4 border-blue-500">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
               <p className="text-sm font-medium text-blue-900 mb-1">Why Connect Meta Ads?</p>
-              <p className="text-sm text-blue-700">
+              <p className="text-sm text-cyan-400">
                 Once connected, you'll be able to view real campaign performance, manage budgets,
                 pause/resume campaigns, and access AI-powered ad copy generation - all from this dashboard.
               </p>
@@ -283,9 +283,9 @@ export default function AdsPage() {
             Real-time campaign management and performance tracking
           </p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-lg">
-          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-          <span className="text-sm font-medium text-green-700">Connected</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/100/10 rounded-lg">
+          <div className="w-2 h-2 bg-green-500/100 rounded-full animate-pulse"></div>
+          <span className="text-sm font-medium text-green-400">Connected</span>
         </div>
       </div>
 
@@ -362,7 +362,7 @@ export default function AdsPage() {
                 Select Product
               </label>
               <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
+                className="w-full px-3 py-2 border border-white/10 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
                 value={selectedProduct?.id || ''}
                 onChange={(e) => {
                   const product = { id: e.target.value, name: e.target.selectedOptions[0].text };
@@ -417,7 +417,7 @@ export default function AdsPage() {
           </div>
 
           {generatedCopy && (
-            <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+            <div className="space-y-4 p-4   rounded-lg">
               <h3 className="font-semibold text-primary">Generated Ad Copy</h3>
 
               <div>
@@ -475,7 +475,7 @@ export default function AdsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className="border-b border-white/10">
                   <th className="text-left text-xs font-semibold text-tertiary uppercase py-3 px-4">
                     Campaign
                   </th>
@@ -504,13 +504,13 @@ export default function AdsPage() {
               </thead>
               <tbody>
                 {metaCampaigns.map((campaign) => (
-                  <tr key={campaign.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={campaign.id} className="border-b border-gray-100 hover: ">
                     <td className="py-3 px-4">
                       <p className="text-sm font-medium text-primary">{campaign.name}</p>
                       <p className="text-xs text-tertiary">ID: {campaign.id}</p>
                     </td>
                     <td className="py-3 px-4">
-                      <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full">
+                      <span className="text-xs px-2 py-1 bg-cyan-500/10 text-cyan-400 rounded-full">
                         {campaign.objective}
                       </span>
                     </td>
@@ -518,8 +518,8 @@ export default function AdsPage() {
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                           campaign.status === 'ACTIVE'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'bg-green-100 text-green-400'
+                            : 'bg-gray-100 text-secondary'
                         }`}
                       >
                         {campaign.status === 'ACTIVE' ? <Check className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
@@ -546,7 +546,7 @@ export default function AdsPage() {
                             className="p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
                             title="Pause campaign"
                           >
-                            <Pause className="w-4 h-4 text-gray-600" />
+                            <Pause className="w-4 h-4 text-secondary" />
                           </button>
                         ) : (
                           <button

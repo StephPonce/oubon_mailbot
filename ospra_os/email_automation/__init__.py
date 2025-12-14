@@ -1,5 +1,1 @@
-"""
-Email Automation Module
-
-Multi-provider email OAuth integration and analytics for OspraOS.
-"""
+"""Email automation module for intelligent auto-replies and email processing."""

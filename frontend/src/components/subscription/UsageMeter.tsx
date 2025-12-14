@@ -29,14 +29,14 @@ function UsageItem({ icon: Icon, label, current, limit, color, compact }: UsageI
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-2">
           <Icon className={`w-4 h-4 ${color}`} />
-          <span className="text-sm text-gray-600">{label}</span>
+          <span className="text-sm text-secondary">{label}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`text-sm font-medium ${isAtLimit ? 'text-red-600' : isNearLimit ? 'text-amber-600' : 'text-gray-900'}`}>
+          <span className={`text-sm font-medium ${isAtLimit ? 'text-red-600' : isNearLimit ? 'text-amber-600' : 'text-primary'}`}>
             {current}
           </span>
-          <span className="text-sm text-gray-400">/</span>
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-tertiary">/</span>
+          <span className="text-sm text-tertiary">
             {isUnlimited ? '∞' : limit}
           </span>
         </div>
@@ -51,13 +51,13 @@ function UsageItem({ icon: Icon, label, current, limit, color, compact }: UsageI
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${color.replace('text-', 'bg-').replace('500', '100').replace('600', '100')}`}>
             <Icon className={`w-4 h-4 ${color}`} />
           </div>
-          <span className="text-sm font-medium text-gray-700">{label}</span>
+          <span className="text-sm font-medium text-secondary">{label}</span>
         </div>
         <div className="text-right">
-          <span className={`text-lg font-bold ${isAtLimit ? 'text-red-600' : isNearLimit ? 'text-amber-600' : 'text-gray-900'}`}>
+          <span className={`text-lg font-bold ${isAtLimit ? 'text-red-600' : isNearLimit ? 'text-amber-600' : 'text-primary'}`}>
             {current}
           </span>
-          <span className="text-sm text-gray-400 ml-1">
+          <span className="text-sm text-tertiary ml-1">
             / {isUnlimited ? '∞' : limit}
           </span>
         </div>
@@ -67,7 +67,7 @@ function UsageItem({ icon: Icon, label, current, limit, color, compact }: UsageI
         <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
             className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
-              isAtLimit ? 'bg-red-500' : isNearLimit ? 'bg-amber-500' : color.replace('text-', 'bg-')
+              isAtLimit ? 'bg-red-500/100' : isNearLimit ? 'bg-amber-500' : color.replace('text-', 'bg-')
             }`}
             style={{ width: `${percentage}%` }}
           />
@@ -134,7 +134,7 @@ export function UsageMeter({ userId = 1, compact = false, onLimitReached }: Usag
 
   if (error || !usage) {
     return (
-      <div className="text-center py-4 text-gray-500 text-sm">
+      <div className="text-center py-4 text-tertiary text-sm">
         {error || 'No usage data available'}
       </div>
     );
@@ -184,8 +184,8 @@ export function UsageMeter({ userId = 1, compact = false, onLimitReached }: Usag
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Usage This Period</h3>
-        <div className="text-xs text-gray-500">
+        <h3 className="text-lg font-semibold text-primary">Usage This Period</h3>
+        <div className="text-xs text-tertiary">
           Resets: {new Date(usage.period?.weekly_resets_at || '').toLocaleDateString()}
         </div>
       </div>
@@ -219,26 +219,26 @@ export function UsageMeterMini({ userId = 1 }: { userId?: number }) {
 
   return (
     <div className="flex gap-4">
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="flex justify-between text-xs mb-1">
-          <span className="text-gray-500">Searches</span>
+          <span className="text-tertiary">Searches</span>
           <span className="font-medium">{searches?.current || 0}/{searches?.limit || '∞'}</span>
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div 
-            className={`h-full rounded-full ${searchPercent >= 80 ? 'bg-amber-500' : 'bg-blue-500'}`}
+            className={`h-full rounded-full ${searchPercent >= 80 ? 'bg-amber-500' : 'bg-cyan-500/100'}`}
             style={{ width: `${Math.min(searchPercent, 100)}%` }}
           />
         </div>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="flex justify-between text-xs mb-1">
-          <span className="text-gray-500">Products</span>
+          <span className="text-tertiary">Products</span>
           <span className="font-medium">{products?.current || 0}/{products?.limit || '∞'}</span>
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div 
-            className={`h-full rounded-full ${productPercent >= 80 ? 'bg-amber-500' : 'bg-green-500'}`}
+            className={`h-full rounded-full ${productPercent >= 80 ? 'bg-amber-500' : 'bg-green-500/100'}`}
             style={{ width: `${Math.min(productPercent, 100)}%` }}
           />
         </div>

@@ -8,6 +8,12 @@ export function useSocket() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
+    // NOTE: WebSocket connection is intentionally disabled as the backend endpoint is not yet implemented.
+    // This prevents "Lost Connection" errors in the UI and console spam.
+    // To re-enable, uncomment the block below.
+    console.log('[Socket] Connection disabled pending backend implementation.');
+    
+    /*
     const socketInstance = io(SOCKET_URL, {
       transports: ['websocket'],
       autoConnect: true,
@@ -32,6 +38,7 @@ export function useSocket() {
     return () => {
       socketInstance.disconnect();
     };
+    */
   }, []);
 
   return { socket, isConnected };

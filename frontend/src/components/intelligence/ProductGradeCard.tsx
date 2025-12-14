@@ -54,18 +54,18 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
   }, [productId]);
 
   const getGradeColor = (grade: string) => {
-    if (grade.startsWith('A')) return 'text-green-600 bg-green-50';
-    if (grade.startsWith('B')) return 'text-blue-600 bg-blue-50';
-    if (grade.startsWith('C')) return 'text-yellow-600 bg-yellow-50';
+    if (grade.startsWith('A')) return 'text-green-600 bg-green-500/100/10';
+    if (grade.startsWith('B')) return 'text-blue-600 bg-cyan-500/10';
+    if (grade.startsWith('C')) return 'text-yellow-600 bg-amber-500/10';
     if (grade.startsWith('D')) return 'text-orange-600 bg-orange-50';
-    return 'text-red-600 bg-red-50';
+    return 'text-red-600 bg-red-500/10';
   };
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 80) return 'bg-green-500';
-    if (percentage >= 60) return 'bg-blue-500';
-    if (percentage >= 40) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (percentage >= 80) return 'bg-green-500/100';
+    if (percentage >= 60) return 'bg-cyan-500/100';
+    if (percentage >= 40) return 'bg-amber-500/100';
+    return 'bg-red-500/100';
   };
 
   if (loading) {
@@ -82,7 +82,7 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-500/10 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">Error: {error}</p>
       </div>
     );
@@ -110,13 +110,13 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
 
       {/* Breakdown */}
       <div className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Score Breakdown</h3>
+        <h3 className="text-lg font-semibold text-primary mb-4">Score Breakdown</h3>
         <div className="space-y-3">
           {gradeData.breakdown.map((item, index) => (
             <div key={index}>
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-gray-700">{item.factor}</span>
-                <span className="text-sm text-gray-600">
+                <span className="text-sm font-medium text-secondary">{item.factor}</span>
+                <span className="text-sm text-secondary">
                   {item.score.toFixed(1)}/{item.max_points} ({item.percentage.toFixed(0)}%)
                 </span>
               </div>
@@ -133,10 +133,10 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
         {/* Strengths */}
         {gradeData.strengths.length > 0 && (
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-900 mb-2">Strengths</h4>
+            <h4 className="text-sm font-semibold text-primary mb-2">Strengths</h4>
             <ul className="space-y-1">
               {gradeData.strengths.map((strength, index) => (
-                <li key={index} className="flex items-start text-sm text-gray-700">
+                <li key={index} className="flex items-start text-sm text-secondary">
                   <span className="text-green-500 mr-2">✓</span>
                   {strength}
                 </li>
@@ -148,10 +148,10 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
         {/* Weaknesses */}
         {gradeData.weaknesses.length > 0 && (
           <div className="mt-4">
-            <h4 className="text-sm font-semibold text-gray-900 mb-2">Weaknesses</h4>
+            <h4 className="text-sm font-semibold text-primary mb-2">Weaknesses</h4>
             <ul className="space-y-1">
               {gradeData.weaknesses.map((weakness, index) => (
-                <li key={index} className="flex items-start text-sm text-gray-700">
+                <li key={index} className="flex items-start text-sm text-secondary">
                   <span className="text-red-500 mr-2">✗</span>
                   {weakness}
                 </li>
@@ -162,7 +162,7 @@ export const ProductGradeCard: React.FC<ProductGradeCardProps> = ({ productId })
 
         {/* Recommendation */}
         {gradeData.recommendation && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="mt-6 bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4">
             <h4 className="text-sm font-semibold text-blue-900 mb-1">Recommendation</h4>
             <p className="text-sm text-blue-800">{gradeData.recommendation}</p>
           </div>

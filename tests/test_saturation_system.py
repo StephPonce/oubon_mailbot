@@ -6,7 +6,7 @@ Verifies database tables and core functionality
 import asyncio
 import sys
 from datetime import datetime
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Base,
     ProductSaturation,
     UserProductRecommendation,

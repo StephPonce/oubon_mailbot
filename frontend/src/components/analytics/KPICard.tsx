@@ -11,7 +11,7 @@ interface KPICardProps {
 }
 
 export default function KPICard({ title, value, change, trend, icon: Icon, subtitle, loading = false }: KPICardProps) {
-  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400';
+  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-tertiary';
   const trendSymbol = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '→';
 
   return (
@@ -28,7 +28,7 @@ export default function KPICard({ title, value, change, trend, icon: Icon, subti
       ) : (
         <>
           <div className="flex items-center justify-between mb-4">
-            <div className="p-2 bg-blue-500/10 rounded-lg">
+            <div className="p-2 bg-cyan-500/100/10 rounded-lg">
               <Icon className="w-5 h-5 text-blue-400" />
             </div>
             {change !== undefined && (
@@ -37,9 +37,9 @@ export default function KPICard({ title, value, change, trend, icon: Icon, subti
               </span>
             )}
           </div>
-          <h3 className="text-sm font-medium text-gray-400 mb-1">{title}</h3>
+          <h3 className="text-sm font-medium text-tertiary mb-1">{title}</h3>
           <p className="text-2xl font-bold text-white mb-1">{value}</p>
-          {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+          {subtitle && <p className="text-xs text-tertiary">{subtitle}</p>}
         </>
       )}
     </div>

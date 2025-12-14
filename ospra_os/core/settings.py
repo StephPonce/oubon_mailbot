@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     SUPPORT_FROM_EMAIL: EmailStr = Field(default="support@oubonshop.com")
     LOG_LEVEL: str = Field(default="INFO")
 
+    # Observability & Monitoring (TECHNICAL FIX T5)
+    LOG_FORMAT: str = Field(default="console")  # "console" or "json"
+    SENTRY_DSN: Optional[str] = None  # Sentry Data Source Name
+    SENTRY_ENVIRONMENT: str = Field(default="production")  # production, staging, development
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(default=0.1)  # 10% of transactions
+    SENTRY_PROFILES_SAMPLE_RATE: float = Field(default=0.1)  # 10% profiling
+
     # Gmail
     GMAIL_USER_EMAIL: str
     GMAIL_TOKEN_PATH: str = Field(default=".secrets/gmail/token.json")
@@ -65,6 +72,13 @@ class Settings(BaseSettings):
     CLAUDE_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None
     GOOGLE_CLOUD_PROJECT: Optional[str] = None  # For Gemini API project ID
+
+    # Gmail Push Notifications (Cloud Pub/Sub)
+    GOOGLE_CLOUD_PROJECT_ID: Optional[str] = None  # GCP project ID for Gmail watch
+    GMAIL_PUBSUB_TOPIC: str = Field(default="gmail-notifications")
+
+    # Alerts & Notifications
+    SLACK_WEBHOOK_URL: Optional[str] = None  # Slack webhook for priority alerts
 
     # Store / public URLs
     STORE_DOMAIN: Optional[str] = None
@@ -108,6 +122,7 @@ class Settings(BaseSettings):
     SHOPIFY_API_KEY: Optional[str] = None
     SHOPIFY_API_SECRET: Optional[str] = None
     SHOPIFY_API_VERSION: Optional[str] = Field(default="2025-01")
+    SHOPIFY_MODE: str = Field(default="safe")  # "safe" or "live" mode for deployments
 
     # AliExpress
     ALIEXPRESS_API_KEY: Optional[str] = None  # App Key
@@ -322,6 +337,11 @@ class Settings(BaseSettings):
         # Sync gmail client settings
         object.__setattr__(self, "google_credentials_file", self.GMAIL_CREDENTIALS_PATH)
         object.__setattr__(self, "google_token_file", self.GMAIL_TOKEN_PATH)
+
+        # Backwards compatibility for app/ lowercase field names
+        object.__setattr__(self, "openai_api_key", self.OPENAI_API_KEY)
+        object.__setattr__(self, "claude_api_key", self.CLAUDE_API_KEY)
+        object.__setattr__(self, "slack_webhook_url", self.SLACK_WEBHOOK_URL)
 
 
 @lru_cache(maxsize=1)

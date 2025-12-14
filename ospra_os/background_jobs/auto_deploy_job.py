@@ -62,6 +62,13 @@ class AutoDeployJob:
 
     def start(self):
         """Start the scheduler"""
+        import os
+
+        # Skip scheduler in test mode to avoid event loop conflicts
+        if os.getenv("APP_ENV") == "testing":
+            logger.debug("🧪 Skipping auto-deploy scheduler in test mode")
+            return
+
         try:
             # Schedule auto-deploy check to run every hour
             self.scheduler.add_job(
@@ -82,8 +89,12 @@ class AutoDeployJob:
             if job and job.next_run_time:
                 logger.info(f"   📅 Next auto-deploy check: {job.next_run_time}")
 
-        except Exception as e:
-            logger.error(f"❌ Failed to start auto-deploy scheduler: {e}")
+        except (RuntimeError, Exception) as e:
+            # Silently handle event loop errors in test environments
+            if "Event loop is closed" in str(e) or "no running event loop" in str(e).lower():
+                logger.debug(f"⚠️  Scheduler not started (event loop unavailable): {e}")
+            else:
+                logger.error(f"❌ Failed to start auto-deploy scheduler: {e}")
 
     def stop(self):
         """Stop the scheduler"""

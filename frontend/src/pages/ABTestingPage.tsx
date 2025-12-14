@@ -50,11 +50,11 @@ interface TestCardProps {
 function TestCard({ test, onPause, onResume, onViewResults, isPausing, isResuming }: TestCardProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'running': return 'text-green-600 bg-green-500/10 border-green-500/20';
-      case 'completed': return 'text-blue-600 bg-blue-500/10 border-blue-500/20';
+      case 'running': return 'text-green-600 bg-green-500/100/10 border-green-500/20';
+      case 'completed': return 'text-blue-600 bg-cyan-500/100/10 border-blue-500/20';
       case 'paused': return 'text-amber-600 bg-amber-500/10 border-amber-500/20';
-      case 'draft': return 'text-gray-600 bg-gray-500/10 border-gray-500/20';
-      default: return 'text-gray-600 bg-gray-500/10 border-gray-500/20';
+      case 'draft': return 'text-secondary  0/10 border-gray-500/20';
+      default: return 'text-secondary  0/10 border-gray-500/20';
     }
   };
 
@@ -131,7 +131,7 @@ function TestCard({ test, onPause, onResume, onViewResults, isPausing, isResumin
             </button>
           ) : test.status === 'paused' ? (
             <button
-              className="p-2.5 rounded-xl bg-green-500/10 text-green-600 hover:bg-green-500/20 transition-colors"
+              className="p-2.5 rounded-xl bg-green-500/100/10 text-green-600 hover:bg-green-500/100/20 transition-colors"
               onClick={() => onResume(test)}
               disabled={isResuming}
             >
@@ -299,14 +299,14 @@ function ResultsModal({ test, onClose }: ResultsModalProps) {
 
         <div className="p-6">
           {/* Status */}
-          <div className={`p-4 rounded-xl mb-6 ${isSignificant ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+          <div className={`p-4 rounded-xl mb-6 ${isSignificant ? 'bg-green-500/100/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
             <div className="flex items-center gap-2">
               {isSignificant ? (
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               ) : (
                 <AlertCircle className="w-5 h-5 text-amber-600" />
               )}
-              <span className={`font-medium ${isSignificant ? 'text-green-700' : 'text-amber-700'}`}>
+              <span className={`font-medium ${isSignificant ? 'text-green-400' : 'text-amber-700'}`}>
                 {isSignificant 
                   ? `Variant ${winner} is the winner with ${confidence.toFixed(0)}% confidence!`
                   : `Not yet significant (${confidence.toFixed(0)}% confidence). Keep running the test.`
@@ -317,7 +317,7 @@ function ResultsModal({ test, onClose }: ResultsModalProps) {
 
           {/* Comparison */}
           <div className="grid grid-cols-2 gap-6 mb-6">
-            <div className={`p-6 rounded-xl border ${winner === 'A' && isSignificant ? 'bg-green-500/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
+            <div className={`p-6 rounded-xl border ${winner === 'A' && isSignificant ? 'bg-green-500/100/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
               <div className="text-sm text-secondary mb-2">Variant A (Control)</div>
               <div className="text-3xl font-bold text-primary">{conversionA.toFixed(2)}%</div>
               <div className="text-xs text-tertiary mt-1">Conversion Rate</div>
@@ -327,7 +327,7 @@ function ResultsModal({ test, onClose }: ResultsModalProps) {
                 </div>
               )}
             </div>
-            <div className={`p-6 rounded-xl border ${winner === 'B' && isSignificant ? 'bg-green-500/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
+            <div className={`p-6 rounded-xl border ${winner === 'B' && isSignificant ? 'bg-green-500/100/5 border-green-500/20' : 'bg-black/5 border-black/10'}`}>
               <div className="text-sm text-secondary mb-2">Variant B (Treatment)</div>
               <div className="text-3xl font-bold text-primary">{conversionB.toFixed(2)}%</div>
               <div className="text-xs text-tertiary mt-1">Conversion Rate</div>

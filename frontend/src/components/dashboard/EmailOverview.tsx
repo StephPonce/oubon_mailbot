@@ -44,7 +44,7 @@ export function EmailOverview({ delay = 0 }: EmailOverviewProps) {
   // Determine operating status
   const currentHour = new Date().getHours();
   const isOperatingHours = currentHour >= 9 && currentHour < 18; // 9 AM - 6 PM
-  const statusColor = isOperatingHours ? 'text-green-600 bg-green-500/10' : 'text-amber-600 bg-amber-500/10';
+  const statusColor = isOperatingHours ? 'text-green-600 bg-green-500/100/10' : 'text-amber-600 bg-amber-500/10';
   const statusText = isOperatingHours ? 'Operating Hours' : 'Quiet Hours';
 
   return (

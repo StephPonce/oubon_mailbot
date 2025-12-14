@@ -46,12 +46,12 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, change, icon: Icon, color }: MetricCardProps) {
   const colorClasses = {
-    blue: 'bg-blue-500/10 text-blue-600',
-    green: 'bg-green-500/10 text-green-600',
+    blue: 'bg-cyan-500/100/10 text-blue-600',
+    green: 'bg-green-500/100/10 text-green-600',
     purple: 'bg-purple-500/10 text-purple-600',
     cyan: 'bg-cyan-500/10 text-cyan-600',
     amber: 'bg-amber-500/10 text-amber-600',
-    red: 'bg-red-500/10 text-red-600',
+    red: 'bg-red-500/100/10 text-red-600',
   };
 
   const isPositive = change !== undefined && change >= 0;
@@ -198,7 +198,7 @@ function FunnelChart({ data }: { data: any[] }) {
           <div key={index} className="relative">
             <div className="flex items-center gap-4">
               <div className="w-28 text-sm text-primary font-medium">{stage.name}</div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="h-10 bg-black/5 rounded-lg overflow-hidden">
                   <div
                     className="h-full rounded-lg bg-gradient-to-r from-purple-500 to-purple-600 flex items-center justify-end pr-3"

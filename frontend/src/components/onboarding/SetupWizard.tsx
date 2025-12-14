@@ -629,7 +629,7 @@ export default function SetupWizard() {
                               >
                                 <Zap className="w-5 h-5 text-[var(--accent)]" />
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium text-[var(--text-primary)]">
                                   Auto-Deploy Products
                                 </div>
@@ -673,7 +673,7 @@ export default function SetupWizard() {
                               >
                                 <Calendar className="w-5 h-5 text-[var(--accent)]" />
                               </div>
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium text-[var(--text-primary)]">
                                   Daily Briefing
                                 </div>

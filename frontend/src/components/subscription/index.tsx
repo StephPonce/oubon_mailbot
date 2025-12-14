@@ -6,8 +6,8 @@ export function TierBadgeCompact({ userId, onClick }: { userId: number; onClick?
   const tier = 'stratosphere'; // For demo, user has top tier
   
   const tierConfig = {
-    nest: { label: 'Nest', color: 'text-gray-400', bg: 'bg-gray-500/10', border: 'border-gray-500/20' },
-    flight: { label: 'Flight', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/20' },
+    nest: { label: 'Nest', color: 'text-tertiary', bg: ' 0/10', border: 'border-gray-500/20' },
+    flight: { label: 'Flight', color: 'text-blue-400', bg: 'bg-cyan-500/100/10', border: 'border-blue-500/20' },
     soar: { label: 'Soar', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
     stratosphere: { label: 'Stratosphere', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
   };

@@ -55,9 +55,9 @@ function TrendCard({ product, rank, previousRank, onDeploy, onViewDetails, isDep
   const velocity = product.velocity_score || product.trend_score || 0;
 
   const getVelocityColor = (v: number) => {
-    if (v >= 80) return 'text-green-600 bg-green-500/10';
+    if (v >= 80) return 'text-green-600 bg-green-500/100/10';
     if (v >= 50) return 'text-amber-600 bg-amber-500/10';
-    return 'text-red-500 bg-red-500/10';
+    return 'text-red-500 bg-red-500/100/10';
   };
 
   return (
@@ -108,8 +108,8 @@ function TrendCard({ product, rank, previousRank, onDeploy, onViewDetails, isDep
             <div className="h-1.5 bg-black/10 rounded-full overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all ${
-                  velocity >= 80 ? 'bg-green-500' : 
-                  velocity >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                  velocity >= 80 ? 'bg-green-500/100' : 
+                  velocity >= 50 ? 'bg-amber-500' : 'bg-red-500/100'
                 }`}
                 style={{ width: `${Math.min(velocity, 100)}%` }}
               />
@@ -213,9 +213,9 @@ function MoverCard({ product, direction }: { product: Product; direction: 'up' |
   const isUp = direction === 'up';
   
   return (
-    <div className={`p-3 rounded-xl ${isUp ? 'bg-green-500/8' : 'bg-red-500/8'}`}>
+    <div className={`p-3 rounded-xl ${isUp ? 'bg-green-500/100/8' : 'bg-red-500/100/8'}`}>
       <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${isUp ? 'bg-green-500/20 text-green-600' : 'bg-red-500/20 text-red-500'}`}>
+        <div className={`p-2 rounded-lg ${isUp ? 'bg-green-500/100/20 text-green-600' : 'bg-red-500/100/20 text-red-500'}`}>
           {isUp ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
         </div>
         <div className="flex-1 min-w-0">
@@ -303,8 +303,8 @@ export default function LiveTrendsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-500/100/10 border border-green-500/20">
+            <div className="w-2 h-2 rounded-full bg-green-500/100 animate-pulse" />
             <span className="text-xs text-green-600 font-medium">Live Data</span>
           </div>
           <button

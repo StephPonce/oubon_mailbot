@@ -12,12 +12,13 @@ Features:
 - Category-weighted factors (market, financial, competition, trend, etc.)
 - Risk level classification (low, medium, high)
 - Detailed explanations and recommendations
-- User-specific weight learning integration
+- User-specific weight learning integration (G4: Complete Feedback Loop)
 """
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
 from enum import Enum
+from sqlalchemy.orm import Session
 
 
 class FactorType(str, Enum):
@@ -112,7 +113,12 @@ class ConfidenceScore:
 
 
 class ConfidenceEngine:
-    """Engine for calculating transparent confidence scores"""
+    """
+    Engine for calculating transparent confidence scores.
+
+    Integrates with G4 Complete Feedback Loop to use learned weights
+    from real sales performance data.
+    """
 
     # Base scores for different action types
     BASE_SCORES = {
@@ -126,7 +132,7 @@ class ConfidenceEngine:
         "restock_alert": 50,
     }
 
-    # Factor weights by category
+    # Factor weights by category (defaults before learning)
     CATEGORY_WEIGHTS = {
         FactorCategory.MARKET: 1.0,
         FactorCategory.FINANCIAL: 1.2,
@@ -137,11 +143,71 @@ class ConfidenceEngine:
         FactorCategory.QUALITY: 0.7,
     }
 
-    def __init__(self, user_weights: Optional[Dict[str, float]] = None):
+    def __init__(
+        self,
+        db: Optional[Session] = None,
+        user_id: Optional[int] = None,
+        user_weights: Optional[Dict[str, float]] = None
+    ):
         """
-        Initialize with optional user-specific weights from learning system
+        Initialize confidence engine with optional learning integration.
+
+        Args:
+            db: Database session for learning integration
+            user_id: User ID to fetch learned weights for
+            user_weights: Pre-computed user weights (if already fetched)
         """
+        self.db = db
+        self.user_id = user_id
         self.user_weights = user_weights or {}
+        self.learning_processor = None
+
+        # Initialize LearningProcessor if db and user_id provided
+        if db and user_id:
+            try:
+                from ospra_os.services.learning_processor import LearningProcessor
+                self.learning_processor = LearningProcessor(db)
+            except ImportError:
+                print("⚠️  LearningProcessor not available - using default weights")
+
+    def get_learned_weights(self) -> Dict[str, float]:
+        """
+        Get learned weights for this user from the feedback loop.
+
+        Returns weights that have been optimized based on what actually
+        works for this specific user's sales history.
+
+        Returns:
+            Dict of factor weights (historical, market, margin, sentiment)
+        """
+        if not self.learning_processor or not self.user_id:
+            # Return equal default weights
+            return {
+                "historical": 0.25,
+                "market": 0.25,
+                "margin": 0.25,
+                "sentiment": 0.25
+            }
+
+        return self.learning_processor.get_weights_for_user(self.user_id)
+
+    def get_niche_adjustment(self, niche: str) -> float:
+        """
+        Get score adjustment for a specific niche based on user's history.
+
+        If user has 85% success in fitness, boost fitness scores by +10.
+        If user has 20% success in home_decor, penalize by -10.
+
+        Args:
+            niche: Product niche/category
+
+        Returns:
+            Score adjustment (-10 to +10)
+        """
+        if not self.learning_processor or not self.user_id:
+            return 0.0
+
+        return self.learning_processor.get_niche_adjustment(self.user_id, niche)
 
     def calculate_product_confidence(
         self,
@@ -239,8 +305,9 @@ class ConfidenceEngine:
             shipping_factor = self._calculate_shipping_factor(shipping_days)
             factors.append(shipping_factor)
 
-        # Calculate final score
-        return self._finalize_score(base_score, factors, "deploy_product")
+        # Calculate final score (with niche adjustment from learned data)
+        product_niche = product.get("niche") or product.get("category")
+        return self._finalize_score(base_score, factors, "deploy_product", product_niche=product_niche)
 
     def calculate_price_adjustment_confidence(
         self,
@@ -893,12 +960,41 @@ class ConfidenceEngine:
         self,
         base_score: float,
         factors: List[ConfidenceFactor],
-        action_type: str
+        action_type: str,
+        product_niche: Optional[str] = None
     ) -> ConfidenceScore:
-        """Finalize the confidence score"""
+        """
+        Finalize the confidence score with learned weights and niche adjustments.
 
-        # Apply user weights
+        Applies:
+        1. User-specific learned weights from G4 feedback loop
+        2. Niche-specific adjustments based on user's success history
+        3. Final score clamping and risk classification
+        """
+
+        # Get learned weights from feedback loop
+        learned_weights = self.get_learned_weights()
+
+        # Apply learned category weights to factors
         for factor in factors:
+            # Map factor categories to learned weight keys
+            category_to_weight_key = {
+                FactorCategory.HISTORICAL: "historical",
+                FactorCategory.MARKET: "market",
+                FactorCategory.FINANCIAL: "margin",  # Maps to margin weight
+                FactorCategory.TREND: "sentiment",    # Maps to sentiment weight
+                FactorCategory.COMPETITION: "market",
+                FactorCategory.RISK: "historical",    # Risk learned from historical data
+                FactorCategory.QUALITY: "sentiment",  # Quality correlates with sentiment
+            }
+
+            weight_key = category_to_weight_key.get(factor.category)
+            if weight_key and weight_key in learned_weights:
+                # Apply learned weight multiplier (0.25 baseline becomes 0.23 or 0.28, etc.)
+                learned_multiplier = learned_weights[weight_key] / 0.25  # Normalize to 1.0 baseline
+                factor.weight *= learned_multiplier
+
+            # Also apply any pre-computed user weights (for backward compatibility)
             factor_key = f"{factor.category.value}_{factor.name.lower().replace(' ', '_')}"
             if factor_key in self.user_weights:
                 factor.weight *= self.user_weights[factor_key]
@@ -908,6 +1004,25 @@ class ConfidenceEngine:
 
         # Calculate final score (clamped to 0-100)
         final_score = max(0, min(100, base_score + total_adjustment))
+
+        # Apply niche adjustment from learned performance
+        if product_niche:
+            niche_adjustment = self.get_niche_adjustment(product_niche)
+            final_score += niche_adjustment
+            final_score = max(0, min(100, final_score))  # Re-clamp after niche adjustment
+
+            # Add niche adjustment as a virtual factor for transparency
+            if niche_adjustment != 0:
+                niche_factor = ConfidenceFactor(
+                    name=f"{product_niche.title()} Niche Performance",
+                    category=FactorCategory.HISTORICAL,
+                    value=niche_adjustment,
+                    weight=1.0,
+                    factor_type=FactorType.POSITIVE if niche_adjustment > 0 else FactorType.NEGATIVE,
+                    description=f"Based on your {abs(niche_adjustment * 10):.0f}% success rate in {product_niche}",
+                    icon="award" if niche_adjustment > 0 else "alert-circle"
+                )
+                factors.append(niche_factor)
 
         # Determine risk level
         if final_score >= 85:

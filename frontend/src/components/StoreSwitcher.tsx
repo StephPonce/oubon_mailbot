@@ -98,7 +98,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
 
     if (platformLower === 'shopify') {
       return (
-        <div className="w-5 h-5 rounded bg-green-500/10 flex items-center justify-center">
+        <div className="w-5 h-5 rounded bg-green-500/100/10 flex items-center justify-center">
           <span className="text-green-600 text-xs font-bold">S</span>
         </div>
       );
@@ -117,7 +117,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
     }
 
     return (
-      <div className="w-5 h-5 rounded bg-blue-500/10 flex items-center justify-center">
+      <div className="w-5 h-5 rounded bg-cyan-500/100/10 flex items-center justify-center">
         <Store className="w-3 h-3 text-blue-600" />
       </div>
     );
@@ -136,7 +136,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
     return (
       <button
         onClick={() => navigate('/stores')}
-        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/100/10 text-blue-600 hover:bg-cyan-500/100/20 transition-colors"
       >
         <Plus className="w-4 h-4" />
         <span className="text-sm font-medium">Add Store</span>
@@ -189,7 +189,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-primary">{store.store_name}</span>
                     {activeStore.id === store.id && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500/100" />
                     )}
                     {store.status === 'error' && (
                       <AlertCircle className="w-3 h-3 text-red-500" />
@@ -208,7 +208,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
                       ${store.status === 'paused' ? 'text-yellow-600' : ''}
                       ${store.status === 'error' ? 'text-red-600' : ''}
                       ${store.status === 'setup' ? 'text-blue-600' : ''}
-                      ${store.status === 'disconnected' ? 'text-gray-600' : ''}
+                      ${store.status === 'disconnected' ? 'text-secondary' : ''}
                     `}>
                       {store.status}
                     </span>
@@ -232,7 +232,7 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
                 setIsOpen(false);
                 navigate('/stores');
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-500/100/10 text-blue-600 hover:bg-cyan-500/100/20 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Add New Store</span>

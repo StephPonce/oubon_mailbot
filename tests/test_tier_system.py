@@ -6,7 +6,7 @@ Verifies database tables, TierManager service, and API endpoints
 import asyncio
 import sys
 from datetime import datetime
-from ospra_os.database.multi_store_models import Base, User, UserSettings
+from ospra_os.database import Base, User, UserSettings
 from ospra_os.subscription.tier_manager import TierManager
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
@@ -67,6 +67,7 @@ async def test_tier_manager():
         test_user = User(
             email="test@tiertest.com",
             name="Tier Test User",
+            password_hash="$2b$12$test_hash",  # Add password_hash field for test
             subscription_tier='free'
         )
         session.add(test_user)

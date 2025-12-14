@@ -149,14 +149,14 @@ export function UpgradePrompt({
                   relative rounded-xl border-2 p-5 transition-all cursor-pointer
                   ${tier.highlight 
                     ? 'border-blue-500 shadow-lg shadow-blue-500/20 scale-105' 
-                    : 'border-gray-200 hover:border-gray-300'
+                    : 'border-white/10 hover:border-white/10'
                   }
                   ${selectedTier === tier.id ? 'ring-2 ring-blue-500' : ''}
                 `}
                 onClick={() => setSelectedTier(tier.id)}
               >
                 {tier.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-cyan-500/100 text-white text-xs font-bold px-3 py-1 rounded-full">
                     MOST POPULAR
                   </div>
                 )}
@@ -165,13 +165,13 @@ export function UpgradePrompt({
                   <Rocket className="w-6 h-6 text-white" />
                 </div>
                 
-                <h3 className="text-xl font-bold text-gray-900">{tier.name}</h3>
-                <p className="text-sm text-gray-500 mb-2">{tier.description}</p>
-                <div className="text-2xl font-bold text-gray-900 mb-4">{tier.price}</div>
+                <h3 className="text-xl font-bold text-primary">{tier.name}</h3>
+                <p className="text-sm text-tertiary mb-2">{tier.description}</p>
+                <div className="text-2xl font-bold text-primary mb-4">{tier.price}</div>
                 
                 <ul className="space-y-2 mb-6">
                   {tier.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                    <li key={i} className="flex items-start gap-2 text-sm text-secondary">
                       <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                       <span>{feature}</span>
                     </li>
@@ -188,7 +188,7 @@ export function UpgradePrompt({
                     w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition
                     ${tier.highlight
                       ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:shadow-lg'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      : 'bg-gray-100 text-primary hover:bg-gray-200'
                     }
                     ${loading === tier.id ? 'opacity-50 cursor-not-allowed' : ''}
                   `}
@@ -207,8 +207,8 @@ export function UpgradePrompt({
           </div>
           
           {/* Benefits */}
-          <div className="mt-8 p-4 bg-gray-50 rounded-xl">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="mt-8 p-4   rounded-xl">
+            <div className="flex items-center gap-2 text-sm text-secondary">
               <Zap className="w-4 h-4 text-yellow-500" />
               <span>All plans include 14-day money-back guarantee</span>
             </div>
@@ -236,8 +236,8 @@ export function UpgradeBanner({
           <Zap className="w-5 h-5 text-amber-600" />
         </div>
         <div>
-          <p className="font-medium text-gray-900">{message}</p>
-          <p className="text-sm text-gray-500">Upgrade to unlock more</p>
+          <p className="font-medium text-primary">{message}</p>
+          <p className="text-sm text-tertiary">Upgrade to unlock more</p>
         </div>
       </div>
       <button

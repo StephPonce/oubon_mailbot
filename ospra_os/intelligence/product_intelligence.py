@@ -88,6 +88,7 @@ class ProductIntelligenceEngine:
 
     def __init__(self, claude_client=None, database_url: Optional[str] = None, enable_saturation_tracking: bool = True):
         self.claude = claude_client
+        self.aliexpress_api = None  # Placeholder for AliExpress API client (not implemented yet)
         self.profit_margin = 51.7  # Standard margin
         self.market_analyzer = ComprehensiveMarketAnalyzer()
 
@@ -241,6 +242,29 @@ class ProductIntelligenceEngine:
             products.append(product)
 
         return products
+
+    def discover_products(self, niche: str = None, per_page: int = 20, **kwargs) -> Dict[str, Any]:
+        """
+        Alias for discover_products_by_niche() for backward compatibility.
+
+        Args:
+            niche: Product niche to filter by
+            per_page: Number of products to return (maps to 'count' parameter)
+            **kwargs: Additional arguments (ignored for compatibility)
+
+        Returns:
+            Dict with 'data_source', 'total', and 'products' keys
+        """
+        if not niche:
+            niche = 'smart_home'  # Default niche
+
+        products = self.discover_products_by_niche(niche=niche, count=per_page)
+
+        return {
+            "data_source": "ADVANCED_SCRAPING",
+            "total": len(products),
+            "products": products
+        }
 
     async def discover_winning_products(self, niches: List[str] = None, max_per_niche: int = 20) -> List[Dict[str, Any]]:
         """Async wrapper - now with ACCURATE profit calculations and more efficient processing!"""

@@ -289,7 +289,7 @@ interface DashboardContext {
               {messages.length === 0 && (
                 <div className="text-center py-8">
                   <Sparkles className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                  <p className="text-gray-400 mb-4">How can I help you today?</p>
+                  <p className="text-tertiary mb-4">How can I help you today?</p>
                   <div className="space-y-2">
                     {quickPrompts.map((prompt, idx) => (
                       <button
@@ -328,9 +328,9 @@ interface DashboardContext {
                 <div className="flex justify-start">
                   <div className="bg-gray-800 rounded-lg px-4 py-2">
                     <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2  0 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2  0 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2  0 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -359,7 +359,7 @@ interface DashboardContext {
                 <button
                   type="submit"
                   disabled={loading || !input.trim()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg text-white transition-colors"
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 rounded-lg text-white transition-colors"
                 >
                   <Send className="w-4 h-4" />
                 </button>

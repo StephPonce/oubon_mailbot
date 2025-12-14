@@ -2,12 +2,22 @@
 """
 Multi-Store Backend Test Script
 Comprehensive testing of all multi-store API endpoints
+
+NOTE: This is a standalone integration test script designed to be run directly with:
+      python tests/test_multi_store.py
+
+      It is NOT a pytest test file. The functions are called programmatically from run_all_tests(),
+      not by pytest. Pytest is configured to skip this file.
 """
 
+import pytest
 import requests
 import json
 from typing import Dict, Any, Optional
 import sys
+
+# Skip this entire module when running pytest - it's a standalone integration test
+pytestmark = pytest.mark.skip(reason="Standalone integration test script, not pytest tests. Run with: python tests/test_multi_store.py")
 
 # Configuration
 BASE_URL = "http://localhost:8001"

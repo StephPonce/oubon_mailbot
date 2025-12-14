@@ -66,13 +66,13 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
   const getStageColor = (stage: string) => {
     const colors: Record<string, string> = {
       discovery: 'bg-purple-500',
-      analysis: 'bg-blue-500',
-      deploy: 'bg-yellow-500',
-      active: 'bg-green-500',
+      analysis: 'bg-cyan-500/100',
+      deploy: 'bg-amber-500/100',
+      active: 'bg-green-500/100',
       review: 'bg-orange-500',
-      dropped: 'bg-red-500',
+      dropped: 'bg-red-500/100',
     };
-    return colors[stage] || 'bg-gray-500';
+    return colors[stage] || ' 0';
   };
 
   if (loading) {
@@ -89,7 +89,7 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-500/10 border border-red-200 rounded-lg p-4">
         <p className="text-red-800">Error: {error}</p>
       </div>
     );
@@ -103,18 +103,18 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Product Lifecycle Progress</h3>
+      <h3 className="text-xl font-bold text-primary mb-6">Product Lifecycle Progress</h3>
 
       {/* Current Stage & Progress */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <span className="text-sm text-gray-600">Current Stage:</span>
-            <span className="ml-2 font-semibold text-gray-900 capitalize">
+            <span className="text-sm text-secondary">Current Stage:</span>
+            <span className="ml-2 font-semibold text-primary capitalize">
               {progressData.current_stage}
             </span>
           </div>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-secondary">
             {progressData.days_in_stage} days in stage
           </div>
         </div>
@@ -126,14 +126,14 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
             style={{ width: `${progressData.progress_percentage}%` }}
           ></div>
         </div>
-        <div className="text-right text-sm font-medium text-gray-700">
+        <div className="text-right text-sm font-medium text-secondary">
           {progressData.progress_percentage}% Complete
         </div>
       </div>
 
       {/* Stage Timeline */}
       <div className="mb-6">
-        <h4 className="text-sm font-semibold text-gray-900 mb-3">Lifecycle Stages</h4>
+        <h4 className="text-sm font-semibold text-primary mb-3">Lifecycle Stages</h4>
         <div className="relative">
           <div className="flex items-center justify-between">
             {stages.map((stage, index) => (
@@ -147,7 +147,7 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
                 >
                   {index <= currentStageIndex ? '✓' : index + 1}
                 </div>
-                <span className="text-xs text-gray-600 mt-2 capitalize text-center">
+                <span className="text-xs text-secondary mt-2 capitalize text-center">
                   {stage}
                 </span>
               </div>
@@ -160,14 +160,14 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
 
       {/* Next Milestone */}
       {progressData.next_milestone && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-blue-900">Next Milestone</p>
               <p className="text-sm text-blue-800">{progressData.next_milestone}</p>
             </div>
             {progressData.next_milestone_date && (
-              <div className="text-sm text-blue-700">
+              <div className="text-sm text-cyan-400">
                 {new Date(progressData.next_milestone_date).toLocaleDateString()}
               </div>
             )}
@@ -178,31 +178,31 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
       {/* Milestones Checklist */}
       {progressData.milestones && progressData.milestones.length > 0 && (
         <div className="mb-6">
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">Milestones</h4>
+          <h4 className="text-sm font-semibold text-primary mb-3">Milestones</h4>
           <div className="space-y-2">
             {progressData.milestones.map((milestone, index) => (
               <div
                 key={index}
                 className={`flex items-center justify-between p-2 rounded ${
-                  milestone.completed ? 'bg-green-50' : 'bg-gray-50'
+                  milestone.completed ? 'bg-green-500/100/10' : ' '
                 }`}
               >
                 <div className="flex items-center">
                   <span
                     className={`w-5 h-5 rounded-full flex items-center justify-center mr-3 ${
                       milestone.completed
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-300 text-gray-600'
+                        ? 'bg-green-500/100 text-white'
+                        : 'bg-gray-300 text-secondary'
                     }`}
                   >
                     {milestone.completed ? '✓' : ''}
                   </span>
-                  <span className={`text-sm ${milestone.completed ? 'text-gray-700' : 'text-gray-500'}`}>
+                  <span className={`text-sm ${milestone.completed ? 'text-secondary' : 'text-tertiary'}`}>
                     {milestone.name}
                   </span>
                 </div>
                 {milestone.completed && milestone.date && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-tertiary">
                     {new Date(milestone.date).toLocaleDateString()}
                   </span>
                 )}
@@ -215,7 +215,7 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
       {/* Stage History */}
       {progressData.stage_history && progressData.stage_history.length > 0 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-900 mb-3">Stage History</h4>
+          <h4 className="text-sm font-semibold text-primary mb-3">Stage History</h4>
           <div className="space-y-2">
             {progressData.stage_history.map((item, index) => (
               <div
@@ -223,8 +223,8 @@ export const ProductProgressTracker: React.FC<ProductProgressTrackerProps> = ({ 
                 className="flex items-center justify-between text-sm border-l-4 pl-3 py-1"
                 style={{ borderColor: getStageColor(item.stage).replace('bg-', '#') }}
               >
-                <span className="capitalize text-gray-700">{item.stage}</span>
-                <div className="flex items-center gap-4 text-gray-600">
+                <span className="capitalize text-secondary">{item.stage}</span>
+                <div className="flex items-center gap-4 text-secondary">
                   <span>{item.duration_days} days</span>
                   <span className="text-xs">
                     {new Date(item.entered_at).toLocaleDateString()}

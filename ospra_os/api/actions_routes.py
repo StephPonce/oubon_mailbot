@@ -26,7 +26,8 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
-from ospra_os.auth.jwt_auth import get_db, get_current_user
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import get_db
 from ospra_os.database.multi_store_models import User
 from ospra_os.database.action_models import (
     Action,
@@ -35,6 +36,7 @@ from ospra_os.database.action_models import (
     AIActionStatus,
 )
 from ospra_os.actions.undo_manager import UndoManager
+from ospra_os.services.action_executor import ActionExecutorFactory
 
 
 router = APIRouter(prefix="/api/actions", tags=["Actions Queue"])
@@ -207,124 +209,44 @@ def capture_previous_state(action: Action) -> Dict[str, Any]:
 
 async def execute_action(action: Action, db: Session) -> Dict[str, Any]:
     """
-    Execute approved action based on action_type.
-    Returns execution result with success status.
+    Execute approved action using ActionExecutorFactory.
+    Routes to the appropriate executor based on action_type and executes the action.
+    Returns execution result with success status and platform response data.
     """
     try:
-        if action.action_type == AIActionType.DEPLOY_PRODUCT:
-            return await execute_deploy_product(action, db)
-        elif action.action_type == AIActionType.ADJUST_PRICE:
-            return await execute_price_adjustment(action, db)
-        elif action.action_type == AIActionType.PAUSE_AD:
-            return await execute_pause_ad(action, db)
-        elif action.action_type == AIActionType.RESUME_AD:
-            return await execute_resume_ad(action, db)
-        elif action.action_type == AIActionType.DROP_PRODUCT:
-            return await execute_drop_product(action, db)
-        elif action.action_type == AIActionType.SEND_REFUND:
-            return await execute_send_refund(action, db)
-        elif action.action_type == AIActionType.REPLY_EMAIL:
-            return await execute_reply_email(action, db)
-        elif action.action_type == AIActionType.RESTOCK_ALERT:
-            return await execute_restock_alert(action, db)
-        else:
-            return {"success": False, "error": f"Unknown action type: {action.action_type}"}
+        # Get the appropriate executor for this action type
+        executor = ActionExecutorFactory.get_executor(
+            action_type=action.action_type.value,
+            db=db,
+            user_id=action.user_id
+        )
+
+        if not executor:
+            return {
+                "success": False,
+                "error": f"No executor found for action type: {action.action_type}"
+            }
+
+        # Execute the action
+        result = await executor.execute(action)
+
+        # Convert ExecutionResult to dict for JSON serialization
+        return {
+            "success": result.success,
+            "message": result.message,
+            "before_state": result.before_state,
+            "after_state": result.after_state,
+            "platform_response": result.platform_response,
+            "error": result.error,
+            "is_undoable": result.is_undoable,
+            "undo_payload": result.undo_payload
+        }
+
     except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-async def execute_deploy_product(action: Action, db: Session) -> Dict[str, Any]:
-    """Deploy product to Shopify/platform"""
-    # TODO: Integrate with Shopify deployment API
-    payload = action.payload
-    return {
-        "success": True,
-        "product_name": payload.get("product_name"),
-        "message": f"Product '{payload.get('product_name')}' deployed successfully",
-        "shopify_product_id": None  # Will be filled by actual Shopify integration
-    }
-
-
-async def execute_price_adjustment(action: Action, db: Session) -> Dict[str, Any]:
-    """Adjust product price"""
-    # TODO: Integrate with Shopify price update API
-    payload = action.payload
-    return {
-        "success": True,
-        "product_name": payload.get("product_name"),
-        "old_price": payload.get("current_price"),
-        "new_price": payload.get("new_price"),
-        "message": f"Price updated from ${payload.get('current_price')} to ${payload.get('new_price')}"
-    }
-
-
-async def execute_pause_ad(action: Action, db: Session) -> Dict[str, Any]:
-    """Pause ad campaign"""
-    # TODO: Integrate with Meta/Google Ads API
-    payload = action.payload
-    return {
-        "success": True,
-        "campaign_name": payload.get("campaign_name"),
-        "platform": payload.get("platform"),
-        "message": f"Ad campaign '{payload.get('campaign_name')}' paused"
-    }
-
-
-async def execute_resume_ad(action: Action, db: Session) -> Dict[str, Any]:
-    """Resume ad campaign"""
-    # TODO: Integrate with Meta/Google Ads API
-    payload = action.payload
-    return {
-        "success": True,
-        "campaign_name": payload.get("campaign_name"),
-        "platform": payload.get("platform"),
-        "message": f"Ad campaign '{payload.get('campaign_name')}' resumed"
-    }
-
-
-async def execute_drop_product(action: Action, db: Session) -> Dict[str, Any]:
-    """Remove product from store"""
-    # TODO: Integrate with Shopify product removal API
-    payload = action.payload
-    return {
-        "success": True,
-        "product_name": payload.get("product_name"),
-        "message": f"Product '{payload.get('product_name')}' removed from store"
-    }
-
-
-async def execute_send_refund(action: Action, db: Session) -> Dict[str, Any]:
-    """Process customer refund"""
-    # TODO: Integrate with Shopify refund API
-    payload = action.payload
-    return {
-        "success": True,
-        "order_id": payload.get("order_id"),
-        "amount": payload.get("refund_amount"),
-        "message": f"Refund of ${payload.get('refund_amount')} processed for order {payload.get('order_id')}"
-    }
-
-
-async def execute_reply_email(action: Action, db: Session) -> Dict[str, Any]:
-    """Send email reply"""
-    # TODO: Integrate with Gmail API
-    payload = action.payload
-    return {
-        "success": True,
-        "email_thread_id": payload.get("thread_id"),
-        "message": "Email reply sent successfully"
-    }
-
-
-async def execute_restock_alert(action: Action, db: Session) -> Dict[str, Any]:
-    """Send restock notification"""
-    # TODO: Integrate with notification system
-    payload = action.payload
-    return {
-        "success": True,
-        "product_name": payload.get("product_name"),
-        "message": f"Restock alert sent for '{payload.get('product_name')}'"
-    }
+        return {
+            "success": False,
+            "error": f"Execution error: {str(e)}"
+        }
 
 
 # ============================================================================

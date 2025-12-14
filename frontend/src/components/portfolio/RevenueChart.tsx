@@ -70,7 +70,7 @@ const platformColors: Record<string, string> = {
 
 // Fallback component for Suspense
 const LoadingChart = () => (
-  <div className="flex items-center justify-center h-full text-gray-400">
+  <div className="flex items-center justify-center h-full text-tertiary">
     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
     <span className="ml-3">Loading Chart...</span>
   </div>
@@ -103,7 +103,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
               className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-gray-400">{entry.name}:</span>
+            <span className="text-tertiary">{entry.name}:</span>
             <span className="text-white font-medium">
               ${entry.value.toLocaleString()}
             </span>
@@ -121,9 +121,9 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold text-white">Revenue Trends</h2>
-          <p className="text-sm text-gray-400 mt-1">Last 30 days performance</p>
+          <p className="text-sm text-tertiary mt-1">Last 30 days performance</p>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 rounded-lg">
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-500/100/10 rounded-lg">
           <TrendingUp className="w-5 h-5 text-green-400" />
           <span className="text-sm font-medium text-green-400">+12.5%</span>
         </div>
@@ -184,13 +184,13 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
       {/* Legend Info */}
       <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
         <div>
-          <p className="text-xs text-gray-500 uppercase">Total (30d)</p>
+          <p className="text-xs text-tertiary uppercase">Total (30d)</p>
           <p className="text-lg font-bold text-white">
             ${rankings.reduce((sum, store) => sum + store.monthly_revenue, 0).toLocaleString()}
           </p>
         </div>
         <div>
-          <p className="text-xs text-gray-500 uppercase">Daily Average</p>
+          <p className="text-xs text-tertiary uppercase">Daily Average</p>
           <p className="text-lg font-bold text-white">
             ${Math.round(rankings.reduce((sum, store) => sum + store.monthly_revenue, 0) / 30).toLocaleString()}
           </p>

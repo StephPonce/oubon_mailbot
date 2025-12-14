@@ -28,21 +28,21 @@ export default function StoreRankingsTable({ stores, onStoreClick }: StoreRankin
     switch (platform.toLowerCase()) {
       case 'shopify': return `${baseClasses} bg-purple-500/10 text-purple-400`;
       case 'amazon': return `${baseClasses} bg-orange-500/10 text-orange-400`;
-      case 'woocommerce': return `${baseClasses} bg-blue-500/10 text-blue-400`;
-      default: return `${baseClasses} bg-gray-500/10 text-gray-300`;
+      case 'woocommerce': return `${baseClasses} bg-cyan-500/100/10 text-blue-400`;
+      default: return `${baseClasses}  0/10 text-gray-300`;
     }
   };
 
   const getRankChangeIcon = (change: number) => {
     if (change > 0) return <ArrowUp className="w-4 h-4 text-success-green" />;
     if (change < 0) return <ArrowDown className="w-4 h-4 text-red-500" />;
-    return <Minus className="w-4 h-4 text-gray-500" />;
+    return <Minus className="w-4 h-4 text-tertiary" />;
   };
 
   return (
     <div>
       {/* Table Header */}
-      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-gray-400 uppercase">
+      <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs font-medium text-tertiary uppercase">
         <div className="col-span-1">Rank</div>
         <div className="col-span-4">Store</div>
         <div className="col-span-2">Platform</div>
@@ -67,7 +67,7 @@ export default function StoreRankingsTable({ stores, onStoreClick }: StoreRankin
 
             <div className="col-span-4">
               <p className="font-semibold text-gray-200">{store.store_name}</p>
-              {store.url && <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-brand-blue">{store.url}</a>}
+              {store.url && <a href={store.url} target="_blank" rel="noopener noreferrer" className="text-xs text-tertiary hover:text-brand-blue">{store.url}</a>}
             </div>
 
             <div className="col-span-2">
@@ -97,9 +97,9 @@ export default function StoreRankingsTable({ stores, onStoreClick }: StoreRankin
 
       {safeStores.length === 0 && (
         <div className="text-center py-20 bg-gray-900/50 border border-gray-800 rounded-lg">
-          <StoreIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-400">No stores found</h3>
-          <p className="text-sm text-gray-500 mt-1">Add your first store to see its ranking here.</p>
+          <StoreIcon className="w-12 h-12 text-secondary mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-tertiary">No stores found</h3>
+          <p className="text-sm text-tertiary mt-1">Add your first store to see its ranking here.</p>
         </div>
       )}
     </div>

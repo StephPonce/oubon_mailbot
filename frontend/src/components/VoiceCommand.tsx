@@ -246,7 +246,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
       case 'error':
         return <AlertCircle className="w-5 h-5 text-red-500" />;
       default:
-        return <Mic className="w-5 h-5 text-gray-400" />;
+        return <Mic className="w-5 h-5 text-tertiary" />;
     }
   };
 
@@ -279,7 +279,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
 
         {state === 'recording' && (
           <motion.span
-            className="absolute inset-0 rounded-full bg-red-500/20"
+            className="absolute inset-0 rounded-full bg-red-500/100/20"
             animate={{
               scale: [1, 1.5, 1],
               opacity: [0.5, 0, 0.5]
@@ -315,14 +315,14 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
             >
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between p-6 border-b border-white/10 dark:border-gray-700">
                 <div className="flex items-center gap-3">
                   {getStatusIcon()}
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <h2 className="text-lg font-semibold text-primary dark:text-white">
                       Voice Commands
                     </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-tertiary dark:text-tertiary">
                       {getStatusText()}
                     </p>
                   </div>
@@ -331,7 +331,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                   onClick={toggleModal}
                   className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="w-5 h-5 text-tertiary" />
                 </button>
               </div>
 
@@ -340,7 +340,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                 {/* Transcript */}
                 {transcript && (
                   <motion.div
-                    className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg"
+                    className="p-4 bg-cyan-500/10 dark:bg-blue-900/20 rounded-lg"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -350,7 +350,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                         <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                           You said:
                         </p>
-                        <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        <p className="text-sm text-cyan-400 dark:text-blue-300 mt-1">
                           "{transcript}"
                         </p>
                       </div>
@@ -361,7 +361,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                 {/* Response */}
                 {response && (
                   <motion.div
-                    className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg"
+                    className="p-4 bg-green-500/100/10 dark:bg-green-900/20 rounded-lg"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -371,7 +371,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                         <p className="text-sm font-medium text-green-900 dark:text-green-100">
                           Ospra says:
                         </p>
-                        <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                        <p className="text-sm text-green-400 dark:text-green-300 mt-1">
                           {response}
                         </p>
                       </div>
@@ -382,7 +382,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                 {/* Error */}
                 {error && (
                   <motion.div
-                    className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg"
+                    className="p-4 bg-red-500/10 dark:bg-red-900/20 rounded-lg"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -407,10 +407,10 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
                     disabled={state === 'processing' || state === 'speaking'}
                     className={`relative w-20 h-20 rounded-full flex items-center justify-center transition-all ${
                       state === 'recording'
-                        ? 'bg-red-500 hover:bg-red-600'
+                        ? 'bg-red-500/100 hover:bg-red-600'
                         : state === 'processing' || state === 'speaking'
                         ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
-                        : 'bg-blue-500 hover:bg-blue-600'
+                        : 'bg-cyan-500 hover:bg-cyan-600'
                     }`}
                     whileHover={{ scale: state === 'idle' ? 1.05 : 1 }}
                     whileTap={{ scale: state === 'idle' ? 0.95 : 1 }}
@@ -442,7 +442,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
 
                 {/* Instructions */}
                 {state === 'idle' && !transcript && (
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400 pt-2">
+                  <div className="text-center text-sm text-tertiary dark:text-tertiary pt-2">
                     <p>Click the microphone and try saying:</p>
                     <ul className="mt-2 space-y-1">
                       <li>"What's my revenue today?"</li>
@@ -454,7 +454,7 @@ export function VoiceCommand({ className = '', onCommandExecuted }: VoiceCommand
               </div>
 
               {/* Keyboard hint */}
-              <div className="px-6 pb-4 text-center text-xs text-gray-400 dark:text-gray-500">
+              <div className="px-6 pb-4 text-center text-xs text-tertiary dark:text-tertiary">
                 Press <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">Cmd+M</kbd> to toggle
               </div>
             </motion.div>

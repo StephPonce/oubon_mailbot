@@ -117,7 +117,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
   };
 
   const getUrgencyColor = (hours: number | null): string => {
-    if (hours === null) return 'text-gray-400';
+    if (hours === null) return 'text-tertiary';
     if (hours < 1) return 'text-red-400';
     if (hours < 6) return 'text-orange-400';
     if (hours < 24) return 'text-yellow-400';
@@ -133,7 +133,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
       >
         <div className="flex items-center gap-3">
           <History className="w-5 h-5 animate-spin text-purple-400" />
-          <p className="text-sm text-gray-400">Loading recent actions...</p>
+          <p className="text-sm text-tertiary">Loading recent actions...</p>
         </div>
       </motion.div>
     );
@@ -178,7 +178,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">Recent Actions</h2>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-tertiary">
                 {actions.length} action{actions.length !== 1 ? 's' : ''} in history
               </p>
             </div>
@@ -196,8 +196,8 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
         {/* Actions List */}
         {actions.length === 0 ? (
           <div className="text-center py-8">
-            <History className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-            <p className="text-sm text-gray-400">No recent actions to display</p>
+            <History className="w-12 h-12 text-secondary mx-auto mb-3" />
+            <p className="text-sm text-tertiary">No recent actions to display</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -212,7 +212,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
                   className={cn(
                     "p-4 rounded-lg border transition-all",
                     action.undone_at
-                      ? "bg-gray-500/10 border-gray-500/20"
+                      ? " 0/10 border-gray-500/20"
                       : "bg-white/5 border-white/10 hover:bg-white/10"
                   )}
                 >
@@ -227,7 +227,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
                           {action.title}
                         </h3>
                         {action.undone_at && (
-                          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-500/100/20 text-yellow-300 border border-yellow-500/30">
                             <Undo2 className="w-3 h-3" />
                             UNDONE
                           </span>
@@ -236,11 +236,11 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
 
                       {/* Description */}
                       {action.description && (
-                        <p className="text-xs text-gray-400 mb-2">{action.description}</p>
+                        <p className="text-xs text-tertiary mb-2">{action.description}</p>
                       )}
 
                       {/* Metadata */}
-                      <div className="flex items-center gap-3 text-[10px] text-gray-500">
+                      <div className="flex items-center gap-3 text-[10px] text-tertiary">
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {new Date(action.executed_at).toLocaleString()}
@@ -274,7 +274,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
 
                       {!action.can_undo && !action.undone_at && (
                         <div className="flex flex-col items-end">
-                          <span className="text-[10px] text-gray-500 flex items-center gap-1">
+                          <span className="text-[10px] text-tertiary flex items-center gap-1">
                             <XCircle className="w-3 h-3" />
                             Cannot undo
                           </span>
@@ -283,7 +283,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
 
                       {action.undone_at && (
                         <div className="flex flex-col items-end">
-                          <span className="text-[10px] text-gray-500">
+                          <span className="text-[10px] text-tertiary">
                             {new Date(action.undone_at).toLocaleString()}
                           </span>
                         </div>

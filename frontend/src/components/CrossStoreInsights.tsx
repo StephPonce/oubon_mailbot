@@ -127,15 +127,15 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
   };
 
   const getConfidenceColor = (score: number): string => {
-    if (score >= 80) return 'text-green-600 bg-green-500/10';
-    if (score >= 60) return 'text-yellow-600 bg-yellow-500/10';
+    if (score >= 80) return 'text-green-600 bg-green-500/100/10';
+    if (score >= 60) return 'text-yellow-600 bg-amber-500/100/10';
     return 'text-orange-600 bg-orange-500/10';
   };
 
   const getNicheMatchColor = (score: number): string => {
     if (score >= 80) return 'text-blue-600';
     if (score >= 60) return 'text-purple-600';
-    return 'text-gray-600';
+    return 'text-secondary';
   };
 
   if (!storeId) {
@@ -149,7 +149,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
           <Lightbulb className="w-5 h-5 text-purple-400" />
           <div>
             <p className="text-sm font-medium text-white">No Store Selected</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-tertiary mt-1">
               Select a store to view cross-store insights
             </p>
           </div>
@@ -167,7 +167,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
       >
         <div className="flex items-center gap-3">
           <Lightbulb className="w-5 h-5 animate-pulse text-purple-400" />
-          <p className="text-sm text-gray-400">Loading insights...</p>
+          <p className="text-sm text-tertiary">Loading insights...</p>
         </div>
       </motion.div>
     );
@@ -182,7 +182,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
       >
         <div className="flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-400" />
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-sm text-red-400">{error}</p>
             <button
               onClick={fetchInsights}
@@ -211,7 +211,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
           </div>
           <div>
             <h2 className="text-lg font-semibold text-white">Cross-Store Insights</h2>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-tertiary">
               AI-powered recommendations from your other stores
             </p>
           </div>
@@ -232,9 +232,9 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
       {/* Insights List */}
       {insights.length === 0 ? (
         <div className="text-center py-12">
-          <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-          <p className="text-sm text-gray-400 mb-2">No insights available yet</p>
-          <p className="text-xs text-gray-500 mb-4">
+          <Sparkles className="w-12 h-12 text-secondary mx-auto mb-3" />
+          <p className="text-sm text-tertiary mb-2">No insights available yet</p>
+          <p className="text-xs text-tertiary mb-4">
             Generate insights to discover winning products from your other stores
           </p>
           <button
@@ -259,14 +259,14 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Store className="w-4 h-4 text-purple-400" />
                       <span className="text-sm font-medium text-white">
                         {insight.source_store_name}
                       </span>
                       {insight.source_store_niche && (
-                        <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-medium">
+                        <span className="px-2 py-0.5 rounded-full bg-cyan-500/100/20 text-blue-300 text-[10px] font-medium">
                           {insight.source_store_niche}
                         </span>
                       )}
@@ -275,7 +275,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                       {insight.product_name}
                     </h3>
                     {insight.product_category && (
-                      <p className="text-xs text-gray-400 mt-1">{insight.product_category}</p>
+                      <p className="text-xs text-tertiary mt-1">{insight.product_category}</p>
                     )}
                   </div>
 
@@ -292,7 +292,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                 {/* Metrics */}
                 <div className="grid grid-cols-3 gap-3 mb-3">
                   <div className="p-2 rounded-lg bg-black/20">
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
+                    <div className="text-[10px] text-tertiary uppercase tracking-wide mb-1">
                       Conversion Rate
                     </div>
                     <div className="text-sm font-semibold text-green-400">
@@ -300,7 +300,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-black/20">
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
+                    <div className="text-[10px] text-tertiary uppercase tracking-wide mb-1">
                       Revenue
                     </div>
                     <div className="text-sm font-semibold text-blue-400">
@@ -308,7 +308,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-black/20">
-                    <div className="text-[10px] text-gray-400 uppercase tracking-wide mb-1">
+                    <div className="text-[10px] text-tertiary uppercase tracking-wide mb-1">
                       Niche Match
                     </div>
                     <div className={cn(
@@ -330,7 +330,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                     <p className="text-xs text-white">{insight.insight}</p>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="p-3 rounded-lg bg-cyan-500/100/10 border border-blue-500/20">
                     <div className="text-[10px] text-blue-300 uppercase tracking-wide mb-1 flex items-center gap-1">
                       <TrendingUp className="w-3 h-3" />
                       Recommendation
@@ -343,8 +343,8 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                 {(insight.projected_conversion_rate || insight.projected_monthly_revenue || insight.projected_roi) && (
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     {insight.projected_conversion_rate && (
-                      <div className="p-2 rounded-lg bg-green-500/10">
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wide">
+                      <div className="p-2 rounded-lg bg-green-500/100/10">
+                        <div className="text-[10px] text-tertiary uppercase tracking-wide">
                           Projected CVR
                         </div>
                         <div className="text-sm font-semibold text-green-400">
@@ -353,8 +353,8 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                       </div>
                     )}
                     {insight.projected_monthly_revenue && (
-                      <div className="p-2 rounded-lg bg-blue-500/10">
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wide">
+                      <div className="p-2 rounded-lg bg-cyan-500/100/10">
+                        <div className="text-[10px] text-tertiary uppercase tracking-wide">
                           Projected Revenue
                         </div>
                         <div className="text-sm font-semibold text-blue-400">
@@ -363,8 +363,8 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                       </div>
                     )}
                     {insight.projected_roi && (
-                      <div className="p-2 rounded-lg bg-yellow-500/10">
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wide">
+                      <div className="p-2 rounded-lg bg-amber-500/100/10">
+                        <div className="text-[10px] text-tertiary uppercase tracking-wide">
                           ROI
                         </div>
                         <div className="text-sm font-semibold text-yellow-400">
@@ -380,7 +380,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                   <button
                     onClick={() => applyInsight(insight.id)}
                     disabled={actioningId === insight.id}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-300 text-xs font-medium border border-green-500/30 hover:border-green-500/50 transition-all disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-green-500/100/20 hover:bg-green-500/100/30 text-green-300 text-xs font-medium border border-green-500/30 hover:border-green-500/50 transition-all disabled:opacity-50"
                   >
                     <Check className="w-3 h-3" />
                     {actioningId === insight.id ? 'Applying...' : 'Apply'}
@@ -388,7 +388,7 @@ export function CrossStoreInsights({ storeId, limit = 5, className }: CrossStore
                   <button
                     onClick={() => dismissInsight(insight.id)}
                     disabled={actioningId === insight.id}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 text-gray-300 text-xs font-medium border border-gray-500/30 hover:border-gray-500/50 transition-all disabled:opacity-50"
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg  0/20 hover: 0/30 text-gray-300 text-xs font-medium border border-gray-500/30 hover:border-gray-500/50 transition-all disabled:opacity-50"
                   >
                     <X className="w-3 h-3" />
                   </button>

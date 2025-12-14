@@ -97,7 +97,7 @@ interface NotificationSettings {
 
 // Tier configurations
 const TIER_INFO = {
-  NEST: { name: 'Nest', icon: <Store className="w-5 h-5" />, color: 'text-gray-600', price: 0, stores: 1, team: 0, apiAccess: false },
+  NEST: { name: 'Nest', icon: <Store className="w-5 h-5" />, color: 'text-secondary', price: 0, stores: 1, team: 0, apiAccess: false },
   FLIGHT: { name: 'Flight', icon: <Zap className="w-5 h-5" />, color: 'text-blue-600', price: 49, stores: 1, team: 0, apiAccess: false },
   SOAR: { name: 'Soar', icon: <Rocket className="w-5 h-5" />, color: 'text-purple-600', price: 99, stores: 5, team: 0, apiAccess: true },
   STRATOSPHERE: { name: 'Stratosphere', icon: <Crown className="w-5 h-5" />, color: 'text-yellow-600', price: 199, stores: Infinity, team: 3, apiAccess: true }
@@ -218,24 +218,24 @@ export default function NewSettingsPage() {
 
       {/* Success notification */}
       {showSuccess && (
-        <div className="mb-6 p-4 bg-green-500/10 border border-green-500/50 rounded-lg flex items-center gap-3">
+        <div className="mb-6 p-4 bg-green-500/100/10 border border-green-500/50 rounded-lg flex items-center gap-3">
           <CheckCircle className="w-5 h-5 text-green-600" />
-          <p className="text-sm text-green-700">Settings saved successfully!</p>
+          <p className="text-sm text-green-400">Settings saved successfully!</p>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar Navigation */}
         <div className="lg:col-span-1">
-          <nav className="space-y-1 glass-card p-2">
+          <nav className="glass-card p-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-blue-500/10 text-blue-600'
-                    : 'text-secondary hover:bg-black/5'
+                    ? 'bg-cyan-500/10 text-cyan-400'
+                    : 'text-secondary hover:bg-white/5'
                 }`}
               >
                 {tab.icon}
@@ -258,7 +258,7 @@ export default function NewSettingsPage() {
               <div className="space-y-6">
                 {/* Avatar & Basic Info */}
                 <div className="flex items-start gap-6">
-                  <div className="w-24 h-24 rounded-full bg-blue-500/10 flex items-center justify-center text-3xl font-bold text-blue-600">
+                  <div className="w-24 h-24 rounded-full bg-cyan-500/10 flex items-center justify-center text-3xl font-bold text-cyan-400">
                     {profile.name.split(' ').map(n => n[0]).join('')}
                   </div>
                   <div className="flex-1 space-y-4">
@@ -268,7 +268,7 @@ export default function NewSettingsPage() {
                         type="text"
                         value={profile.name}
                         onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       />
                     </div>
                     <div>
@@ -277,7 +277,7 @@ export default function NewSettingsPage() {
                         type="email"
                         value={profile.email}
                         onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       />
                     </div>
                   </div>
@@ -289,7 +289,7 @@ export default function NewSettingsPage() {
                   <select
                     value={profile.timezone}
                     onChange={(e) => setProfile({ ...profile, timezone: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
                     <option value="America/New_York">Eastern Time (US & Canada)</option>
@@ -301,7 +301,7 @@ export default function NewSettingsPage() {
                 </div>
 
                 {/* Two-Factor Authentication */}
-                <div className="flex items-center justify-between p-4 bg-black/5 rounded-lg">
+                <div className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
                   <div>
                     <div className="flex items-center gap-2 font-medium text-primary">
                       <Shield className="w-4 h-4" />
@@ -313,8 +313,8 @@ export default function NewSettingsPage() {
                     onClick={() => setProfile({ ...profile, twoFactorEnabled: !profile.twoFactorEnabled })}
                     className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                       profile.twoFactorEnabled
-                        ? 'bg-green-500 text-white'
-                        : 'bg-black/10 text-primary hover:bg-black/20'
+                        ? 'bg-success text-white'
+                        : 'bg-white/10 text-primary hover:bg-white/20'
                     }`}
                   >
                     {profile.twoFactorEnabled ? 'Enabled' : 'Enable'}
@@ -324,7 +324,7 @@ export default function NewSettingsPage() {
                 {/* Change Password */}
                 <div>
                   <label className="block text-sm font-medium text-primary mb-2">Change Password</label>
-                  <button className="px-4 py-2 bg-black/10 text-primary rounded-lg hover:bg-black/20 transition-colors flex items-center gap-2">
+                  <button className="px-4 py-2 bg-white/10 text-primary rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2">
                     <Lock className="w-4 h-4" />
                     Update Password
                   </button>
@@ -333,7 +333,7 @@ export default function NewSettingsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Profile
@@ -353,7 +353,7 @@ export default function NewSettingsPage() {
                 </h2>
 
                 {/* Tier Badge */}
-                <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border border-blue-100">
+                <div className="mb-6 p-6 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 rounded-xl border border-white/10">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`${tierInfo.color}`}>{tierInfo.icon}</div>
@@ -363,9 +363,9 @@ export default function NewSettingsPage() {
                       </div>
                     </div>
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      subscription.status === 'active' ? 'bg-green-500/20 text-green-700' :
-                      subscription.status === 'trial' ? 'bg-blue-500/20 text-blue-700' :
-                      'bg-red-500/20 text-red-700'
+                      subscription.status === 'active' ? 'bg-success/20 text-success' :
+                      subscription.status === 'trial' ? 'bg-cyan-500/20 text-cyan-400' :
+                      'bg-error/20 text-error'
                     }`}>
                       {subscription.status.charAt(0).toUpperCase() + subscription.status.slice(1)}
                     </div>
@@ -391,9 +391,9 @@ export default function NewSettingsPage() {
                       </span>
                     </div>
                     {subscription.usage.discoveries.limit !== Infinity && (
-                      <div className="h-2 bg-black/10 rounded-full overflow-hidden">
+                      <div className="h-2 bg-black/20 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-blue-600"
+                          className="h-full bg-cyan-500"
                           style={{ width: `${(subscription.usage.discoveries.used / subscription.usage.discoveries.limit) * 100}%` }}
                         />
                       </div>
@@ -409,9 +409,9 @@ export default function NewSettingsPage() {
                       </span>
                     </div>
                     {subscription.usage.stores.limit !== Infinity && (
-                      <div className="h-2 bg-black/10 rounded-full overflow-hidden">
+                      <div className="h-2 bg-black/20 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-purple-600"
+                          className="h-full bg-purple-500"
                           style={{ width: `${(subscription.usage.stores.used / subscription.usage.stores.limit) * 100}%` }}
                         />
                       </div>
@@ -427,9 +427,9 @@ export default function NewSettingsPage() {
                           {subscription.usage.teamMembers.used} / {subscription.usage.teamMembers.limit}
                         </span>
                       </div>
-                      <div className="h-2 bg-black/10 rounded-full overflow-hidden">
+                      <div className="h-2 bg-black/20 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-yellow-600"
+                          className="h-full bg-amber-500/100"
                           style={{ width: `${(subscription.usage.teamMembers.used / subscription.usage.teamMembers.limit) * 100}%` }}
                         />
                       </div>
@@ -439,10 +439,10 @@ export default function NewSettingsPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-3">
-                  <button className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:scale-105 transition-transform font-medium">
+                  <button className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-purple-500 text-white rounded-lg hover:scale-105 transition-transform font-medium">
                     Upgrade Plan
                   </button>
-                  <button className="px-4 py-2 bg-black/10 text-primary rounded-lg hover:bg-black/20 transition-colors font-medium flex items-center gap-2">
+                  <button className="px-4 py-2 bg-white/10 text-primary rounded-lg hover:bg-white/20 transition-colors font-medium flex items-center gap-2">
                     <ExternalLink className="w-4 h-4" />
                     Manage Billing
                   </button>
@@ -458,17 +458,17 @@ export default function NewSettingsPage() {
                     { date: '2024-11-09', amount: 199, status: 'paid' },
                     { date: '2024-10-09', amount: 199, status: 'paid' }
                   ].map((invoice, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                    <div key={idx} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <DollarSign className="w-4 h-4 text-green-600" />
+                        <DollarSign className="w-4 h-4 text-success" />
                         <div>
                           <div className="text-sm font-medium text-primary">${invoice.amount.toFixed(2)}</div>
                           <div className="text-xs text-tertiary">{new Date(invoice.date).toLocaleDateString()}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-700">Paid</span>
-                        <button className="p-2 hover:bg-black/10 rounded transition-colors">
+                        <span className="text-xs px-2 py-1 rounded-full bg-success/20 text-success">Paid</span>
+                        <button className="p-2 hover:bg-white/10 rounded transition-colors">
                           <Download className="w-4 h-4 text-tertiary" />
                         </button>
                       </div>
@@ -499,7 +499,7 @@ export default function NewSettingsPage() {
                       lowStockWarnings: 'Low Stock Warnings',
                       adPerformance: 'Ad Performance Alerts'
                     }).map(([key, label]) => (
-                      <div key={key} className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                      <div key={key} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                         <span className="text-sm text-primary">{label}</span>
                         <button
                           onClick={() => setNotifications({
@@ -511,7 +511,7 @@ export default function NewSettingsPage() {
                           })}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                             notifications.emailNotifications[key as keyof typeof notifications.emailNotifications]
-                              ? 'bg-blue-600'
+                              ? 'bg-cyan-500'
                               : 'bg-black/20'
                           }`}
                         >
@@ -530,7 +530,7 @@ export default function NewSettingsPage() {
 
                 {/* Push Notifications */}
                 <div>
-                  <div className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                     <div>
                       <div className="text-sm font-medium text-primary">Push Notifications</div>
                       <p className="text-xs text-tertiary mt-1">Browser notifications for real-time updates</p>
@@ -538,7 +538,7 @@ export default function NewSettingsPage() {
                     <button
                       onClick={() => setNotifications({ ...notifications, pushNotifications: !notifications.pushNotifications })}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        notifications.pushNotifications ? 'bg-blue-600' : 'bg-black/20'
+                        notifications.pushNotifications ? 'bg-cyan-500' : 'bg-black/20'
                       }`}
                     >
                       <span
@@ -563,7 +563,7 @@ export default function NewSettingsPage() {
                     <button
                       onClick={() => setNotifications({ ...notifications, quietHoursEnabled: !notifications.quietHoursEnabled })}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        notifications.quietHoursEnabled ? 'bg-blue-600' : 'bg-black/20'
+                        notifications.quietHoursEnabled ? 'bg-cyan-500' : 'bg-black/20'
                       }`}
                     >
                       <span
@@ -581,7 +581,7 @@ export default function NewSettingsPage() {
                           type="time"
                           value={notifications.quietHoursStart}
                           onChange={(e) => setNotifications({ ...notifications, quietHoursStart: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         />
                       </div>
                       <div>
@@ -590,7 +590,7 @@ export default function NewSettingsPage() {
                           type="time"
                           value={notifications.quietHoursEnd}
                           onChange={(e) => setNotifications({ ...notifications, quietHoursEnd: e.target.value })}
-                          className="w-full px-3 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                         />
                       </div>
                     </div>
@@ -600,7 +600,7 @@ export default function NewSettingsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Preferences
@@ -619,9 +619,9 @@ export default function NewSettingsPage() {
 
               <div className="space-y-3">
                 {integrations.map((integration) => (
-                  <div key={integration.id} className="flex items-center justify-between p-4 bg-black/5 rounded-lg">
+                  <div key={integration.id} className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-white border border-black/10 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-lg bg-black/20 border border-white/10 flex items-center justify-center">
                         {integration.icon}
                       </div>
                       <div>
@@ -629,12 +629,12 @@ export default function NewSettingsPage() {
                         <div className="text-xs text-tertiary mt-1">
                           {integration.status === 'connected' ? (
                             <span className="flex items-center gap-1">
-                              <CheckCircle className="w-3 h-3 text-green-600" />
+                              <CheckCircle className="w-3 h-3 text-success" />
                               Connected • Last sync: {integration.lastSync}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1">
-                              <XCircle className="w-3 h-3 text-gray-400" />
+                              <XCircle className="w-3 h-3 text-tertiary" />
                               Not connected
                             </span>
                           )}
@@ -644,7 +644,7 @@ export default function NewSettingsPage() {
                     <div className="flex items-center gap-2">
                       {integration.status === 'connected' ? (
                         <>
-                          <button className="px-3 py-1.5 bg-blue-500/10 text-blue-600 rounded-lg hover:bg-blue-500/20 transition-colors text-sm font-medium">
+                          <button className="px-3 py-1.5 bg-white/5 text-primary rounded-lg hover:bg-white/10 transition-colors text-sm font-medium">
                             Refresh
                           </button>
                           {integration.canDisconnect && (
@@ -655,7 +655,7 @@ export default function NewSettingsPage() {
                                 );
                                 setIntegrations(updated);
                               }}
-                              className="px-3 py-1.5 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20 transition-colors text-sm font-medium"
+                              className="px-3 py-1.5 bg-error/10 text-error rounded-lg hover:bg-error/20 transition-colors text-sm font-medium"
                             >
                               Disconnect
                             </button>
@@ -669,7 +669,7 @@ export default function NewSettingsPage() {
                             );
                             setIntegrations(updated);
                           }}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors text-sm font-medium"
                         >
                           Connect
                         </button>
@@ -702,8 +702,8 @@ export default function NewSettingsPage() {
                           onClick={() => setAiPreferences({ ...aiPreferences, personality: style })}
                           className={`p-3 rounded-lg border-2 transition-all ${
                             aiPreferences.personality === style
-                              ? 'border-blue-600 bg-blue-500/10'
-                              : 'border-black/10 hover:border-black/20'
+                              ? 'border-cyan-500 bg-cyan-500/10'
+                              : 'border-white/10 hover:border-white/20'
                           }`}
                         >
                           <div className="text-sm font-medium text-primary capitalize">{style}</div>
@@ -714,7 +714,7 @@ export default function NewSettingsPage() {
 
                   {/* Auto Features */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                       <div>
                         <div className="text-sm font-medium text-primary">Auto-Suggestions</div>
                         <p className="text-xs text-tertiary mt-1">Get AI-powered product recommendations</p>
@@ -722,7 +722,7 @@ export default function NewSettingsPage() {
                       <button
                         onClick={() => setAiPreferences({ ...aiPreferences, autoSuggestions: !aiPreferences.autoSuggestions })}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          aiPreferences.autoSuggestions ? 'bg-blue-600' : 'bg-black/20'
+                          aiPreferences.autoSuggestions ? 'bg-cyan-500' : 'bg-black/20'
                         }`}
                       >
                         <span
@@ -733,7 +733,7 @@ export default function NewSettingsPage() {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                       <div>
                         <div className="text-sm font-medium text-primary">Auto-Deploy AI Content</div>
                         <p className="text-xs text-tertiary mt-1">Automatically use AI-generated descriptions</p>
@@ -741,7 +741,7 @@ export default function NewSettingsPage() {
                       <button
                         onClick={() => setAiPreferences({ ...aiPreferences, autoDeployContent: !aiPreferences.autoDeployContent })}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          aiPreferences.autoDeployContent ? 'bg-blue-600' : 'bg-black/20'
+                          aiPreferences.autoDeployContent ? 'bg-cyan-500' : 'bg-black/20'
                         }`}
                       >
                         <span
@@ -756,7 +756,7 @@ export default function NewSettingsPage() {
                   <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Save Preferences
@@ -781,7 +781,7 @@ export default function NewSettingsPage() {
                 {/* Store Selector */}
                 <div>
                   <label className="block text-sm font-medium text-primary mb-2">Store</label>
-                  <select className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <select className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500">
                     <option>Oubon Shop (Primary)</option>
                     <option>Store 2</option>
                   </select>
@@ -794,7 +794,7 @@ export default function NewSettingsPage() {
                     type="text"
                     value={brandVoice.brandName}
                     onChange={(e) => setBrandVoice({ ...brandVoice, brandName: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                 </div>
 
@@ -805,7 +805,7 @@ export default function NewSettingsPage() {
                     value={brandVoice.description}
                     onChange={(e) => setBrandVoice({ ...brandVoice, description: e.target.value })}
                     rows={3}
-                    className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
                   />
                 </div>
 
@@ -819,8 +819,8 @@ export default function NewSettingsPage() {
                         onClick={() => setBrandVoice({ ...brandVoice, tone })}
                         className={`p-3 rounded-lg border-2 transition-all ${
                           brandVoice.tone === tone
-                            ? 'border-blue-600 bg-blue-500/10'
-                            : 'border-black/10 hover:border-black/20'
+                            ? 'border-cyan-500 bg-cyan-500/10'
+                            : 'border-white/10 hover:border-white/20'
                         }`}
                       >
                         <div className="text-sm font-medium text-primary capitalize">{tone}</div>
@@ -837,13 +837,13 @@ export default function NewSettingsPage() {
                     value={brandVoice.targetAudience}
                     onChange={(e) => setBrandVoice({ ...brandVoice, targetAudience: e.target.value })}
                     placeholder="e.g., Young professionals aged 25-35"
-                    className="w-full px-4 py-2 rounded-lg border border-black/10 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 rounded-lg border border-white/10 bg-black/20 text-primary focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                 </div>
 
                 {/* AI Preview */}
-                <div className="p-4 bg-blue-500/10 border border-blue-500/50 rounded-lg">
-                  <div className="text-sm font-medium text-blue-600 mb-2">AI Output Preview</div>
+                <div className="p-4 bg-cyan-500/10 border border-cyan-500/50 rounded-lg">
+                  <div className="text-sm font-medium text-cyan-400 mb-2">AI Output Preview</div>
                   <p className="text-sm text-tertiary">
                     Based on your brand voice, AI-generated content will have a <strong>{brandVoice.tone}</strong> tone,
                     targeting <strong>{brandVoice.targetAudience.toLowerCase()}</strong>.
@@ -853,7 +853,7 @@ export default function NewSettingsPage() {
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Save Brand Voice
@@ -870,17 +870,17 @@ export default function NewSettingsPage() {
                   <Users className="w-5 h-5" />
                   Team Members
                 </h2>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                <button className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2">
                   <UserPlus className="w-4 h-4" />
                   Invite Member
                 </button>
               </div>
 
               {/* Usage */}
-              <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/50 rounded-lg">
+              <div className="mb-6 p-4 bg-cyan-500/10 border border-cyan-500/50 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-blue-700">Team Seats</span>
-                  <span className="text-sm font-medium text-blue-700">
+                  <span className="text-sm text-cyan-400">Team Seats</span>
+                  <span className="text-sm font-medium text-cyan-400">
                     {subscription.usage.teamMembers.used} of {subscription.usage.teamMembers.limit} seats used
                   </span>
                 </div>
@@ -889,9 +889,9 @@ export default function NewSettingsPage() {
               {/* Members List */}
               <div className="space-y-3">
                 {teamMembers.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between p-4 bg-black/5 rounded-lg">
+                  <div key={member.id} className="flex items-center justify-between p-4 bg-black/20 rounded-lg">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-sm font-bold text-blue-600">
+                      <div className="w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center text-sm font-bold text-cyan-400">
                         {member.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div>
@@ -908,14 +908,14 @@ export default function NewSettingsPage() {
                           );
                           setTeamMembers(updated);
                         }}
-                        className="px-3 py-1.5 rounded-lg border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-1.5 rounded-lg border border-white/10 bg-black/20 text-primary text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       >
                         <option value="admin">Admin</option>
                         <option value="editor">Editor</option>
                         <option value="viewer">Viewer</option>
                       </select>
                       {member.role !== 'admin' && (
-                        <button className="p-2 text-red-600 hover:bg-red-500/10 rounded-lg transition-colors">
+                        <button className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       )}
@@ -944,7 +944,7 @@ export default function NewSettingsPage() {
                         type={showApiKey ? 'text' : 'password'}
                         value={apiKey}
                         readOnly
-                        className="w-full px-4 py-2 pr-10 rounded-lg border border-black/10 bg-black/5 font-mono text-sm focus:outline-none"
+                        className="w-full px-4 py-2 pr-10 rounded-lg border border-white/10 bg-black/20 font-mono text-sm focus:outline-none text-primary"
                       />
                       <button
                         onClick={() => setShowApiKey(!showApiKey)}
@@ -958,7 +958,7 @@ export default function NewSettingsPage() {
                         navigator.clipboard.writeText(apiKey);
                         alert('API key copied!');
                       }}
-                      className="px-4 py-2 bg-black/10 text-primary rounded-lg hover:bg-black/20 transition-colors"
+                      className="px-4 py-2 bg-white/10 text-primary rounded-lg hover:bg-white/20 transition-colors"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
@@ -970,13 +970,13 @@ export default function NewSettingsPage() {
                           setTimeout(() => setApiKeyRegenerated(false), 3000);
                         }
                       }}
-                      className="px-4 py-2 bg-red-500/10 text-red-600 rounded-lg hover:bg-red-500/20 transition-colors"
+                      className="px-4 py-2 bg-error/10 text-error rounded-lg hover:bg-error/20 transition-colors"
                     >
                       <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
                   {apiKeyRegenerated && (
-                    <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                    <p className="text-sm text-success mt-2 flex items-center gap-1">
                       <Check className="w-4 h-4" />
                       API key regenerated successfully
                     </p>
@@ -985,34 +985,34 @@ export default function NewSettingsPage() {
 
                 {/* Usage Stats */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-black/5 rounded-lg">
+                  <div className="p-4 bg-black/20 rounded-lg">
                     <div className="text-xs text-tertiary mb-1">Requests (30d)</div>
                     <div className="text-2xl font-bold text-primary">12,450</div>
                   </div>
-                  <div className="p-4 bg-black/5 rounded-lg">
+                  <div className="p-4 bg-black/20 rounded-lg">
                     <div className="text-xs text-tertiary mb-1">Avg Response</div>
                     <div className="text-2xl font-bold text-primary">245ms</div>
                   </div>
-                  <div className="p-4 bg-black/5 rounded-lg">
+                  <div className="p-4 bg-black/20 rounded-lg">
                     <div className="text-xs text-tertiary mb-1">Errors</div>
                     <div className="text-2xl font-bold text-primary">12</div>
                   </div>
                 </div>
 
                 {/* Documentation */}
-                <div className="p-4 bg-blue-500/10 border border-blue-500/50 rounded-lg">
+                <div className="p-4 bg-cyan-500/10 border border-cyan-500/50 rounded-lg">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-700 mb-1">API Documentation</p>
-                      <p className="text-xs text-blue-600 mb-3">
+                    <AlertCircle className="w-5 h-5 text-cyan-400 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-cyan-400 mb-1">API Documentation</p>
+                      <p className="text-xs text-cyan-300 mb-3">
                         Learn how to integrate Ospra Intelligence into your applications
                       </p>
                       <a
                         href="https://docs.ospra.io/api"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-cyan-400 hover:underline"
                       >
                         View Documentation
                         <ExternalLink className="w-4 h-4" />
@@ -1036,7 +1036,7 @@ export default function NewSettingsPage() {
                 <p className="text-sm text-tertiary mb-4">
                   Download all your data including products, analytics, and settings in JSON format
                 </p>
-                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                <button className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors flex items-center gap-2">
                   <Download className="w-4 h-4" />
                   Export Data
                 </button>
@@ -1049,12 +1049,12 @@ export default function NewSettingsPage() {
                   Privacy Settings
                 </h2>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-black/5 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                     <div>
                       <div className="text-sm font-medium text-primary">Analytics Tracking</div>
                       <p className="text-xs text-tertiary mt-1">Help us improve by sharing usage data</p>
                     </div>
-                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
+                    <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-cyan-500">
                       <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
                     </button>
                   </div>
@@ -1062,15 +1062,15 @@ export default function NewSettingsPage() {
               </div>
 
               {/* Delete Account */}
-              <div className="glass-card p-6 border-2 border-red-200">
-                <h2 className="text-lg font-semibold text-red-600 mb-4 flex items-center gap-2">
+              <div className="glass-card p-6 border-2 border-error/50">
+                <h2 className="text-lg font-semibold text-error mb-4 flex items-center gap-2">
                   <Trash2 className="w-5 h-5" />
                   Delete Account
                 </h2>
                 <p className="text-sm text-tertiary mb-4">
                   Permanently delete your account and all associated data. This action cannot be undone.
                 </p>
-                <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2">
+                <button className="px-4 py-2 bg-error text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2">
                   <Trash2 className="w-4 h-4" />
                   Delete Account
                 </button>

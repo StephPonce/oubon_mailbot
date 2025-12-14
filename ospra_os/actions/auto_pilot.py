@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ospra_os.database.multi_store_models import (
-    UserSettings, AutoPilotLog, User
+    UserSettings, User
 )
 from ospra_os.database.action_models import Action, AIActionStatus, AIActionType
+from ospra_os.database.actions_models import AutoPilotLog
 
 
 class AutoPilotEngine:

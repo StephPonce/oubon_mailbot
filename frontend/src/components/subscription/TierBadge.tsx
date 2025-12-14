@@ -24,7 +24,7 @@ const tierConfig = {
   },
   soar: {
     icon: Bird,
-    color: 'bg-blue-100 text-blue-800 border-blue-200',
+    color: 'bg-blue-100 text-blue-800 border-cyan-500/20',
     gradient: 'from-blue-500 to-indigo-600',
     name: 'Soar',
   },

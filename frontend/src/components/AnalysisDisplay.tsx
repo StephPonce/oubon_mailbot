@@ -46,13 +46,13 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis }) =>
       case 'STRONG_BUY':
         return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
       case 'BUY':
-        return 'bg-blue-500 text-white';
+        return 'bg-cyan-500/100 text-white';
       case 'HOLD':
         return 'bg-amber-500 text-white';
       case 'SELL':
-        return 'bg-red-500 text-white';
+        return 'bg-red-500/100 text-white';
       default:
-        return 'bg-gray-500 text-white';
+        return ' 0 text-white';
     }
   };
 
@@ -61,14 +61,14 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis }) =>
       {/* Hero Score Section */}
       <div className="flex items-center justify-between p-6 bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl">
         <div>
-          <p className="text-gray-400 text-sm mb-1">Ospra AI Score</p>
+          <p className="text-tertiary text-sm mb-1">Ospra AI Score</p>
           <div className="flex items-baseline gap-2">
             <span className="text-5xl font-bold text-white">
               <AnimatedScore score={analysis.score} />
             </span>
-            <span className="text-2xl text-gray-500">/10</span>
+            <span className="text-2xl text-tertiary">/10</span>
           </div>
-          <p className="text-gray-400 text-sm mt-2">{analysis.success_prediction}</p>
+          <p className="text-tertiary text-sm mt-2">{analysis.success_prediction}</p>
         </div>
         <div
           className={`px-6 py-3 rounded-xl font-bold text-lg ${getRecommendationStyle(
@@ -90,7 +90,7 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis }) =>
             {analysis.reasoning.map((reason, i) => (
               <div
                 key={i}
-                className="flex gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-xl hover:bg-green-500/20 transition-colors duration-200"
+                className="flex gap-3 p-4 bg-green-500/100/10 border border-green-500/20 rounded-xl hover:bg-green-500/100/20 transition-colors duration-200"
               >
                 <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
                 <p className="text-gray-300">{reason}</p>
@@ -122,7 +122,7 @@ export const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ analysis }) =>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-gray-500 pt-4 border-t border-gray-700">
+      <div className="flex items-center justify-between text-xs text-tertiary pt-4 border-t border-gray-700">
         <span>Source: {analysis.source}</span>
         <span>{new Date(analysis.timestamp).toLocaleString()}</span>
       </div>

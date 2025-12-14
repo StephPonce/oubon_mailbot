@@ -12,7 +12,7 @@ function ComponentTest() {
   const [testStage, setTestStage] = useState(1);
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-8   min-h-screen">
       <h1 className="text-3xl font-bold mb-4 text-green-600">
         ✅ React + Tailwind Working!
       </h1>

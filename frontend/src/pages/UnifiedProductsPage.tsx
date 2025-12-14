@@ -122,17 +122,17 @@ function ProductCard({
   isAnalyzing,
 }: ProductCardProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'bg-green-500 text-white';
+    if (score >= 8) return 'bg-green-500/100 text-white';
     if (score >= 6) return 'bg-amber-500 text-white';
-    return 'bg-red-500 text-white';
+    return 'bg-red-500/100 text-white';
   };
 
   const getSaturationColor = (level?: string) => {
     switch (level) {
-      case 'low': return 'text-green-600 bg-green-500/10';
+      case 'low': return 'text-green-600 bg-green-500/100/10';
       case 'medium': return 'text-amber-600 bg-amber-500/10';
-      case 'high': return 'text-red-600 bg-red-500/10';
-      default: return 'text-gray-600 bg-gray-500/10';
+      case 'high': return 'text-red-600 bg-red-500/100/10';
+      default: return 'text-secondary  0/10';
     }
   };
 
@@ -321,7 +321,7 @@ function ProductCard({
 
         {/* AI Reason */}
         {product.ai_reason && (
-          <div className="p-2 rounded-lg bg-blue-500/8 border border-blue-500/15 mb-3">
+          <div className="p-2 rounded-lg bg-cyan-500/100/8 border border-blue-500/15 mb-3">
             <div className="flex items-start gap-2">
               <Brain className="w-3.5 h-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-secondary line-clamp-2">{product.ai_reason}</p>
@@ -477,10 +477,10 @@ function ProductDetailModal({
 
           {/* AI Recommendation */}
           {product.ai_reason && (
-            <div className="p-4 rounded-xl bg-blue-500/8 border border-blue-500/15">
+            <div className="p-4 rounded-xl bg-cyan-500/100/8 border border-blue-500/15">
               <div className="flex items-center gap-2 mb-2">
                 <Brain className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">AI Analysis</span>
+                <span className="text-sm font-medium text-cyan-400">AI Analysis</span>
               </div>
               <p className="text-sm text-secondary">{product.ai_reason}</p>
             </div>
@@ -558,7 +558,7 @@ export default function UnifiedProductsPage() {
   // State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filters, setFilters] = useState<ProductFilters>({
-    niches: [],
+    niches: undefined, // undefined = show all niches instead of empty array
     min_score: 0,
     source: undefined,
     sort_by: 'score',
@@ -614,8 +614,15 @@ export default function UnifiedProductsPage() {
     setIsDiscovering(true);
     try {
       const selectedNiches = filters.niches?.length ? filters.niches : ['smart_home', 'tech_gadgets', 'fitness'];
-      await productsAPI.discover(selectedNiches, 10);
-      await refetchProducts();
+      const result = await productsAPI.discover(selectedNiches, 10);
+
+      // If discover returns products directly, they're already in the database
+      // Just refetch to show them
+      if (result) {
+        // Wait a moment for backend to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await refetchProducts();
+      }
     } catch (error) {
       console.error('Discovery failed:', error);
       alert('Product discovery failed. Please check if the backend is running.');

@@ -78,7 +78,7 @@ export const NotificationBell: React.FC = () => {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+        className="relative p-2 rounded-full text-tertiary hover:text-white hover:bg-white/10 transition-colors"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
@@ -103,7 +103,7 @@ export const NotificationBell: React.FC = () => {
 
             <div className="flex-grow overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
+                <div className="p-8 text-center text-tertiary">
                   <Bell size={32} className="mx-auto mb-2" />
                   <p>No new notifications</p>
                 </div>
@@ -118,10 +118,10 @@ export const NotificationBell: React.FC = () => {
                     >
                       <div className="flex items-start gap-3">
                         <Icon className={`w-5 h-5 mt-0.5 ${color} flex-shrink-0`} />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <h4 className="font-semibold text-sm text-gray-200">{n.title}</h4>
-                          <p className="text-sm text-gray-400 mt-1">{n.message}</p>
-                          <p className="text-xs text-gray-500 mt-2">{formatTime(n.created_at)}</p>
+                          <p className="text-sm text-tertiary mt-1">{n.message}</p>
+                          <p className="text-xs text-tertiary mt-2">{formatTime(n.created_at)}</p>
                         </div>
                         {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-brand-blue mt-1.5 flex-shrink-0"></div>}
                       </div>

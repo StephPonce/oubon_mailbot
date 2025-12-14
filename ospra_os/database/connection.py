@@ -153,11 +153,11 @@ def get_db(database_url: str = None) -> Generator[Session, None, None]:
 def init_database(database_url: str = None):
     """
     Initialize database - create all tables.
-    
+
     Call this on app startup.
     """
-    from ospra_os.database.multi_store_models import Base
-    
+    from ospra_os.database.base import Base
+
     engine = get_engine(database_url)
     Base.metadata.create_all(bind=engine)
     

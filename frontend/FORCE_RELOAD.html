@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FORCE RELOAD - OSPRA DASHBOARD</title>
+    <style>
+        body {
+            background: #0a0a0f;
+            color: white;
+            font-family: Arial;
+            padding: 40px;
+            text-align: center;
+        }
+        .btn {
+            background: #06b6d4;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 24px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 20px;
+        }
+        .btn:hover {
+            background: #14b8a6;
+        }
+        .status {
+            margin-top: 30px;
+            font-size: 18px;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <h1>🔧 FORCE RELOAD OSPRA DASHBOARD</h1>
+    <p>This will aggressively clear ALL caches including React Query</p>
+
+    <button class="btn" onclick="forceReload()">FORCE COMPLETE RELOAD</button>
+    <button class="btn" onclick="hardRefresh()">HARD REFRESH (Cmd+Shift+R)</button>
+
+    <div id="status" class="status"></div>
+
+    <script>
+        function forceReload() {
+            const status = document.getElementById('status');
+
+            try {
+                status.innerHTML = '<div class="warning">⏳ Clearing all caches...</div>';
+
+                // Clear ALL storage
+                localStorage.clear();
+                sessionStorage.clear();
+
+                // Clear IndexedDB completely
+                if ('indexedDB' in window) {
+                    indexedDB.databases().then(dbs => {
+                        dbs.forEach(db => {
+                            console.log('Deleting IndexedDB:', db.name);
+                            indexedDB.deleteDatabase(db.name);
+                        });
+                    });
+                }
+
+                // Clear all cookies
+                document.cookie.split(";").forEach(function(c) {
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+                });
+
+                // Set fresh state
+                localStorage.setItem('ospra-storage', JSON.stringify({
+                    state: {
+                        isOnboarded: true,
+                        onboardingSteps: [
+                            { id: 'welcome', title: 'Meet Ospra', completed: true }
+                        ],
+                        preferences: {
+                            selectedNiches: [],
+                            theme: 'light'
+                        },
+                        userName: 'User'
+                    },
+                    version: 0
+                }));
+
+                status.innerHTML = '<div class="success">✅ CLEARED! Reloading with cache bypass...</div>';
+
+                // Hard reload with cache bypass
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:5173/?nocache=' + Date.now();
+                    // Also force reload
+                    setTimeout(() => {
+                        location.reload(true);
+                    }, 500);
+                }, 1000);
+
+            } catch (error) {
+                status.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function hardRefresh() {
+            const status = document.getElementById('status');
+            status.innerHTML = '<div class="warning">⏳ Use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows) on the dashboard page!</div>';
+
+            setTimeout(() => {
+                window.open('http://localhost:5173', '_blank');
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

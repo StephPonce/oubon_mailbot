@@ -53,7 +53,7 @@ export function Top20Rankings({ niche, compact = false }: Top20RankingsProps) {
     } else if (direction === 'down' || change < 0) {
       return <TrendingDown className="w-3.5 h-3.5 text-red-600" />;
     } else {
-      return <Minus className="w-3.5 h-3.5 text-gray-400" />;
+      return <Minus className="w-3.5 h-3.5 text-tertiary" />;
     }
   };
 
@@ -156,7 +156,7 @@ export function Top20Rankings({ niche, compact = false }: Top20RankingsProps) {
                         <span className={`text-xs font-medium ${
                           item.rank_change > 0 ? 'text-green-600' :
                           item.rank_change < 0 ? 'text-red-600' :
-                          'text-gray-400'
+                          'text-tertiary'
                         }`}>
                           {Math.abs(item.rank_change)}
                         </span>

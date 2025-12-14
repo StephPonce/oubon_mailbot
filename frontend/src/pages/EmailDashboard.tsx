@@ -64,19 +64,19 @@ function EmailCard({
 }: EmailCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'replied': return 'text-green-600 bg-green-500/10';
-      case 'pending': return 'text-amber-600 bg-amber-500/10';
-      case 'ignored': return 'text-gray-500 bg-gray-500/10';
-      default: return 'text-gray-500 bg-gray-500/10';
+      case 'replied': return 'text-success bg-success/10';
+      case 'pending': return 'text-warning bg-warning/10';
+      case 'ignored': return 'text-tertiary bg-white/5';
+      default: return 'text-tertiary bg-white/5';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return 'text-red-600 bg-red-500/10';
-      case 'medium': return 'text-amber-600 bg-amber-500/10';
-      case 'low': return 'text-blue-600 bg-blue-500/10';
-      default: return 'text-gray-500 bg-gray-500/10';
+      case 'high': return 'text-error bg-error/10';
+      case 'medium': return 'text-warning bg-warning/10';
+      case 'low': return 'text-info bg-cyan-500/10';
+      default: return 'text-tertiary bg-white/5';
     }
   };
 
@@ -93,7 +93,7 @@ function EmailCard({
     >
       <div className="flex items-start gap-4">
         {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-black/10 flex items-center justify-center flex-shrink-0">
+        <div className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center flex-shrink-0">
           <User className="w-5 h-5 text-tertiary" />
         </div>
 
@@ -104,7 +104,7 @@ function EmailCard({
               {email.from}
             </span>
             {email.auto_replied && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success">
                 Auto-replied
               </span>
             )}
@@ -135,7 +135,7 @@ function EmailCard({
             {email.status === 'pending' && (
               <>
                 <button
-                  className="p-1.5 hover:bg-black/5 rounded-lg"
+                  className="p-1.5 hover:bg-white/5 rounded-lg"
                   onClick={(e) => { e.stopPropagation(); onReply(email); }}
                   disabled={isReplying}
                   title="Reply"
@@ -147,7 +147,7 @@ function EmailCard({
                   )}
                 </button>
                 <button
-                  className="p-1.5 hover:bg-black/5 rounded-lg"
+                  className="p-1.5 hover:bg-white/5 rounded-lg"
                   onClick={(e) => { e.stopPropagation(); onIgnore(email); }}
                   disabled={isIgnoring}
                   title="Ignore"
@@ -211,7 +211,7 @@ function EmailDetailPanel({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-black/5">
+      <div className="p-4 border-b border-white/10">
         <div className="flex items-start justify-between mb-2">
           <div>
             <h2 className="text-lg font-medium text-primary">{email.subject}</h2>
@@ -223,7 +223,7 @@ function EmailDetailPanel({
             </div>
           </div>
           <button
-            className="p-2 hover:bg-black/5 rounded-lg"
+            className="p-2 hover:bg-white/5 rounded-lg"
             onClick={onClose}
           >
             <ChevronRight className="w-5 h-5 text-tertiary" />
@@ -237,7 +237,7 @@ function EmailDetailPanel({
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="prose prose-sm max-w-none">
+        <div className="prose prose-sm max-w-none prose-invert">
           {email.body ? (
             <div dangerouslySetInnerHTML={{ __html: email.body }} />
           ) : email.preview ? (
@@ -250,12 +250,12 @@ function EmailDetailPanel({
 
       {/* Reply Section */}
       {email.status === 'pending' && (
-        <div className="p-4 border-t border-black/5">
+        <div className="p-4 border-t border-white/10">
           <textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder="Write your reply..."
-            className="w-full px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm resize-none"
+            className="w-full px-3 py-2 rounded-xl bg-black/20 border border-white/10 focus:border-accent outline-none text-sm resize-none text-primary"
             rows={3}
           />
           <div className="flex items-center justify-between mt-3">
@@ -371,9 +371,9 @@ export default function EmailDashboard() {
   return (
     <div className="h-[calc(100vh-4rem)] flex">
       {/* Main List */}
-      <div className="flex-1 flex flex-col border-r border-black/5">
+      <div className="flex-1 flex flex-col border-r border-white/10">
         {/* Header */}
-        <div className="p-4 border-b border-black/5">
+        <div className="p-4 border-b border-white/10">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Mail className="w-5 h-5 text-accent" />
@@ -408,7 +408,7 @@ export default function EmailDashboard() {
             <select
               value={selectedInbox}
               onChange={(e) => setSelectedInbox(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm font-medium text-primary"
+              className="px-3 py-2 rounded-xl bg-black/20 border border-white/10 focus:border-accent outline-none text-sm font-medium text-primary"
             >
               <option value="primary">Primary</option>
               <option value="social">Social</option>
@@ -424,7 +424,7 @@ export default function EmailDashboard() {
                 placeholder="Search emails..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-xl bg-black/5 border border-black/10 focus:border-accent outline-none text-sm"
+                className="w-full pl-10 pr-4 py-2 rounded-xl bg-black/20 border border-white/10 focus:border-accent outline-none text-sm text-primary placeholder:text-tertiary"
               />
             </div>
           </div>
@@ -442,7 +442,7 @@ export default function EmailDashboard() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   filterStatus === tab.value 
                     ? 'bg-accent text-white' 
-                    : 'bg-black/5 text-secondary hover:bg-black/10'
+                    : 'bg-white/5 text-secondary hover:bg-white/10'
                 }`}
                 onClick={() => setFilterStatus(tab.value)}
               >
@@ -453,21 +453,21 @@ export default function EmailDashboard() {
         </div>
 
         {/* Stats Row */}
-        <div className="grid grid-cols-4 gap-3 p-4 border-b border-black/5">
+        <div className="grid grid-cols-4 gap-3 p-4 border-b border-white/10">
           <div className="text-center">
             <div className="text-xl font-bold text-primary">{stats.total}</div>
             <div className="text-xs text-tertiary">Total</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-amber-600">{stats.pending}</div>
+            <div className="text-xl font-bold text-warning">{stats.pending}</div>
             <div className="text-xs text-tertiary">Pending</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-green-600">{stats.replied}</div>
+            <div className="text-xl font-bold text-success">{stats.replied}</div>
             <div className="text-xs text-tertiary">Replied</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-blue-600">{stats.autoReplied}</div>
+            <div className="text-xl font-bold text-accent">{stats.autoReplied}</div>
             <div className="text-xs text-tertiary">Auto-replied</div>
           </div>
         </div>
@@ -530,7 +530,7 @@ export default function EmailDashboard() {
                 <h2 className="text-lg font-semibold text-primary">Add Email Account</h2>
                 <button
                   onClick={() => setShowAddAccountModal(false)}
-                  className="p-2 rounded-lg hover:bg-black/5 text-secondary"
+                  className="p-2 rounded-lg hover:bg-white/5 text-secondary"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -543,13 +543,13 @@ export default function EmailDashboard() {
               <div className="space-y-3">
                 {/* Gmail */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     window.location.href = `http://localhost:8001/gmail/auth/start`;
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/gmail/EA4335" alt="Gmail" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">Gmail</div>
                     <div className="text-xs text-secondary">Connect via Google OAuth</div>
                   </div>
@@ -558,13 +558,13 @@ export default function EmailDashboard() {
 
                 {/* Outlook */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     window.location.href = `http://localhost:8001/api/email-oauth/outlook/connect?user_id=1`;
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/microsoftoutlook/0078D4" alt="Outlook" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">Outlook</div>
                     <div className="text-xs text-secondary">Connect via Microsoft OAuth</div>
                   </div>
@@ -573,13 +573,13 @@ export default function EmailDashboard() {
 
                 {/* Yahoo */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     alert('Yahoo Mail: Please contact support for IMAP setup instructions.');
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/yahoo/6001D2" alt="Yahoo" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">Yahoo Mail</div>
                     <div className="text-xs text-secondary">IMAP/SMTP setup required</div>
                   </div>
@@ -588,13 +588,13 @@ export default function EmailDashboard() {
 
                 {/* iCloud */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     alert('iCloud Mail: Please contact support for app-specific password setup.');
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/icloud/3693F3" alt="iCloud" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">iCloud Mail</div>
                     <div className="text-xs text-secondary">App-specific password required</div>
                   </div>
@@ -603,13 +603,13 @@ export default function EmailDashboard() {
 
                 {/* Zoho */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     alert('Zoho Mail: Please contact support for IMAP setup instructions.');
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/zoho/C8202E" alt="Zoho" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">Zoho Mail</div>
                     <div className="text-xs text-secondary">IMAP/SMTP setup required</div>
                   </div>
@@ -618,13 +618,13 @@ export default function EmailDashboard() {
 
                 {/* ProtonMail */}
                 <button
-                  className="w-full p-4 rounded-xl border border-black/10 hover:border-accent hover:bg-white/50 transition-all text-left flex items-center gap-3"
+                  className="w-full p-4 rounded-xl border border-white/10 hover:border-accent hover:bg-white/5 transition-all text-left flex items-center gap-3"
                   onClick={() => {
                     alert('ProtonMail: Requires ProtonMail Bridge. Please contact support for setup.');
                   }}
                 >
                   <img src="https://cdn.simpleicons.org/protonmail/6D4AFF" alt="ProtonMail" className="w-6 h-6" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-primary">ProtonMail</div>
                     <div className="text-xs text-secondary">Bridge application required</div>
                   </div>

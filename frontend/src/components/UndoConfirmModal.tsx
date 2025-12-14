@@ -100,7 +100,7 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-white">Confirm Undo Action</h2>
-                <p className="text-xs text-gray-400">This action will be reversed</p>
+                <p className="text-xs text-tertiary">This action will be reversed</p>
               </div>
             </div>
             <button
@@ -108,7 +108,7 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
               className="p-1 rounded-lg hover:bg-white/10 transition-colors"
               disabled={isUndoing}
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5 text-tertiary" />
             </button>
           </div>
 
@@ -116,10 +116,10 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
           <div className="space-y-4 mb-6">
             {/* Action Title */}
             <div className="p-4 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-xs text-gray-400 mb-1">Action to Undo:</p>
+              <p className="text-xs text-tertiary mb-1">Action to Undo:</p>
               <p className="text-sm font-medium text-white">{action.title}</p>
               {action.description && (
-                <p className="text-xs text-gray-400 mt-1">{action.description}</p>
+                <p className="text-xs text-tertiary mt-1">{action.description}</p>
               )}
             </div>
 
@@ -134,7 +134,7 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
 
             {/* Time Remaining */}
             {action.hours_remaining !== null && (
-              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="p-3 rounded-lg bg-cyan-500/100/10 border border-blue-500/20">
                 <p className="text-xs text-blue-300 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   You have {formatTimeRemaining(action.hours_remaining)} left to undo this action
@@ -144,7 +144,7 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
 
             {/* Reason Input */}
             <div>
-              <label className="block text-xs text-gray-400 mb-2">
+              <label className="block text-xs text-tertiary mb-2">
                 Reason for undo (optional):
               </label>
               <textarea
@@ -204,7 +204,7 @@ export function UndoConfirmModal({ action, onConfirm, onCancel }: UndoConfirmMod
           </div>
 
           {/* Warning */}
-          <p className="text-[10px] text-gray-500 text-center mt-4">
+          <p className="text-[10px] text-tertiary text-center mt-4">
             This will reverse the action and update your store/campaigns accordingly
           </p>
         </motion.div>

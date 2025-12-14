@@ -7,15 +7,20 @@ from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
     ForeignKey, Index, JSON, Enum as SQLEnum, UniqueConstraint
 )
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Session, sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
+from typing import Dict, Any, List, Optional
 import enum
 import json
 import os
 
+# Create separate Base for legacy multi_store_models (keeps it isolated)
+from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
+
+# Note: This file maintains its own Base and model definitions for backward compatibility.
+# New code should import from ospra_os.database (which uses the modular structure).
 
 
 # ============================================================================
@@ -182,13 +187,36 @@ class User(Base):
     last_login = Column(DateTime, nullable=True)
 
     # Relationships
+    # NOTE: Legacy file - relationships kept minimal for backwards compatibility
+    # Full relationships are defined in ospra_os/database/user_models.py
     stores = relationship("Store", back_populates="user", cascade="all, delete-orphan")
     settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
     ai_usage = relationship("AIUsage", back_populates="user", cascade="all, delete-orphan")
     product_recommendations = relationship("UserProductRecommendation", back_populates="user", cascade="all, delete-orphan")
     email_accounts = relationship("UserEmailAccount", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("Email", back_populates="user", cascade="all, delete-orphan")
-    actions = relationship("Action", back_populates="user", cascade="all, delete-orphan")
+    # actions relationship removed - Action model not in this Base class, use modular database instead
+
+    # Backward compatibility properties
+    @property
+    def hashed_password(self):
+        """Alias for password_hash (backward compatibility)"""
+        return self.password_hash
+
+    @hashed_password.setter
+    def hashed_password(self, value):
+        """Alias setter for password_hash (backward compatibility)"""
+        self.password_hash = value
+
+    @property
+    def username(self):
+        """Alias for name (backward compatibility)"""
+        return self.name
+
+    @username.setter
+    def username(self, value):
+        """Alias setter for name (backward compatibility)"""
+        self.name = value
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier='{self.subscription_tier}')>"
@@ -243,10 +271,11 @@ class Store(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    # NOTE: Legacy file - relationships kept minimal for backwards compatibility
     user = relationship("User", back_populates="stores")
     products = relationship("Product", back_populates="store", cascade="all, delete-orphan")
     deployments = relationship("ProductDeployment", back_populates="store", cascade="all, delete-orphan")
-    actions = relationship("Action", back_populates="store", cascade="all, delete-orphan")
+    # actions relationship removed - Action model not in this Base class, use modular database instead
     cross_store_learnings_source = relationship("CrossStoreLearning", foreign_keys="CrossStoreLearning.source_store_id", back_populates="source_store", cascade="all, delete-orphan")
     cross_store_learnings_target = relationship("CrossStoreLearning", foreign_keys="CrossStoreLearning.target_store_id", back_populates="target_store", cascade="all, delete-orphan")
 
@@ -1589,45 +1618,52 @@ class ABTestAssignment(Base):
         return f"<ABTestAssignment(test_id={self.test_id}, variant_id={self.variant_id}, visitor='{self.visitor_id}')>"
 
 
-# ============================================================================
-# AUTO-PILOT LOGS
-# ============================================================================
-
-
-class AutoPilotLog(Base):
-    """Log of auto-pilot decisions and executions"""
-    __tablename__ = "auto_pilot_logs"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    action_id = Column(Integer, ForeignKey("actions.id"), nullable=False)
-
-    # Decision details
-    confidence = Column(Float)
-    threshold_used = Column(Float)
-
-    # Execution result
-    executed = Column(Boolean, default=False)
-    skipped_reason = Column(String(255), nullable=True)  # "below_threshold", "daily_limit", etc.
-
-    # Timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-
-    # Relationships
-    user = relationship("User")
-    action = relationship("Action")
-
-    __table_args__ = (
-        Index('idx_autopilot_user_created', 'user_id', 'created_at'),
-    )
-
-    def __repr__(self):
-        return f"<AutoPilotLog(action_id={self.action_id}, executed={self.executed})>"
-
-
 print("✅ Intelligence models added")
 print("✅ A/B Testing models added")
-print("✅ Auto-Pilot models added")
+
+
+# ============================================================================
+# EMAIL AUTOMATION MODELS
+# ============================================================================
+
+class EmailFollowup(Base):
+    """Track emails that need AI follow-up during operating hours."""
+
+    __tablename__ = "email_followups"
+
+    gmail_message_id = Column(String, primary_key=True)  # Gmail message ID
+    customer_email = Column(String, nullable=False)
+    customer_name = Column(String)
+    subject = Column(String)
+    body = Column(Text)
+    label = Column(String)  # Support, Tracking, Return/Refund, etc.
+
+    needs_followup = Column(Boolean, default=False)  # True if sent template during quiet hours
+    followup_sent = Column(Boolean, default=False)   # True after AI follow-up sent
+
+    received_at = Column(DateTime, default=datetime.utcnow)
+    template_sent_at = Column(DateTime)  # When template was sent
+    followup_sent_at = Column(DateTime)  # When AI follow-up was sent
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<EmailFollowup {self.gmail_message_id} - {self.customer_email}>"
+
+
+def get_followup_session(database_url: str):
+    """Get a synchronous database session for follow-up tracking."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    sync_url = database_url.replace("+aiosqlite", "")
+    engine = create_engine(sync_url, echo=False)
+    Session = sessionmaker(bind=engine)
+    return Session()
+
+
+print("✅ Email Automation models added")
 
 
 # ============================================================================

@@ -92,31 +92,31 @@ export const AutoDeploymentPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-12 flex items-center justify-center">
+      <div className="min-h-screen   p-12 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading auto-deployment data...</p>
+          <p className="text-secondary">Loading auto-deployment data...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-12">
+    <div className="min-h-screen   p-12">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-light text-gray-900 flex items-center gap-3">
+            <h1 className="text-3xl font-light text-primary flex items-center gap-3">
               <Bot className="w-8 h-8 text-indigo-600" />
               Auto-Deployment
             </h1>
-            <p className="text-gray-500 mt-1">Automatically deploy high-scoring products to Shopify</p>
+            <p className="text-tertiary mt-1">Automatically deploy high-scoring products to Shopify</p>
           </div>
           <div className="flex gap-3">
             <button
               onClick={loadData}
-              className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
+              className="px-4 py-2 bg-white border border-white/10 rounded-lg hover:  transition flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" />
               Refresh
@@ -144,19 +144,19 @@ export const AutoDeploymentPage = () => {
         </div>
 
         {/* Status Banner */}
-        <GlassPanel className={`p-6 border-2 ${status?.enabled ? 'border-green-500 bg-green-50' : 'border-gray-300'}`}>
+        <GlassPanel className={`p-6 border-2 ${status?.enabled ? 'border-green-500 bg-green-500/100/10' : 'border-white/10'}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-3">
-                <div className={`w-4 h-4 rounded-full ${status?.enabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-                <span className="font-semibold text-gray-900">
+                <div className={`w-4 h-4 rounded-full ${status?.enabled ? 'bg-green-500/100 animate-pulse' : 'bg-gray-400'}`} />
+                <span className="font-semibold text-primary">
                   {status?.enabled ? 'Active' : 'Disabled'}
                 </span>
               </div>
               {status?.last_run && (
                 <>
-                  <div className="text-gray-400">|</div>
-                  <div className="text-gray-600 flex items-center gap-2">
+                  <div className="text-tertiary">|</div>
+                  <div className="text-secondary flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     Last run: {new Date(status.last_run).toLocaleString()}
                   </div>
@@ -168,7 +168,7 @@ export const AutoDeploymentPage = () => {
               className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition ${
                 status?.enabled
                   ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                  : 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-green-100 text-green-400 hover:bg-green-200'
               }`}
             >
               {status?.enabled ? (
@@ -186,9 +186,9 @@ export const AutoDeploymentPage = () => {
           </div>
 
           {!status?.enabled && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+            <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-yellow-800">
+              <div className="text-sm text-amber-300">
                 <p className="font-medium">Auto-deployment is currently disabled</p>
                 <p className="mt-1">Enable it to start automatically deploying high-scoring products to your Shopify store.</p>
               </div>
@@ -203,8 +203,8 @@ export const AutoDeploymentPage = () => {
               <Package className="w-8 h-8 text-indigo-500" />
               <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">Total</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{status?.total_deployed || 0}</p>
-            <p className="text-sm text-gray-500">Products Deployed</p>
+            <p className="text-3xl font-bold text-primary">{status?.total_deployed || 0}</p>
+            <p className="text-sm text-tertiary">Products Deployed</p>
           </GlassPanel>
 
           <GlassPanel className="p-6">
@@ -212,8 +212,8 @@ export const AutoDeploymentPage = () => {
               <DollarSign className="w-8 h-8 text-emerald-500" />
               <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Cost</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">${status?.total_cost.toFixed(2) || '0.00'}</p>
-            <p className="text-sm text-gray-500">Total AI Cost</p>
+            <p className="text-3xl font-bold text-primary">${status?.total_cost.toFixed(2) || '0.00'}</p>
+            <p className="text-sm text-tertiary">Total AI Cost</p>
           </GlassPanel>
 
           <GlassPanel className="p-6">
@@ -221,10 +221,10 @@ export const AutoDeploymentPage = () => {
               <TrendingUp className="w-8 h-8 text-purple-500" />
               <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Avg</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">
+            <p className="text-3xl font-bold text-primary">
               ${status?.total_deployed ? (status.total_cost / status.total_deployed).toFixed(2) : '0.00'}
             </p>
-            <p className="text-sm text-gray-500">Cost per Product</p>
+            <p className="text-sm text-tertiary">Cost per Product</p>
           </GlassPanel>
 
           <GlassPanel className="p-6">
@@ -232,19 +232,19 @@ export const AutoDeploymentPage = () => {
               <Clock className="w-8 h-8 text-amber-500" />
               <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">Schedule</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">1h</p>
-            <p className="text-sm text-gray-500">Check Interval</p>
+            <p className="text-3xl font-bold text-primary">1h</p>
+            <p className="text-sm text-tertiary">Check Interval</p>
           </GlassPanel>
         </div>
 
         {/* Settings Panel */}
         {showSettings && (
           <GlassPanel className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Deployment Criteria</h2>
+            <h2 className="text-xl font-semibold text-primary mb-6">Deployment Criteria</h2>
 
             <div className="grid grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Min Score (0-100)
                 </label>
                 <input
@@ -253,12 +253,12 @@ export const AutoDeploymentPage = () => {
                   max="100"
                   value={criteria.min_score || 80}
                   onChange={(e) => setCriteria({ ...criteria, min_score: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Min Profit Margin (%)
                 </label>
                 <input
@@ -267,18 +267,18 @@ export const AutoDeploymentPage = () => {
                   max="100"
                   value={(criteria.min_profit_margin || 0.35) * 100}
                   onChange={(e) => setCriteria({ ...criteria, min_profit_margin: Number(e.target.value) / 100 })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Max Saturation
                 </label>
                 <select
                   value={criteria.max_saturation || 'medium'}
                   onChange={(e) => setCriteria({ ...criteria, max_saturation: e.target.value as 'low' | 'medium' | 'high' })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -287,7 +287,7 @@ export const AutoDeploymentPage = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Max per Day
                 </label>
                 <input
@@ -296,12 +296,12 @@ export const AutoDeploymentPage = () => {
                   max="100"
                   value={criteria.max_per_day || 5}
                   onChange={(e) => setCriteria({ ...criteria, max_per_day: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Max per Hour
                 </label>
                 <input
@@ -310,12 +310,12 @@ export const AutoDeploymentPage = () => {
                   max="10"
                   value={criteria.max_per_hour || 2}
                   onChange={(e) => setCriteria({ ...criteria, max_per_hour: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Max Daily Cost ($)
                 </label>
                 <input
@@ -324,12 +324,12 @@ export const AutoDeploymentPage = () => {
                   step="0.1"
                   value={criteria.max_daily_cost || 1.0}
                   onChange={(e) => setCriteria({ ...criteria, max_daily_cost: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-secondary mb-2">
                   Min Trend Velocity
                 </label>
                 <input
@@ -338,7 +338,7 @@ export const AutoDeploymentPage = () => {
                   max="100"
                   value={criteria.min_trend_velocity || 70}
                   onChange={(e) => setCriteria({ ...criteria, min_trend_velocity: Number(e.target.value) })}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
 
@@ -348,9 +348,9 @@ export const AutoDeploymentPage = () => {
                     type="checkbox"
                     checked={criteria.require_multiple_sources ?? true}
                     onChange={(e) => setCriteria({ ...criteria, require_multiple_sources: e.target.checked })}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-sm font-medium text-gray-700">Require Multiple Sources</span>
+                  <span className="text-sm font-medium text-secondary">Require Multiple Sources</span>
                 </label>
               </div>
 
@@ -360,9 +360,9 @@ export const AutoDeploymentPage = () => {
                     type="checkbox"
                     checked={criteria.auto_publish ?? false}
                     onChange={(e) => setCriteria({ ...criteria, auto_publish: e.target.checked })}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-white/10 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-sm font-medium text-gray-700">Auto-Publish (vs Draft)</span>
+                  <span className="text-sm font-medium text-secondary">Auto-Publish (vs Draft)</span>
                 </label>
               </div>
             </div>
@@ -370,7 +370,7 @@ export const AutoDeploymentPage = () => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowSettings(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                className="px-4 py-2 border border-white/10 rounded-lg hover:  transition"
               >
                 Cancel
               </button>
@@ -387,33 +387,33 @@ export const AutoDeploymentPage = () => {
 
         {/* Deployment History */}
         <GlassPanel className="p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Deployment History</h2>
+          <h2 className="text-xl font-semibold text-primary mb-6">Deployment History</h2>
 
           {history.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-lg">
+            <div className="text-center py-12 border-2 border-dashed border-white/10 rounded-lg">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No deployments yet</p>
-              <p className="text-sm text-gray-400 mt-1">Products will appear here once auto-deployed</p>
+              <p className="text-tertiary">No deployments yet</p>
+              <p className="text-sm text-tertiary mt-1">Products will appear here once auto-deployed</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Product</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Niche</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Score</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">AI Cost</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Deployed</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-700">Link</th>
+                  <tr className="border-b border-white/10">
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Product</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Niche</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Score</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">AI Cost</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Status</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Deployed</th>
+                    <th className="text-left py-3 px-4 font-medium text-secondary">Link</th>
                   </tr>
                 </thead>
                 <tbody>
                   {history.map((item) => (
-                    <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <tr key={item.id} className="border-b border-gray-100 hover: ">
                       <td className="py-3 px-4">
-                        <span className="font-medium text-gray-900">{item.product_name}</span>
+                        <span className="font-medium text-primary">{item.product_name}</span>
                       </td>
                       <td className="py-3 px-4">
                         <span className="inline-block px-2 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-full">
@@ -426,7 +426,7 @@ export const AutoDeploymentPage = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-gray-700">${item.ai_cost.toFixed(2)}</span>
+                        <span className="text-secondary">${item.ai_cost.toFixed(2)}</span>
                       </td>
                       <td className="py-3 px-4">
                         {item.success ? (
@@ -442,7 +442,7 @@ export const AutoDeploymentPage = () => {
                         )}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-secondary">
                           {new Date(item.deployed_at).toLocaleString()}
                         </span>
                       </td>
@@ -467,7 +467,7 @@ export const AutoDeploymentPage = () => {
         </GlassPanel>
 
         {/* Information Panel */}
-        <GlassPanel className="p-6 bg-blue-50 border-blue-200">
+        <GlassPanel className="p-6 bg-cyan-500/10 border-cyan-500/20">
           <div className="flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="text-sm text-blue-800">

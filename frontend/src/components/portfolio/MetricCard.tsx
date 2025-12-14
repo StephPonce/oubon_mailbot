@@ -22,7 +22,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
 }) => {
   const isPositive = trend === 'up';
   const changeColor = isPositive ? 'text-success-green' : 'text-red-400';
-  const bgColor = isPositive ? 'bg-success-green/10' : 'bg-red-500/10';
+  const bgColor = isPositive ? 'bg-success-green/10' : 'bg-red-500/100/10';
   const TrendIcon = isPositive ? TrendingUp : TrendingDown;
 
   return (

@@ -52,9 +52,9 @@ interface CompetitorCardProps {
 function CompetitorCard({ competitor, onViewDetails, onAnalyze, isAnalyzing }: CompetitorCardProps) {
   const getThreatColor = (level: string) => {
     switch (level?.toLowerCase()) {
-      case 'high': return 'text-red-600 bg-red-500/10 border-red-500/20';
+      case 'high': return 'text-red-600 bg-red-500/100/10 border-red-500/20';
       case 'medium': return 'text-amber-600 bg-amber-500/10 border-amber-500/20';
-      case 'low': return 'text-green-600 bg-green-500/10 border-green-500/20';
+      case 'low': return 'text-green-600 bg-green-500/100/10 border-green-500/20';
       default: return 'text-secondary bg-black/5 border-black/10';
     }
   };
@@ -235,7 +235,7 @@ function CompetitorDetailModal({ competitor, analysis, onClose }: CompetitorDeta
             <h3 className="text-sm font-medium text-primary mb-2">Active Niches</h3>
             <div className="flex flex-wrap gap-2">
               {competitor.niches.map((niche, i) => (
-                <span key={i} className="px-3 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 border border-blue-500/20">
+                <span key={i} className="px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/100/10 text-blue-600 border border-blue-500/20">
                   {niche}
                 </span>
               ))}
@@ -292,7 +292,7 @@ function PriceComparisonChart({ data }: { data: any[] }) {
           <div className="flex-1 h-8 bg-black/5 rounded-lg overflow-hidden">
             <div
               className={`h-full rounded-lg ${
-                item.is_our_store ? 'bg-accent' : 'bg-blue-500/50'
+                item.is_our_store ? 'bg-accent' : 'bg-cyan-500/100/50'
               }`}
               style={{ width: `${((item.avg_price || 0) / maxPrice) * 100}%` }}
             />
