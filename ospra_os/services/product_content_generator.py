@@ -311,10 +311,12 @@ SHORT_DESCRIPTION:
 
 LONG_DESCRIPTION:
 [Full product page content in HTML format, 150-250 words, including:
-- Opening hook
-- Key benefits (3-5 points)
-- Who it's for
-- Call to action]
+- Opening hook (compelling benefit statement)
+- Key benefits (3-5 points as prose, not bullet lists)
+- Brief usage examples (don't say "Perfect For" - just mention use cases naturally)
+- Call to action
+
+IMPORTANT: Do NOT include "Perfect For" sections or list buyer personas - this alienates customers. Keep it universal and benefit-focused.]
 
 BULLET_POINTS:
 [5-7 key features as bullets, format: "- Feature text"]

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Store, ChevronDown, Check, Plus, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '@/lib/api';
+import api from '@/lib/api';
 
 interface StoreData {
   id: number;
@@ -50,7 +50,8 @@ export default function StoreSwitcher({ onStoreChange }: StoreSwitcherProps) {
 
   const fetchStores = async () => {
     try {
-      const data = await apiClient.get<StoreData[]>('/api/stores');
+      const response = await api.get<{ stores: StoreData[] }>('/api/stores');
+      const data = response.data.stores || response.data || [];
       setStores(data);
 
       // Get active store from localStorage, or use first active store

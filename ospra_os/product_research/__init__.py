@@ -6,6 +6,12 @@ Integrates with multiple platforms to find winning products.
 """
 
 from .scorer import ProductScorer
-from .routes import router
 
-__all__ = ["ProductScorer", "router"]
+# Make FastAPI routes import optional
+try:
+    from .routes import router
+    __all__ = ["ProductScorer", "router"]
+except ImportError:
+    # FastAPI not installed - skip routes
+    router = None
+    __all__ = ["ProductScorer"]

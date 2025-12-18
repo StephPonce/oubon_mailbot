@@ -59,7 +59,7 @@ class ShopifyClient:
                     "title": title,
                     "body_html": description,
                     "vendor": vendor,
-                    "product_type": "Physical",
+                    "product_type": "",  # Empty - 'Physical' shows as ugly link on storefront
                     "tags": ",".join(tags) if tags else "",
                     "published": True,
                     "status": "active"
@@ -323,4 +323,235 @@ class ShopifyClient:
 
         except Exception as e:
             print(f"❌ Error updating inventory: {e}")
+            return False
+
+    async def publish_to_online_store(self, product_id: int) -> bool:
+        """
+        Publish a product to the Online Store sales channel using GraphQL.
+
+        Products created via API are often not visible on the storefront
+        until explicitly published to the Online Store channel.
+
+        Requires: write_publications scope
+        """
+        try:
+            print(f"📢 Publishing product {product_id} to Online Store...")
+
+            graphql_url = f"{self.base_url}/graphql.json"
+            gid = f"gid://shopify/Product/{product_id}"
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Step 1: Get Online Store publication ID
+                pubs_query = """
+                {
+                  publications(first: 10) {
+                    edges {
+                      node {
+                        id
+                        name
+                      }
+                    }
+                  }
+                }
+                """
+
+                pubs_resp = await client.post(
+                    graphql_url,
+                    headers=self.headers,
+                    json={"query": pubs_query}
+                )
+
+                if pubs_resp.status_code != 200:
+                    print(f"❌ Failed to fetch publications: {pubs_resp.status_code}")
+                    return False
+
+                result = pubs_resp.json()
+                if 'errors' in result:
+                    print(f"⚠️  GraphQL errors: {result['errors']}")
+                    return False
+
+                # Find Online Store publication
+                online_store_pub_id = None
+                if 'data' in result and 'publications' in result['data']:
+                    pubs = result['data']['publications']['edges']
+                    for edge in pubs:
+                        pub = edge['node']
+                        if 'Online Store' in pub['name']:
+                            online_store_pub_id = pub['id']
+                            break
+
+                if not online_store_pub_id:
+                    print(f"⚠️  Could not find Online Store publication")
+                    return False
+
+                # Step 2: Publish product to Online Store
+                publish_mutation = """
+                mutation publishProduct($id: ID!, $input: [PublicationInput!]!) {
+                  publishablePublish(id: $id, input: $input) {
+                    publishable {
+                      ... on Product {
+                        id
+                        title
+                      }
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }
+                """
+
+                mutation_data = {
+                    "query": publish_mutation,
+                    "variables": {
+                        "id": gid,
+                        "input": [{"publicationId": online_store_pub_id}]
+                    }
+                }
+
+                pub_resp = await client.post(
+                    graphql_url,
+                    headers=self.headers,
+                    json=mutation_data
+                )
+
+                if pub_resp.status_code != 200:
+                    print(f"❌ Publish mutation failed: {pub_resp.status_code}")
+                    return False
+
+                result = pub_resp.json()
+                if 'errors' in result:
+                    print(f"⚠️  GraphQL errors: {result['errors']}")
+                    return False
+
+                data = result['data']['publishablePublish']
+                errors = data.get('userErrors', [])
+
+                if errors:
+                    print(f"⚠️  User errors: {errors}")
+                    return False
+
+                print(f"✅ Product published to Online Store!")
+                return True
+
+        except Exception as e:
+            print(f"❌ Error publishing product: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    async def create_and_publish_product(
+        self,
+        title: str,
+        description: str,
+        price: float,
+        images: List[str],
+        vendor: str = "Oubon Shop",
+        tags: List[str] = None,
+        variants: List[Dict] = None,
+        inventory_quantity: int = 100,
+        meta_fields: Dict = None,
+        add_to_featured: bool = True
+    ) -> Dict:
+        """
+        Create a product AND publish it to the Online Store.
+
+        This is the recommended method for deploying products that
+        should be immediately visible on your storefront.
+
+        Args:
+            add_to_featured: If True, adds product to "Featured Products" collection (default: True)
+        """
+        # Create the product first
+        product = await self.create_product(
+            title=title,
+            description=description,
+            price=price,
+            images=images,
+            vendor=vendor,
+            tags=tags,
+            variants=variants,
+            inventory_quantity=inventory_quantity,
+            meta_fields=meta_fields
+        )
+
+        if product and product.get('id'):
+            product_id = product['id']
+
+            # Publish it to the Online Store
+            await self.publish_to_online_store(product_id)
+
+            # Add to Featured Products collection for immediate visibility
+            if add_to_featured:
+                await self.add_to_featured_collection(product_id)
+
+        return product
+
+    async def add_to_featured_collection(self, product_id: int) -> bool:
+        """
+        Add product to the 'Featured Products' custom collection.
+
+        This ensures the product appears on the storefront immediately.
+        If the collection doesn't exist, it will be created.
+        """
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                # Try to find or create the "Featured Products" collection
+                colls_resp = await client.get(
+                    f"{self.base_url}/custom_collections.json",
+                    headers=self.headers
+                )
+
+                featured_collection_id = None
+
+                if colls_resp.status_code == 200:
+                    collections = colls_resp.json().get('custom_collections', [])
+                    featured = [c for c in collections if 'Featured' in c.get('title', '')]
+
+                    if featured:
+                        featured_collection_id = featured[0]['id']
+                    else:
+                        # Create the collection
+                        collection_data = {
+                            'custom_collection': {
+                                'title': 'Featured Products',
+                                'body_html': '<p>Our hand-picked featured products - trending now!</p>',
+                                'published': True,
+                                'published_scope': 'global'
+                            }
+                        }
+
+                        coll_resp = await client.post(
+                            f"{self.base_url}/custom_collections.json",
+                            headers=self.headers,
+                            json=collection_data
+                        )
+
+                        if coll_resp.status_code in [200, 201]:
+                            featured_collection_id = coll_resp.json()['custom_collection']['id']
+
+                # Add product to the collection
+                if featured_collection_id:
+                    collect_data = {
+                        'collect': {
+                            'product_id': product_id,
+                            'collection_id': featured_collection_id
+                        }
+                    }
+
+                    collect_resp = await client.post(
+                        f"{self.base_url}/collects.json",
+                        headers=self.headers,
+                        json=collect_data
+                    )
+
+                    if collect_resp.status_code in [200, 201]:
+                        print(f"✅ Added product to 'Featured Products' collection")
+                        return True
+
+                return False
+
+        except Exception as e:
+            print(f"⚠️  Could not add to featured collection: {e}")
             return False

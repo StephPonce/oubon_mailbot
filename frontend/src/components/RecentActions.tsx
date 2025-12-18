@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { History, Undo2, Clock, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { apiClient } from '@/lib/api';
+import api from '@/lib/api';
 import { UndoConfirmModal } from './UndoConfirmModal';
 
 interface ExecutedAction {
@@ -61,8 +61,10 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiClient.get<RecentActionsResponse>(`/actions/recent-executed?limit=${limit}`);
-      setActions(response.actions);
+      const response = await api.get<RecentActionsResponse>(`/api/actions/recent-executed?limit=${limit}`);
+      // @ts-ignore - response.data structure
+      const data = response.data as RecentActionsResponse;
+      setActions(data.actions || []);
     } catch (err) {
       console.error('Failed to load recent actions:', err);
       setError('Failed to load recent actions. Please try again.');
@@ -86,7 +88,7 @@ export function RecentActions({ className, limit = 10 }: RecentActionsProps) {
     try {
       setUndoingActionId(actionId);
       const queryParams = reason ? `?reason=${encodeURIComponent(reason)}` : '';
-      await apiClient.post(`/actions/${actionId}/undo${queryParams}`, {});
+      await api.post(`/api/actions/${actionId}/undo${queryParams}`, {});
 
       // Refresh the list
       await fetchActions();

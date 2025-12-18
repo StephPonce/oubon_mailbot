@@ -34,12 +34,20 @@ from pathlib import Path
 
 import httpx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
-from rembg import remove
 from openai import OpenAI, AsyncOpenAI
 
-# Configure logging
+# Configure logging FIRST
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Make rembg optional - it's a heavy dependency
+try:
+    from rembg import remove as rembg_remove
+    REMBG_AVAILABLE = True
+except ImportError:
+    REMBG_AVAILABLE = False
+    rembg_remove = None
+    logger.warning("rembg not installed - background removal disabled. Install with: pip install rembg")
 
 
 # ============================================================================
@@ -300,6 +308,19 @@ class ProductImageProcessor:
         """
         logger.info(f"Removing background from: {image_url}")
 
+        if not REMBG_AVAILABLE:
+            logger.warning("rembg not installed - returning original image without background removal")
+            # Just download and return the original image
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(image_url)
+                    response.raise_for_status()
+                    image_bytes = response.content
+                return Image.open(io.BytesIO(image_bytes)).convert('RGBA')
+            except Exception as e:
+                logger.error(f"Failed to download image: {e}")
+                raise
+
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(image_url)
@@ -307,7 +328,7 @@ class ProductImageProcessor:
                 image_bytes = response.content
 
             input_image = Image.open(io.BytesIO(image_bytes))
-            output_image = remove(input_image)
+            output_image = rembg_remove(input_image)
 
             logger.info(f"Background removed successfully. Size: {output_image.size}")
             return output_image

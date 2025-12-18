@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowRight, Flame, BarChart2, Layers } from 'lucide-react';
-import { ImageEnhanceModal } from './ImageEnhanceModal';
+import { ExternalLink, Flame, BarChart2, Layers, Star, ShoppingCart } from 'lucide-react';
 import { DeployPreviewModal } from './DeployPreviewModal';
-import { ExplainTooltip } from './ui/ExplainTooltip';
 import type { DeployResult } from '../services/api';
 
 interface Product {
@@ -11,30 +9,16 @@ interface Product {
   image_url?: string;
   price: number;
   cost?: number;
-  trend_score?: number;
-  velocity_score?: number;
-  score?: number;
-  sales_rank?: number;
-  orders?: number;
-  competition_score?: number;
+  score?: number;           // AI Score 0-10 (use this directly!)
+  velocity_score?: number;  // 0-100 trend velocity
   profit_margin?: number;
   estimated_profit?: number;
+  aliexpress_url?: string;
   supplier_url?: string;
   niche?: string;
-  discovered_at?: string;
-  commission_rate?: number;
-  tier?: string;
   rating?: number;
-  original_price?: number;
-  aliexpress_cost?: number;
-  shipping_cost?: number;
+  orders?: number;
   source?: string;
-  data_sources?: {
-    aliexpress?: { available: boolean; orders?: number };
-    amazon?: { available: boolean; sales_rank?: number };
-    tiktok?: { available: boolean; views?: number };
-    google_trends?: { available: boolean; trend_score?: number };
-  };
 }
 
 interface ProductCardProps {
@@ -44,86 +28,35 @@ interface ProductCardProps {
   onToggleSelect?: (productId: string) => void;
 }
 
-// Utility functions
+// Utility: Sanitize image URL
 function sanitizeImageUrl(url?: string, productName?: string): string {
   if (!url || url.trim() === '') {
-    const text = encodeURIComponent(productName?.substring(0, 20) || 'Product');
+    const text = encodeURIComponent(productName?.substring(0, 15) || 'Product');
     return `https://placehold.co/400x200/1a1a2e/eaeaea?text=${text}`;
   }
   let cleanUrl = url.replace(/^http:\/\//i, 'https://');
-  if (cleanUrl.includes('alicdn.com') || cleanUrl.includes('aliexpress-media')) {
-    cleanUrl = cleanUrl.split('_')[0];
-    if (!cleanUrl.includes('?')) {
-      cleanUrl = cleanUrl + '_400x200.jpg';
-    }
-  }
   return cleanUrl;
 }
 
-// ProductCardSkeleton Component - Loading state
-export const ProductCardSkeleton: React.FC = () => {
-  return (
-    <div className="bg-white border border-white/10 rounded-xl overflow-hidden shadow-sm animate-pulse">
-      {/* Image skeleton */}
-      <div className="h-[200px] bg-gray-200" />
-
-      {/* Content skeleton */}
-      <div className="p-4 space-y-3">
-        {/* Title skeleton */}
-        <div className="h-5 bg-gray-200 rounded w-3/4" />
-
-        {/* Niche badge skeleton */}
-        <div className="h-4 bg-gray-200 rounded w-1/3" />
-
-        {/* Metrics row skeleton */}
-        <div className="flex justify-between py-3 border-y border-white/10">
-          <div className="text-center space-y-2">
-            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
-            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
-          </div>
-          <div className="text-center space-y-2">
-            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
-            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
-          </div>
-          <div className="text-center space-y-2">
-            <div className="h-6 bg-gray-200 rounded w-12 mx-auto" />
-            <div className="h-3 bg-gray-200 rounded w-10 mx-auto" />
-          </div>
-        </div>
-
-        {/* Action buttons skeleton */}
-        <div className="flex gap-2 pt-2">
-          <div className="h-10 bg-gray-200 rounded-lg flex-1" />
-          <div className="h-10 bg-gray-200 rounded-lg flex-1" />
-        </div>
+// Loading skeleton
+export const ProductCardSkeleton: React.FC = () => (
+  <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden animate-pulse">
+    <div className="h-[160px] bg-white/10" />
+    <div className="p-4 space-y-3">
+      <div className="h-5 bg-white/10 rounded w-3/4" />
+      <div className="h-4 bg-white/10 rounded w-1/3" />
+      <div className="flex justify-between py-3">
+        <div className="h-6 bg-white/10 rounded w-16" />
+        <div className="h-6 bg-white/10 rounded w-16" />
+        <div className="h-6 bg-white/10 rounded w-16" />
+      </div>
+      <div className="flex gap-2">
+        <div className="h-10 bg-white/10 rounded flex-1" />
+        <div className="h-10 bg-white/10 rounded flex-1" />
       </div>
     </div>
-  );
-};
-
-// MetricPill Component
-const MetricPill: React.FC<{
-  icon: string;
-  value: string | number;
-  label: string;
-  color: 'green' | 'blue' | 'purple';
-}> = ({ icon, value, label, color }) => {
-  const colorClasses = {
-    green: 'text-green-600',
-    blue: 'text-blue-600',
-    purple: 'text-purple-600',
-  };
-
-  return (
-    <div className="text-center">
-      <div className={`text-lg font-bold ${colorClasses[color]} flex items-center justify-center gap-1`}>
-        <span>{icon}</span>
-        <span>{value}</span>
-      </div>
-      <div className="text-xs text-tertiary mt-0.5">{label}</div>
-    </div>
-  );
-};
+  </div>
+);
 
 export const ProductCard: React.FC<ProductCardProps> = ({
   product,
@@ -135,103 +68,62 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [deploymentStatus, setDeploymentStatus] = useState<{
     deployed: boolean;
     shopify_url?: string;
-    deployed_at?: string;
   } | null>(null);
-  const [showEnhanceModal, setShowEnhanceModal] = useState(false);
-  const [enhancedImageUrl, setEnhancedImageUrl] = useState<string | null>(null);
 
-  const handleOpenDeployModal = () => {
+  // ==========================================
+  // METRIC CALCULATIONS (using real data!)
+  // ==========================================
+  
+  // AI Score: Use product.score directly (0-10), NOT velocity_score/10!
+  const aiScore = product.score ?? 0;
+  
+  // Profit: Use estimated_profit or calculate from price - cost
+  const cost = product.cost ?? 0;
+  const price = product.price ?? 0;
+  const profit = product.estimated_profit ?? (price - cost);
+  
+  // Margin: Use profit_margin or calculate
+  const margin = product.profit_margin ?? (price > 0 ? ((price - cost) / price) * 100 : 0);
+  
+  // Velocity: 0-100 trend score
+  const velocity = product.velocity_score ?? 0;
+  
+  // Product URL: Prefer aliexpress_url, fallback to supplier_url
+  const productUrl = product.aliexpress_url || product.supplier_url;
+  
+  // Is this product "hot"?
+  const isHot = velocity > 70 || (product.orders && product.orders > 5000);
+  
+  // Is profitable?
+  const isProfitable = profit > 0;
+
+  // Score color
+  const getScoreColor = () => {
+    if (aiScore >= 7) return 'from-green-500 to-emerald-600';
+    if (aiScore >= 5) return 'from-cyan-500 to-blue-600';
+    if (aiScore >= 3) return 'from-amber-500 to-orange-600';
+    return 'from-gray-500 to-gray-600';
+  };
+
+  const handleDeploy = () => {
     if (product.id.startsWith('demo-') || product.source === 'DEMO_FALLBACK') {
-      alert('Demo products cannot be deployed. Please run real product discovery first or configure real data sources.');
+      alert('Demo products cannot be deployed.');
       return;
     }
     setShowDeployModal(true);
   };
 
-  const handleDeploymentSuccess = (result: DeployResult) => {
-    setDeploymentStatus({
-      deployed: true,
-      shopify_url: result.shopify_url,
-      deployed_at: new Date().toISOString()
-    });
+  const handleDeploySuccess = (result: DeployResult) => {
+    setDeploymentStatus({ deployed: true, shopify_url: result.shopify_url });
   };
-
-  const handleUseEnhanced = (enhancedUrl: string) => {
-    setEnhancedImageUrl(enhancedUrl);
-  };
-
-  // Calculate metrics
-  const score = (product.velocity_score || 0) / 10; // Convert 0-100 to 0-10
-  const profit = product.estimated_profit || (product.price - (product.cost || 0));
-  const margin = Math.round(product.profit_margin || ((product.price - (product.cost || 0)) / product.price * 100));
-  const velocity = product.velocity_score || 0;
-
-  // Determine if product is "hot"
-  const isHot = velocity > 80 || product.data_sources?.tiktok?.available;
-
-  // Get score color
-  const getScoreColor = () => {
-    if (score >= 8) return 'bg-green-500/100/90';
-    if (score >= 6) return 'bg-cyan-500/100/90';
-    return 'bg-amber-500/90';
-  };
-
-  // Generate rationale for the recommendation
-  const generateRationale = () => {
-    const factors = [];
-    const parts = [];
-    let confidenceBoost = 0;
-
-    // Velocity analysis
-    if (velocity > 80) {
-      factors.push({ label: "Exceptional demand velocity", value: 15, icon: "trend" as const });
-      parts.push("selling rapidly");
-      confidenceBoost += 15;
-    } else if (velocity > 60) {
-      factors.push({ label: "Strong demand", value: 10, icon: "trend" as const });
-      parts.push("steady sales");
-      confidenceBoost += 10;
-    }
-
-    // Margin analysis
-    if (margin > 50) {
-      factors.push({ label: "Excellent margins", value: 20, icon: "success" as const });
-      parts.push(`${margin}% profit margin`);
-      confidenceBoost += 20;
-    } else if (margin > 30) {
-      factors.push({ label: "Healthy margins", value: 12, icon: "success" as const });
-      parts.push(`${margin}% margin`);
-      confidenceBoost += 12;
-    }
-
-    // Rating analysis
-    if (product.rating && product.rating >= 4.5) {
-      factors.push({ label: "Excellent reviews", value: 10, icon: "success" as const });
-      parts.push(`${product.rating}★ rating`);
-      confidenceBoost += 10;
-    }
-
-    // Orders analysis
-    if (product.orders && product.orders > 1000) {
-      factors.push({ label: "High sales volume", value: 12, icon: "success" as const });
-      parts.push(`${product.orders}+ sales`);
-      confidenceBoost += 12;
-    }
-
-    const rationaleText = parts.length > 0
-      ? `This product shows ${parts.slice(0, 3).join(", ")}. ${score >= 8 ? "Strong buy signal." : score >= 6 ? "Good potential." : "Consider testing."}`
-      : "Meets baseline criteria for dropshipping.";
-
-    const confidence = Math.min(95, Math.max(40, Math.round(score * 10 + confidenceBoost)));
-
-    return { rationale: rationaleText, confidence, factors: factors.slice(0, 4) };
-  };
-
-  const explanation = generateRationale();
 
   return (
-    <div className={`relative bg-white border ${isSelected ? 'border-blue-500 ring-2 ring-blue-500/50' : 'border-white/10'} rounded-xl overflow-hidden shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300`}>
-
+    <div className={`
+      relative bg-white/5 backdrop-blur-sm border rounded-xl overflow-hidden
+      transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:bg-white/10
+      ${isSelected ? 'border-cyan-500 ring-2 ring-cyan-500/50' : 'border-white/10'}
+    `}>
+      
       {/* Selection Checkbox */}
       {onToggleSelect && (
         <div className="absolute top-3 left-3 z-20">
@@ -240,17 +132,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             checked={isSelected}
             onChange={() => onToggleSelect(product.id)}
             onClick={(e) => e.stopPropagation()}
-            className="w-5 h-5 rounded-md bg-white/90 backdrop-blur-sm border-white/10 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="w-5 h-5 rounded bg-black/50 border-white/30 text-cyan-500 focus:ring-cyan-500 cursor-pointer"
           />
         </div>
       )}
 
-      {/* ========================================
-          IMAGE SECTION - 200px height
-      ======================================== */}
-      <div className="relative h-[200px] bg-gray-100 overflow-hidden">
+      {/* ====== IMAGE SECTION ====== */}
+      <div className="relative h-[160px] bg-gray-900 overflow-hidden">
         <img
-          src={sanitizeImageUrl(enhancedImageUrl || product.image_url, product.name)}
+          src={sanitizeImageUrl(product.image_url, product.name)}
           alt={product.name}
           className="w-full h-full object-cover"
           crossOrigin="anonymous"
@@ -259,16 +149,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             const target = e.currentTarget;
             if (!target.dataset.retried) {
               target.dataset.retried = 'true';
-              const text = encodeURIComponent(product.name.substring(0, 20));
+              const text = encodeURIComponent(product.name.substring(0, 15));
               target.src = `https://placehold.co/400x200/1a1a2e/eaeaea?text=${text}`;
             }
           }}
         />
 
-        {/* Gradient overlay at bottom */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
-        {/* HOT/TRENDING Badge (top left) */}
+        {/* HOT Badge */}
         {isHot && (
           <div className="absolute top-3 left-3 px-2 py-1 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
             <Flame className="w-3 h-3" />
@@ -276,151 +166,141 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
 
-        {/* Score Badge (top right) with Explain Tooltip */}
-        <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl backdrop-blur-md ${getScoreColor()} shadow-lg`}>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="text-white font-bold text-lg text-center">{score.toFixed(1)}</div>
-            <ExplainTooltip
-              rationale={explanation.rationale}
-              confidence={explanation.confidence}
-              factors={explanation.factors}
-              position="bottom"
-            />
-          </div>
-          <div className="flex gap-0.5">
-            {[...Array(10)].map((_, i) => (
-              <div
-                key={i}
-                className={`w-1.5 h-1.5 rounded-full ${i < Math.floor(score) ? 'bg-white' : 'bg-white/30'}`}
-              />
-            ))}
+        {/* AI Score Badge */}
+        <div className={`absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-gradient-to-r ${getScoreColor()} shadow-lg`}>
+          <div className="flex items-center gap-1">
+            <Star className="w-3.5 h-3.5 text-white fill-white" />
+            <span className="text-white font-bold text-sm">{aiScore.toFixed(1)}</span>
           </div>
         </div>
-      </div>
 
-      {/* ========================================
-          CONTENT SECTION
-      ======================================== */}
-      <div className="p-4 space-y-3">
-
-        {/* Product Name & Niche */}
-        <div>
-          <h3 className="font-bold text-primary text-base line-clamp-2 mb-2">
-            {product.name}
-          </h3>
-          <span className="text-xs text-tertiary bg-gray-100 px-2 py-0.5 rounded-full">
-            {product.niche?.replace(/_/g, ' ') || 'General'}
-          </span>
-        </div>
-
-        {/* ========================================
-            METRICS ROW (compact, scannable)
-        ======================================== */}
-        <div className="flex justify-between items-center py-3 border-y border-white/10">
-          <MetricPill
-            icon="💰"
-            value={`$${profit.toFixed(0)}`}
-            label="Profit"
-            color="green"
-          />
-          <MetricPill
-            icon="📊"
-            value={`${margin}%`}
-            label="Margin"
-            color="blue"
-          />
-          <MetricPill
-            icon="🚀"
-            value={velocity}
-            label="Velocity"
-            color="purple"
-          />
-        </div>
-
-        {/* ========================================
-            ACTION BUTTONS
-        ======================================== */}
-        <div className="flex gap-2 pt-2">
-          <button
-            onClick={() => onAnalyze(product)}
-            className="flex-1 py-2.5 text-sm font-medium text-secondary bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 flex items-center justify-center gap-1"
-          >
-            <BarChart2 className="w-4 h-4" />
-            Analyze
-          </button>
-          <button
-            onClick={handleOpenDeployModal}
-            disabled={deploymentStatus?.deployed}
-            className="flex-1 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center justify-center gap-1 shadow-md"
-          >
-            {deploymentStatus?.deployed ? (
-              <>
-                <Layers className="w-4 h-4" />
-                Deployed
-              </>
-            ) : (
-              <>
-                Deploy
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Deployment Status (if deployed) */}
-        {deploymentStatus?.deployed && (
-          <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/100/10 border border-green-200">
-            <div className="w-2 h-2 rounded-full bg-green-500/100 animate-pulse" />
-            <span className="text-xs text-green-400 font-medium flex-1">
-              Live on Shopify
-            </span>
-            {deploymentStatus.shopify_url && (
-              <a
-                href={deploymentStatus.shopify_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-green-600 hover:text-green-400 font-medium"
-              >
-                View →
-              </a>
-            )}
+        {/* Orders badge (if available) */}
+        {product.orders && product.orders > 0 && (
+          <div className="absolute bottom-3 left-3 px-2 py-1 bg-black/60 backdrop-blur-sm text-white text-xs rounded-full flex items-center gap-1">
+            <ShoppingCart className="w-3 h-3" />
+            {product.orders.toLocaleString()} sold
           </div>
         )}
       </div>
 
-      {/* ========================================
-          MODALS
-      ======================================== */}
-      {/* Image Enhancement Modal */}
-      {showEnhanceModal && (
-        <ImageEnhanceModal
-          product={{
-            id: product.id,
-            name: product.name,
-            image_url: product.image_url,
-          }}
-          onClose={() => setShowEnhanceModal(false)}
-          onUseEnhanced={handleUseEnhanced}
-        />
-      )}
+      {/* ====== CONTENT SECTION ====== */}
+      <div className="p-4 space-y-3">
+        
+        {/* Product Name */}
+        <h3 className="font-semibold text-white text-sm line-clamp-2 leading-tight min-h-[2.5rem]">
+          {product.name}
+        </h3>
 
-      {/* Deploy Preview Modal */}
+        {/* Niche Badge */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full">
+            {product.niche?.replace(/_/g, ' ') || 'General'}
+          </span>
+          {product.source && (
+            <span className="text-xs text-gray-400">
+              {product.source === 'aliexpress_api' ? 'AliExpress' : product.source}
+            </span>
+          )}
+        </div>
+
+        {/* ====== METRICS ROW ====== */}
+        <div className="grid grid-cols-3 gap-2 py-3 border-y border-white/10">
+          {/* Profit */}
+          <div className="text-center">
+            <div className={`text-lg font-bold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
+              ${profit.toFixed(2)}
+            </div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Profit</div>
+          </div>
+          
+          {/* Cost */}
+          <div className="text-center">
+            <div className="text-lg font-bold text-white">
+              ${cost.toFixed(2)}
+            </div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Cost</div>
+          </div>
+          
+          {/* Margin */}
+          <div className="text-center">
+            <div className={`text-lg font-bold ${margin >= 30 ? 'text-cyan-400' : 'text-amber-400'}`}>
+              {margin.toFixed(0)}%
+            </div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Margin</div>
+          </div>
+        </div>
+
+        {/* ====== VIEW PRODUCT LINK ====== */}
+        {productUrl && (
+          <a
+            href={productUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors py-1"
+          >
+            <ExternalLink className="w-4 h-4" />
+            View on AliExpress
+          </a>
+        )}
+
+        {/* ====== ACTION BUTTONS ====== */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onAnalyze(product)}
+            className="flex-1 py-2.5 text-sm font-medium text-white bg-white/10 hover:bg-white/20 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          >
+            <BarChart2 className="w-4 h-4" />
+            Analyze
+          </button>
+          
+          <button
+            onClick={handleDeploy}
+            disabled={deploymentStatus?.deployed}
+            className="flex-1 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md"
+          >
+            {deploymentStatus?.deployed ? (
+              <>
+                <Layers className="w-4 h-4" />
+                Live
+              </>
+            ) : (
+              'Deploy'
+            )}
+          </button>
+        </div>
+
+        {/* Deployment Status */}
+        {deploymentStatus?.deployed && deploymentStatus.shopify_url && (
+          <a
+            href={deploymentStatus.shopify_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 text-xs text-green-400 hover:text-green-300"
+          >
+            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+            View on Shopify →
+          </a>
+        )}
+      </div>
+
+      {/* ====== DEPLOY MODAL ====== */}
       {showDeployModal && (
         <DeployPreviewModal
           product={{
             id: product.id,
             name: product.name,
             niche: product.niche,
-            image_url: enhancedImageUrl || product.image_url,
+            image_url: product.image_url,
             cost: product.cost,
             price: product.price,
-            supplier_url: product.supplier_url,
-            description: product.description,
+            supplier_url: productUrl,
           }}
           onClose={() => setShowDeployModal(false)}
-          onSuccess={handleDeploymentSuccess}
+          onSuccess={handleDeploySuccess}
         />
       )}
     </div>
   );
 };
+
+export default ProductCard;

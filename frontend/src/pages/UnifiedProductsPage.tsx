@@ -1,16 +1,16 @@
 /**
- * Ospra Intelligence - Unified Products Page
+ * Ospra Intelligence - Unified Products Page V2
  * 
- * FULLY FUNCTIONAL:
- * - Product discovery from AliExpress, TikTok, Amazon
- * - Filtering and sorting
- * - One-click deploy to Shopify
- * - AI analysis
- * - Real-time data
+ * NOW SHOWS REAL INTELLIGENCE:
+ * - Cross-source validation indicators
+ * - Live price badges
+ * - Trend direction from Google Trends
+ * - Confidence scores
+ * - Score breakdown
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   Package,
   Search,
@@ -29,6 +29,13 @@ import {
   Grid3X3,
   List,
   CheckCircle2,
+  AlertTriangle,
+  Globe,
+  ShoppingBag,
+  BarChart3,
+  DollarSign,
+  Star,
+  Eye,
 } from 'lucide-react';
 
 import {
@@ -52,52 +59,98 @@ const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest' },
 ];
 
-const SOURCE_OPTIONS = [
-  { value: 'all', label: 'All Sources' },
-  { value: 'aliexpress', label: 'AliExpress' },
-  { value: 'tiktok_shop', label: 'TikTok Shop' },
-  { value: 'amazon', label: 'Amazon' },
-];
-
-// Format niche name: "smart_home" => "Smart Home"
 function formatNiche(niche: string): string {
   if (!niche) return '';
-  return niche
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return niche.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
-// Sanitize image URL to fix CORS and protocol issues
 function sanitizeImageUrl(url?: string, productName?: string): string {
   if (!url || url.trim() === '') {
     return getPlaceholder(productName);
   }
-
-  // Force HTTPS (AliExpress CDN requires it)
   let cleanUrl = url.replace(/^http:\/\//i, 'https://');
-
-  // Handle AliExpress CDN URLs - use optimized size for faster loading
   if (cleanUrl.includes('alicdn.com') || cleanUrl.includes('aliexpress-media')) {
-    // Remove any existing size params and add 400x400 for cards
     cleanUrl = cleanUrl.split('_')[0];
-    // Don't add extension if URL already has query params
     if (!cleanUrl.includes('?')) {
       cleanUrl = cleanUrl + '_400x400.jpg';
     }
   }
-
   return cleanUrl;
 }
 
-// Generate placeholder image with product name
 function getPlaceholder(name?: string): string {
   const text = encodeURIComponent(name?.substring(0, 20) || 'Product');
   return `https://placehold.co/400x400/1a1a2e/eaeaea?text=${text}`;
 }
 
+// Get recommendation badge styling
+function getRecommendationStyle(rec?: string) {
+  switch (rec) {
+    case 'STRONG_BUY': return 'bg-gradient-to-r from-green-500 to-emerald-500 text-white';
+    case 'BUY': return 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white';
+    case 'HOLD': return 'bg-gradient-to-r from-amber-500 to-yellow-500 text-black';
+    default: return 'bg-gradient-to-r from-gray-500 to-gray-600 text-white';
+  }
+}
+
 // =============================================================================
-// PRODUCT CARD COMPONENT
+// INTELLIGENCE BADGE - Shows data sources that validated this product
+// =============================================================================
+
+interface IntelligenceBadgeProps {
+  product: Product;
+}
+
+function IntelligenceBadge({ product }: IntelligenceBadgeProps) {
+  const sources = product.data_sources || 1;
+  const confidence = product.confidence || (sources * 30 + 10);
+  const trendDirection = product.trend_direction;
+  const livePricing = product.live_price !== false;
+  
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {/* Live Price Indicator */}
+      {livePricing && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-medium">
+          <DollarSign className="w-3 h-3" />
+          Live
+        </span>
+      )}
+      
+      {/* Trend Direction */}
+      {trendDirection && trendDirection !== 'unknown' && (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+          trendDirection === 'rising' ? 'bg-green-500/10 text-green-600' :
+          trendDirection === 'declining' ? 'bg-red-500/10 text-red-600' :
+          'bg-gray-500/10 text-gray-600'
+        }`}>
+          {trendDirection === 'rising' ? <TrendingUp className="w-3 h-3" /> :
+           trendDirection === 'declining' ? <TrendingDown className="w-3 h-3" /> :
+           <Activity className="w-3 h-3" />}
+          {trendDirection}
+        </span>
+      )}
+      
+      {/* Data Sources Count */}
+      {sources > 1 && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 text-[10px] font-medium">
+          <Eye className="w-3 h-3" />
+          {sources} sources
+        </span>
+      )}
+      
+      {/* Confidence */}
+      {confidence > 50 && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-600 text-[10px] font-medium">
+          {confidence}% conf
+        </span>
+      )}
+    </div>
+  );
+}
+
+// =============================================================================
+// PRODUCT CARD COMPONENT - Now with Intelligence Display
 // =============================================================================
 
 interface ProductCardProps {
@@ -122,22 +175,18 @@ function ProductCard({
   isAnalyzing,
 }: ProductCardProps) {
   const getScoreColor = (score: number) => {
-    if (score >= 8) return 'bg-green-500/100 text-white';
-    if (score >= 6) return 'bg-amber-500 text-white';
-    return 'bg-red-500/100 text-white';
+    if (score >= 7.5) return 'bg-gradient-to-br from-green-500 to-emerald-600 text-white';
+    if (score >= 6) return 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white';
+    if (score >= 4) return 'bg-gradient-to-br from-amber-500 to-orange-600 text-white';
+    return 'bg-gradient-to-br from-gray-500 to-gray-600 text-white';
   };
 
-  const getSaturationColor = (level?: string) => {
-    switch (level) {
-      case 'low': return 'text-green-600 bg-green-500/100/10';
-      case 'medium': return 'text-amber-600 bg-amber-500/10';
-      case 'high': return 'text-red-600 bg-red-500/100/10';
-      default: return 'text-secondary  0/10';
-    }
-  };
-
-  const score = product.score || product.final_score || 0;
+  const score = product.score || 0;
   const profit = product.profit || product.estimated_profit || 0;
+  const cost = product.cost || 0;
+  const margin = product.profit_margin || 0;
+  const orders = product.orders || 0;
+  const recommendation = product.recommendation;
 
   if (viewMode === 'list') {
     return (
@@ -148,7 +197,7 @@ function ProductCard({
         onClick={() => onSelect(product)}
       >
         {/* Image */}
-        <div className="w-20 h-20 rounded-lg bg-black/5 flex-shrink-0 overflow-hidden">
+        <div className="w-20 h-20 rounded-lg bg-black/5 flex-shrink-0 overflow-hidden relative">
           <img
             src={sanitizeImageUrl(product.image_url, product.name)}
             alt={product.name}
@@ -164,26 +213,33 @@ function ProductCard({
               }
             }}
           />
+          {orders > 0 && (
+            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px]">
+              {orders > 1000 ? `${(orders/1000).toFixed(1)}k` : orders} sold
+            </div>
+          )}
         </div>
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-medium text-primary line-clamp-1">{product.name}</h3>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="badge badge-blue">{formatNiche(product.niche)}</span>
-            <span className="text-xs text-tertiary">{product.source}</span>
-            {product.saturation_level && (
-              <span className={`text-xs px-2 py-0.5 rounded-full ${getSaturationColor(product.saturation_level)}`}>
-                {product.saturation_level} saturation
+            {recommendation && (
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getRecommendationStyle(recommendation)}`}>
+                {recommendation.replace('_', ' ')}
               </span>
             )}
+          </div>
+          <div className="mt-1">
+            <IntelligenceBadge product={product} />
           </div>
         </div>
 
         {/* Stats */}
         <div className="flex items-center gap-6 flex-shrink-0">
           <div className="text-center">
-            <div className={`text-lg font-bold px-2 py-1 rounded ${getScoreColor(score)}`}>
+            <div className={`text-lg font-bold px-3 py-1 rounded-lg ${getScoreColor(score)}`}>
               {score.toFixed(1)}
             </div>
             <div className="text-xs text-tertiary mt-1">Score</div>
@@ -193,23 +249,16 @@ function ProductCard({
             <div className="text-xs text-tertiary">Profit</div>
           </div>
           <div className="text-center">
-            <div className={`flex items-center justify-center ${
-              product.trend === 'up' ? 'text-green-600' : 
-              product.trend === 'down' ? 'text-red-500' : 'text-tertiary'
-            }`}>
-              {product.trend === 'up' ? <TrendingUp className="w-5 h-5" /> : 
-               product.trend === 'down' ? <TrendingDown className="w-5 h-5" /> : 
-               <Activity className="w-5 h-5" />}
-            </div>
-            <div className="text-xs text-tertiary">Trend</div>
+            <div className="text-lg font-semibold text-primary">{margin.toFixed(0)}%</div>
+            <div className="text-xs text-tertiary">Margin</div>
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {(product.aliexpress_url || product.url) && (
+          {(product.aliexpress_url || product.url || product.supplier_url) && (
             <a
-              href={product.aliexpress_url || product.url}
+              href={product.aliexpress_url || product.supplier_url || product.url}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-ghost text-xs"
@@ -243,7 +292,7 @@ function ProductCard({
   return (
     <div 
       className={`glass-card overflow-hidden cursor-pointer transition-all ${
-        isSelected ? 'ring-2 ring-accent' : 'hover:shadow-lg'
+        isSelected ? 'ring-2 ring-accent' : 'hover:shadow-lg hover:-translate-y-1'
       }`}
       onClick={() => onSelect(product)}
     >
@@ -265,40 +314,23 @@ function ProductCard({
           }}
         />
 
-        {/* Score Badge */}
-        <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-sm font-bold ${getScoreColor(score)}`}>
+        {/* Score Badge - Top Right */}
+        <div className={`absolute top-3 right-3 px-2.5 py-1.5 rounded-lg text-sm font-bold shadow-lg ${getScoreColor(score)}`}>
           {score.toFixed(1)}
         </div>
 
-        {/* Trend Badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-sm">
-          {product.trend === 'up' ? (
-            <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-          ) : product.trend === 'down' ? (
-            <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-          ) : (
-            <Activity className="w-3.5 h-3.5 text-tertiary" />
-          )}
-          <span className={`text-xs font-medium ${
-            product.trend === 'up' ? 'text-green-600' : 
-            product.trend === 'down' ? 'text-red-500' : 'text-tertiary'
-          }`}>
-            {product.trend_value || `${product.velocity_score || 0}%`}
-          </span>
-        </div>
+        {/* Recommendation Badge - Top Left */}
+        {recommendation && (
+          <div className={`absolute top-3 left-3 px-2 py-1 rounded-lg text-xs font-bold shadow-lg ${getRecommendationStyle(recommendation)}`}>
+            {recommendation.replace('_', ' ')}
+          </div>
+        )}
 
-        {/* Platform Badges */}
-        {product.platform_badges && product.platform_badges.length > 0 && (
-          <div className="absolute bottom-3 left-3 flex gap-1">
-            {product.platform_badges.map((badge, i) => (
-              <div
-                key={i}
-                className="px-2 py-0.5 rounded text-xs font-medium bg-white/90 backdrop-blur-sm"
-                title={badge.label}
-              >
-                {badge.emoji} {badge.platform}
-              </div>
-            ))}
+        {/* Orders Badge - Bottom Right */}
+        {orders > 0 && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-black/70 text-white text-xs backdrop-blur-sm">
+            <ShoppingBag className="w-3 h-3" />
+            {orders > 1000 ? `${(orders/1000).toFixed(1)}k` : orders}
           </div>
         )}
 
@@ -314,49 +346,53 @@ function ProductCard({
       <div className="p-4">
         <h3 className="text-sm font-medium text-primary line-clamp-2 mb-2">{product.name}</h3>
 
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <span className="badge badge-blue">{formatNiche(product.niche)}</span>
-          <span className="text-xs text-tertiary">{product.source}</span>
+        </div>
+
+        {/* Intelligence Badges */}
+        <div className="mb-3">
+          <IntelligenceBadge product={product} />
         </div>
 
         {/* AI Reason */}
         {product.ai_reason && (
-          <div className="p-2 rounded-lg bg-cyan-500/100/8 border border-blue-500/15 mb-3">
+          <div className="p-2 rounded-lg bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20 mb-3">
             <div className="flex items-start gap-2">
-              <Brain className="w-3.5 h-3.5 text-blue-600 mt-0.5 flex-shrink-0" />
+              <Brain className="w-3.5 h-3.5 text-purple-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-secondary line-clamp-2">{product.ai_reason}</p>
             </div>
           </div>
         )}
 
-        {/* Stats */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-3 gap-2 mb-3">
-          <div className="text-center p-2 rounded-lg bg-black/5">
-            <div className="text-sm font-semibold text-green-600">${profit.toFixed(2)}</div>
+          <div className="text-center p-2 rounded-lg bg-green-500/10">
+            <div className="text-sm font-bold text-green-600">${profit.toFixed(2)}</div>
             <div className="text-[10px] text-tertiary">Profit</div>
           </div>
           <div className="text-center p-2 rounded-lg bg-black/5">
-            <div className="text-sm font-semibold text-primary">${(product.cost || 0).toFixed(2)}</div>
+            <div className="text-sm font-semibold text-primary">${cost.toFixed(2)}</div>
             <div className="text-[10px] text-tertiary">Cost</div>
           </div>
           <div className="text-center p-2 rounded-lg bg-black/5">
-            <div className="text-sm font-semibold text-primary">{(product.profit_margin || 0).toFixed(0)}%</div>
+            <div className="text-sm font-semibold text-primary">{margin.toFixed(0)}%</div>
             <div className="text-[10px] text-tertiary">Margin</div>
           </div>
         </div>
 
         {/* Actions */}
         <div className="flex flex-col gap-2">
-          {(product.aliexpress_url || product.url) && (
+          {(product.aliexpress_url || product.url || product.supplier_url) && (
             <a
-              href={product.aliexpress_url || product.url}
+              href={product.aliexpress_url || product.supplier_url || product.url}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-ghost text-xs justify-center w-full"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="w-4 h-4" />
-              <span>View Product</span>
+              <span>View on AliExpress</span>
             </a>
           )}
           <div className="flex items-center gap-2">
@@ -396,7 +432,7 @@ function ProductCard({
 }
 
 // =============================================================================
-// PRODUCT DETAIL MODAL
+// PRODUCT DETAIL MODAL - Full Intelligence Display
 // =============================================================================
 
 interface ProductDetailModalProps {
@@ -420,18 +456,32 @@ function ProductDetailModal({
 }: ProductDetailModalProps) {
   if (!product) return null;
 
-  const score = product.score || product.final_score || 0;
+  const score = product.score || 0;
   const profit = product.profit || product.estimated_profit || 0;
+  const cost = product.cost || 0;
+  const margin = product.profit_margin || 0;
+  const orders = product.orders || 0;
+  const rating = product.rating || 0;
+  const recommendation = product.recommendation;
+  const confidence = product.confidence || 50;
+  const dataSources = product.data_sources || 1;
+  const trendDirection = product.trend_direction;
+  const trendScore = product.trend_score || 0;
+  const scoreBreakdown = product.score_breakdown;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="glass-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="glass-card max-w-3xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-black/10">
           <div className="flex items-start gap-4">
-            <div className="w-24 h-24 rounded-xl bg-black/5 overflow-hidden flex-shrink-0">
+            <div className="w-28 h-28 rounded-xl bg-black/5 overflow-hidden flex-shrink-0 shadow-lg">
               {product.image_url ? (
-                <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
+                <img 
+                  src={sanitizeImageUrl(product.image_url, product.name)} 
+                  alt={product.name} 
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <Package className="w-10 h-10 text-tertiary" />
@@ -440,10 +490,28 @@ function ProductDetailModal({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-primary">{product.name}</h2>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="badge badge-blue">{product.niche}</span>
-                <span className="text-sm text-tertiary">{product.source}</span>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="badge badge-blue">{formatNiche(product.niche)}</span>
+                {recommendation && (
+                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getRecommendationStyle(recommendation)}`}>
+                    {recommendation.replace('_', ' ')}
+                  </span>
+                )}
               </div>
+              <div className="mt-2">
+                <IntelligenceBadge product={product} />
+              </div>
+              {(product.aliexpress_url || product.url || product.supplier_url) && (
+                <a
+                  href={product.aliexpress_url || product.supplier_url || product.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-500 mt-2"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View on AliExpress
+                </a>
+              )}
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-lg">
@@ -453,66 +521,191 @@ function ProductDetailModal({
 
         {/* Content */}
         <div className="p-6 space-y-6">
-          {/* Score & Stats */}
-          <div className="grid grid-cols-4 gap-4">
-            <div className="text-center p-4 rounded-xl bg-black/5">
-              <div className={`text-2xl font-bold ${score >= 7 ? 'text-green-600' : score >= 5 ? 'text-amber-600' : 'text-red-500'}`}>
-                {score.toFixed(1)}
+          {/* Main Score Card */}
+          <div className="p-4 rounded-xl bg-gradient-to-r from-purple-600/20 via-cyan-600/20 to-green-600/20 border border-purple-500/20">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-tertiary">Ospra Intelligence Score</p>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-4xl font-bold text-primary">{score.toFixed(1)}</span>
+                  <span className="text-xl text-tertiary">/10</span>
+                </div>
+                <p className="text-sm text-secondary mt-1">{confidence}% confidence • {dataSources} data source{dataSources > 1 ? 's' : ''}</p>
               </div>
-              <div className="text-xs text-tertiary mt-1">AI Score</div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-black/5">
-              <div className="text-2xl font-bold text-green-600">${profit.toFixed(2)}</div>
-              <div className="text-xs text-tertiary mt-1">Est. Profit</div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-black/5">
-              <div className="text-2xl font-bold text-primary">{(product.profit_margin || 0).toFixed(0)}%</div>
-              <div className="text-xs text-tertiary mt-1">Margin</div>
-            </div>
-            <div className="text-center p-4 rounded-xl bg-black/5">
-              <div className="text-2xl font-bold text-primary">{product.velocity_score || 0}</div>
-              <div className="text-xs text-tertiary mt-1">Velocity</div>
+              {recommendation && (
+                <div className={`px-4 py-2 rounded-xl text-lg font-bold shadow-lg ${getRecommendationStyle(recommendation)}`}>
+                  {recommendation.replace('_', ' ')}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* AI Recommendation */}
-          {product.ai_reason && (
-            <div className="p-4 rounded-xl bg-cyan-500/100/8 border border-blue-500/15">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-cyan-400">AI Analysis</span>
+          {/* Stats Grid */}
+          <div className="grid grid-cols-5 gap-3">
+            <div className="text-center p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+              <DollarSign className="w-5 h-5 text-green-600 mx-auto mb-1" />
+              <div className="text-xl font-bold text-green-600">${profit.toFixed(2)}</div>
+              <div className="text-xs text-tertiary">Profit</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black/5">
+              <ShoppingBag className="w-5 h-5 text-primary mx-auto mb-1" />
+              <div className="text-xl font-bold text-primary">${cost.toFixed(2)}</div>
+              <div className="text-xs text-tertiary">Cost</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black/5">
+              <BarChart3 className="w-5 h-5 text-primary mx-auto mb-1" />
+              <div className="text-xl font-bold text-primary">{margin.toFixed(0)}%</div>
+              <div className="text-xs text-tertiary">Margin</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black/5">
+              <ShoppingBag className="w-5 h-5 text-primary mx-auto mb-1" />
+              <div className="text-xl font-bold text-primary">{orders > 1000 ? `${(orders/1000).toFixed(1)}k` : orders}</div>
+              <div className="text-xs text-tertiary">Orders</div>
+            </div>
+            <div className="text-center p-3 rounded-xl bg-black/5">
+              <Star className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+              <div className="text-xl font-bold text-primary">{rating.toFixed(1)}</div>
+              <div className="text-xs text-tertiary">Rating</div>
+            </div>
+          </div>
+
+          {/* Trend Info */}
+          {trendDirection && trendDirection !== 'unknown' && (
+            <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+              trendDirection === 'rising' ? 'bg-green-500/10 border-green-500/20' :
+              trendDirection === 'declining' ? 'bg-red-500/10 border-red-500/20' :
+              'bg-gray-500/10 border-gray-500/20'
+            }`}>
+              {trendDirection === 'rising' ? <TrendingUp className="w-6 h-6 text-green-600" /> :
+               trendDirection === 'declining' ? <TrendingDown className="w-6 h-6 text-red-600" /> :
+               <Activity className="w-6 h-6 text-gray-600" />}
+              <div>
+                <p className={`font-semibold ${
+                  trendDirection === 'rising' ? 'text-green-600' :
+                  trendDirection === 'declining' ? 'text-red-600' :
+                  'text-gray-600'
+                }`}>
+                  {trendDirection === 'rising' ? '📈 Rising Trend' :
+                   trendDirection === 'declining' ? '📉 Declining Trend' :
+                   '📊 Stable Trend'}
+                </p>
+                <p className="text-sm text-secondary">Google Trends score: {trendScore}</p>
               </div>
-              <p className="text-sm text-secondary">{product.ai_reason}</p>
+            </div>
+          )}
+
+          {/* Score Breakdown */}
+          {scoreBreakdown && (
+            <div>
+              <h4 className="text-sm font-semibold text-primary mb-3 flex items-center gap-2">
+                <Brain className="w-4 h-4 text-purple-600" />
+                Score Breakdown
+              </h4>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(scoreBreakdown).map(([key, value]) => (
+                  <div key={key} className="text-center p-2 rounded-lg bg-purple-500/10">
+                    <div className="text-sm font-bold text-purple-600">{(value as number).toFixed(2)}</div>
+                    <div className="text-[10px] text-tertiary capitalize">{key.replace('_', ' ')}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI Reason */}
+          {product.ai_reason && (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Brain className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-600">AI Intelligence Summary</span>
+              </div>
+              <p className="text-sm text-secondary leading-relaxed">{product.ai_reason}</p>
             </div>
           )}
 
           {/* Deep Analysis Result */}
           {analysis && (
-            <div className="p-4 rounded-xl bg-purple-500/8 border border-purple-500/15">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-700">Deep Analysis</span>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-600/20 to-cyan-600/20 border border-purple-500/20">
+                <div>
+                  <p className="text-xs text-tertiary">Deep Analysis Score</p>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-primary">{(analysis as any).score?.toFixed(1) || score.toFixed(1)}</span>
+                    <span className="text-lg text-tertiary">/10</span>
+                  </div>
+                </div>
+                <div className={`px-3 py-1.5 rounded-lg text-sm font-bold ${getRecommendationStyle((analysis as any).recommendation)}`}>
+                  {((analysis as any).recommendation || 'PENDING').replace('_', ' ')}
+                </div>
               </div>
-              <pre className="text-xs text-secondary whitespace-pre-wrap overflow-auto max-h-60">
-                {JSON.stringify(analysis, null, 2)}
-              </pre>
+
+              {(analysis as any).success_prediction && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
+                  <TrendingUp className="w-5 h-5 text-cyan-600" />
+                  <span className="text-sm text-secondary">Success Prediction: </span>
+                  <span className="text-cyan-600 font-bold">{(analysis as any).success_prediction}</span>
+                </div>
+              )}
+
+              {(analysis as any).analysis && (
+                <div className="p-4 rounded-xl bg-black/5">
+                  <p className="text-sm text-secondary leading-relaxed">{(analysis as any).analysis}</p>
+                </div>
+              )}
+
+              {(analysis as any).reasoning?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    Why This Product Wins
+                  </h4>
+                  <div className="space-y-2">
+                    {(analysis as any).reasoning.map((reason: string, i: number) => (
+                      <div key={i} className="flex gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                        <span className="text-green-600 font-bold">✓</span>
+                        <p className="text-sm text-secondary">{reason}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(analysis as any).risks?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    Risks to Consider
+                  </h4>
+                  <div className="space-y-2">
+                    {(analysis as any).risks.map((risk: string, i: number) => (
+                      <div key={i} className="flex gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                        <span className="text-amber-600 font-bold">!</span>
+                        <p className="text-sm text-secondary">{risk}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Links */}
-          <div className="flex items-center gap-4">
-            {product.aliexpress_url && (
-              <a
-                href={product.aliexpress_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-ghost text-sm"
-              >
-                <ExternalLink className="w-4 h-4" />
-                <span>View on AliExpress</span>
-              </a>
-            )}
-          </div>
+          {/* Analyze Button */}
+          {!analysis && !isAnalyzing && (
+            <button
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white rounded-xl font-semibold hover:from-purple-500 hover:to-cyan-500 transition-all flex items-center justify-center gap-2 shadow-lg"
+              onClick={() => onAnalyze(product)}
+            >
+              <Brain className="w-5 h-5" />
+              Run Deep Analysis
+            </button>
+          )}
+
+          {isAnalyzing && (
+            <div className="flex items-center justify-center gap-3 py-8">
+              <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+              <span className="text-secondary">Analyzing product with AI...</span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -522,23 +715,15 @@ function ProductDetailModal({
             onClick={() => onAnalyze(product)}
             disabled={isAnalyzing}
           >
-            {isAnalyzing ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Brain className="w-4 h-4" />
-            )}
-            <span>Deep Analysis</span>
+            {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Brain className="w-4 h-4" />}
+            <span>{analysis ? 'Re-Analyze' : 'Deep Analysis'}</span>
           </button>
           <button
             className="btn-primary"
             onClick={() => onDeploy(product)}
             disabled={isDeploying}
           >
-            {isDeploying ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Rocket className="w-4 h-4" />
-            )}
+            {isDeploying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Rocket className="w-4 h-4" />}
             <span>Deploy to Shopify</span>
           </button>
         </div>
@@ -552,18 +737,17 @@ function ProductDetailModal({
 // =============================================================================
 
 export default function UnifiedProductsPage() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filters, setFilters] = useState<ProductFilters>({
-    niches: undefined, // undefined = show all niches instead of empty array
+    niches: undefined,
     min_score: 0,
     source: undefined,
     sort_by: 'score',
     sort_order: 'desc',
-    limit: 20,
+    limit: 50,
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -580,12 +764,13 @@ export default function UnifiedProductsPage() {
   const [deployingProductId, setDeployingProductId] = useState<string | null>(null);
   const [analyzingProductId, setAnalyzingProductId] = useState<string | null>(null);
 
-  // Data hooks - live data only
-  const { data: productsData, isLoading: productsLoading, isError: productsError, error: productsErrorObj, refetch: refetchProducts } = useProducts(filters);
+  // Data hooks
+  const { data: productsData, isLoading: productsLoading, refetch: refetchProducts } = useProducts(filters);
   const { data: nichesData } = useNiches();
 
   const products = productsData?.products || [];
   const niches = nichesData || [];
+  const dataSource = productsData?.data_source || 'DATABASE';
 
   // Filter products by search
   const filteredProducts = useMemo(() => {
@@ -613,16 +798,10 @@ export default function UnifiedProductsPage() {
   const handleDiscover = async () => {
     setIsDiscovering(true);
     try {
-      const selectedNiches = filters.niches?.length ? filters.niches : ['smart_home', 'tech_gadgets', 'fitness'];
-      const result = await productsAPI.discover(selectedNiches, 10);
-
-      // If discover returns products directly, they're already in the database
-      // Just refetch to show them
-      if (result) {
-        // Wait a moment for backend to process
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await refetchProducts();
-      }
+      const selectedNiches = filters.niches?.length ? filters.niches : ['smart_home', 'fitness', 'tech_accessories'];
+      await productsAPI.discover(selectedNiches, 30);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await refetchProducts();
     } catch (error) {
       console.error('Discovery failed:', error);
       alert('Product discovery failed. Please check if the backend is running.');
@@ -667,32 +846,6 @@ export default function UnifiedProductsPage() {
     }
   };
 
-  const handleBulkDeploy = async () => {
-    if (selectedProducts.size === 0) {
-      alert('Please select products to deploy.');
-      return;
-    }
-
-    if (!confirm(`Deploy ${selectedProducts.size} products to Shopify?`)) return;
-
-    const productsToDeploy = products.filter(p => selectedProducts.has(p.id));
-    let successCount = 0;
-    let failCount = 0;
-
-    for (const product of productsToDeploy) {
-      try {
-        const result = await deploy(product.id, product);
-        if (result.success) successCount++;
-        else failCount++;
-      } catch {
-        failCount++;
-      }
-    }
-
-    alert(`Deployment complete!\n\n✅ Success: ${successCount}\n❌ Failed: ${failCount}`);
-    setSelectedProducts(new Set());
-  };
-
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
     setAnalysisResult(null);
@@ -710,14 +863,20 @@ export default function UnifiedProductsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-primary">Product Discovery</h1>
+          <h1 className="text-2xl font-semibold text-primary flex items-center gap-2">
+            <Brain className="w-7 h-7 text-purple-600" />
+            Ospra Intelligence
+          </h1>
           <p className="text-sm text-secondary mt-1">
-            Discover winning products from AliExpress, TikTok Shop, and Amazon
+            {products.length > 0 
+              ? `${products.length} products • ${dataSource.includes('V5') ? '✨ Cross-source validated' : dataSource}`
+              : 'Click "Discover Products" to find winning products with AI'
+            }
           </p>
         </div>
         <div className="flex items-center gap-3">
           <button
-            className="btn-primary"
+            className="btn-primary bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500"
             onClick={handleDiscover}
             disabled={isDiscovering}
           >
@@ -730,6 +889,21 @@ export default function UnifiedProductsPage() {
           </button>
         </div>
       </div>
+
+      {/* Intelligence Banner */}
+      {dataSource.includes('V5') && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-purple-600/10 via-cyan-600/10 to-green-600/10 border border-purple-500/20">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-purple-600/20">
+              <Brain className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <p className="font-medium text-primary">Ospra Intelligence V5 Active</p>
+              <p className="text-sm text-secondary">Products are cross-referenced with Google Trends + AliExpress data for validated scores</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
@@ -791,7 +965,7 @@ export default function UnifiedProductsPage() {
               <select
                 className="w-full px-3 py-2 rounded-lg bg-white border border-black/10 text-sm"
                 value={filters.niches?.[0] || ''}
-                onChange={(e) => setFilters(f => ({ ...f, niches: e.target.value ? [e.target.value] : [] }))}
+                onChange={(e) => setFilters(f => ({ ...f, niches: e.target.value ? [e.target.value] : undefined }))}
               >
                 <option value="">All Niches</option>
                 {niches.map((niche) => (
@@ -800,23 +974,9 @@ export default function UnifiedProductsPage() {
               </select>
             </div>
 
-            {/* Source Filter */}
-            <div>
-              <label className="text-xs font-medium text-secondary mb-2 block">Source</label>
-              <select
-                className="w-full px-3 py-2 rounded-lg bg-white border border-black/10 text-sm"
-                value={filters.source || 'all'}
-                onChange={(e) => setFilters(f => ({ ...f, source: e.target.value === 'all' ? undefined : e.target.value }))}
-              >
-                {SOURCE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-
             {/* Min Score Filter */}
             <div>
-              <label className="text-xs font-medium text-secondary mb-2 block">Min Score</label>
+              <label className="text-xs font-medium text-secondary mb-2 block">Min Score: {filters.min_score || 0}+</label>
               <input
                 type="range"
                 min="0"
@@ -824,9 +984,8 @@ export default function UnifiedProductsPage() {
                 step="0.5"
                 value={filters.min_score || 0}
                 onChange={(e) => setFilters(f => ({ ...f, min_score: Number(e.target.value) }))}
-                className="w-full"
+                className="w-full accent-purple-600"
               />
-              <div className="text-xs text-tertiary mt-1">{filters.min_score || 0}+</div>
             </div>
 
             {/* Sort */}
@@ -835,82 +994,46 @@ export default function UnifiedProductsPage() {
               <select
                 className="w-full px-3 py-2 rounded-lg bg-white border border-black/10 text-sm"
                 value={filters.sort_by || 'score'}
-                onChange={(e) => setFilters(f => ({ ...f, sort_by: e.target.value as ProductFilters['sort_by'] }))}
+                onChange={(e) => setFilters(f => ({ ...f, sort_by: e.target.value as any }))}
               >
                 {SORT_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </div>
+
+            {/* Reset */}
+            <div className="flex items-end">
+              <button
+                className="btn-ghost w-full justify-center"
+                onClick={() => setFilters({ niches: undefined, min_score: 0, sort_by: 'score', sort_order: 'desc', limit: 50 })}
+              >
+                <X className="w-4 h-4" />
+                <span>Reset</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Bulk Actions */}
-      {selectedProducts.size > 0 && (
-        <div className="glass-card p-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-accent" />
-            <span className="text-sm font-medium">{selectedProducts.size} products selected</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              className="btn-ghost text-sm"
-              onClick={() => setSelectedProducts(new Set())}
-            >
-              Clear Selection
-            </button>
-            <button
-              className="btn-primary text-sm"
-              onClick={handleBulkDeploy}
-            >
-              <Rocket className="w-4 h-4" />
-              <span>Deploy Selected</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Top 20 Rankings Section */}
-      <div className="mb-6">
-        <Top20Rankings niche={filters.niches?.[0]} />
-      </div>
 
       {/* Products Grid/List */}
-      {productsError && products.length === 0 ? (
-        <div className="glass-card p-12 text-center">
-          <X className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-primary mb-2">Connection Error</h3>
-          <p className="text-sm text-secondary mb-6">
-            {productsErrorObj?.message || 'Unable to fetch products. Backend might be offline.'}
-          </p>
-          <button
-            className="btn-primary"
-            onClick={() => refetchProducts()}
-            disabled={productsLoading}
-          >
-            {productsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            <span>Retry Connection</span>
-          </button>
-        </div>
-      ) : productsLoading && products.length === 0 ? (
+      {productsLoading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+          <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+          <span className="ml-3 text-secondary">Loading products...</span>
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="glass-card p-12 text-center">
+        <div className="text-center py-20">
           <Package className="w-16 h-16 text-tertiary mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-primary mb-2">No Products Found</h3>
-          <p className="text-sm text-secondary mb-6">
-            Click "Discover Products" to find winning products using AI.
-          </p>
+          <h3 className="text-lg font-medium text-primary mb-2">No Products Yet</h3>
+          <p className="text-secondary mb-4">Click "Discover Products" to find winning products with Ospra Intelligence</p>
           <button
-            className="btn-primary"
+            className="btn-primary bg-gradient-to-r from-purple-600 to-cyan-600"
             onClick={handleDiscover}
             disabled={isDiscovering}
           >
             {isDiscovering ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-            <span>Start Discovery</span>
+            <span>Discover Products</span>
           </button>
         </div>
       ) : (
@@ -925,7 +1048,7 @@ export default function UnifiedProductsPage() {
               viewMode={viewMode}
               onAnalyze={handleAnalyze}
               onDeploy={handleDeploy}
-              onSelect={() => handleProductClick(product)}
+              onSelect={handleProductClick}
               isSelected={selectedProducts.has(product.id)}
               isDeploying={deployingProductId === product.id}
               isAnalyzing={analyzingProductId === product.id}

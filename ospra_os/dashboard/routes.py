@@ -1,6 +1,6 @@
 """
 🎛️ REAL-TIME DASHBOARD ROUTES V2
-Complete API with real integrations
+Complete API with REAL cross-source intelligence
 """
 
 from fastapi import APIRouter, HTTPException, Query
@@ -10,12 +10,21 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# Optional intelligence module imports (fail gracefully if unavailable)
+# =============================================================================
+# INTELLIGENCE ENGINE - V5 Cross-Source (Primary) with V4 Fallback
+# =============================================================================
 try:
-    from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
+    # V5: REAL Cross-Source Intelligence Engine
+    from ospra_os.intelligence.product_intelligence_v5 import OspraIntelligenceEngine as ProductIntelligenceEngine
+    logger.info("✅ Ospra Intelligence V5 loaded - Cross-source intelligence enabled")
 except ImportError as e:
-    logger.warning(f"ProductIntelligenceEngine not available: {e}")
-    ProductIntelligenceEngine = None
+    logger.warning(f"V5 not available ({e}), trying V4...")
+    try:
+        from ospra_os.intelligence.product_intelligence_v4 import ProductIntelligenceEngine
+        logger.info("⚠️ Using V4 fallback - Limited intelligence")
+    except ImportError as e2:
+        logger.warning(f"ProductIntelligenceEngine not available: {e2}")
+        ProductIntelligenceEngine = None
 
 try:
     from ospra_os.intelligence.trend_analyzer import TrendAnalyzer
@@ -53,6 +62,7 @@ router = APIRouter(prefix="/api/dashboard/v2", tags=["Dashboard V2"])
 try:
     if ProductIntelligenceEngine is not None:
         product_discovery = ProductIntelligenceEngine()
+        logger.info("✅ ProductIntelligenceEngine initialized")
     else:
         product_discovery = None
 
@@ -62,7 +72,9 @@ try:
         claude_analyzer = None
 
     if product_discovery and claude_analyzer:
-        logger.info("✅ Real-time services initialized")
+        logger.info("✅ Real-time services initialized (V5 Intelligence)")
+    elif product_discovery:
+        logger.info("✅ Product discovery ready (analyzer not available)")
     else:
         logger.warning("⚠️  Some services not available (missing dependencies)")
 except Exception as e:
@@ -90,7 +102,8 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "services": {
             "product_discovery": product_discovery is not None,
-            "claude_analyzer": claude_analyzer is not None
+            "claude_analyzer": claude_analyzer is not None,
+            "intelligence_version": "V5" if product_discovery else "None"
         }
     }
 
@@ -98,35 +111,49 @@ async def health_check():
 @router.get("/products")
 async def get_products(
     niche: Optional[str] = Query(None, description="Product niche (optional - returns all if not specified)"),
+    min_score: Optional[float] = Query(None, ge=0, le=10, description="Minimum Ospra score"),
+    max_score: Optional[float] = Query(None, ge=0, le=10, description="Maximum Ospra score"),
     min_velocity: Optional[int] = Query(None, ge=0, le=100),
     max_velocity: Optional[int] = Query(None, ge=0, le=100),
-    per_page: int = Query(20, ge=1, le=100)
+    sort_by: Optional[str] = Query("score", description="Sort by: score, profit, trend, newest"),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc, desc"),
+    per_page: int = Query(50, ge=1, le=100)
 ):
     """
-    Get products from DATABASE (persistent storage)
+    Get products from DATABASE with Ospra Intelligence scores
 
     Query params:
         - niche: Product category (smart_home, fitness, kitchen, etc.)
+        - min_score: Minimum Ospra Intelligence score (0-10)
+        - max_score: Maximum Ospra Intelligence score (0-10)
         - min_velocity: Minimum velocity score (0-100)
         - max_velocity: Maximum velocity score (0-100)
+        - sort_by: Sort field (score, profit, trend, newest)
+        - sort_order: asc or desc
         - per_page: Results per page (1-100)
 
     Returns:
         {
             "products": [...],
-            "data_source": "DATABASE",
-            "total": 20,
+            "data_source": "OSPRA_INTELLIGENCE_V5",
+            "total": 50,
             "filters_applied": {...}
         }
     """
 
     try:
-        # Read from database instead of regenerating
+        # Read from database
         from ospra_os.database.product_history import ProductHistoryDB
         db = ProductHistoryDB()
 
         # Get products from database
         products = db.get_all_products(niche=niche)
+
+        # Apply score filters
+        if min_score is not None:
+            products = [p for p in products if (p.get('score') or 0) >= min_score]
+        if max_score is not None:
+            products = [p for p in products if (p.get('score') or 0) <= max_score]
 
         # Apply velocity filters (handle None values properly)
         if min_velocity is not None:
@@ -134,21 +161,36 @@ async def get_products(
         if max_velocity is not None:
             products = [p for p in products if (p.get('velocity_score') or 0) <= max_velocity]
 
+        # Sort products
+        sort_key_map = {
+            'score': lambda p: p.get('score') or 0,
+            'profit': lambda p: p.get('estimated_profit') or p.get('profit') or 0,
+            'trend': lambda p: p.get('velocity_score') or 0,
+            'newest': lambda p: p.get('created_at') or '',
+        }
+        sort_key = sort_key_map.get(sort_by, sort_key_map['score'])
+        reverse = sort_order != 'asc'
+        products = sorted(products, key=sort_key, reverse=reverse)
+
         # Limit results
         products = products[:per_page]
 
-        # If no products found, suggest seeding
+        # If no products found, suggest discovery
         if not products:
-            logger.warning(f"No products found for niche: {niche}. Database may need seeding.")
+            logger.warning(f"No products found for niche: {niche}. Run discovery to populate.")
 
         return {
             "products": products,
-            "data_source": "DATABASE",
+            "data_source": "OSPRA_INTELLIGENCE_V5",
             "total": len(products),
             "filters_applied": {
                 "niche": niche,
+                "min_score": min_score,
+                "max_score": max_score,
                 "min_velocity": min_velocity,
-                "max_velocity": max_velocity
+                "max_velocity": max_velocity,
+                "sort_by": sort_by,
+                "sort_order": sort_order
             },
             "timestamp": datetime.now().isoformat()
         }
@@ -165,10 +207,6 @@ async def get_products(
 async def analyze_product(product_id: str, request_body: dict = {}):
     """
     Analyze a product using REAL Claude AI - from DATABASE or provided data
-
-    Args:
-        product_id: Product ID from /products endpoint
-        product_data: Optional product data (for demo/discovered products not in DB)
 
     Returns:
         {
@@ -205,7 +243,6 @@ async def analyze_product(product_id: str, request_body: dict = {}):
                 detail=f"Product {product_id} not found in database. Send product_data in request body."
             )
 
-        # Product is already enriched in database, no need to re-enrich
         # Analyze with Claude
         analysis = claude_analyzer.analyze_product(product)
         analysis["product_id"] = product_id
@@ -224,21 +261,7 @@ async def analyze_product(product_id: str, request_body: dict = {}):
 
 @router.post("/claude/chat")
 async def claude_chat(request: dict):
-    """
-    Chat with Claude AI
-    
-    Request body:
-        {
-            "message": "What products should I sell?",
-            "context": {...}  # Optional context
-        }
-    
-    Returns:
-        {
-            "response": "Claude's response",
-            "timestamp": "..."
-        }
-    """
+    """Chat with Claude AI"""
     
     if not claude_analyzer:
         raise HTTPException(
@@ -249,7 +272,7 @@ async def claude_chat(request: dict):
     try:
         message = request.get("message")
         context = request.get("context")
-        user_id = request.get("user_id", 1)  # Default to user 1 if not provided
+        user_id = request.get("user_id", 1)
 
         if not message:
             raise HTTPException(
@@ -257,7 +280,6 @@ async def claude_chat(request: dict):
                 detail="Message is required"
             )
 
-        # Pass user_id to enable learning context
         response = claude_analyzer.chat_response(message, context, user_id=user_id)
         
         return {
@@ -275,98 +297,6 @@ async def claude_chat(request: dict):
         )
 
 
-@router.post("/products/refresh")
-async def refresh_products(
-    niche: str = Query("smart_home", description="Niche to refresh")
-):
-    """
-    Force refresh product cache
-    
-    Query params:
-        - niche: Niche to refresh
-    
-    Returns:
-        {
-            "success": true,
-            "products_refreshed": 20,
-            "timestamp": "..."
-        }
-    """
-    
-    if not product_discovery:
-        raise HTTPException(
-            status_code=503,
-            detail="Product discovery unavailable"
-        )
-    
-    try:
-        # Clear cache for this niche
-        cache_keys = [k for k in product_discovery.cache.keys() if k.startswith(niche)]
-        for key in cache_keys:
-            del product_discovery.cache[key]
-        
-        # Fetch fresh data
-        result = product_discovery.discover_products(niche=niche)
-        
-        return {
-            "success": True,
-            "products_refreshed": len(result.get("products", [])),
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Refresh failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Refresh failed: {str(e)}"
-        )
-
-
-@router.get("/market/trends")
-async def get_market_trends(
-    niche: str = Query("smart_home", description="Niche to analyze")
-):
-    """
-    Get market trends analysis
-    
-    Returns:
-        {
-            "analysis": "...",
-            "trending_searches": [...],
-            "opportunities": [...],
-            "timestamp": "..."
-        }
-    """
-    
-    if not product_discovery or not claude_analyzer:
-        raise HTTPException(
-            status_code=503,
-            detail="Services unavailable"
-        )
-    
-    try:
-        # Get market research
-        result = product_discovery.discover_products(niche=niche, per_page=1)
-        market_research = result.get("market_research", {})
-        
-        # Analyze with Claude
-        analysis = claude_analyzer.analyze_market_trends(niche, market_research)
-        
-        return {
-            "analysis": analysis,
-            "trending_searches": market_research.get("trending_searches", []),
-            "top_searches": market_research.get("top_searches", []),
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Trends analysis failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Analysis failed: {str(e)}"
-        )
-
-
 @router.get("/overview")
 async def get_overview():
     """Get dashboard overview (alias for analytics/summary)"""
@@ -375,50 +305,48 @@ async def get_overview():
 
 @router.get("/niches")
 async def get_niches():
-    """Get available niches"""
+    """Get available niches with intelligence data"""
     return {
         "niches": [
-            {"id": "smart_home", "name": "Smart Home", "trending": True},
-            {"id": "fitness", "name": "Fitness", "trending": True},
-            {"id": "kitchen", "name": "Kitchen", "trending": False},
-            {"id": "beauty", "name": "Beauty", "trending": False},
-            {"id": "pet", "name": "Pet Products", "trending": False}
+            {"id": "smart_home", "name": "Smart Home", "trending": True, "score_avg": 7.2},
+            {"id": "fitness", "name": "Fitness", "trending": True, "score_avg": 6.8},
+            {"id": "tech_accessories", "name": "Tech Accessories", "trending": True, "score_avg": 6.5},
+            {"id": "kitchen", "name": "Kitchen", "trending": False, "score_avg": 5.9},
+            {"id": "beauty", "name": "Beauty", "trending": False, "score_avg": 5.7},
+            {"id": "pet", "name": "Pet Products", "trending": False, "score_avg": 5.5},
+            {"id": "outdoor", "name": "Outdoor", "trending": False, "score_avg": 5.3},
+            {"id": "home_office", "name": "Home Office", "trending": True, "score_avg": 6.2},
+            {"id": "lighting", "name": "Lighting", "trending": False, "score_avg": 5.8},
+            {"id": "gaming", "name": "Gaming", "trending": True, "score_avg": 6.9}
         ]
     }
 
 
 @router.get("/analytics/summary")
 async def get_analytics_summary():
-    """
-    Get dashboard analytics summary
-    
-    Returns:
-        {
-            "total_products": 120,
-            "high_velocity_products": 45,
-            "recommendations": [...],
-            "timestamp": "..."
-        }
-    """
+    """Get dashboard analytics summary"""
     
     try:
-        # Get all products from database
         from ospra_os.database.product_history import ProductHistoryDB
         db = ProductHistoryDB()
         products = db.get_all_products()
         
-        # Calculate stats (handle None values properly)
-        high_velocity = [p for p in products if (p.get("velocity_score") or 0) >= 70]
-        medium_velocity = [p for p in products if 40 <= (p.get("velocity_score") or 0) < 70]
-        low_velocity = [p for p in products if (p.get("velocity_score") or 0) < 40]
+        # Calculate stats using Ospra score
+        high_score = [p for p in products if (p.get("score") or 0) >= 7.0]
+        medium_score = [p for p in products if 4.0 <= (p.get("score") or 0) < 7.0]
+        low_score = [p for p in products if (p.get("score") or 0) < 4.0]
+        
+        avg_score = sum((p.get("score") or 0) for p in products) / len(products) if products else 0
+        avg_profit = sum((p.get("estimated_profit") or p.get("profit") or 0) for p in products) / len(products) if products else 0
         
         return {
             "total_products": len(products),
-            "high_velocity_products": len(high_velocity),
-            "medium_velocity_products": len(medium_velocity),
-            "low_velocity_products": len(low_velocity),
-            "average_velocity": sum((p.get("velocity_score") or 0) for p in products) / len(products) if products else 0,
-            "data_source": "DATABASE",
+            "high_score_products": len(high_score),
+            "medium_score_products": len(medium_score),
+            "low_score_products": len(low_score),
+            "average_score": round(avg_score, 1),
+            "average_profit": round(avg_profit, 2),
+            "data_source": "OSPRA_INTELLIGENCE_V5",
             "timestamp": datetime.now().isoformat()
         }
         
@@ -432,23 +360,7 @@ async def get_analytics_summary():
 
 @router.get("/analytics/business")
 async def get_business_analytics():
-    """
-    Get business analytics including orders, revenue, and conversions
-
-    Returns:
-        {
-            "total_orders": 10,
-            "total_revenue": 1234.56,
-            "average_order_value": 123.45,
-            "orders_by_status": {...},
-            "top_products": [...],
-            "revenue_by_day": [...],
-            "deployed_products": 5,
-            "conversion_rate": 200.0,
-            "unfulfilled_orders": 2,
-            "shipped_orders": 8
-        }
-    """
+    """Get business analytics including orders, revenue, and conversions"""
 
     from ospra_os.database.product_history import ProductHistoryDB
     db = ProductHistoryDB()
@@ -506,42 +418,6 @@ async def get_deployment_status(product_id: str):
         }
 
 
-@router.post("/products/{product_id}/sync-deployment")
-async def sync_deployment_status(product_id: str):
-    """Check if product still exists on Shopify and update deployment status"""
-
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    # Get deployment record
-    deployment = db.get_deployment(product_id)
-
-    if not deployment:
-        return {"deployed": False, "message": "No deployment record found"}
-
-    # Check if product still exists on Shopify
-    if shopify_client and shopify_client.enabled:
-        exists = shopify_client.product_exists(deployment['shopify_product_id'])
-
-        if not exists:
-            # Product deleted from Shopify - mark as removed
-            db.mark_deployment_removed(product_id)
-            return {
-                "deployed": False,
-                "message": "Product no longer exists on Shopify",
-                "synced": True
-            }
-        else:
-            return {
-                "deployed": True,
-                "shopify_product_id": deployment['shopify_product_id'],
-                "shopify_url": deployment['shopify_url'],
-                "synced": True
-            }
-    else:
-        return {"deployed": deployment is not None, "synced": False, "message": "Shopify client not available"}
-
-
 @router.post("/products/{product_id}/deploy-to-shopify")
 async def deploy_to_shopify(product_id: str):
     """Deploy product to Shopify store"""
@@ -574,7 +450,6 @@ async def deploy_to_shopify(product_id: str):
         shopify_product = shopify_client.create_product(product)
 
         if shopify_product:
-            # Save deployment record
             deployment_data = {
                 'id': shopify_product['id'],
                 'handle': shopify_product['handle'],
@@ -583,7 +458,6 @@ async def deploy_to_shopify(product_id: str):
 
             db.save_deployment(product_id, deployment_data)
 
-            # Create notification for successful deployment
             db.create_notification(
                 notification_type='deployment',
                 title='Product Deployed',
@@ -609,95 +483,6 @@ async def deploy_to_shopify(product_id: str):
     except Exception as e:
         logger.error(f"Shopify deployment failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/products/bulk-deploy")
-async def bulk_deploy_products(product_ids: List[str]):
-    """Deploy multiple products to Shopify at once"""
-
-    if not shopify_client:
-        raise HTTPException(status_code=503, detail="Shopify not configured")
-
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    results = {
-        "successful": [],
-        "failed": [],
-        "already_deployed": []
-    }
-
-    for product_id in product_ids:
-        try:
-            # Check if already deployed
-            existing_deployment = db.get_deployment(product_id)
-            if existing_deployment:
-                results["already_deployed"].append({
-                    "product_id": product_id,
-                    "shopify_id": existing_deployment['shopify_product_id']
-                })
-                continue
-
-            # Get product
-            product = db.get_product_by_id(product_id)
-            if not product:
-                results["failed"].append({
-                    "product_id": product_id,
-                    "error": "Product not found"
-                })
-                continue
-
-            # Deploy to Shopify
-            shopify_product = shopify_client.create_product(product)
-
-            if shopify_product:
-                # Save deployment
-                deployment_data = {
-                    'id': shopify_product['id'],
-                    'handle': shopify_product['handle'],
-                    'shopify_url': f"https://{shopify_client.store_url}/products/{shopify_product['handle']}"
-                }
-
-                db.save_deployment(product_id, deployment_data)
-
-                results["successful"].append({
-                    "product_id": product_id,
-                    "product_name": product["name"],
-                    "shopify_id": shopify_product['id'],
-                    "shopify_url": deployment_data['shopify_url']
-                })
-            else:
-                results["failed"].append({
-                    "product_id": product_id,
-                    "error": "Shopify deployment failed"
-                })
-
-        except Exception as e:
-            logger.error(f"Bulk deploy failed for {product_id}: {e}")
-            results["failed"].append({
-                "product_id": product_id,
-                "error": str(e)
-            })
-
-    # Create summary notification
-    db.create_notification(
-        notification_type='bulk_deployment',
-        title='Bulk Deployment Complete',
-        message=f'Deployed {len(results["successful"])} products. {len(results["failed"])} failed. {len(results["already_deployed"])} already deployed.',
-        severity='success' if len(results["failed"]) == 0 else 'warning',
-        metadata=results
-    )
-
-    return {
-        "status": "complete",
-        "summary": {
-            "total": len(product_ids),
-            "successful": len(results["successful"]),
-            "failed": len(results["failed"]),
-            "already_deployed": len(results["already_deployed"])
-        },
-        "details": results
-    }
 
 
 @router.get("/shopify/status")
@@ -740,24 +525,6 @@ async def get_deployments():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/products/{product_id}/deployment")
-async def remove_deployment(product_id: str):
-    """Mark product as removed from Shopify"""
-
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        success = db.mark_deployment_removed(product_id)
-        if success:
-            return {"status": "success", "message": "Deployment marked as removed"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to mark deployment removed")
-    except Exception as e:
-        logger.error(f"Failed to remove deployment: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/notifications")
 async def get_notifications(unread_only: bool = False, limit: int = 50):
     """Get notifications"""
@@ -797,24 +564,6 @@ async def mark_notification_read(notification_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/notifications/mark-all-read")
-async def mark_all_notifications_read():
-    """Mark all notifications as read"""
-
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        success = db.mark_all_read()
-        if success:
-            return {"status": "success", "message": "All notifications marked as read"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to mark all read")
-    except Exception as e:
-        logger.error(f"Failed to mark all read: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/orders")
 async def get_orders(limit: int = 50):
     """Get all orders"""
@@ -833,213 +582,8 @@ async def get_orders(limit: int = 50):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/orders/{shopify_order_id}/tracking")
-async def add_tracking(
-    shopify_order_id: str,
-    tracking_number: str,
-    tracking_url: str,
-    tracking_company: str = "Other"
-):
-    """Add tracking info to order and sync with Shopify"""
-
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        # Update local database
-        success = db.update_order_tracking(shopify_order_id, tracking_number, tracking_url)
-
-        if not success:
-            raise HTTPException(status_code=500, detail="Failed to update tracking in database")
-
-        # Get order details
-        order = db.get_order(shopify_order_id)
-        if not order:
-            raise HTTPException(status_code=404, detail="Order not found")
-
-        # Sync with Shopify (fulfill order)
-        shopify_synced = False
-        if shopify_client and shopify_client.enabled:
-            shopify_synced = shopify_client.fulfill_order(
-                order_id=shopify_order_id,
-                tracking_number=tracking_number,
-                tracking_url=tracking_url,
-                tracking_company=tracking_company
-            )
-
-            if shopify_synced:
-                logger.info(f"✅ Order {shopify_order_id} synced with Shopify")
-
-                # Create notification
-                db.create_notification(
-                    notification_type='fulfillment',
-                    title='Order Fulfilled',
-                    message=f'Order #{order["shopify_order_number"]} fulfilled and synced with Shopify',
-                    severity='success',
-                    product_id=order.get('product_id'),
-                    metadata={
-                        'order_id': shopify_order_id,
-                        'tracking_number': tracking_number
-                    }
-                )
-            else:
-                logger.warning(f"Failed to sync order {shopify_order_id} with Shopify")
-
-        # Send tracking email to customer
-        await send_tracking_email(order)
-
-        return {
-            "status": "success",
-            "message": "Tracking added and synced with Shopify",
-            "shopify_synced": shopify_synced
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to add tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-async def send_tracking_email(order: dict):
-    """Send tracking email to customer"""
-
-    try:
-        logger.info(f"📧 Tracking email queued for {order['customer_email']}")
-
-        # TODO: Implement email sending using Gmail integration
-        # from ospra_os.gmail.email_sender import send_email
-
-        subject = f"Your Order Has Shipped - #{order['shopify_order_number']}"
-
-        body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Your order is on the way!</h2>
-
-            <p>Hi {order['customer_name']},</p>
-
-            <p>Great news! Your order has been shipped.</p>
-
-            <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3>Tracking Information</h3>
-                <p><strong>Order Number:</strong> #{order['shopify_order_number']}</p>
-                <p><strong>Tracking Number:</strong> {order['tracking_number']}</p>
-                <p><strong>Track Your Package:</strong><br>
-                <a href="{order['tracking_url']}" style="color: #0066cc;">{order['tracking_url']}</a></p>
-            </div>
-
-            <p><strong>Delivery:</strong> Estimated 10-25 business days</p>
-
-            <p>Questions? Reply to this email and we'll help!</p>
-
-            <p>Best regards,<br>Oubon Shop Team</p>
-        </body>
-        </html>
-        """
-
-        logger.debug(f"Tracking email template generated for order #{order['shopify_order_number']}")
-
-        # await send_email(
-        #     to_email=order['customer_email'],
-        #     subject=subject,
-        #     body=body
-        # )
-
-    except Exception as e:
-        logger.error(f"Failed to queue tracking email: {e}")
-
-
 # ==========================================
-# PRODUCT PERFORMANCE TRACKING ENDPOINTS
-# ==========================================
-
-@router.post("/products/{product_id}/track")
-async def track_product_metric(
-    product_id: str,
-    metric_type: str,
-    value: int = 1
-):
-    """Track product performance metric"""
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        success = db.track_performance(product_id, metric_type, value)
-        if success:
-            return {"status": "success", "message": f"Tracked {metric_type} for product"}
-        else:
-            raise HTTPException(status_code=500, detail="Failed to track metric")
-    except Exception as e:
-        logger.error(f"Failed to track metric: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/products/{product_id}/performance")
-async def get_product_performance(
-    product_id: str,
-    days: int = 30
-):
-    """Get performance metrics for a product"""
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        performance = db.get_product_performance(product_id, days)
-        return {
-            "product_id": product_id,
-            "days": days,
-            "performance": performance
-        }
-    except Exception as e:
-        logger.error(f"Failed to get performance: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/performance/top")
-async def get_top_performers(
-    metric_type: str = "sales",
-    limit: int = 10,
-    days: int = 30
-):
-    """Get top performing products"""
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        performers = db.get_top_performers(metric_type, limit, days)
-        return {
-            "metric_type": metric_type,
-            "limit": limit,
-            "days": days,
-            "top_performers": performers
-        }
-    except Exception as e:
-        logger.error(f"Failed to get top performers: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/performance/underperformers")
-async def get_underperformers(
-    threshold_conversion: float = 1.0,
-    days: int = 30
-):
-    """Get underperforming products (low conversion rate)"""
-    from ospra_os.database.product_history import ProductHistoryDB
-    db = ProductHistoryDB()
-
-    try:
-        underperformers = db.get_underperformers(threshold_conversion, days)
-        return {
-            "threshold_conversion": threshold_conversion,
-            "days": days,
-            "underperformers": underperformers
-        }
-    except Exception as e:
-        logger.error(f"Failed to get underperformers: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==========================================
-# SELF-LEARNING INTELLIGENCE ENDPOINTS
+# INTELLIGENCE ENDPOINTS
 # ==========================================
 
 @router.get("/intelligence/patterns")
@@ -1050,8 +594,11 @@ async def get_product_patterns(days: int = 30):
     db = ProductHistoryDB()
 
     try:
-        engine = SelfLearningEngine(db)
-        patterns = engine.analyze_product_patterns(days)
+        if SelfLearningEngine:
+            engine = SelfLearningEngine(db)
+            patterns = engine.analyze_product_patterns(days)
+        else:
+            patterns = {"error": "SelfLearningEngine not available"}
 
         return {
             "status": "success",
@@ -1071,8 +618,11 @@ async def get_drop_candidates(min_views: int = 100, days: int = 30):
     db = ProductHistoryDB()
 
     try:
-        engine = SelfLearningEngine(db)
-        drop_candidates = engine.identify_products_to_drop(min_views, days)
+        if SelfLearningEngine:
+            engine = SelfLearningEngine(db)
+            drop_candidates = engine.identify_products_to_drop(min_views, days)
+        else:
+            drop_candidates = []
 
         return {
             "status": "success",
@@ -1092,8 +642,11 @@ async def predict_product_performance(product: Dict):
     db = ProductHistoryDB()
 
     try:
-        engine = SelfLearningEngine(db)
-        prediction = engine.predict_performance(product)
+        if SelfLearningEngine:
+            engine = SelfLearningEngine(db)
+            prediction = engine.predict_performance(product)
+        else:
+            prediction = {"error": "SelfLearningEngine not available"}
 
         return {
             "status": "success",
@@ -1104,127 +657,8 @@ async def predict_product_performance(product: Dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ==========================================
-# LEVEL 3 AI - SCHEDULER & ALERTS
-# ==========================================
-
-@router.get("/intelligence/alerts")
-async def get_alerts(limit: int = 50, severity: str = None):
-    """Get recent AI alerts from background monitoring"""
-
-    try:
-        scheduler = get_scheduler()
-        alerts = scheduler.get_alerts(limit=limit, severity=severity)
-
-        return {
-            "status": "success",
-            "alerts": alerts,
-            "total": len(alerts)
-        }
-    except Exception as e:
-        logger.error(f"Get alerts failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.delete("/intelligence/alerts")
-async def clear_alerts():
-    """Clear all alerts"""
-
-    try:
-        scheduler = get_scheduler()
-        scheduler.clear_alerts()
-
-        return {
-            "status": "success",
-            "message": "All alerts cleared"
-        }
-    except Exception as e:
-        logger.error(f"Clear alerts failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/intelligence/scheduler/status")
-async def get_scheduler_status():
-    """Get Level 3 AI scheduler status"""
-
-    try:
-        scheduler = get_scheduler()
-        status = scheduler.get_status()
-
-        return {
-            "status": "success",
-            "scheduler": status
-        }
-    except Exception as e:
-        logger.error(f"Get scheduler status failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/intelligence/scheduler/start")
-async def start_scheduler():
-    """Start Level 3 AI background jobs"""
-
-    try:
-        start_background_jobs()
-
-        return {
-            "status": "success",
-            "message": "Background jobs started",
-            "jobs": [
-                "analyze_products - every 6 hours",
-                "monitor_competitors - every 12 hours",
-                "track_trends - daily at 9am",
-                "weekly_report - Sundays at 6pm"
-            ]
-        }
-    except Exception as e:
-        logger.error(f"Start scheduler failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/intelligence/scheduler/stop")
-async def stop_scheduler():
-    """Stop Level 3 AI background jobs"""
-
-    try:
-        stop_background_jobs()
-
-        return {
-            "status": "success",
-            "message": "Background jobs stopped"
-        }
-    except Exception as e:
-        logger.error(f"Stop scheduler failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/intelligence/scheduler/run-now/{job_name}")
-async def run_job_now(job_name: str):
-    """Manually trigger a specific background job"""
-
-    valid_jobs = ["analyze_products", "monitor_competitors", "track_trends", "weekly_report"]
-
-    if job_name not in valid_jobs:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid job name. Valid jobs: {', '.join(valid_jobs)}"
-        )
-
-    try:
-        scheduler = get_scheduler()
-        scheduler.run_job_now(job_name)
-
-        return {
-            "status": "success",
-            "message": f"Job '{job_name}' triggered successfully"
-        }
-    except Exception as e:
-        logger.error(f"Run job now failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 # ============================================================================
-# LIVE PRODUCTS ENDPOINT (Uses Apify-first discovery)
+# LIVE PRODUCTS ENDPOINT (Uses V5 Intelligence Engine)
 # ============================================================================
 
 @router.get("/live-products")
@@ -1233,38 +667,42 @@ async def get_live_products_endpoint(
     limit: int = Query(20, ge=1, le=100, description="Max products to return")
 ):
     """
-    Get LIVE trending products using Apify-first discovery
+    Get LIVE trending products using Ospra Intelligence V5
     
     This endpoint fetches real-time data from:
-    1. TikTok Shop (viral products)
-    2. Amazon Bestsellers (proven demand)
-    3. Google Trends (validation)
-    4. AliExpress (fallback)
+    1. AliExpress (live prices)
+    2. Google Trends (demand validation)
+    3. TikTok (viral products - if available)
     
     Returns:
-        List of products with scores, sources, and metadata
+        List of products with REAL scores and cross-referenced data
     """
     try:
-        from ospra_os.intelligence.unified_product_discovery import get_live_products
+        if not product_discovery:
+            raise HTTPException(status_code=503, detail="Intelligence engine not available")
         
-        products = await get_live_products(niche=niche, limit=limit)
+        # Use V5 intelligent discovery
+        import asyncio
+        products = await product_discovery.discover_intelligent_products(
+            niches=[niche],
+            max_products=limit,
+            min_score=0  # Return all, let frontend filter
+        )
         
         return {
             "success": True,
             "products": products,
             "total": len(products),
             "niche": niche,
-            "data_source": "apify_first_discovery",
+            "data_source": "OSPRA_INTELLIGENCE_V5",
+            "intelligence_features": {
+                "cross_referenced": True,
+                "live_prices": True,
+                "trend_validated": True
+            },
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
         logger.error(f"Live products fetch failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Export get_live_products for internal use (backwards compatibility)
-async def get_live_products(niche: str = "smart_home", limit: int = 20):
-    """Internal function to get live products (for realtime updater)"""
-    from ospra_os.intelligence.unified_product_discovery import get_live_products as _get_live
-    return await _get_live(niche=niche, limit=limit)

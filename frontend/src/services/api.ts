@@ -37,7 +37,6 @@ api.interceptors.response.use(
       localStorage.removeItem('ospra_token');
       localStorage.removeItem('ospra_user');
     }
-    // Don't log 404s here - handled by safeApiCall
     return Promise.reject(error);
   }
 );
@@ -55,22 +54,42 @@ export interface Product {
   profit_margin: number;
   profit?: number;
   estimated_profit?: number;
-  trend: 'up' | 'down' | 'stable';
-  trend_value: string;
+  trend?: 'up' | 'down' | 'stable';
+  trend_value?: string;
   trend_score?: number;
   velocity_score?: number;
-  source: string;
+  source?: string;
   niche: string;
   niches?: string[];
-  saturation_level: 'low' | 'medium' | 'high';
+  saturation_level?: 'low' | 'medium' | 'high';
   sales_velocity?: number;
   social_mentions?: number;
   ai_reason?: string;
   rank?: number;
   previous_rank?: number;
   aliexpress_url?: string;
+  supplier_url?: string;
+  url?: string;
   created_at?: string;
   updated_at?: string;
+  recommendation?: 'STRONG_BUY' | 'BUY' | 'HOLD' | 'AVOID';
+  confidence?: number;
+  data_sources?: number;
+  trend_direction?: 'rising' | 'stable' | 'declining' | 'unknown';
+  live_price?: boolean;
+  orders?: number;
+  rating?: number;
+  shipping_cost?: number;
+  original_price?: number;
+  description?: string;
+  aliexpress_id?: string;
+  score_breakdown?: {
+    tiktok_viral?: number;
+    google_trend?: number;
+    aliexpress_orders?: number;
+    profit_margin?: number;
+    supplier_rating?: number;
+  };
 }
 
 export interface ProductFilters {
@@ -101,39 +120,56 @@ export interface Trend {
 export interface Niche {
   id: string;
   name: string;
-  score: number;
-  saturation: 'low' | 'medium' | 'high';
-  trend: 'up' | 'down' | 'stable';
-  trend_value: string;
-  product_count: number;
-  avg_profit: number;
-  competition: string;
-  updated_at: string;
+  score?: number;
+  saturation?: 'low' | 'medium' | 'high';
+  trend?: 'up' | 'down' | 'stable';
+  trend_value?: string;
+  product_count?: number;
+  avg_profit?: number;
+  competition?: string;
+  trending?: boolean;
+  score_avg?: number;
+  updated_at?: string;
+}
+
+export interface Email {
+  id: string;
+  subject: string;
+  from: string;
+  from_address?: string;
+  to?: string;
+  preview?: string;
+  body?: string;
+  timestamp?: string;
+  date?: string;
+  status: 'pending' | 'replied' | 'ignored';
+  priority: 'high' | 'medium' | 'low';
+  category?: string;
+  is_read: boolean;
+  auto_replied?: boolean;
+  thread_id?: string;
+  labels?: string[];
 }
 
 // ============================================
-// AUTH API (✅ All endpoints exist)
+// AUTH API
 // ============================================
 export const authAPI = {
-  // POST /api/auth/login
   login: async (email: string, password: string) => {
     const response = await api.post('/api/auth/login', { email, password });
     return response.data;
   },
 
-  // POST /api/auth/register
   register: async (email: string, password: string, name: string) => {
     const response = await api.post('/api/auth/register', { email, password, name });
     return response.data;
   },
 
-  // GET /api/auth/me
   getProfile: async () => {
     const response = await api.get('/api/auth/me');
     return response.data;
   },
 
-  // POST /api/auth/logout
   logout: async () => {
     const response = await api.post('/api/auth/logout');
     return response.data;
@@ -141,12 +177,10 @@ export const authAPI = {
 };
 
 // ============================================
-// PRODUCTS API (✅ All endpoints exist)
+// PRODUCTS API
 // ============================================
 export const productsAPI = {
-  // GET /api/dashboard/v2/products
   getAll: async (filters?: ProductFilters) => {
-    // Clean up undefined values from filters to avoid sending "undefined" strings
     const cleanFilters = filters ? Object.fromEntries(
       Object.entries(filters).filter(([_, value]) => value !== undefined)
     ) : {};
@@ -154,13 +188,11 @@ export const productsAPI = {
     return response.data;
   },
 
-  // GET /api/dashboard/v2/products/{id}
   getById: async (id: string) => {
     const response = await api.get(`/api/dashboard/v2/products/${id}`);
     return response.data;
   },
 
-  // POST /api/intelligence/discover
   discover: async (niches: string[] = ['smart_home'], maxPerNiche = 10) => {
     const response = await api.post('/api/intelligence/discover', {
       niches,
@@ -169,30 +201,32 @@ export const productsAPI = {
     return response.data;
   },
 
-  // GET /api/rankings/top
   getRankings: async (limit = 20) => {
     const response = await api.get('/api/rankings/top', { params: { limit } });
     return response.data;
   },
 
-  // POST /api/dashboard/v2/products/{id}/analyze
-  analyze: async (productId: string) => {
-    const response = await api.post(`/api/dashboard/v2/products/${productId}/analyze`);
+  analyze: async (productId: string, productData?: Product) => {
+    const response = await api.post(`/api/dashboard/v2/products/${productId}/analyze`, {
+      product_data: productData
+    });
     return response.data;
   },
 
-  // POST /api/shopify/deploy (✅ exists)
-  deployToShopify: async (productData: any) => {
-    const response = await api.post('/api/shopify/deploy', { product_data: productData });
-    return response.data;
+  deployToShopify: async (productId: string, productData?: Product) => {
+    try {
+      const response = await api.post(`/api/dashboard/v2/products/${productId}/deploy-to-shopify`);
+      return { success: true, ...response.data };
+    } catch (err) {
+      const response = await api.post('/api/shopify/deploy', { product_data: productData });
+      return { success: true, ...response.data };
+    }
   },
 
-  // Search - uses getAll with search param
   search: async (query: string) => {
     return productsAPI.getAll({ search: query } as any);
   },
 
-  // Recommendations - uses discovery
   getRecommendations: async (limit = 10) => {
     const result = await productsAPI.discover(
       ['smart_home', 'tech_gadgets', 'home_security'],
@@ -206,74 +240,68 @@ export const productsAPI = {
 };
 
 // ============================================
-// TRENDS API (✅ All endpoints exist)
+// TRENDS API
 // ============================================
 export const trendsAPI = {
-  // GET /api/trends/live (✅ exists)
   getLive: async () => {
     const response = await api.get('/api/trends/live', { params: { limit: 20 } });
     return response.data.products || [];
   },
 
-  // GET /api/trends/movers (✅ exists)
   getMovers: async (direction: 'up' | 'down' = 'up', limit = 10) => {
     const response = await api.get('/api/trends/movers', { params: { direction, limit } });
     return response.data.movers || [];
   },
 
-  // GET /api/trends/breakouts (✅ exists)
   getBreakouts: async (limit = 10) => {
     const response = await api.get('/api/trends/breakouts');
     return response.data.breakouts?.slice(0, limit) || [];
   },
 
-  // GET /api/trends/heatmap (✅ exists)
   getHeatmap: async (rows = 10, cols = 5) => {
     const response = await api.get('/api/trends/heatmap', { params: { rows, cols } });
     return response.data;
   },
 
-  // GET /api/trends/product/{id} (✅ exists)
   getProductMomentum: async (productId: string) => {
     const response = await api.get(`/api/trends/product/${productId}`);
     return response.data.product || null;
   },
 
-  // Get by platform - uses live with filter
   getByPlatform: async (platform: string) => {
     const response = await api.get('/api/trends/live', { params: { platform } });
     return response.data.products || [];
   },
 
-  // History - not implemented yet
   getHistory: async (trendId: string, days = 30) => {
-    throw new Error('GET /api/trends/history not implemented');
+    try {
+      const response = await api.get(`/api/trends/${trendId}/history`, { params: { days } });
+      return response.data;
+    } catch {
+      return { history: [] };
+    }
   },
 };
 
 // ============================================
-// NICHES API (✅ All endpoints exist via frontend_compat)
+// NICHES API
 // ============================================
 export const nichesAPI = {
-  // GET /api/niches (✅ exists via frontend_compat)
   getAll: async () => {
-    const response = await api.get('/api/niches');
+    const response = await api.get('/api/dashboard/v2/niches');
     return response.data.niches || response.data || [];
   },
 
-  // GET /api/niches/{id} (✅ exists)
   getById: async (id: string) => {
     const response = await api.get(`/api/niches/${id}`);
     return response.data;
   },
 
-  // POST /api/niches/{id}/analyze (✅ exists)
   analyze: async (nicheId: string) => {
     const response = await api.post(`/api/niches/${nicheId}/analyze`);
     return response.data;
   },
 
-  // GET /api/niches/{id}/products (✅ exists via frontend_compat)
   getProducts: async (nicheId: string) => {
     const response = await api.get(`/api/niches/${nicheId}/products`);
     return response.data.products || response.data || [];
@@ -281,10 +309,183 @@ export const nichesAPI = {
 };
 
 // ============================================
-// INTELLIGENCE API (Ospra) (✅ All endpoints exist)
+// EMAIL API
+// ============================================
+export const emailAPI = {
+  getAll: async (status?: string) => {
+    try {
+      const params = status ? { status } : {};
+      const response = await api.get('/api/emails', { params });
+      return response.data.emails || response.data || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getById: async (emailId: string) => {
+    const response = await api.get(`/api/emails/${emailId}`);
+    return response.data;
+  },
+
+  sync: async () => {
+    const response = await api.post('/api/emails/sync');
+    return response.data;
+  },
+
+  reply: async (emailId: string, message: string) => {
+    const response = await api.post(`/api/emails/${emailId}/reply`, { message });
+    return response.data;
+  },
+
+  markAsIgnored: async (emailId: string) => {
+    const response = await api.post(`/api/emails/${emailId}/ignore`);
+    return response.data;
+  },
+
+  markAsRead: async (emailId: string) => {
+    const response = await api.post(`/api/emails/${emailId}/read`);
+    return response.data;
+  },
+
+  getStats: async () => {
+    try {
+      const response = await api.get('/api/emails/stats');
+      return response.data;
+    } catch {
+      return { total: 0, pending: 0, replied: 0, ignored: 0, auto_replied: 0 };
+    }
+  },
+
+  getPerformanceMetrics: async () => {
+    try {
+      const response = await api.get('/api/emails/performance');
+      return response.data;
+    } catch {
+      return { avgResponseTime: 0, autoReplyRate: 0, successRate: 0 };
+    }
+  },
+
+  getAutoReplySettings: async () => {
+    const response = await api.get('/api/emails/auto-reply/settings');
+    return response.data;
+  },
+
+  updateAutoReplySettings: async (settings: Record<string, unknown>) => {
+    const response = await api.put('/api/emails/auto-reply/settings', settings);
+    return response.data;
+  },
+};
+
+// ============================================
+// COMPETITORS API
+// ============================================
+export const competitorsAPI = {
+  getAll: async () => {
+    try {
+      const response = await api.get('/api/competitors');
+      return response.data.competitors || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/api/competitors/${id}`);
+    return response.data;
+  },
+
+  getPriceComparison: async () => {
+    try {
+      const response = await api.get('/api/competitors/price-comparison');
+      return response.data;
+    } catch {
+      return { comparisons: [] };
+    }
+  },
+
+  analyze: async (id: string) => {
+    const response = await api.post(`/api/competitors/${id}/analyze`);
+    return response.data;
+  },
+};
+
+// ============================================
+// A/B TESTING API
+// ============================================
+export const abTestingAPI = {
+  getAll: async () => {
+    try {
+      const response = await api.get('/api/ab-tests');
+      return response.data.tests || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/api/ab-tests/${id}`);
+    return response.data;
+  },
+
+  getResults: async (id: string) => {
+    const response = await api.get(`/api/ab-tests/${id}/results`);
+    return response.data;
+  },
+
+  create: async (test: any) => {
+    const response = await api.post('/api/ab-tests', test);
+    return response.data;
+  },
+
+  stop: async (id: string) => {
+    const response = await api.post(`/api/ab-tests/${id}/stop`);
+    return response.data;
+  },
+};
+
+// ============================================
+// SYSTEM API
+// ============================================
+export const systemAPI = {
+  getHealth: async () => {
+    try {
+      const response = await api.get('/api/health');
+      return response.data;
+    } catch {
+      return { status: 'offline', services: [] };
+    }
+  },
+
+  getServices: async () => {
+    try {
+      const response = await api.get('/api/system/services');
+      return response.data.services || [];
+    } catch {
+      return [];
+    }
+  },
+};
+
+// ============================================
+// RANKINGS API
+// ============================================
+export const rankingsAPI = {
+  getTop: async (limit = 20, niche?: string) => {
+    try {
+      const params: any = { limit };
+      if (niche) params.niche = niche;
+      const response = await api.get('/api/rankings/top', { params });
+      return response.data;
+    } catch {
+      return { rankings: [] };
+    }
+  },
+};
+
+// ============================================
+// INTELLIGENCE API (Ospra)
 // ============================================
 export const intelligenceAPI = {
-  // POST /api/dashboard/v2/claude/chat (✅ exists)
   chat: async (message: string, context?: any) => {
     const response = await api.post('/api/dashboard/v2/claude/chat', { message, context });
     return {
@@ -293,414 +494,380 @@ export const intelligenceAPI = {
     };
   },
 
-  // POST /api/dashboard/v2/claude/chat with streaming
   chatStream: async (message: string, context?: any, onChunk?: (chunk: string) => void) => {
     const response = await fetch(`${API_BASE_URL}/api/dashboard/v2/claude/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('ospra_token')}`,
+        Authorization: `Bearer ${localStorage.getItem('ospra_token') || ''}`,
       },
-      body: JSON.stringify({ message, context }),
+      body: JSON.stringify({ message, context, stream: true }),
     });
 
     if (!response.ok) {
-      throw new Error('Chat failed');
+      throw new Error(`Chat failed: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    const fullMessage = data.response || '';
+    const reader = response.body?.getReader();
+    const decoder = new TextDecoder();
+    let fullMessage = '';
 
-    // Simulate streaming
-    if (onChunk && fullMessage) {
-      const words = fullMessage.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 30));
-        onChunk(words.slice(0, i + 1).join(' '));
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value);
+        fullMessage += chunk;
+        onChunk?.(chunk);
       }
     }
 
-    return fullMessage;
-  },
-
-  // GET /api/intelligence/briefing/morning (✅ exists)
-  getInsights: async () => {
-    const response = await api.get('/api/intelligence/briefing/morning');
-    const briefing = response.data;
-    const insights = briefing.attention_items?.map((item: any, idx: number) => ({
-      id: `insight-${idx}`,
-      type: item.priority === 'high' ? 'warning' : item.priority === 'medium' ? 'opportunity' : 'success',
-      title: item.title || item.item,
-      description: item.description || item.details,
-      action: item.action_label,
-    })) || [];
-    return { insights, briefing: briefing.briefing_text };
-  },
-
-  // POST /api/intelligence/analyze/product/{id} (✅ exists via frontend_compat)
-  analyzeProduct: async (productId: string) => {
-    const response = await api.post(`/api/intelligence/analyze/product/${productId}`);
-    return response.data;
-  },
-
-  // POST /api/intelligence/analyze/niche/{id} (✅ exists via frontend_compat)
-  analyzeNiche: async (nicheId: string) => {
-    const response = await api.post(`/api/intelligence/analyze/niche/${nicheId}`);
-    return response.data;
-  },
-
-  // POST /api/recommendations/smart (✅ exists)
-  getRecommendations: async () => {
-    const response = await api.post('/api/recommendations/smart', { user_id: 1, max_products: 10 });
-    return response.data;
-  },
-
-  // POST /api/reports/generate (✅ exists via frontend_compat)
-  generateReport: async (type: 'daily' | 'weekly' | 'monthly') => {
-    const response = await api.post('/api/reports/generate', { report_type: type });
-    return response.data;
-  },
-
-  // Get context for AI
-  getContext: async () => {
-    const [metrics, products] = await Promise.all([
-      api.get('/api/dashboard/overview'),
-      api.post('/api/intelligence/discover', { niches: ['smart_home'], max_per_niche: 5 }),
-    ]);
     return {
-      metrics: metrics.data,
-      products: products.data.products?.slice(0, 5) || [],
+      message: fullMessage,
+      timestamp: new Date().toISOString(),
     };
+  },
+
+  analyzeProduct: async (productId: string, productData?: Product) => {
+    const response = await api.post(`/api/dashboard/v2/products/${productId}/analyze`, {
+      product_data: productData
+    });
+    return response.data;
+  },
+
+  getPatterns: async (days = 30) => {
+    const response = await api.get('/api/dashboard/v2/intelligence/patterns', { params: { days } });
+    return response.data;
+  },
+
+  getDropCandidates: async (minViews = 100, days = 30) => {
+    const response = await api.get('/api/dashboard/v2/intelligence/drop-candidates', {
+      params: { min_views: minViews, days }
+    });
+    return response.data;
+  },
+
+  predict: async (product: Product) => {
+    const response = await api.post('/api/dashboard/v2/intelligence/predict', product);
+    return response.data;
+  },
+
+  getConnections: async () => {
+    const response = await api.get('/api/intelligence/connections');
+    return response.data;
+  },
+
+  generateImage: async (productName: string, style = 'professional', count = 1) => {
+    const response = await api.post('/api/intelligence/images/generate', {
+      product_name: productName,
+      style,
+      count
+    });
+    return response.data;
+  },
+
+  generateBanner: async (productName: string, campaignType = 'social') => {
+    const response = await api.post('/api/intelligence/images/banner', {
+      product_name: productName,
+      campaign_type: campaignType
+    });
+    return response.data;
+  },
+
+  getInsights: async () => {
+    try {
+      const response = await api.get('/api/intelligence/insights');
+      return response.data.insights || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getRecommendations: async () => {
+    try {
+      const response = await api.get('/api/intelligence/recommendations');
+      return response.data.recommendations || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getContext: async () => {
+    try {
+      const response = await api.get('/api/intelligence/context/summary');
+      return response.data;
+    } catch {
+      return {};
+    }
   },
 };
 
 // ============================================
-// ANALYTICS API (⚠️ Some endpoints return demo data)
+// SHOPIFY API
+// ============================================
+export const shopifyAPI = {
+  getStatus: async () => {
+    const response = await api.get('/api/dashboard/v2/shopify/status');
+    return response.data;
+  },
+
+  deploy: async (productId: string, productData?: Product) => {
+    const response = await api.post(`/api/dashboard/v2/products/${productId}/deploy-to-shopify`);
+    return response.data;
+  },
+
+  getDeployments: async () => {
+    const response = await api.get('/api/dashboard/v2/deployments');
+    return response.data;
+  },
+
+  getDeploymentStatus: async (productId: string) => {
+    const response = await api.get(`/api/dashboard/v2/products/${productId}/deployment-status`);
+    return response.data;
+  },
+};
+
+// ============================================
+// ANALYTICS API
 // ============================================
 export const analyticsAPI = {
-  // GET /api/dashboard/v2/overview (✅ exists, returns real data)
-  getDashboardMetrics: async () => {
+  getSummary: async () => {
+    const response = await api.get('/api/dashboard/v2/analytics/summary');
+    return response.data;
+  },
+
+  getBusiness: async () => {
+    const response = await api.get('/api/dashboard/v2/analytics/business');
+    return response.data;
+  },
+
+  getOverview: async () => {
     const response = await api.get('/api/dashboard/v2/overview');
     return response.data;
   },
 
-  // GET /api/analytics/revenue (✅ exists)
-  getRevenue: async (period: 'day' | 'week' | 'month' | 'quarter' | 'year' = 'month') => {
-    const response = await api.get('/api/analytics/revenue', { params: { period } });
-    return response.data.data || response.data || [];
+  getDashboardMetrics: async () => {
+    try {
+      const response = await api.get('/api/dashboard/v2/analytics/metrics');
+      return response.data;
+    } catch {
+      return { revenue: 0, orders: 0, products: 0, conversionRate: 0 };
+    }
   },
 
-  // GET /api/customers/segments (✅ exists)
+  getRevenue: async (period: string) => {
+    try {
+      const response = await api.get('/api/dashboard/v2/analytics/revenue', { params: { period } });
+      return response.data;
+    } catch {
+      return { total: 0, trend: 0, history: [] };
+    }
+  },
+
   getCustomerSegments: async () => {
-    const response = await api.get('/api/customers/segments');
-    return response.data.segments || response.data || [];
+    try {
+      const response = await api.get('/api/dashboard/v2/analytics/customers/segments');
+      return response.data;
+    } catch {
+      return { segments: [] };
+    }
   },
 
-  // GET /api/analytics/products/performance (✅ exists via frontend_compat, returns demo data)
   getProductPerformance: async () => {
-    const response = await api.get('/api/analytics/products/performance');
-    return response.data;
+    try {
+      const response = await api.get('/api/dashboard/v2/analytics/products/performance');
+      return response.data;
+    } catch {
+      return { products: [] };
+    }
   },
 
-  // GET /api/analytics/funnel (✅ exists via frontend_compat, returns demo data)
   getConversionFunnel: async () => {
-    const response = await api.get('/api/analytics/funnel');
-    return response.data.funnel || response.data || [];
+    try {
+      const response = await api.get('/api/dashboard/v2/analytics/funnel');
+      return response.data;
+    } catch {
+      return { stages: [] };
+    }
   },
 };
 
 // ============================================
-// COMPETITORS API (⚠️ List endpoint may not exist)
+// NOTIFICATIONS API
 // ============================================
-export const competitorsAPI = {
-  // GET /api/competitors (❌ may not exist - check backend)
-  getAll: async () => {
-    const response = await api.get('/api/competitors');
-    return response.data.competitors || response.data || [];
-  },
-
-  // GET /api/competitors/{id} (✅ exists)
-  getById: async (id: string) => {
-    const response = await api.get(`/api/competitors/${id}`);
+export const notificationsAPI = {
+  getAll: async (unreadOnly = false, limit = 50) => {
+    const response = await api.get('/api/dashboard/v2/notifications', {
+      params: { unread_only: unreadOnly, limit }
+    });
     return response.data;
   },
 
-  // POST /api/competitors/{id}/analyze (✅ exists via frontend_compat)
-  analyze: async (competitorId: string) => {
-    const response = await api.post(`/api/competitors/${competitorId}/analyze`);
+  markRead: async (notificationId: number) => {
+    const response = await api.post(`/api/dashboard/v2/notifications/${notificationId}/read`);
     return response.data;
   },
 
-  // GET /api/competitors/prices (✅ exists via frontend_compat)
-  getPriceComparison: async () => {
-    const response = await api.get('/api/competitors/prices');
-    return response.data;
-  },
-};
-
-// ============================================
-// EMAIL API (✅ All endpoints exist)
-// ============================================
-export const emailAPI = {
-  // GET /api/emails/recent (✅ exists)
-  getAll: async (status?: string) => {
-    const response = await api.get('/api/emails/recent', { params: { status, limit: 50 } });
-    return response.data.emails || response.data || [];
-  },
-
-  // GET /api/dashboard/emails (✅ exists)
-  getStats: async () => {
-    const response = await api.get('/api/dashboard/emails');
-    return response.data;
-  },
-
-  // GET /api/emails/stats/weekly (✅ exists)
-  getWeeklyStats: async () => {
-    const response = await api.get('/api/emails/stats/weekly');
-    return response.data;
-  },
-
-  // GET /api/emails/stats/categories (✅ exists)
-  getCategories: async (days = 7) => {
-    const response = await api.get('/api/emails/stats/categories', { params: { days } });
-    return response.data;
-  },
-
-  // GET /api/emails/stats/performance (✅ exists)
-  getPerformanceMetrics: async () => {
-    const response = await api.get('/api/emails/stats/performance');
-    return response.data;
-  },
-
-  // POST /api/emails/messages/{id}/reply (✅ exists via frontend_compat)
-  reply: async (emailId: string, message: string) => {
-    const response = await api.post(`/api/emails/messages/${emailId}/reply`, { message });
-    return response.data;
-  },
-
-  // POST /api/emails/messages/{id}/ignore (✅ exists via frontend_compat)
-  markAsIgnored: async (emailId: string) => {
-    const response = await api.post(`/api/emails/messages/${emailId}/ignore`);
-    return response.data;
-  },
-
-  // POST /api/emails/sync (✅ exists)
-  sync: async () => {
-    const response = await api.post('/api/emails/sync');
+  markAllRead: async () => {
+    const response = await api.post('/api/dashboard/v2/notifications/mark-all-read');
     return response.data;
   },
 };
 
 // ============================================
-// A/B TESTING API (✅ All endpoints exist)
+// ORDERS API
 // ============================================
-export const abTestingAPI = {
-  // GET /api/abtesting/tests (✅ exists)
-  getAll: async () => {
-    const response = await api.get('/api/abtesting/tests');
-    return response.data.tests || response.data || [];
-  },
-
-  // GET /api/abtesting/tests/{id} (✅ exists)
-  getById: async (id: string) => {
-    const response = await api.get(`/api/abtesting/tests/${id}`);
+export const ordersAPI = {
+  getAll: async (limit = 50) => {
+    const response = await api.get('/api/dashboard/v2/orders', { params: { limit } });
     return response.data;
   },
 
-  // POST /api/abtesting/tests (✅ exists)
-  create: async (test: any) => {
-    const response = await api.post('/api/abtesting/tests', test);
-    return response.data;
-  },
-
-  // POST /api/abtesting/tests/{id}/pause (✅ exists)
-  pause: async (id: string) => {
-    const response = await api.post(`/api/abtesting/tests/${id}/pause`);
-    return response.data;
-  },
-
-  // POST /api/abtesting/tests/{id}/resume (✅ exists)
-  resume: async (id: string) => {
-    const response = await api.post(`/api/abtesting/tests/${id}/resume`);
-    return response.data;
-  },
-
-  // GET /api/abtesting/tests/{id}/results (✅ exists)
-  getResults: async (id: string) => {
-    const response = await api.get(`/api/abtesting/tests/${id}/results`);
+  addTracking: async (orderId: string, trackingNumber: string, trackingUrl: string, trackingCompany = 'Other') => {
+    const response = await api.post(`/api/dashboard/v2/orders/${orderId}/tracking`, null, {
+      params: { tracking_number: trackingNumber, tracking_url: trackingUrl, tracking_company: trackingCompany }
+    });
     return response.data;
   },
 };
 
 // ============================================
-// SYSTEM API (✅ All endpoints exist)
+// SUBSCRIPTION API
 // ============================================
-export const systemAPI = {
-  // GET /health (✅ exists)
-  getHealth: async () => {
-    const response = await api.get('/health');
-    return response.data;
+export const subscriptionAPI = {
+  getCurrentTier: async (userId: number) => {
+    try {
+      const response = await api.get(`/api/subscription/tier/${userId}`);
+      return response.data;
+    } catch {
+      return {
+        tier: 'nest',
+        tier_info: {
+          name: 'Nest',
+          price_monthly: 0,
+          price_display: 'Free',
+          product_freshness: '30+ days',
+          products_per_week: 5,
+          store_limit: 1,
+          features: ['Basic product discovery', 'Email support']
+        }
+      };
+    }
   },
 
-  // GET /api/health/detailed (✅ exists)
-  getServices: async () => {
-    const response = await api.get('/api/health/detailed');
-    return response.data;
+  getPricing: async () => {
+    try {
+      const response = await api.get('/api/subscription/pricing');
+      return response.data;
+    } catch {
+      return {
+        tiers: [
+          { tier: 'nest', name: 'Nest', price_monthly: 0, price_display: 'Free', tagline: 'Get started', features: ['5 products/week', '1 store'] },
+          { tier: 'flight', name: 'Flight', price_monthly: 29, price_display: '$29/mo', tagline: 'For growing stores', features: ['20 products/week', '3 stores'] },
+          { tier: 'soar', name: 'Soar', price_monthly: 79, price_display: '$79/mo', tagline: 'Scale your business', features: ['50 products/week', '10 stores'] },
+          { tier: 'stratosphere', name: 'Stratosphere', price_monthly: 199, price_display: '$199/mo', tagline: 'Enterprise', features: ['Unlimited', 'Priority support'] }
+        ]
+      };
+    }
   },
 
-  // Service refresh - not implemented
-  refreshService: async (serviceName: string) => {
-    throw new Error('POST /api/system/services/refresh not implemented');
+  upgrade: async (userId: number, tier: string) => {
+    const response = await api.post('/api/subscription/upgrade', { user_id: userId, tier });
+    return response.data;
   },
 };
 
 // ============================================
-// SHOPIFY API (✅ All endpoints exist)
+// USAGE API
 // ============================================
-export interface DeployRequest {
-  product_id: string;
-  name: string;
-  niche?: string;
-  supplier_cost?: number;
-  supplier_url?: string;
-  images?: string[];
-  description?: string;
-  trend_score?: number;
-  features?: string[];
-
-  // AI Control Flags
-  ai_content?: boolean;
-  ai_images?: boolean;
-  ai_pricing?: boolean;
-  ai_seo?: boolean;
-  publish?: boolean;
-
-  // Deployment Options
-  target_margin?: number;
-  add_branding?: boolean;
-  max_images?: number;
-
-  // Legacy support
-  generate_ai_description?: boolean;
-  auto_publish?: boolean;
-}
-
-export interface DeployResult {
-  success: boolean;
-  product_id: string;
-  shopify_product_id?: string;
-  shopify_url?: string;
-  admin_url?: string;
-  price?: string;
-  error?: string;
-
-  // AI Metrics
-  content_generated?: {
-    title: string;
-    description: string;
-    tags: string[];
+export interface UsageDashboard {
+  current_usage: {
+    products_discovered: number;
+    products_deployed: number;
+    ai_analyses: number;
+    email_responses: number;
   };
-  images_enhanced?: number;
-  ai_costs?: {
-    content: number;
-    images: number;
-    total: number;
+  limits: {
+    products_per_week: number;
+    stores: number;
+    ai_analyses_per_day: number;
   };
-  total_cost?: number;
-  processing_time_seconds?: number;
-  published?: boolean;
+  period_start: string;
+  period_end: string;
 }
 
-export interface ShopifyProduct {
-  id: number;
-  title: string;
-  price: string;
-  inventory_quantity: number;
-  image_url?: string;
-  ospra_tracked?: boolean;
-  created_at?: string;
-}
-
-export interface ShopifyStatus {
-  configured: boolean;
-  store_name: string;
-  store_domain?: string;
-  connection: string;
-  error?: string;
-}
-
-export interface ShopifyAnalytics {
-  total_products: number;
-  total_inventory: number;
-  estimated_value: number;
-  ospra_tracked: number;
-}
-
-export const shopifyAPI = {
-  // GET /api/shopify/status (✅ exists)
-  getStatus: async (): Promise<ShopifyStatus> => {
-    const response = await api.get('/api/shopify/status');
-    return response.data;
+export const usageAPI = {
+  getDashboard: async (userId: number): Promise<UsageDashboard> => {
+    try {
+      const response = await api.get(`/api/usage/dashboard/${userId}`);
+      return response.data;
+    } catch {
+      return {
+        current_usage: { products_discovered: 0, products_deployed: 0, ai_analyses: 0, email_responses: 0 },
+        limits: { products_per_week: 5, stores: 1, ai_analyses_per_day: 10 },
+        period_start: new Date().toISOString(),
+        period_end: new Date().toISOString(),
+      };
+    }
   },
 
-  // GET /api/shopify/products (✅ exists)
-  getProducts: async (limit = 50): Promise<ShopifyProduct[]> => {
-    const response = await api.get('/api/shopify/products', { params: { limit } });
-    return response.data.products || [];
-  },
-
-  // GET /api/shopify/analytics (✅ exists)
-  getAnalytics: async (): Promise<ShopifyAnalytics> => {
-    const response = await api.get('/api/shopify/analytics');
-    return response.data;
-  },
-
-  // POST /api/shopify/deploy (✅ enhanced with AI)
-  deployProduct: async (request: DeployRequest): Promise<DeployResult> => {
-    const response = await api.post('/api/shopify/deploy', request);
-    return response.data;
-  },
-
-  // POST /api/shopify/deploy/preview (✅ new endpoint)
-  previewDeployment: async (request: DeployRequest): Promise<DeployResult> => {
-    const response = await api.post('/api/shopify/deploy/preview', request);
-    return response.data;
-  },
-
-  // DELETE /api/shopify/products/{id} (✅ exists)
-  deleteProduct: async (productId: number): Promise<void> => {
-    await api.delete(`/api/shopify/products/${productId}`);
-  },
-
-  // POST /api/shopify/bulk-deploy (✅ exists)
-  bulkDeploy: async (products: DeployRequest[]): Promise<{ deployed: number; failed: number }> => {
-    const response = await api.post('/api/shopify/bulk-deploy', { products });
+  trackAction: async (userId: number, action: string) => {
+    const response = await api.post('/api/usage/track', { user_id: userId, action });
     return response.data;
   },
 };
 
 // ============================================
-// AUTO-DEPLOYMENT API (✅ All endpoints exist)
+// PAYMENTS API
+// ============================================
+export const paymentsAPI = {
+  getCheckoutUrl: async (tier: string) => {
+    try {
+      const response = await api.post('/api/payments/checkout', { tier });
+      return response.data;
+    } catch {
+      // Fallback to hardcoded URLs
+      const urls: Record<string, string> = {
+        flight: 'https://ospra.lemonsqueezy.com/buy/7f817d94-cf31-4ab6-9ff4-54de583f7920',
+        soar: 'https://ospra.lemonsqueezy.com/buy/e1f7dd88-9c08-4486-ac77-be77af8bf976',
+        stratosphere: 'https://ospra.lemonsqueezy.com/buy/5d7d273d-f3df-470a-8827-40c3cd975cfc',
+      };
+      return { checkout_url: urls[tier] || '' };
+    }
+  },
+
+  getPortalUrl: async (userId: number) => {
+    const response = await api.get(`/api/payments/portal/${userId}`);
+    return response.data;
+  },
+
+  verifyWebhook: async (payload: any) => {
+    const response = await api.post('/api/payments/webhook/verify', payload);
+    return response.data;
+  },
+};
+
+// ============================================
+// AUTO-DEPLOY API
 // ============================================
 export interface AutoDeployCriteria {
-  min_score?: number;
-  min_profit_margin?: number;
-  max_saturation?: 'low' | 'medium' | 'high';
-  allowed_niches?: string[];
-  max_per_day?: number;
-  max_per_hour?: number;
-  max_daily_cost?: number;
-  require_multiple_sources?: boolean;
-  min_trend_velocity?: number;
-  auto_publish?: boolean;
+  min_score: number;
+  min_profit_margin: number;
+  max_saturation: 'low' | 'medium' | 'high';
+  max_per_day: number;
+  max_per_hour: number;
+  max_daily_cost: number;
+  min_trend_velocity: number;
+  require_multiple_sources: boolean;
+  auto_publish: boolean;
 }
 
 export interface AutoDeployStatus {
   enabled: boolean;
-  criteria: AutoDeployCriteria;
   last_run: string | null;
   total_deployed: number;
   total_cost: number;
+  criteria: AutoDeployCriteria;
 }
 
 export interface DeploymentHistoryItem {
@@ -708,120 +875,69 @@ export interface DeploymentHistoryItem {
   product_name: string;
   niche: string;
   score: number;
-  shopify_url: string | null;
-  success: boolean;
-  error: string | null;
   ai_cost: number;
-  deployed_at: string;
-}
-
-export interface RunNowResponse {
   success: boolean;
-  deployed: number;
-  failed: number;
-  total_cost: number;
-  message: string;
+  error?: string;
+  deployed_at: string;
+  shopify_url?: string;
 }
 
 export const autoDeployAPI = {
-  // GET /api/auto-deploy/status (✅ exists)
   getStatus: async (): Promise<AutoDeployStatus> => {
-    const response = await api.get('/api/auto-deploy/status');
-    return response.data;
+    try {
+      const response = await api.get('/api/auto-deploy/status');
+      return response.data;
+    } catch {
+      return {
+        enabled: false,
+        last_run: null,
+        total_deployed: 0,
+        total_cost: 0,
+        criteria: {
+          min_score: 80,
+          min_profit_margin: 0.35,
+          max_saturation: 'medium',
+          max_per_day: 5,
+          max_per_hour: 2,
+          max_daily_cost: 1.0,
+          min_trend_velocity: 70,
+          require_multiple_sources: true,
+          auto_publish: false,
+        },
+      };
+    }
   },
 
-  // POST /api/auto-deploy/enable (✅ exists)
-  enable: async (): Promise<{ success: boolean; message: string; criteria: AutoDeployCriteria }> => {
+  getHistory: async (limit = 20): Promise<DeploymentHistoryItem[]> => {
+    try {
+      const response = await api.get(`/api/auto-deploy/history?limit=${limit}`);
+      return response.data.history || [];
+    } catch {
+      return [];
+    }
+  },
+
+  enable: async () => {
     const response = await api.post('/api/auto-deploy/enable');
     return response.data;
   },
 
-  // POST /api/auto-deploy/disable (✅ exists)
-  disable: async (): Promise<{ success: boolean; message: string }> => {
+  disable: async () => {
     const response = await api.post('/api/auto-deploy/disable');
     return response.data;
   },
 
-  // PUT /api/auto-deploy/criteria (✅ exists)
-  updateCriteria: async (criteria: Partial<AutoDeployCriteria>): Promise<{ success: boolean; criteria: AutoDeployCriteria }> => {
+  runNow: async () => {
+    const response = await api.post('/api/auto-deploy/run');
+    return response.data;
+  },
+
+  updateCriteria: async (criteria: Partial<AutoDeployCriteria>) => {
     const response = await api.put('/api/auto-deploy/criteria', criteria);
     return response.data;
   },
-
-  // GET /api/auto-deploy/history (✅ exists)
-  getHistory: async (limit = 50): Promise<DeploymentHistoryItem[]> => {
-    const response = await api.get('/api/auto-deploy/history', { params: { limit } });
-    return response.data;
-  },
-
-  // POST /api/auto-deploy/run-now (✅ exists)
-  runNow: async (): Promise<RunNowResponse> => {
-    const response = await api.post('/api/auto-deploy/run-now');
-    return response.data;
-  },
-
-  // GET /api/auto-deploy/health (✅ exists)
-  getHealth: async (): Promise<{ status: string; deployer_initialized: boolean; database_connected: boolean }> => {
-    const response = await api.get('/api/auto-deploy/health');
-    return response.data;
-  },
 };
 
-// ============================================
-// IMAGE ENHANCEMENT API (✅ All endpoints exist)
-// ============================================
-export interface ImageEnhanceRequest {
-  product_id: string;
-  image_url: string;
-}
-
-export interface ImageEnhanceResult {
-  success: boolean;
-  enhanced_url?: string;
-  original_url: string;
-  processing_time?: number;
-  cost: number;
-  error?: string;
-}
-
-export interface BatchEnhanceRequest {
-  products: ImageEnhanceRequest[];
-}
-
-export interface BatchEnhanceResult {
-  results: ImageEnhanceResult[];
-  total_cost: number;
-  succeeded: number;
-  failed: number;
-}
-
-export const imageEnhanceAPI = {
-  // POST /api/images/enhance-product (✅ exists)
-  enhanceProduct: async (request: ImageEnhanceRequest): Promise<ImageEnhanceResult> => {
-    const response = await api.post('/api/images/enhance-product', request);
-    return response.data;
-  },
-
-  // POST /api/images/enhance-batch (✅ exists)
-  enhanceBatch: async (products: ImageEnhanceRequest[]): Promise<BatchEnhanceResult> => {
-    const response = await api.post('/api/images/enhance-batch', { products });
-    return response.data;
-  },
-};
-
-// ============================================
-// RANKINGS API
-// ============================================
-export const rankingsAPI = {
-  // GET /api/rankings/top (✅ exists)
-  getTop: async (limit: number = 20, niche?: string) => {
-    const params: any = { limit };
-    if (niche) params.niche = niche;
-    const response = await api.get('/api/rankings/top', { params });
-    return response.data;
-  },
-};
-
-// Export as both default and named export for backwards compatibility
+// Export the base api instance for custom requests
+export { api };
 export default api;
-export const apiClient = api;

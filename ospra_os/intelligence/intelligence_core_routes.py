@@ -10,12 +10,19 @@ Endpoints:
 - Unified context (full, summary)
 - Actions (preview, execute, undo)
 - Tier management (check, upgrade)
+- 🧠 OSPRA DISCOVERY (REAL cross-source intelligence)
+- 🎨 DALL-E Image Generation
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from pydantic import BaseModel
+from datetime import datetime
+import logging
+import os
+
+logger = logging.getLogger(__name__)
 
 from ospra_os.database.multi_store_models import get_db
 from ospra_os.intelligence.unified_context import get_unified_context_builder
@@ -48,6 +55,23 @@ class TierUpgradeRequest(BaseModel):
     payment_method_id: Optional[str] = None
 
 
+class DiscoverRequest(BaseModel):
+    niches: Optional[List[str]] = None
+    max_per_niche: int = 10
+    generate_images: bool = False
+
+
+class ImageGenerateRequest(BaseModel):
+    product_name: str
+    style: str = "professional"
+    count: int = 1
+
+
+class BannerGenerateRequest(BaseModel):
+    product_name: str
+    campaign_type: str = "social"
+
+
 # ============================================================================
 # BRIEFING ENDPOINTS
 # ============================================================================
@@ -58,15 +82,6 @@ async def get_morning_briefing(
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Get morning AI briefing.
-
-    Returns:
-    - Professional briefing text (no emojis)
-    - Attention items requiring action
-    - Key metrics summary
-    - Recommended actions
-    """
     engine = get_briefing_engine(db)
     return await engine.generate_morning_briefing(user_id, store_id)
 
@@ -75,17 +90,14 @@ async def get_morning_briefing(
 async def get_on_demand_briefing(
     user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
-    focus: Optional[str] = Query(None, description="products, ads, emails, competitors"),
+    focus: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Get on-demand AI briefing, optionally focused on specific area.
-    """
     engine = get_briefing_engine(db)
     return {
         "briefing_text": await engine.generate_on_demand_briefing(user_id, store_id, focus),
         "focus_area": focus,
-        "timestamp": "now"
+        "timestamp": datetime.now().isoformat()
     }
 
 
@@ -100,11 +112,6 @@ async def get_full_context(
     force_refresh: bool = Query(False),
     db: Session = Depends(get_db)
 ):
-    """
-    Get complete unified context (ALL data aggregated).
-
-    This is the "brain's eyes" - everything the AI sees at once.
-    """
     builder = get_unified_context_builder(db)
     return await builder.build_full_context(user_id, store_id, force_refresh)
 
@@ -115,9 +122,6 @@ async def get_context_summary(
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Get executive summary from unified context.
-    """
     builder = get_unified_context_builder(db)
     context = await builder.build_full_context(user_id, store_id)
     return context.get("summary", {})
@@ -129,9 +133,6 @@ async def invalidate_context_cache(
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db)
 ):
-    """
-    Invalidate cached context to force refresh.
-    """
     builder = get_unified_context_builder(db)
     builder.invalidate_cache(user_id, store_id)
     return {"success": True, "message": "Cache invalidated"}
@@ -142,45 +143,21 @@ async def invalidate_context_cache(
 # ============================================================================
 
 @router.get("/grade/product/{product_id}")
-async def grade_product(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Calculate comprehensive product grade with full breakdown.
-
-    Returns:
-    - Letter grade (A+, A, B+, B, C+, C, D, F)
-    - Numerical score (0-100)
-    - Detailed breakdown by factor
-    - Strengths and weaknesses
-    - Actionable recommendation
-    """
+async def grade_product(product_id: int, db: Session = Depends(get_db)):
     engine = get_grade_reasoning_engine(db)
     return await engine.calculate_product_grade(product_id)
 
 
 @router.post("/grade/bulk")
-async def grade_products_bulk(
-    product_ids: List[int],
-    db: Session = Depends(get_db)
-):
-    """
-    Grade multiple products at once.
-    """
+async def grade_products_bulk(product_ids: List[int], db: Session = Depends(get_db)):
     engine = get_grade_reasoning_engine(db)
-
     results = []
     for product_id in product_ids:
         try:
             grade = await engine.calculate_product_grade(product_id)
             results.append(grade)
         except Exception as e:
-            results.append({
-                "product_id": product_id,
-                "error": str(e)
-            })
-
+            results.append({"product_id": product_id, "error": str(e)})
     return {"grades": results, "total": len(results)}
 
 
@@ -189,21 +166,7 @@ async def grade_products_bulk(
 # ============================================================================
 
 @router.get("/progress/product/{product_id}")
-async def get_product_progress(
-    product_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Get complete progress information for product.
-
-    Returns:
-    - Current lifecycle stage
-    - Progress percentage
-    - Days in current stage
-    - Next milestone
-    - Stage history
-    - All milestones with completion status
-    """
+async def get_product_progress(product_id: int, db: Session = Depends(get_db)):
     tracker = get_progress_tracker(db)
     return await tracker.get_product_progress(product_id)
 
@@ -215,9 +178,6 @@ async def advance_product_stage(
     note: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """
-    Manually advance product to new lifecycle stage.
-    """
     tracker = get_progress_tracker(db)
     stage_enum = LifecycleStage(new_stage)
     return await tracker.advance_stage(product_id, stage_enum, note)
@@ -231,11 +191,6 @@ async def get_products_by_stage(
     limit: int = Query(50, le=200),
     db: Session = Depends(get_db)
 ):
-    """
-    Get all products in a specific lifecycle stage.
-
-    Stages: discovery, analysis, deploy, active, review, dropped
-    """
     tracker = get_progress_tracker(db)
     stage_enum = LifecycleStage(stage)
     return await tracker.get_products_by_stage(stage_enum, user_id, store_id, limit)
@@ -246,20 +201,7 @@ async def get_products_by_stage(
 # ============================================================================
 
 @router.get("/tier/info")
-async def get_tier_info(
-    user_id: int = Query(...),
-    db: Session = Depends(get_db)
-):
-    """
-    Get complete tier information for user.
-
-    Returns:
-    - Current tier (starter, pro, enterprise)
-    - Pricing
-    - Feature access
-    - Usage limits
-    - Current usage
-    """
+async def get_tier_info(user_id: int = Query(...), db: Session = Depends(get_db)):
     tier_system = get_tier_system(db)
     return await tier_system.get_tier_info(user_id)
 
@@ -270,18 +212,9 @@ async def check_feature_access(
     feature: str = Query(...),
     db: Session = Depends(get_db)
 ):
-    """
-    Check if user has access to specific feature.
-
-    Features: ai_briefings, auto_deploy, ad_automation, etc.
-    """
     tier_system = get_tier_system(db)
     has_access = await tier_system.check_feature_access(user_id, feature)
-    return {
-        "user_id": user_id,
-        "feature": feature,
-        "has_access": has_access
-    }
+    return {"user_id": user_id, "feature": feature, "has_access": has_access}
 
 
 @router.get("/tier/check-limit")
@@ -291,11 +224,6 @@ async def check_usage_limit(
     current_usage: int = Query(...),
     db: Session = Depends(get_db)
 ):
-    """
-    Check if user has exceeded usage limit.
-
-    Limits: max_products, ai_briefings_per_day, auto_actions_per_day, etc.
-    """
     tier_system = get_tier_system(db)
     return await tier_system.check_limit(user_id, limit_type, current_usage)
 
@@ -306,11 +234,6 @@ async def upgrade_tier(
     request: TierUpgradeRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Upgrade user to new tier.
-
-    Tiers: starter ($29/mo), pro ($99/mo), enterprise ($299/mo)
-    """
     tier_system = get_tier_system(db)
     tier_enum = Tier(request.new_tier)
     return await tier_system.upgrade_tier(user_id, tier_enum, request.payment_method_id)
@@ -321,60 +244,21 @@ async def upgrade_tier(
 # ============================================================================
 
 @router.post("/action/preview")
-async def preview_action(
-    request: ActionPreviewRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Preview what an action will do (without executing).
-
-    Returns:
-    - Action description
-    - Impact
-    - Reversibility
-    - Estimated time
-    - Requires confirmation
-    """
+async def preview_action(request: ActionPreviewRequest, db: Session = Depends(get_db)):
     executor = get_action_executor(db)
     action_type = ActionType(request.action_type)
     return await executor.preview_action(action_type, request.params)
 
 
 @router.post("/action/execute")
-async def execute_action(
-    request: ActionExecuteRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Execute one-click action.
-
-    Actions:
-    - deploy_product
-    - pause_campaign
-    - discontinue_product
-    - adjust_price
-    - create_campaign
-    - reply_email
-
-    Returns:
-    - Action ID (for undo)
-    - Status
-    - Result
-    - Undo availability
-    """
+async def execute_action(request: ActionExecuteRequest, db: Session = Depends(get_db)):
     executor = get_action_executor(db)
     action_type = ActionType(request.action_type)
     return await executor.execute_action(action_type, request.params, request.user_id)
 
 
 @router.post("/action/undo/{action_id}")
-async def undo_action(
-    action_id: int,
-    db: Session = Depends(get_db)
-):
-    """
-    Undo a previously executed action.
-    """
+async def undo_action(action_id: int, db: Session = Depends(get_db)):
     executor = get_action_executor(db)
     return await executor.undo_action(action_id)
 
@@ -385,9 +269,6 @@ async def undo_action(
 
 @router.get("/health")
 async def intelligence_health():
-    """
-    Health check for Intelligence Core.
-    """
     return {
         "status": "healthy",
         "modules": {
@@ -396,7 +277,265 @@ async def intelligence_health():
             "grade_reasoning": "active",
             "progress_flow": "active",
             "tier_system": "active",
-            "action_executor": "active"
+            "action_executor": "active",
+            "ospra_discovery": "active",
+            "dalle_images": "active"
         },
         "message": "Intelligence Core is operational"
+    }
+
+
+# ============================================================================
+# 🧠 OSPRA INTELLIGENCE DISCOVERY (FULLY INTEGRATED)
+# ============================================================================
+
+_ospra_engine = None
+
+def _get_ospra_engine():
+    global _ospra_engine
+    if _ospra_engine is None:
+        try:
+            from ospra_os.intelligence.ospra_engine import OspraIntelligenceEngine
+            database_url = os.getenv('DATABASE_URL')
+            _ospra_engine = OspraIntelligenceEngine(database_url=database_url)
+            logger.info("✅ Ospra Intelligence Engine initialized")
+        except Exception as e:
+            logger.warning(f"⚠️ Ospra Engine not available: {e}")
+            _ospra_engine = None
+    return _ospra_engine
+
+
+@router.post("/discover")
+async def discover_winning_products(request: DiscoverRequest):
+    """
+    🔍 DISCOVER WINNING PRODUCTS
+    
+    Uses ALL connected sources:
+    - Google Trends
+    - TikTok
+    - AliExpress
+    - xAI/Grok (Twitter)
+    - Reddit
+    - Amazon
+    - Apify
+    
+    Only products scoring 7.5+ are saved.
+    """
+    engine = _get_ospra_engine()
+    niches = request.niches or ['smart_home', 'fitness', 'tech_accessories']
+    
+    if not engine:
+        raise HTTPException(status_code=503, detail="Intelligence engine not available")
+    
+    try:
+        winners = await engine.discover_winners(
+            niches=niches,
+            max_per_niche=request.max_per_niche,
+            save_to_db=True,
+            generate_images=request.generate_images
+        )
+        
+        return {
+            "success": True,
+            "message": f"Found {len(winners)} winning products (score 7.5+)",
+            "winners": [w.to_dict() for w in winners],
+            "count": len(winners),
+            "stats": engine.get_stats(),
+            "engine": "OSPRA_INTELLIGENCE_V5",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Discovery failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/discover/stats")
+async def get_discovery_stats():
+    engine = _get_ospra_engine()
+    if not engine:
+        return {"status": "unavailable", "engine_type": "NONE"}
+    return {
+        "status": "ready",
+        "stats": engine.get_stats(),
+        "engine_type": "OSPRA_INTELLIGENCE_V5",
+        "min_score_threshold": 7.5
+    }
+
+
+@router.get("/discover/health")
+async def discovery_engine_health():
+    engine = _get_ospra_engine()
+    if not engine:
+        return {"status": "unavailable", "components": {}}
+    
+    stats = engine.get_stats()
+    return {
+        "status": "operational",
+        "components": stats.get('connected_sources', {}),
+        "engine_type": "OSPRA_INTELLIGENCE_V5"
+    }
+
+
+@router.get("/discover/niches")
+async def get_available_discovery_niches():
+    engine = _get_ospra_engine()
+    
+    default_niches = {
+        'smart_home': ['smart plug wifi', 'led strip lights', 'smart sensor'],
+        'fitness': ['resistance bands', 'yoga mat', 'massage gun'],
+        'tech_accessories': ['wireless charger', 'phone stand', 'usb hub'],
+        'kitchen': ['air fryer accessories', 'kitchen organizer', 'spice rack'],
+        'beauty': ['led face mask', 'facial massager', 'makeup organizer'],
+        'pet': ['pet camera', 'automatic feeder', 'dog water fountain'],
+        'car': ['car phone mount', 'dash cam', 'car vacuum'],
+        'home_office': ['desk organizer', 'monitor stand', 'ergonomic mouse'],
+    }
+    
+    niches = engine.NICHE_KEYWORDS if engine and hasattr(engine, 'NICHE_KEYWORDS') else default_niches
+    
+    return {
+        "success": True,
+        "niches": [
+            {
+                "id": niche_id,
+                "name": niche_id.replace('_', ' ').title(),
+                "keyword_count": len(keywords),
+                "sample_keywords": keywords[:3]
+            }
+            for niche_id, keywords in niches.items()
+        ],
+        "total": len(niches)
+    }
+
+
+# ============================================================================
+# 🎨 DALL-E IMAGE GENERATION
+# ============================================================================
+
+@router.post("/images/generate")
+async def generate_product_images(request: ImageGenerateRequest):
+    """Generate AI product lifestyle images using DALL-E 3"""
+    try:
+        from ospra_os.media.ai_image_generator import AIImageGenerator
+        
+        generator = AIImageGenerator()
+        
+        if generator.provider != 'dalle':
+            raise HTTPException(
+                status_code=503,
+                detail="DALL-E not configured. Set OPENAI_API_KEY."
+            )
+        
+        if request.count == 1:
+            image_path = await generator.generate_lifestyle_image(
+                product_name=request.product_name,
+                style=request.style
+            )
+            images = [image_path] if image_path else []
+        else:
+            images = await generator.generate_product_carousel(
+                product_name=request.product_name,
+                product_image_url="",
+                count=min(request.count, 4)
+            )
+        
+        return {
+            "success": True,
+            "product_name": request.product_name,
+            "style": request.style,
+            "images": images,
+            "count": len(images),
+            "provider": "dall-e-3",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Image generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/images/banner")
+async def generate_marketing_banner(request: BannerGenerateRequest):
+    """Generate marketing banner for ads"""
+    try:
+        from ospra_os.media.ai_image_generator import AIImageGenerator
+        
+        generator = AIImageGenerator()
+        
+        if generator.provider != 'dalle':
+            raise HTTPException(status_code=503, detail="DALL-E not configured")
+        
+        image_path = await generator.generate_marketing_banner(
+            product_name=request.product_name,
+            campaign_type=request.campaign_type
+        )
+        
+        return {
+            "success": True,
+            "product_name": request.product_name,
+            "campaign_type": request.campaign_type,
+            "image": image_path,
+            "provider": "dall-e-3",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Banner generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/images/status")
+async def get_image_generation_status():
+    """Check DALL-E status"""
+    try:
+        from ospra_os.media.ai_image_generator import AIImageGenerator
+        generator = AIImageGenerator()
+        return {
+            "available": generator.provider == 'dalle',
+            "provider": generator.provider,
+            "openai_configured": bool(generator.openai_key)
+        }
+    except Exception as e:
+        return {"available": False, "error": str(e)}
+
+
+# ============================================================================
+# 🔗 ALL CONNECTIONS STATUS
+# ============================================================================
+
+@router.get("/connections")
+async def get_all_connection_status():
+    """Get status of ALL intelligence connections"""
+    engine = _get_ospra_engine()
+    
+    if not engine:
+        return {
+            "status": "engine_not_initialized",
+            "connections": {
+                "google_trends": False,
+                "aliexpress": False,
+                "tiktok": False,
+                "xai_twitter": False,
+                "apify": False,
+                "reddit": False,
+                "amazon": False,
+                "dalle": False,
+            },
+            "total_connected": 0,
+            "total_available": 8
+        }
+    
+    stats = engine.get_stats()
+    connected = stats.get('connected_sources', {})
+    
+    return {
+        "status": "operational",
+        "connections": connected,
+        "total_connected": sum(1 for v in connected.values() if v),
+        "total_available": len(connected),
+        "discovery_stats": {
+            "trends_checked": stats.get('trends_checked', 0),
+            "products_found": stats.get('products_found', 0),
+            "products_validated": stats.get('products_validated', 0),
+            "products_passed": stats.get('products_passed', 0),
+            "pass_rate": stats.get('pass_rate', 0),
+        }
     }
