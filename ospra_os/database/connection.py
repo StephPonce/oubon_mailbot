@@ -20,76 +20,59 @@ from functools import lru_cache
 from typing import Generator
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 
-# Get database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ospra_os.db")
+# Get database URL from environment (PostgreSQL required)
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL environment variable is required for PostgreSQL connection. "
+        "Set it to your PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/dbname)"
+    )
 
 
-def get_connection_args(url: str) -> dict:
+def get_pool_args() -> dict:
     """
-    Get appropriate connection args based on database type.
-    
-    SQLite: needs check_same_thread=False for FastAPI
-    PostgreSQL: no special args needed
-    """
-    if "sqlite" in url.lower():
-        return {
-            "check_same_thread": False
-        }
-    return {}
+    Get PostgreSQL connection pool configuration.
 
-
-def get_pool_args(url: str) -> dict:
+    Returns optimized pool settings for production PostgreSQL usage.
     """
-    Get pool configuration based on database type.
-    
-    SQLite: use StaticPool for better concurrency
-    PostgreSQL: use default connection pooling
-    """
-    if "sqlite" in url.lower():
-        return {
-            "poolclass": StaticPool
-        }
     return {
         "pool_size": 5,
         "max_overflow": 10,
-        "pool_pre_ping": True  # Verify connections before use
+        "pool_pre_ping": True,  # Verify connections before use
+        "pool_recycle": 3600,   # Recycle connections after 1 hour
     }
 
 
 @lru_cache(maxsize=1)
 def get_engine(database_url: str = None):
     """
-    Create SQLAlchemy engine with proper configuration.
-    
-    Cached to ensure single engine instance.
+    Create PostgreSQL SQLAlchemy engine with optimized connection pooling.
+
+    Cached to ensure single engine instance across the application.
     """
     url = database_url or DATABASE_URL
-    
+
     # Handle Render's postgres:// URL format (needs postgresql://)
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
-    
+
+    # Verify it's a PostgreSQL URL
+    if not url.startswith("postgresql://"):
+        raise ValueError(
+            f"Invalid database URL. PostgreSQL required, got: {url[:20]}... "
+            "Expected format: postgresql://user:pass@host:5432/dbname"
+        )
+
     engine = create_engine(
         url,
-        connect_args=get_connection_args(url),
-        **get_pool_args(url),
+        **get_pool_args(),
         echo=os.getenv("SQL_ECHO", "false").lower() == "true"
     )
-    
-    # Enable WAL mode for SQLite (better concurrency)
-    if "sqlite" in url.lower():
-        @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA journal_mode=WAL")
-            cursor.execute("PRAGMA synchronous=NORMAL")
-            cursor.execute("PRAGMA busy_timeout=5000")
-            cursor.close()
-    
+
     return engine
 
 
@@ -152,7 +135,7 @@ def get_db(database_url: str = None) -> Generator[Session, None, None]:
 
 def init_database(database_url: str = None):
     """
-    Initialize database - create all tables.
+    Initialize PostgreSQL database - create all tables.
 
     Call this on app startup.
     """
@@ -160,35 +143,33 @@ def init_database(database_url: str = None):
 
     engine = get_engine(database_url)
     Base.metadata.create_all(bind=engine)
-    
-    db_type = "PostgreSQL" if "postgresql" in str(engine.url) else "SQLite"
-    print(f"✅ Database initialized ({db_type})")
+
+    print(f"[SUCCESS] PostgreSQL database initialized")
+    print(f"   URL: {str(engine.url).split('@')[-1]}")  # Hide credentials
     print(f"   Tables: {len(Base.metadata.tables)}")
-    
+
     return engine
 
 
 def check_database_connection(database_url: str = None) -> dict:
     """
-    Check database connectivity and return status.
-    
+    Check PostgreSQL database connectivity and return status.
+
     Useful for health checks.
     """
     try:
         engine = get_engine(database_url)
-        
+
         from sqlalchemy import text
-        
+
         with engine.connect() as conn:
             # Simple query to verify connection
             result = conn.execute(text("SELECT 1"))
             result.fetchone()
-        
-        db_type = "postgresql" if "postgresql" in str(engine.url) else "sqlite"
-        
+
         return {
             "status": "healthy",
-            "database_type": db_type,
+            "database_type": "postgresql",
             "url_masked": str(engine.url).split("@")[-1] if "@" in str(engine.url) else str(engine.url)
         }
     except Exception as e:
