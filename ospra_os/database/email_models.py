@@ -5,8 +5,7 @@ Email Models for OspraOS
 import os
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
-    ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum,
-    create_engine
+    ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum
 )
 from sqlalchemy.orm import relationship, Session, sessionmaker
 from datetime import datetime
@@ -17,6 +16,7 @@ from .base import (
     AIProvider, TaskType, TriggerType, ActionType, LifecycleStage,
     EntryTiming, RiskLevel
 )
+from .connection import get_engine
 
 
 class Email(Base):
@@ -418,15 +418,8 @@ print("[SUCCESS] Email Automation models added")
 # DATABASE SESSION MANAGEMENT
 # ============================================================================
 
-# Database URL (from environment or default to SQLite)
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./ospra_os.db")
-
-# Create engine
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
-    echo=False
-)
+# Use centralized engine from connection module (handles PostgreSQL with psycopg2)
+engine = get_engine()
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
