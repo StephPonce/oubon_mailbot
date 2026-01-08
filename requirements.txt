@@ -67,3 +67,9 @@ psutil>=5.9.0
 
 # PDF Reports
 reportlab>=4.0.0
+
+# Web Scraping
+beautifulsoup4>=4.12.0
+
+# Microsoft OAuth (Email Sync)
+msal>=1.24.0
