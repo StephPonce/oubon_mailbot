@@ -39,7 +39,7 @@ class GoogleAdsManager:
             Campaign info dict
         """
         try:
-            print(f"🔍 Creating Google Ads campaign for: {product_name}")
+            print(f"[SEARCH] Creating Google Ads campaign for: {product_name}")
 
             campaign_service = self.client.get_service("CampaignService")
             ad_group_service = self.client.get_service("AdGroupService")
@@ -87,7 +87,7 @@ class GoogleAdsManager:
             # Add Keywords
             await self._add_keywords(ad_group_resource_name, keywords)
 
-            print(f"✅ Google Ads campaign created")
+            print(f"[SUCCESS] Google Ads campaign created")
 
             return {
                 'success': True,
@@ -98,7 +98,7 @@ class GoogleAdsManager:
             }
 
         except GoogleAdsException as e:
-            print(f"❌ Google Ads failed: {e}")
+            print(f"[ERROR] Google Ads failed: {e}")
             return {'success': False, 'error': str(e)}
 
     def _build_campaign_operation(self, name: str, daily_budget: float):

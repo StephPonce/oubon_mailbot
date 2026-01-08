@@ -333,7 +333,7 @@ class CompetitorScrapeLogs(Base):
 def init_competitor_tables(engine):
     """Create all competitor intelligence tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Competitor intelligence tables created")
+    print("[SUCCESS] Competitor intelligence tables created")
     print("   - competitors")
     print("   - competitor_products")
     print("   - competitor_price_history")

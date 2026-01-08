@@ -38,7 +38,7 @@ class ResponseCache:
             expires_at = cached["expires_at"]
 
             if datetime.utcnow() < expires_at:
-                print(f"💾 Cache hit! Saved AI call")
+                print(f" Cache hit! Saved AI call")
                 return cached["response"]
             else:
                 # Expired, remove from cache
@@ -57,7 +57,7 @@ class ResponseCache:
             "created_at": datetime.utcnow(),
         }
 
-        print(f"💾 Cached response (expires in {self.ttl_hours}h)")
+        print(f" Cached response (expires in {self.ttl_hours}h)")
 
     def clear_expired(self):
         """Remove expired entries from cache."""
@@ -71,7 +71,7 @@ class ResponseCache:
             del self.cache[key]
 
         if expired_keys:
-            print(f"🧹 Cleared {len(expired_keys)} expired cache entries")
+            print(f" Cleared {len(expired_keys)} expired cache entries")
 
     def get_stats(self) -> Dict:
         """Get cache statistics."""
@@ -158,7 +158,7 @@ def get_cached_response(subject: str, body: str) -> Optional[str]:
     # Check FAQ first (instant)
     faq = get_faq_response(subject, body)
     if faq:
-        print("📚 FAQ response used (instant, no AI cost)")
+        print(" FAQ response used (instant, no AI cost)")
         return faq
 
     # Check cache

@@ -682,4 +682,4 @@ def get_price_recommendations(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-print("✅ A/B Testing API routes loaded successfully")
+print("[SUCCESS] A/B Testing API routes loaded successfully")

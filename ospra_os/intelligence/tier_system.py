@@ -1,5 +1,5 @@
 """
-⚠️ DEPRECATED - Use ospra_os.core.tiers instead
+[WARNING] DEPRECATED - Use ospra_os.core.tiers instead
 
 This file is maintained for backward compatibility only.
 All tier logic has been unified in ospra_os.core.tiers.
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 
 class Tier(str, Enum):
     """
-    ⚠️ DEPRECATED - Use SubscriptionTier from ospra_os.core.tiers
+    [WARNING] DEPRECATED - Use SubscriptionTier from ospra_os.core.tiers
     
     Legacy tier enum kept for backward compatibility.
     """
@@ -68,7 +68,7 @@ def _convert_tier(old_tier) -> SubscriptionTier:
 
 class TierSystem:
     """
-    ⚠️ DEPRECATED - Use TierEnforcer from ospra_os.core.tiers
+    [WARNING] DEPRECATED - Use TierEnforcer from ospra_os.core.tiers
     
     This class wraps the new TierEnforcer for backward compatibility.
     """
@@ -177,7 +177,7 @@ _tier_system = None
 
 def get_tier_system(db: Session = None) -> TierSystem:
     """
-    ⚠️ DEPRECATED - Use TierEnforcer from ospra_os.core.tiers instead
+    [WARNING] DEPRECATED - Use TierEnforcer from ospra_os.core.tiers instead
     """
     warnings.warn(
         "get_tier_system is deprecated. Use TierEnforcer from ospra_os.core.tiers instead.",
@@ -193,36 +193,36 @@ def get_tier_system(db: Session = None) -> TierSystem:
 # ==================== MIGRATION GUIDE ====================
 
 MIGRATION_GUIDE = """
-╔══════════════════════════════════════════════════════════════════╗
-║              TIER SYSTEM MIGRATION GUIDE                         ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  This file is DEPRECATED. Please migrate to the new system:     ║
-║                                                                  ║
-║  OLD (deprecated):                                               ║
-║    from ospra_os.intelligence.tier_system import Tier, TierSystem║
-║    tier_system = TierSystem(db)                                  ║
-║    await tier_system.check_feature_access(user_id, 'feature')    ║
-║                                                                  ║
-║  NEW (use this):                                                 ║
-║    from ospra_os.core import (                                   ║
-║        SubscriptionTier,                                         ║
-║        TierEnforcer,                                             ║
-║        get_tier_feature,                                         ║
-║        tier_has_feature,                                         ║
-║    )                                                             ║
-║                                                                  ║
-║    enforcer = TierEnforcer(user_tier=SubscriptionTier.SOAR)     ║
-║    if enforcer.can_access('feature'):                            ║
-║        # do something                                            ║
-║                                                                  ║
-║  Tier name mappings:                                             ║
-║    STARTER    →  FLIGHT ($29)                                   ║
-║    PRO        →  SOAR ($79)                                     ║
-║    ENTERPRISE →  STRATOSPHERE ($199)                            ║
-║    FREE       →  NEST ($0)                                      ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+
+              TIER SYSTEM MIGRATION GUIDE                         
+
+                                                                  
+  This file is DEPRECATED. Please migrate to the new system:     
+                                                                  
+  OLD (deprecated):                                               
+    from ospra_os.intelligence.tier_system import Tier, TierSystem
+    tier_system = TierSystem(db)                                  
+    await tier_system.check_feature_access(user_id, 'feature')    
+                                                                  
+  NEW (use this):                                                 
+    from ospra_os.core import (                                   
+        SubscriptionTier,                                         
+        TierEnforcer,                                             
+        get_tier_feature,                                         
+        tier_has_feature,                                         
+    )                                                             
+                                                                  
+    enforcer = TierEnforcer(user_tier=SubscriptionTier.SOAR)     
+    if enforcer.can_access('feature'):                            
+        # do something                                            
+                                                                  
+  Tier name mappings:                                             
+    STARTER    →  FLIGHT ($29)                                   
+    PRO        →  SOAR ($79)                                     
+    ENTERPRISE →  STRATOSPHERE ($199)                            
+    FREE       →  NEST ($0)                                      
+                                                                  
+
 """
 
 if __name__ == "__main__":

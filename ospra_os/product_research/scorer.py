@@ -184,11 +184,11 @@ class ProductScorer:
     def _get_recommendation(self, score: float) -> str:
         """Get recommendation text based on score with priority labels."""
         if score >= 7.0:
-            return "🔥 HIGH PRIORITY - Strong demand and trending"
+            return "[HOT] HIGH PRIORITY - Strong demand and trending"
         elif score >= 5.0:
-            return "✅ MEDIUM PRIORITY - Worth testing with small budget"
+            return "[SUCCESS] MEDIUM PRIORITY - Worth testing with small budget"
         else:
-            return "⚠️ LOW PRIORITY - Weak signals, high risk"
+            return "[WARNING] LOW PRIORITY - Weak signals, high risk"
 
     def get_priority_label(self, score: float) -> str:
         """Get priority label (HIGH/MEDIUM/LOW) based on score."""

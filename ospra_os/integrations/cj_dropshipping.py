@@ -205,7 +205,7 @@ class CJDropshippingClient:
 
                 # Check if API call was successful
                 if not response.get("result"):
-                    print(f"⚠️ API error on page {page}: {response.get('message')}")
+                    print(f"[WARNING] API error on page {page}: {response.get('message')}")
                     continue
 
                 # Extract product list from response
@@ -224,7 +224,7 @@ class CJDropshippingClient:
                     break
 
             except Exception as e:
-                print(f"⚠️ Error fetching page {page}: {e}")
+                print(f"[WARNING] Error fetching page {page}: {e}")
                 continue
 
         return all_products[:max_products]
@@ -286,20 +286,20 @@ async def test_connection():
     client = get_cj_client()
 
     try:
-        print("🔍 Testing CJ Dropshipping API connection...")
+        print("[SEARCH] Testing CJ Dropshipping API connection...")
 
         # Test categories
         categories = await client.get_categories()
-        print(f"✅ Found {len(categories)} categories")
+        print(f"[SUCCESS] Found {len(categories)} categories")
 
         # Test product search
         products = await client.discover_products_for_ospra(max_products=5)
-        print(f"✅ Found {len(products)} products")
+        print(f"[SUCCESS] Found {len(products)} products")
 
         for p in products:
             print(f"   {p['name'][:40]:40} | ${p['cost']:6.2f} → ${p['price']:6.2f}")
 
-        print("\n✅ CJ API connection successful!")
+        print("\n[SUCCESS] CJ API connection successful!")
 
     finally:
         await client.close()

@@ -28,13 +28,13 @@ class ImageStorage:
 
     Directory structure:
     data/images/
-    ├── products/
-    │   ├── {product_id}/
-    │   │   ├── original_20241206_143022.png
-    │   │   ├── enhanced_20241206_143023.png
-    │   │   └── thumbnail_20241206_143024.jpg
-    │   └── {another_product_id}/
-    └── temp/
+     products/
+        {product_id}/
+           original_20241206_143022.png
+           enhanced_20241206_143023.png
+           thumbnail_20241206_143024.jpg
+        {another_product_id}/
+     temp/
     """
 
     def __init__(
@@ -72,7 +72,7 @@ class ImageStorage:
         if enable_cloud_upload:
             self._init_cloud_clients()
 
-        logger.info(f"✅ ImageStorage initialized: {self.base_path.absolute()}")
+        logger.info(f"[SUCCESS] ImageStorage initialized: {self.base_path.absolute()}")
         logger.info(f"   Cloud upload: {'enabled' if enable_cloud_upload else 'disabled'}")
 
     def _ensure_directories(self) -> None:
@@ -80,7 +80,7 @@ class ImageStorage:
         self.base_path.mkdir(parents=True, exist_ok=True)
         self.products_path.mkdir(parents=True, exist_ok=True)
         self.temp_path.mkdir(parents=True, exist_ok=True)
-        logger.debug(f"📁 Ensured directories exist: {self.base_path}")
+        logger.debug(f" Ensured directories exist: {self.base_path}")
 
     def _init_cloud_clients(self) -> None:
         """Initialize cloud storage clients (Cloudinary, S3)."""
@@ -96,11 +96,11 @@ class ImageStorage:
                     api_secret=self.cloudinary_config.get("api_secret")
                 )
                 self.cloudinary_client = cloudinary
-                logger.info("✅ Cloudinary client initialized")
+                logger.info("[SUCCESS] Cloudinary client initialized")
             except ImportError:
-                logger.warning("⚠️  Cloudinary not installed: pip install cloudinary")
+                logger.warning("[WARNING]  Cloudinary not installed: pip install cloudinary")
             except Exception as e:
-                logger.error(f"❌ Cloudinary initialization failed: {e}")
+                logger.error(f"[ERROR] Cloudinary initialization failed: {e}")
 
         # S3 initialization
         if self.s3_config:
@@ -113,11 +113,11 @@ class ImageStorage:
                     aws_access_key_id=self.s3_config.get("access_key"),
                     aws_secret_access_key=self.s3_config.get("secret_key")
                 )
-                logger.info("✅ S3 client initialized")
+                logger.info("[SUCCESS] S3 client initialized")
             except ImportError:
-                logger.warning("⚠️  boto3 not installed: pip install boto3")
+                logger.warning("[WARNING]  boto3 not installed: pip install boto3")
             except Exception as e:
-                logger.error(f"❌ S3 initialization failed: {e}")
+                logger.error(f"[ERROR] S3 initialization failed: {e}")
 
     def _generate_filename(
         self,
@@ -242,11 +242,11 @@ class ImageStorage:
                     result["cloud_url"] = cloud_result["url"]
                     result["cloud_public_id"] = cloud_result.get("public_id")
 
-            logger.info(f"✅ Saved image: {filename} ({file_size:,} bytes)")
+            logger.info(f"[SUCCESS] Saved image: {filename} ({file_size:,} bytes)")
             return result
 
         except Exception as e:
-            logger.error(f"❌ Failed to save image: {e}")
+            logger.error(f"[ERROR] Failed to save image: {e}")
             return {
                 "success": False,
                 "error": str(e)
@@ -297,7 +297,7 @@ class ImageStorage:
                 resource_type="image"
             )
 
-            logger.info(f"✅ Uploaded to Cloudinary: {public_id}")
+            logger.info(f"[SUCCESS] Uploaded to Cloudinary: {public_id}")
 
             return {
                 "url": result["secure_url"],
@@ -305,7 +305,7 @@ class ImageStorage:
             }
 
         except Exception as e:
-            logger.error(f"❌ Cloudinary upload failed: {e}")
+            logger.error(f"[ERROR] Cloudinary upload failed: {e}")
             return None
 
     def _upload_to_s3(
@@ -334,7 +334,7 @@ class ImageStorage:
             # Generate URL
             url = f"https://{bucket}.s3.{region}.amazonaws.com/{s3_key}"
 
-            logger.info(f"✅ Uploaded to S3: {s3_key}")
+            logger.info(f"[SUCCESS] Uploaded to S3: {s3_key}")
 
             return {
                 "url": url,
@@ -342,7 +342,7 @@ class ImageStorage:
             }
 
         except Exception as e:
-            logger.error(f"❌ S3 upload failed: {e}")
+            logger.error(f"[ERROR] S3 upload failed: {e}")
             return None
 
     def _get_content_type(self, file_path: str) -> str:
@@ -370,7 +370,7 @@ class ImageStorage:
         product_dir = self.products_path / product_id
 
         if not product_dir.exists():
-            logger.warning(f"⚠️  Product directory not found: {product_id}")
+            logger.warning(f"[WARNING]  Product directory not found: {product_id}")
             return []
 
         images = []
@@ -393,7 +393,7 @@ class ImageStorage:
                     "created_at": datetime.fromtimestamp(image_file.stat().st_ctime).isoformat()
                 })
 
-        logger.debug(f"📸 Found {len(images)} images for product {product_id}")
+        logger.debug(f" Found {len(images)} images for product {product_id}")
         return sorted(images, key=lambda x: x["created_at"], reverse=True)
 
     def get_latest_image(
@@ -452,7 +452,7 @@ class ImageStorage:
             # Remove directory
             product_dir.rmdir()
 
-            logger.info(f"✅ Deleted {deleted_count} images for product {product_id}")
+            logger.info(f"[SUCCESS] Deleted {deleted_count} images for product {product_id}")
 
             return {
                 "success": len(errors) == 0,
@@ -461,7 +461,7 @@ class ImageStorage:
             }
 
         except Exception as e:
-            logger.error(f"❌ Failed to delete images: {e}")
+            logger.error(f"[ERROR] Failed to delete images: {e}")
             return {
                 "success": False,
                 "deleted_count": deleted_count,
@@ -490,7 +490,7 @@ class ImageStorage:
 
         try:
             image_path.unlink()
-            logger.info(f"✅ Deleted image: {filename}")
+            logger.info(f"[SUCCESS] Deleted image: {filename}")
 
             # Remove directory if empty
             if not any(product_dir.iterdir()):
@@ -502,7 +502,7 @@ class ImageStorage:
             }
 
         except Exception as e:
-            logger.error(f"❌ Failed to delete image: {e}")
+            logger.error(f"[ERROR] Failed to delete image: {e}")
             return {
                 "success": False,
                 "message": str(e)
@@ -577,7 +577,7 @@ def get_image_storage() -> ImageStorage:
 
 if __name__ == "__main__":
     # Demo usage
-    print("🖼️  Image Storage Service Demo\n")
+    print("  Image Storage Service Demo\n")
 
     storage = ImageStorage()
 
@@ -592,22 +592,22 @@ if __name__ == "__main__":
         format="png"
     )
 
-    print("✅ Saved image:")
+    print("[SUCCESS] Saved image:")
     print(f"   Local: {result['local_path']}")
     print(f"   URL: {result['url']}")
     print(f"   Size: {result['size_bytes']:,} bytes")
 
     # Get all images for product
     images = storage.get_product_images("test-product-123")
-    print(f"\n📸 Found {len(images)} images for product")
+    print(f"\n Found {len(images)} images for product")
 
     # Get stats
     stats = storage.get_storage_stats()
-    print(f"\n📊 Storage stats:")
+    print(f"\n[STATS] Storage stats:")
     print(f"   Products: {stats['total_products']}")
     print(f"   Images: {stats['total_images']}")
     print(f"   Size: {stats['total_size_mb']} MB")
 
     # Cleanup
     storage.delete_product_images("test-product-123")
-    print("\n🗑️  Cleaned up test images")
+    print("\n  Cleaned up test images")

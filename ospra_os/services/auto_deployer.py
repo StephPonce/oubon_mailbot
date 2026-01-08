@@ -99,14 +99,14 @@ class AutoDeployer:
         # Load settings from database
         self.settings = self._load_settings()
 
-        logger.info("✅ AutoDeployer initialized")
+        logger.info("[SUCCESS] AutoDeployer initialized")
 
     def _setup_database(self):
         """Setup SQLite database for tracking"""
         engine = create_engine(self.db_url, connect_args={"check_same_thread": False})
         Base.metadata.create_all(bind=engine)
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-        logger.info(f"✅ Auto-deploy database initialized: {self.db_url}")
+        logger.info(f"[SUCCESS] Auto-deploy database initialized: {self.db_url}")
 
     def _load_settings(self) -> Dict:
         """Load settings from database or create defaults"""
@@ -137,7 +137,7 @@ class AutoDeployer:
                 db.add(settings)
                 db.commit()
                 db.refresh(settings)
-                logger.info("✅ Created default auto-deploy settings")
+                logger.info("[SUCCESS] Created default auto-deploy settings")
 
             return {
                 "enabled": settings.enabled,
@@ -162,7 +162,7 @@ class AutoDeployer:
                 settings.total_cost = self.settings.get("total_cost", 0.0)
                 settings.updated_at = datetime.utcnow()
                 db.commit()
-                logger.info("✅ Auto-deploy settings saved")
+                logger.info("[SUCCESS] Auto-deploy settings saved")
         finally:
             db.close()
 
@@ -174,7 +174,7 @@ class AutoDeployer:
             Dict with deployment results and statistics
         """
         if not self.settings["enabled"]:
-            logger.info("⏭️  Auto-deploy is disabled, skipping")
+            logger.info("⏭  Auto-deploy is disabled, skipping")
             return {
                 "success": False,
                 "reason": "Auto-deploy is disabled",
@@ -182,7 +182,7 @@ class AutoDeployer:
             }
 
         logger.info("=" * 70)
-        logger.info("🤖 AUTO-DEPLOY: Starting scheduled check...")
+        logger.info("[AI] AUTO-DEPLOY: Starting scheduled check...")
         logger.info("=" * 70)
 
         try:
@@ -192,7 +192,7 @@ class AutoDeployer:
 
             # Check daily limits
             if not await self._check_daily_limits():
-                logger.info("⏭️  Daily limits reached, skipping")
+                logger.info("⏭  Daily limits reached, skipping")
                 return {
                     "success": False,
                     "reason": "Daily limits reached",
@@ -200,18 +200,18 @@ class AutoDeployer:
                 }
 
             # Get deployment candidates
-            logger.info("🔍 Finding deployment candidates...")
+            logger.info("[SEARCH] Finding deployment candidates...")
             candidates = await self.get_deployment_candidates()
 
             if not candidates:
-                logger.info("📭 No products meet deployment criteria")
+                logger.info(" No products meet deployment criteria")
                 return {
                     "success": True,
                     "reason": "No candidates found",
                     "deployed": 0
                 }
 
-            logger.info(f"✅ Found {len(candidates)} deployment candidates")
+            logger.info(f"[SUCCESS] Found {len(candidates)} deployment candidates")
 
             # Filter by hourly and daily limits
             criteria = self.settings["criteria"]
@@ -221,7 +221,7 @@ class AutoDeployer:
             )
 
             to_deploy = candidates[:max_to_deploy]
-            logger.info(f"📦 Deploying {len(to_deploy)} products (limit: {max_to_deploy})")
+            logger.info(f"[PACKAGE] Deploying {len(to_deploy)} products (limit: {max_to_deploy})")
 
             # Deploy each product
             results = []
@@ -231,7 +231,7 @@ class AutoDeployer:
 
             for i, product in enumerate(to_deploy, 1):
                 logger.info(f"\n{'='*70}")
-                logger.info(f"🚀 Deploying {i}/{len(to_deploy)}: {product['name'][:50]}")
+                logger.info(f"[START] Deploying {i}/{len(to_deploy)}: {product['name'][:50]}")
                 logger.info(f"{'='*70}")
 
                 try:
@@ -248,19 +248,19 @@ class AutoDeployer:
                         # Notify admin
                         await self._notify_admin(product, result)
 
-                        logger.info(f"✅ Deployed successfully: {result.get('shopify_url')}")
+                        logger.info(f"[SUCCESS] Deployed successfully: {result.get('shopify_url')}")
                     else:
                         failed += 1
-                        logger.error(f"❌ Deployment failed: {result.get('error')}")
+                        logger.error(f"[ERROR] Deployment failed: {result.get('error')}")
 
                     # Rate limiting pause between deployments
                     if i < len(to_deploy):
-                        logger.info("⏸️  Pausing 30s between deployments...")
+                        logger.info("[PAUSE]  Pausing 30s between deployments...")
                         await asyncio.sleep(30)
 
                 except Exception as e:
                     failed += 1
-                    logger.error(f"❌ Deployment error: {e}")
+                    logger.error(f"[ERROR] Deployment error: {e}")
                     results.append({
                         "success": False,
                         "product_name": product.get("name"),
@@ -273,12 +273,12 @@ class AutoDeployer:
             self._save_settings()
 
             logger.info("\n" + "=" * 70)
-            logger.info(f"🎯 AUTO-DEPLOY COMPLETE")
+            logger.info(f"[TARGET] AUTO-DEPLOY COMPLETE")
             logger.info("=" * 70)
-            logger.info(f"✅ Successful: {successful}")
-            logger.info(f"❌ Failed: {failed}")
-            logger.info(f"💰 Total cost: ${total_cost:.2f}")
-            logger.info(f"📊 All-time deployed: {self.settings['total_deployed']}")
+            logger.info(f"[SUCCESS] Successful: {successful}")
+            logger.info(f"[ERROR] Failed: {failed}")
+            logger.info(f"[PRICE] Total cost: ${total_cost:.2f}")
+            logger.info(f"[STATS] All-time deployed: {self.settings['total_deployed']}")
             logger.info("=" * 70)
 
             return {
@@ -290,7 +290,7 @@ class AutoDeployer:
             }
 
         except Exception as e:
-            logger.error(f"❌ Auto-deploy check failed: {e}")
+            logger.error(f"[ERROR] Auto-deploy check failed: {e}")
             import traceback
             traceback.print_exc()
             return {
@@ -312,7 +312,7 @@ class AutoDeployer:
         # Discover products from all niches
         for niche in criteria["allowed_niches"]:
             try:
-                logger.info(f"🔍 Discovering products in {niche}...")
+                logger.info(f"[SEARCH] Discovering products in {niche}...")
 
                 # Use unified discovery to find trending products
                 products = await self.discovery.discover_products(
@@ -327,16 +327,16 @@ class AutoDeployer:
                         # Check if already deployed
                         if not await self._is_already_deployed(product):
                             candidates.append(product)
-                            logger.info(f"✅ Candidate: {product.get('name', 'Unknown')[:50]} (score: {product.get('score', 0)})")
+                            logger.info(f"[SUCCESS] Candidate: {product.get('name', 'Unknown')[:50]} (score: {product.get('score', 0)})")
 
             except Exception as e:
-                logger.error(f"❌ Discovery failed for {niche}: {e}")
+                logger.error(f"[ERROR] Discovery failed for {niche}: {e}")
                 continue
 
         # Sort by score (highest first)
         candidates.sort(key=lambda p: p.get("score", 0), reverse=True)
 
-        logger.info(f"✅ Found {len(candidates)} total candidates across all niches")
+        logger.info(f"[SUCCESS] Found {len(candidates)} total candidates across all niches")
         return candidates
 
     async def _meets_criteria(self, product: Dict) -> bool:
@@ -448,7 +448,7 @@ class AutoDeployer:
             )
             db.add(deployment)
             db.commit()
-            logger.info("✅ Deployment tracked in database")
+            logger.info("[SUCCESS] Deployment tracked in database")
         finally:
             db.close()
 
@@ -460,7 +460,7 @@ class AutoDeployer:
             notifier = EmailNotifier()
 
             if result.get("success"):
-                subject = f"✅ Auto-Deployed: {product.get('name', 'Product')[:50]}"
+                subject = f"[SUCCESS] Auto-Deployed: {product.get('name', 'Product')[:50]}"
                 message = f"""
                 Auto-deployment successful!
 
@@ -486,7 +486,7 @@ class AutoDeployer:
                     priority="medium"
                 )
             else:
-                subject = f"❌ Auto-Deploy Failed: {product.get('name', 'Product')[:50]}"
+                subject = f"[ERROR] Auto-Deploy Failed: {product.get('name', 'Product')[:50]}"
                 message = f"""
                 Auto-deployment failed.
 
@@ -502,7 +502,7 @@ class AutoDeployer:
                 )
 
         except Exception as e:
-            logger.error(f"⚠️  Failed to send notification: {e}")
+            logger.error(f"[WARNING]  Failed to send notification: {e}")
 
     async def _check_daily_limits(self) -> bool:
         """Check if daily deployment limits have been reached"""
@@ -518,7 +518,7 @@ class AutoDeployer:
             max_per_day = self.settings["criteria"].get("max_per_day", 5)
 
             if count >= max_per_day:
-                logger.warning(f"⚠️  Daily limit reached: {count}/{max_per_day}")
+                logger.warning(f"[WARNING]  Daily limit reached: {count}/{max_per_day}")
                 return False
 
             # Check daily cost limit
@@ -530,10 +530,10 @@ class AutoDeployer:
             max_daily_cost = self.settings["criteria"].get("max_daily_cost", 1.0)
 
             if daily_cost >= max_daily_cost:
-                logger.warning(f"⚠️  Daily cost limit reached: ${daily_cost:.2f}/${max_daily_cost:.2f}")
+                logger.warning(f"[WARNING]  Daily cost limit reached: ${daily_cost:.2f}/${max_daily_cost:.2f}")
                 return False
 
-            logger.info(f"✅ Daily limits OK: {count}/{max_per_day} deployments, ${daily_cost:.2f}/${max_daily_cost:.2f} spent")
+            logger.info(f"[SUCCESS] Daily limits OK: {count}/{max_per_day} deployments, ${daily_cost:.2f}/${max_daily_cost:.2f} spent")
             return True
 
         finally:
@@ -558,19 +558,19 @@ class AutoDeployer:
         """Enable auto-deployment"""
         self.settings["enabled"] = True
         self._save_settings()
-        logger.info("✅ Auto-deployment ENABLED")
+        logger.info("[SUCCESS] Auto-deployment ENABLED")
 
     def disable(self):
         """Disable auto-deployment"""
         self.settings["enabled"] = False
         self._save_settings()
-        logger.info("⏸️  Auto-deployment DISABLED")
+        logger.info("[PAUSE]  Auto-deployment DISABLED")
 
     def update_criteria(self, new_criteria: Dict):
         """Update deployment criteria"""
         self.settings["criteria"].update(new_criteria)
         self._save_settings()
-        logger.info(f"✅ Criteria updated: {new_criteria}")
+        logger.info(f"[SUCCESS] Criteria updated: {new_criteria}")
 
     def get_status(self) -> Dict:
         """Get current auto-deploy status"""

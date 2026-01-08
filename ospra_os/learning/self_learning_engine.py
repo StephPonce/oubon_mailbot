@@ -1,5 +1,5 @@
 """
-⚠️ DEPRECATED - Use ospra_os.learning.hybrid_learning_engine instead
+[WARNING] DEPRECATED - Use ospra_os.learning.hybrid_learning_engine instead
 
 This file-based learning engine has been replaced by the database-backed
 HybridLearningEngine which supports:
@@ -58,7 +58,7 @@ class SelfLearningEngine:
             stacklevel=2
         )
         self._engine = HybridLearningEngine()
-        logger.warning("⚠️ Using deprecated SelfLearningEngine - migrate to HybridLearningEngine")
+        logger.warning("[WARNING] Using deprecated SelfLearningEngine - migrate to HybridLearningEngine")
     
     @property
     def weights(self):

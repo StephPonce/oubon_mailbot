@@ -41,7 +41,7 @@ class MetaConnector(BaseConnector):
             Product candidates with social engagement data
         """
         if not self.api_key:
-            print("⚠️  META_ACCESS_TOKEN not configured")
+            print("[WARNING]  META_ACCESS_TOKEN not configured")
             return []
 
         platform = kwargs.get("platform", "both")
@@ -53,7 +53,7 @@ class MetaConnector(BaseConnector):
         # - GET /instagram_hashtag_search?q={hashtag}
         # - GET /page/posts (for business pages)
 
-        print(f"📊 Meta API call: search('{query}', platform={platform})")
+        print(f"[STATS] Meta API call: search('{query}', platform={platform})")
         return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
@@ -68,7 +68,7 @@ class MetaConnector(BaseConnector):
             Trending products ranked by social engagement
         """
         if not self.api_key:
-            print("⚠️  META_ACCESS_TOKEN not configured")
+            print("[WARNING]  META_ACCESS_TOKEN not configured")
             return []
 
         # TODO: Implement trending hashtag discovery
@@ -76,7 +76,7 @@ class MetaConnector(BaseConnector):
         # - Calculate engagement rate
         # - Find products with rising mentions
 
-        print(f"📊 Meta API call: get_trending(category={category})")
+        print(f"[STATS] Meta API call: get_trending(category={category})")
         return []
 
     async def get_hashtag_stats(self, hashtag: str) -> dict:

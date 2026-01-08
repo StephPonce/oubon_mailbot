@@ -46,7 +46,7 @@ def setup_sentry(
     """
 
     if not dsn:
-        print("⚠️  Sentry DSN not provided - error tracking disabled")
+        print("[WARNING]  Sentry DSN not provided - error tracking disabled")
         return
 
     sentry_sdk.init(
@@ -78,7 +78,7 @@ def setup_sentry(
         before_send=_filter_events,
     )
 
-    print(f"✅ Sentry initialized: environment={environment}, tracing={enable_tracing}")
+    print(f"[SUCCESS] Sentry initialized: environment={environment}, tracing={enable_tracing}")
 
 
 def _filter_transactions(event, hint):

@@ -84,7 +84,7 @@ class ShopifyAutoDeployer:
         """
 
         print(f"\n{'='*70}")
-        print(f"🚀 SHOPIFY AUTO-DEPLOY: {product_name}")
+        print(f"[START] SHOPIFY AUTO-DEPLOY: {product_name}")
         print(f"{'='*70}")
 
         # Estimate cost if not provided (based on typical dropshipping margins)
@@ -95,20 +95,20 @@ class ShopifyAutoDeployer:
                 aliexpress_cost = 10.0  # Medium-quality product
             else:
                 aliexpress_cost = 5.0   # Low-cost product
-            print(f"💵 Estimated cost: ${aliexpress_cost} (based on score {score}/10)")
+            print(f"[MONEY] Estimated cost: ${aliexpress_cost} (based on score {score}/10)")
 
         # Step 1: Generate AI content
-        print(f"\n📝 Step 1/3: Generating AI content...")
+        print(f"\n[NOTE] Step 1/3: Generating AI content...")
         try:
             content = await self.content_generator.generate_product_content(
                 product_name=product_name,
                 niche=niche,
                 trend_score=trend_score
             )
-            print(f"✅ Content generated: {content['title'][:50]}...")
+            print(f"[SUCCESS] Content generated: {content['title'][:50]}...")
             content_generated = True
         except Exception as e:
-            print(f"⚠️  Content generation failed: {e}")
+            print(f"[WARNING]  Content generation failed: {e}")
             # Use fallback content
             content = {
                 "title": f"{product_name} - Premium Quality",
@@ -121,7 +121,7 @@ class ShopifyAutoDeployer:
             content_generated = False
 
         # Step 2: Optimize pricing
-        print(f"\n💰 Step 2/3: Optimizing pricing...")
+        print(f"\n[PRICE] Step 2/3: Optimizing pricing...")
         try:
             pricing = await self.price_optimizer.analyze_pricing(
                 product_name=product_name,
@@ -129,10 +129,10 @@ class ShopifyAutoDeployer:
                 niche=niche,
                 trend_score=trend_score
             )
-            print(f"✅ Price optimized: ${pricing['suggested_price']} ({pricing['profit_margin']}% margin)")
+            print(f"[SUCCESS] Price optimized: ${pricing['suggested_price']} ({pricing['profit_margin']}% margin)")
             pricing_optimized = True
         except Exception as e:
-            print(f"⚠️  Pricing optimization failed: {e}")
+            print(f"[WARNING]  Pricing optimization failed: {e}")
             # Use fallback pricing
             pricing = {
                 "suggested_price": round(aliexpress_cost * 3, 2),
@@ -144,7 +144,7 @@ class ShopifyAutoDeployer:
             pricing_optimized = False
 
         # Step 3: Create Shopify product
-        print(f"\n🛍️  Step 3/3: Creating Shopify listing...")
+        print(f"\n[SHOP]  Step 3/3: Creating Shopify listing...")
         try:
             shopify_result = await self._create_shopify_product(
                 title=content["title"],
@@ -157,12 +157,12 @@ class ShopifyAutoDeployer:
                 images=product_images or []
             )
 
-            print(f"✅ Product created on Shopify!")
+            print(f"[SUCCESS] Product created on Shopify!")
             print(f"   Product ID: {shopify_result['product_id']}")
             print(f"   Admin URL: {shopify_result['admin_url']}")
 
             print(f"\n{'='*70}")
-            print(f"🎉 DEPLOYMENT COMPLETE!")
+            print(f"[LAUNCH] DEPLOYMENT COMPLETE!")
             print(f"{'='*70}")
             print(f"Product: {content['title']}")
             print(f"Price: ${pricing['suggested_price']} (was ${pricing['compare_at_price']})")
@@ -188,9 +188,9 @@ class ShopifyAutoDeployer:
             }
 
         except Exception as e:
-            print(f"❌ Shopify product creation failed: {e}")
+            print(f"[ERROR] Shopify product creation failed: {e}")
             print(f"\n{'='*70}")
-            print(f"⚠️  DEPLOYMENT FAILED")
+            print(f"[WARNING]  DEPLOYMENT FAILED")
             print(f"{'='*70}\n")
 
             return {
@@ -237,7 +237,7 @@ class ShopifyAutoDeployer:
 
         # Generate SKU
         sku = self._generate_sku(title, product_type)
-        print(f"📦 Generated SKU: {sku}")
+        print(f"[PACKAGE] Generated SKU: {sku}")
 
         # Build product payload
         product_data = {
@@ -313,7 +313,7 @@ class ShopifyAutoDeployer:
         import asyncio
 
         print(f"\n{'='*70}")
-        print(f"📦 BULK DEPLOY: {len(products)} products")
+        print(f"[PACKAGE] BULK DEPLOY: {len(products)} products")
         print(f"{'='*70}\n")
 
         results = []
@@ -340,7 +340,7 @@ class ShopifyAutoDeployer:
                     failed += 1
 
             except Exception as e:
-                print(f"❌ Deployment {i} failed: {e}")
+                print(f"[ERROR] Deployment {i} failed: {e}")
                 results.append({
                     "success": False,
                     "error": str(e),
@@ -354,7 +354,7 @@ class ShopifyAutoDeployer:
                 await asyncio.sleep(delay_between)
 
         print(f"\n{'='*70}")
-        print(f"✅ BULK DEPLOY COMPLETE")
+        print(f"[SUCCESS] BULK DEPLOY COMPLETE")
         print(f"{'='*70}")
         print(f"Total: {len(products)}")
         print(f"Successful: {successful}")

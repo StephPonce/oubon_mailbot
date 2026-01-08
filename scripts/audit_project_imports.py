@@ -259,7 +259,7 @@ class ProjectImportAuditor:
     def generate_report(self) -> str:
         """Generate a markdown report of all issues."""
         if not self.issues:
-            return "# Project Import Audit Report\n\n✅ No import issues found in project code!"
+            return "# Project Import Audit Report\n\n[SUCCESS] No import issues found in project code!"
 
         report = ["# Project Import Audit Report\n"]
         report.append(f"Found **{len(self.issues)}** issues in project code\n")
@@ -296,14 +296,14 @@ def main():
     report_path = project_root / "project_import_audit.md"
     with open(report_path, "w") as f:
         f.write(report)
-    print(f"\n✅ Report saved to: {report_path}")
+    print(f"\n[SUCCESS] Report saved to: {report_path}")
 
     # Return exit code based on issues
     if issues:
-        print(f"\n❌ Found {len(issues)} import issues in project code")
+        print(f"\n[ERROR] Found {len(issues)} import issues in project code")
         sys.exit(1)
     else:
-        print("\n✅ No import issues found in project code")
+        print("\n[SUCCESS] No import issues found in project code")
         sys.exit(0)
 
 

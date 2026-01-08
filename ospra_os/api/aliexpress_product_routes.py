@@ -107,7 +107,7 @@ class AliExpressProductAPI:
             from ospra_os.database.aliexpress_tokens import load_token
             return load_token(api_type)
         except Exception as e:
-            print(f"❌ Error loading {api_type} token from database: {e}")
+            print(f"[ERROR] Error loading {api_type} token from database: {e}")
             return None
 
     def generate_signature(self, params: dict, app_secret: str, api_path: str = "/sync") -> str:
@@ -920,7 +920,7 @@ async def hybrid_product_discovery(
     tenant_db: TenantScopedSession = Depends(get_tenant_db)
 ):
     """
-    🔥 HYBRID DISCOVERY: Best of both APIs
+    [HOT] HYBRID DISCOVERY: Best of both APIs
 
     Uses Affiliate API for discovery (keyword search) + optionally enriches with Dropshipping API.
 
@@ -1113,7 +1113,7 @@ async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
 @router.get("/test/order-create-check")
 async def test_order_create_capability():
     """
-    🧪 TEST: Check if ds.order.create API is accessible
+    [TEST] TEST: Check if ds.order.create API is accessible
 
     This tests whether we have permission to create orders via Dropshipping API.
     DOES NOT place a real order - uses invalid data to check API access.
@@ -1161,7 +1161,7 @@ async def test_order_create_capability():
                             "api_accessible": True,
                             "error_code": error_code,
                             "error_message": error_msg,
-                            "verdict": "✅ API IS ACCESSIBLE - Just needs valid order data",
+                            "verdict": "[SUCCESS] API IS ACCESSIBLE - Just needs valid order data",
                             "capability": "AUTO_ORDERING_POSSIBLE",
                             "note": "Got validation error (expected). This means the API endpoint works and we can place orders with correct data."
                         }
@@ -1171,7 +1171,7 @@ async def test_order_create_capability():
                             "api_accessible": False,
                             "error_code": error_code,
                             "error_message": error_msg,
-                            "verdict": "❌ NO PERMISSION - Requires additional authorization",
+                            "verdict": "[ERROR] NO PERMISSION - Requires additional authorization",
                             "capability": "AFFILIATE_LINK_ONLY",
                             "note": "Order API requires seller/store setup or additional permissions"
                         }
@@ -1181,14 +1181,14 @@ async def test_order_create_capability():
                             "api_accessible": False,
                             "error_code": error_code,
                             "error_message": error_msg,
-                            "verdict": "❓ UNCLEAR - Unexpected error",
+                            "verdict": "[QUESTION] UNCLEAR - Unexpected error",
                             "capability": "UNKNOWN"
                         }
                 else:
                     return {
                         "success": True,
                         "api_accessible": True,
-                        "verdict": "⚠️ UNEXPECTED SUCCESS - Test data should have failed",
+                        "verdict": "[WARNING] UNEXPECTED SUCCESS - Test data should have failed",
                         "capability": "NEEDS_FURTHER_TESTING",
                         "response": data
                     }
@@ -1197,7 +1197,7 @@ async def test_order_create_capability():
         return {
             "success": False,
             "error": str(e),
-            "verdict": "❌ TEST FAILED",
+            "verdict": "[ERROR] TEST FAILED",
             "capability": "ERROR"
         }
 
@@ -1205,7 +1205,7 @@ async def test_order_create_capability():
 @router.get("/test/enrichment/{product_id}")
 async def test_dropship_enrichment(product_id: str):
     """
-    🧪 TEST: Get full raw response from ds.product.get
+    [TEST] TEST: Get full raw response from ds.product.get
 
     Shows ALL fields available from Dropshipping API for enrichment analysis.
     This helps us see what stock/inventory/shipping data is available.

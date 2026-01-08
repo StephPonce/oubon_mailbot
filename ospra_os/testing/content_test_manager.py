@@ -469,11 +469,11 @@ class ContentTestManager:
 
         # 1. Bullet point format
         if key_features:
-            bullet_desc = "✨ Key Features:\n\n"
+            bullet_desc = "[NEW] Key Features:\n\n"
             bullet_desc += "\n".join([f"• {feature}" for feature in key_features])
 
             if benefits:
-                bullet_desc += "\n\n💎 Benefits:\n\n"
+                bullet_desc += "\n\n Benefits:\n\n"
                 bullet_desc += "\n".join([f"• {benefit}" for benefit in benefits])
 
             variants.append({

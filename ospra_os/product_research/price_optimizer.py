@@ -41,7 +41,7 @@ class PriceOptimizer:
             }
         """
 
-        print(f"💰 Analyzing pricing for: {product_name}")
+        print(f"[PRICE] Analyzing pricing for: {product_name}")
         print(f"   Cost: ${aliexpress_cost}")
 
         # Try to find competitor prices (would integrate real scraping later)
@@ -49,7 +49,7 @@ class PriceOptimizer:
 
         if not competitor_prices:
             # No competitors found - use intelligent markup based on cost tier
-            print("   ℹ️  No competitors found, using intelligent markup...")
+            print("   [INFO]  No competitors found, using intelligent markup...")
 
             if aliexpress_cost < 5:
                 markup = 4.0  # 300% profit margin for very cheap items
@@ -87,7 +87,7 @@ class PriceOptimizer:
         min_competitor = min(competitor_prices)
         max_competitor = max(competitor_prices)
 
-        print(f"   📊 Competitors: ${min_competitor} - ${max_competitor} (avg: ${avg_competitor})")
+        print(f"   [STATS] Competitors: ${min_competitor} - ${max_competitor} (avg: ${avg_competitor})")
 
         prompt = f"""
 You are a pricing strategist for an e-commerce dropshipping store.
@@ -145,9 +145,9 @@ Pricing Strategies:
             profit = suggested_price - aliexpress_cost
             margin = (profit / suggested_price) * 100
 
-            print(f"   ✅ Price: ${suggested_price}")
-            print(f"   📊 Margin: {margin:.1f}%")
-            print(f"   💰 Profit: ${profit:.2f}/sale")
+            print(f"   [SUCCESS] Price: ${suggested_price}")
+            print(f"   [STATS] Margin: {margin:.1f}%")
+            print(f"   [PRICE] Profit: ${profit:.2f}/sale")
 
             return {
                 "suggested_price": round(suggested_price, 2),
@@ -160,7 +160,7 @@ Pricing Strategies:
             }
 
         except Exception as e:
-            print(f"⚠️  AI pricing failed: {e}")
+            print(f"[WARNING]  AI pricing failed: {e}")
             # Fallback to simple competitive pricing
             suggested_price = round(avg_competitor * 0.95, 2)  # 5% below average
             compare_at_price = round(suggested_price * 1.4, 2)

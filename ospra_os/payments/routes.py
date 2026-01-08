@@ -326,24 +326,24 @@ async def _process_webhook_result(result: Dict[str, Any]):
                 if user:
                     user.subscription_tier = SubscriptionTier(tier)
                     # Store subscription_id and customer_id in user model or separate table
-                    logger.info(f"✅ Activated {tier} for user {user_id}")
+                    logger.info(f"[SUCCESS] Activated {tier} for user {user_id}")
                     db.commit()
         
         elif action == "update_tier":
             subscription_id = result.get("subscription_id")
             tier = result.get("tier")
             # Find user by subscription_id and update tier
-            logger.info(f"📝 Tier update to {tier} for subscription {subscription_id}")
+            logger.info(f"[NOTE] Tier update to {tier} for subscription {subscription_id}")
         
         elif action == "downgrade_to_nest":
             subscription_id = result.get("subscription_id")
             # Find user by subscription_id and set to NEST
-            logger.info(f"⬇️ Downgraded to Nest for subscription {subscription_id}")
+            logger.info(f" Downgraded to Nest for subscription {subscription_id}")
         
         elif action == "payment_failed":
             subscription_id = result.get("subscription_id")
             # Send notification, maybe set grace period
-            logger.warning(f"⚠️ Payment failed for subscription {subscription_id}")
+            logger.warning(f"[WARNING] Payment failed for subscription {subscription_id}")
     
     except Exception as e:
         logger.error(f"Error processing webhook: {e}")

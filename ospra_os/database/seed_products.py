@@ -1,5 +1,5 @@
 """
-🌱 PRODUCT SEEDING SCRIPT
+ PRODUCT SEEDING SCRIPT
 Fetch products from discovery service and store in database
 """
 
@@ -31,14 +31,14 @@ def seed_products(niches=None, per_page=20):
     db = ProductHistoryDB()
     discovery = ProductIntelligenceEngine()
 
-    print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("🌱 SEEDING PRODUCTS DATABASE")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+    print("\n")
+    print(" SEEDING PRODUCTS DATABASE")
+    print("\n")
 
     all_products = []
 
     for niche in niches:
-        print(f"📦 Fetching {niche} products...")
+        print(f"[PACKAGE] Fetching {niche} products...")
 
         try:
             products = discovery.discover_products_by_niche(niche=niche, count=per_page)
@@ -50,9 +50,9 @@ def seed_products(niches=None, per_page=20):
                 try:
                     enriched = enrich_product(product)
                     all_products.append(enriched)
-                    print(f"   ✓ Enriched: {enriched['name']}")
+                    print(f"   [OK] Enriched: {enriched['name']}")
                 except Exception as e:
-                    logger.error(f"   ✗ Failed to enrich product {i}: {e}")
+                    logger.error(f"    Failed to enrich product {i}: {e}")
                     # Add non-enriched product as fallback
                     all_products.append(product)
 
@@ -64,26 +64,26 @@ def seed_products(niches=None, per_page=20):
 
     # Save to database
     if all_products:
-        print(f"💾 Saving {len(all_products)} products to database...")
+        print(f" Saving {len(all_products)} products to database...")
         db.save_products(all_products)
 
         # Verify
         saved_count = len(db.get_all_products())
 
-        print("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print(f"✅ Seeded {len(all_products)} products")
-        print(f"✅ Database now contains {saved_count} total products")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+        print("\n")
+        print(f"[SUCCESS] Seeded {len(all_products)} products")
+        print(f"[SUCCESS] Database now contains {saved_count} total products")
+        print("\n")
 
         # Show breakdown by niche
-        print("📊 Products by niche:")
+        print("[STATS] Products by niche:")
         for niche in niches:
             niche_products = db.get_all_products(niche=niche)
             print(f"   • {niche}: {len(niche_products)} products")
         print()
 
     else:
-        print("\n❌ No products to seed")
+        print("\n[ERROR] No products to seed")
 
     return all_products
 
@@ -96,7 +96,7 @@ def reseed_niche(niche: str, per_page=20):
         niche: Niche to reseed
         per_page: Number of products to fetch
     """
-    print(f"\n🔄 Reseeding {niche} niche...")
+    print(f"\n[REFRESH] Reseeding {niche} niche...")
     return seed_products(niches=[niche], per_page=per_page)
 
 
@@ -114,7 +114,7 @@ def clear_database():
     conn.commit()
     conn.close()
 
-    print(f"🗑️  Cleared {deleted_count} products from database")
+    print(f"  Cleared {deleted_count} products from database")
 
 
 if __name__ == "__main__":

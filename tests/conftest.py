@@ -60,7 +60,7 @@ def engine():
     )
     Base.metadata.create_all(bind=engine)
 
-    print(f"🧪 Test database created at: {TEST_DB_PATH}")
+    print(f"[TEST] Test database created at: {TEST_DB_PATH}")
     print(f"   DATABASE_URL: {os.environ['DATABASE_URL']}")
 
     # Register cleanup

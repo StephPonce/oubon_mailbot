@@ -281,7 +281,7 @@ class UnifiedProductDeployer:
             # product.status = 'deployed'
             # self.db.commit()
 
-            logger.info(f"✅ Deployment complete: deployment_id={deployment_id}")
+            logger.info(f"[SUCCESS] Deployment complete: deployment_id={deployment_id}")
 
             return {
                 "success": True,
@@ -407,7 +407,7 @@ class UnifiedProductDeployer:
                     "platform_url": result.get('platform_url'),
                     "ai_cost": result.get('ai_cost', 0.0)
                 })
-                logger.info(f"✅ Deployed to store {store['id']} ({store['platform']})")
+                logger.info(f"[SUCCESS] Deployed to store {store['id']} ({store['platform']})")
 
         total_ai_cost = sum(r.get('ai_cost', 0.0) for r in detailed_results)
 
@@ -422,7 +422,7 @@ class UnifiedProductDeployer:
         }
 
         logger.info(
-            f"✅ Bulk deployment complete: {deployed} deployed, "
+            f"[SUCCESS] Bulk deployment complete: {deployed} deployed, "
             f"{skipped} skipped, {failed} failed"
         )
 
@@ -506,7 +506,7 @@ class UnifiedProductDeployer:
             # deployment.last_sync = datetime.utcnow()
             # self.db.commit()
 
-            logger.info(f"✅ Deployment {deployment_id} updated successfully")
+            logger.info(f"[SUCCESS] Deployment {deployment_id} updated successfully")
 
             return {
                 "success": True,
@@ -600,7 +600,7 @@ class UnifiedProductDeployer:
             # deployment.removed_at = datetime.utcnow()
             # self.db.commit()
 
-            logger.info(f"✅ Deployment {deployment_id} removed successfully")
+            logger.info(f"[SUCCESS] Deployment {deployment_id} removed successfully")
 
             return {
                 "success": True,

@@ -51,7 +51,7 @@ class ShopifyClient:
             Product data with Shopify product ID
         """
         try:
-            print(f"🛍️  Creating Shopify product: {title[:50]}")
+            print(f"[SHOP]  Creating Shopify product: {title[:50]}")
 
             # Build product data
             product_data = {
@@ -92,14 +92,14 @@ class ShopifyClient:
                 )
 
                 if response.status_code not in [200, 201]:
-                    print(f"❌ Shopify API error: {response.status_code}")
+                    print(f"[ERROR] Shopify API error: {response.status_code}")
                     print(response.text)
                     return None
 
                 result = response.json()
                 product = result.get('product', {})
 
-                print(f"✅ Product created! ID: {product.get('id')}")
+                print(f"[SUCCESS] Product created! ID: {product.get('id')}")
 
                 # Add metafields if provided
                 if meta_fields and product.get('id'):
@@ -108,7 +108,7 @@ class ShopifyClient:
                 return product
 
         except Exception as e:
-            print(f"❌ Error creating product: {e}")
+            print(f"[ERROR] Error creating product: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -120,7 +120,7 @@ class ShopifyClient:
     ) -> Dict:
         """Update an existing Shopify product"""
         try:
-            print(f"📝 Updating product {product_id}")
+            print(f"[NOTE] Updating product {product_id}")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.put(
@@ -130,21 +130,21 @@ class ShopifyClient:
                 )
 
                 if response.status_code != 200:
-                    print(f"❌ Update failed: {response.status_code}")
+                    print(f"[ERROR] Update failed: {response.status_code}")
                     return None
 
                 result = response.json()
-                print(f"✅ Product updated!")
+                print(f"[SUCCESS] Product updated!")
                 return result.get('product')
 
         except Exception as e:
-            print(f"❌ Error updating product: {e}")
+            print(f"[ERROR] Error updating product: {e}")
             return None
 
     async def delete_product(self, product_id: int) -> bool:
         """Delete a product from Shopify"""
         try:
-            print(f"🗑️  Deleting product {product_id}")
+            print(f"  Deleting product {product_id}")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.delete(
@@ -153,14 +153,14 @@ class ShopifyClient:
                 )
 
                 if response.status_code == 200:
-                    print(f"✅ Product deleted!")
+                    print(f"[SUCCESS] Product deleted!")
                     return True
                 else:
-                    print(f"❌ Delete failed: {response.status_code}")
+                    print(f"[ERROR] Delete failed: {response.status_code}")
                     return False
 
         except Exception as e:
-            print(f"❌ Error deleting product: {e}")
+            print(f"[ERROR] Error deleting product: {e}")
             return False
 
     async def get_product(self, product_id: int) -> Dict:
@@ -178,7 +178,7 @@ class ShopifyClient:
                 return None
 
         except Exception as e:
-            print(f"❌ Error getting product: {e}")
+            print(f"[ERROR] Error getting product: {e}")
             return None
 
     async def list_products(
@@ -204,7 +204,7 @@ class ShopifyClient:
                 return []
 
         except Exception as e:
-            print(f"❌ Error listing products: {e}")
+            print(f"[ERROR] Error listing products: {e}")
             return []
 
     async def get_shop_info(self) -> Dict:
@@ -222,7 +222,7 @@ class ShopifyClient:
                 return {}
 
         except Exception as e:
-            print(f"❌ Error getting shop info: {e}")
+            print(f"[ERROR] Error getting shop info: {e}")
             return {}
 
     async def _add_metafields(
@@ -258,12 +258,12 @@ class ShopifyClient:
                     )
 
                     if response.status_code not in [200, 201]:
-                        print(f"⚠️  Failed to add metafield {key}")
+                        print(f"[WARNING]  Failed to add metafield {key}")
 
             return True
 
         except Exception as e:
-            print(f"⚠️  Error adding metafields: {e}")
+            print(f"[WARNING]  Error adding metafields: {e}")
             return False
 
     async def update_inventory(
@@ -316,13 +316,13 @@ class ShopifyClient:
                 )
 
                 if inv_response.status_code == 200:
-                    print(f"✅ Inventory updated to {quantity}")
+                    print(f"[SUCCESS] Inventory updated to {quantity}")
                     return True
 
                 return False
 
         except Exception as e:
-            print(f"❌ Error updating inventory: {e}")
+            print(f"[ERROR] Error updating inventory: {e}")
             return False
 
     async def publish_to_online_store(self, product_id: int) -> bool:
@@ -335,7 +335,7 @@ class ShopifyClient:
         Requires: write_publications scope
         """
         try:
-            print(f"📢 Publishing product {product_id} to Online Store...")
+            print(f" Publishing product {product_id} to Online Store...")
 
             graphql_url = f"{self.base_url}/graphql.json"
             gid = f"gid://shopify/Product/{product_id}"
@@ -362,12 +362,12 @@ class ShopifyClient:
                 )
 
                 if pubs_resp.status_code != 200:
-                    print(f"❌ Failed to fetch publications: {pubs_resp.status_code}")
+                    print(f"[ERROR] Failed to fetch publications: {pubs_resp.status_code}")
                     return False
 
                 result = pubs_resp.json()
                 if 'errors' in result:
-                    print(f"⚠️  GraphQL errors: {result['errors']}")
+                    print(f"[WARNING]  GraphQL errors: {result['errors']}")
                     return False
 
                 # Find Online Store publication
@@ -381,7 +381,7 @@ class ShopifyClient:
                             break
 
                 if not online_store_pub_id:
-                    print(f"⚠️  Could not find Online Store publication")
+                    print(f"[WARNING]  Could not find Online Store publication")
                     return False
 
                 # Step 2: Publish product to Online Store
@@ -417,26 +417,26 @@ class ShopifyClient:
                 )
 
                 if pub_resp.status_code != 200:
-                    print(f"❌ Publish mutation failed: {pub_resp.status_code}")
+                    print(f"[ERROR] Publish mutation failed: {pub_resp.status_code}")
                     return False
 
                 result = pub_resp.json()
                 if 'errors' in result:
-                    print(f"⚠️  GraphQL errors: {result['errors']}")
+                    print(f"[WARNING]  GraphQL errors: {result['errors']}")
                     return False
 
                 data = result['data']['publishablePublish']
                 errors = data.get('userErrors', [])
 
                 if errors:
-                    print(f"⚠️  User errors: {errors}")
+                    print(f"[WARNING]  User errors: {errors}")
                     return False
 
-                print(f"✅ Product published to Online Store!")
+                print(f"[SUCCESS] Product published to Online Store!")
                 return True
 
         except Exception as e:
-            print(f"❌ Error publishing product: {e}")
+            print(f"[ERROR] Error publishing product: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -547,11 +547,11 @@ class ShopifyClient:
                     )
 
                     if collect_resp.status_code in [200, 201]:
-                        print(f"✅ Added product to 'Featured Products' collection")
+                        print(f"[SUCCESS] Added product to 'Featured Products' collection")
                         return True
 
                 return False
 
         except Exception as e:
-            print(f"⚠️  Could not add to featured collection: {e}")
+            print(f"[WARNING]  Could not add to featured collection: {e}")
             return False

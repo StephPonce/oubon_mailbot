@@ -208,13 +208,13 @@ class InventoryForecastingEngine:
     def _determine_status(self, days_of_stock: float) -> tuple[str, str]:
         """Determine inventory status level"""
         if days_of_stock <= 0:
-            return "OUT_OF_STOCK", "🔴"
+            return "OUT_OF_STOCK", ""
         elif days_of_stock < 7:
-            return "CRITICAL", "🟠"
+            return "CRITICAL", ""
         elif days_of_stock < 21:
-            return "LOW", "🟡"
+            return "LOW", ""
         else:
-            return "HEALTHY", "🟢"
+            return "HEALTHY", ""
 
     def _get_error_forecast(self, product_id: str, error: str) -> Dict:
         """Return error forecast structure"""
@@ -223,7 +223,7 @@ class InventoryForecastingEngine:
             "error": error,
             "current_status": {
                 "status": "ERROR",
-                "status_icon": "⚠️"
+                "status_icon": "[WARNING]"
             }
         }
 

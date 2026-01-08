@@ -32,7 +32,7 @@ class TwitterAPI:
         Returns:
             List of tweet dicts
         """
-        logger.info(f"🔍 Searching Twitter: {query}")
+        logger.info(f"[SEARCH] Searching Twitter: {query}")
 
         if not self.bearer_token:
             logger.warning("Twitter API not configured, returning mock data")

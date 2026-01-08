@@ -31,7 +31,7 @@ def print_json(data: Any):
 
 def test_health():
     """Test that backend is running with multi-store support"""
-    print_section("1️⃣  HEALTH CHECK")
+    print_section("1⃣  HEALTH CHECK")
 
     response = requests.get(f"{BASE_URL}/health")
     data = response.json()
@@ -41,15 +41,15 @@ def test_health():
     print(f"Multi-Store Loaded: {data.get('multi_store_loaded', False)}")
 
     if not data.get('multi_store_loaded'):
-        print("❌ Multi-store router not loaded!")
+        print("[ERROR] Multi-store router not loaded!")
         return False
 
-    print("✅ Backend healthy with multi-store support")
+    print("[SUCCESS] Backend healthy with multi-store support")
     return True
 
 def test_portfolio_overview():
     """Test portfolio overview endpoint"""
-    print_section("2️⃣  PORTFOLIO OVERVIEW (Initial State)")
+    print_section("2⃣  PORTFOLIO OVERVIEW (Initial State)")
 
     try:
         response = requests.get(f"{API_BASE}/overview")
@@ -57,19 +57,19 @@ def test_portfolio_overview():
         if response.status_code == 200:
             data = response.json()
             print_json(data)
-            print("\n✅ Portfolio overview retrieved successfully")
+            print("\n[SUCCESS] Portfolio overview retrieved successfully")
             return data
         else:
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_add_shopify_store():
     """Test adding a Shopify store"""
-    print_section("3️⃣  ADD SHOPIFY STORE")
+    print_section("3⃣  ADD SHOPIFY STORE")
 
     store_data = {
         "store_name": "Main Shopify Store",
@@ -97,21 +97,21 @@ def test_add_shopify_store():
 
         if response.status_code in [200, 201]:
             data = response.json()
-            print("\n✅ Store added successfully!")
+            print("\n[SUCCESS] Store added successfully!")
             print_json(data)
             return data
         else:
-            print(f"\n❌ Failed to add store")
+            print(f"\n[ERROR] Failed to add store")
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_add_amazon_store():
     """Test adding an Amazon store"""
-    print_section("4️⃣  ADD AMAZON STORE")
+    print_section("4⃣  ADD AMAZON STORE")
 
     store_data = {
         "store_name": "Amazon Storefront",
@@ -138,21 +138,21 @@ def test_add_amazon_store():
 
         if response.status_code in [200, 201]:
             data = response.json()
-            print("\n✅ Amazon store added successfully!")
+            print("\n[SUCCESS] Amazon store added successfully!")
             print_json(data)
             return data
         else:
-            print(f"\n❌ Failed to add store")
+            print(f"\n[ERROR] Failed to add store")
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_store_rankings():
     """Test store rankings endpoint"""
-    print_section("5️⃣  STORE RANKINGS")
+    print_section("5⃣  STORE RANKINGS")
 
     try:
         response = requests.get(f"{API_BASE}/rankings")
@@ -169,19 +169,19 @@ def test_store_rankings():
                 print(f"   Products: {store['active_products']}/{store['product_count']}")
                 print()
 
-            print("✅ Rankings retrieved successfully")
+            print("[SUCCESS] Rankings retrieved successfully")
             return data
         else:
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_get_store_details(store_id: int):
     """Test getting store details"""
-    print_section(f"6️⃣  GET STORE DETAILS (ID: {store_id})")
+    print_section(f"6⃣  GET STORE DETAILS (ID: {store_id})")
 
     try:
         response = requests.get(f"{API_BASE}/stores/{store_id}")
@@ -189,19 +189,19 @@ def test_get_store_details(store_id: int):
         if response.status_code == 200:
             data = response.json()
             print_json(data)
-            print("\n✅ Store details retrieved successfully")
+            print("\n[SUCCESS] Store details retrieved successfully")
             return data
         else:
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_update_store(store_id: int):
     """Test updating a store"""
-    print_section(f"7️⃣  UPDATE STORE (ID: {store_id})")
+    print_section(f"7⃣  UPDATE STORE (ID: {store_id})")
 
     update_data = {
         "niche": "tech_gadgets",
@@ -220,7 +220,7 @@ def test_update_store(store_id: int):
 
         if response.status_code == 200:
             data = response.json()
-            print("\n✅ Store updated successfully!")
+            print("\n[SUCCESS] Store updated successfully!")
             print(f"New name: {data['store_name']}")
             print(f"New niche: {data['niche']}")
             return data
@@ -229,19 +229,19 @@ def test_update_store(store_id: int):
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_switch_active_store(store_id: int):
     """Test switching active store"""
-    print_section(f"8️⃣  SWITCH ACTIVE STORE (ID: {store_id})")
+    print_section(f"8⃣  SWITCH ACTIVE STORE (ID: {store_id})")
 
     try:
         response = requests.post(f"{API_BASE}/stores/{store_id}/switch")
 
         if response.status_code == 200:
             data = response.json()
-            print(f"✅ Switched to: {data['store_name']}")
+            print(f"[SUCCESS] Switched to: {data['store_name']}")
             print(f"New rank position: #{data['rank_position']}")
             return data
         else:
@@ -249,12 +249,12 @@ def test_switch_active_store(store_id: int):
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def test_final_overview():
     """Test final portfolio state"""
-    print_section("9️⃣  FINAL PORTFOLIO STATE")
+    print_section("9⃣  FINAL PORTFOLIO STATE")
 
     try:
         response = requests.get(f"{API_BASE}/overview")
@@ -262,7 +262,7 @@ def test_final_overview():
         if response.status_code == 200:
             data = response.json()
 
-            print(f"📊 Portfolio Summary:")
+            print(f"[STATS] Portfolio Summary:")
             print(f"   Total Stores: {data['total_stores']}")
             print(f"   Active Stores: {data['active_stores']}")
             print(f"   Total Products: {data['total_products']}")
@@ -273,27 +273,27 @@ def test_final_overview():
                 print(f"     • {platform}: {count} store(s)")
 
             if data.get('best_performing_store'):
-                print(f"\n   🏆 Best Performer: {data['best_performing_store']}")
+                print(f"\n   [TOP] Best Performer: {data['best_performing_store']}")
 
-            print("\n✅ Final overview retrieved successfully")
+            print("\n[SUCCESS] Final overview retrieved successfully")
             return data
         else:
             print(f"Status: {response.status_code}")
             print(f"Response: {response.text}")
             return None
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         return None
 
 def main():
     """Run all tests"""
     print("\n" + "="*60)
-    print("  🚀 MULTI-STORE PORTFOLIO SYSTEM TEST")
+    print("  [START] MULTI-STORE PORTFOLIO SYSTEM TEST")
     print("="*60)
 
     # Test 1: Health check
     if not test_health():
-        print("\n❌ Backend not ready. Exiting.")
+        print("\n[ERROR] Backend not ready. Exiting.")
         return
 
     # Test 2: Initial overview
@@ -302,12 +302,12 @@ def main():
     # Test 3: Add Shopify store
     shopify_store = test_add_shopify_store()
     if not shopify_store:
-        print("\n⚠️  Could not add Shopify store")
+        print("\n[WARNING]  Could not add Shopify store")
 
     # Test 4: Add Amazon store
     amazon_store = test_add_amazon_store()
     if not amazon_store:
-        print("\n⚠️  Could not add Amazon store")
+        print("\n[WARNING]  Could not add Amazon store")
 
     # Test 5: View rankings
     rankings = test_store_rankings()
@@ -328,7 +328,7 @@ def main():
     test_final_overview()
 
     # Final summary
-    print_section("✅ TEST COMPLETE")
+    print_section("[SUCCESS] TEST COMPLETE")
     print("All multi-store portfolio endpoints tested successfully!")
     print("\nNext steps:")
     print("  • Visit http://localhost:8001/docs for interactive API docs")

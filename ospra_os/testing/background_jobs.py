@@ -44,7 +44,7 @@ class ABTestMonitor:
         2. Tests with significant results
         3. Tests ready for winner implementation
         """
-        logger.info("🔍 A/B Test Monitor: Starting hourly check...")
+        logger.info("[SEARCH] A/B Test Monitor: Starting hourly check...")
 
         db = get_multi_store_session(self.database_url)
         try:
@@ -59,10 +59,10 @@ class ABTestMonitor:
             # 3. Auto-implement winners (if configured)
             self._auto_implement_winners(db, engine)
 
-            logger.info("✅ A/B Test Monitor: Hourly check complete")
+            logger.info("[SUCCESS] A/B Test Monitor: Hourly check complete")
 
         except Exception as e:
-            logger.error(f"❌ A/B Test Monitor failed: {e}")
+            logger.error(f"[ERROR] A/B Test Monitor failed: {e}")
         finally:
             db.close()
 
@@ -97,13 +97,13 @@ class ABTestMonitor:
                     implement_winner=auto_implement
                 )
 
-                logger.info(f"   ✅ Auto-ended test {test.id}: {test.name}")
+                logger.info(f"   [SUCCESS] Auto-ended test {test.id}: {test.name}")
 
                 if auto_implement:
-                    logger.info(f"      🚀 Auto-implemented winner for test {test.id}")
+                    logger.info(f"      [START] Auto-implemented winner for test {test.id}")
 
             except Exception as e:
-                logger.error(f"   ❌ Failed to end test {test.id}: {e}")
+                logger.error(f"   [ERROR] Failed to end test {test.id}: {e}")
 
     def _check_significant_tests(self, db: Session, engine: ABTestEngine):
         """Check for tests that have reached statistical significance"""
@@ -142,13 +142,13 @@ class ABTestMonitor:
                 )
 
                 if has_significant:
-                    logger.info(f"   📊 Test {test.id} has statistically significant results!")
+                    logger.info(f"   [STATS] Test {test.id} has statistically significant results!")
 
                     # TODO: Send notification
                     # self._send_notification(test, significance)
 
             except Exception as e:
-                logger.error(f"   ❌ Failed to check test {test.id}: {e}")
+                logger.error(f"   [ERROR] Failed to check test {test.id}: {e}")
 
     def _auto_implement_winners(self, db: Session, engine: ABTestEngine):
         """Auto-implement winners for ended tests (if configured)"""
@@ -205,12 +205,12 @@ class ABTestMonitor:
                     test.test_metadata["shopify_result"] = result
                     db.commit()
 
-                    logger.info(f"   🚀 Implemented winner for test {test.id}: {test.name}")
+                    logger.info(f"   [START] Implemented winner for test {test.id}: {test.name}")
                 else:
-                    logger.error(f"   ❌ Failed to implement winner for test {test.id}: {result.get('error')}")
+                    logger.error(f"   [ERROR] Failed to implement winner for test {test.id}: {result.get('error')}")
 
             except Exception as e:
-                logger.error(f"   ❌ Failed to implement winner for test {test.id}: {e}")
+                logger.error(f"   [ERROR] Failed to implement winner for test {test.id}: {e}")
 
     def cleanup_old_tests(self, days: int = 90):
         """
@@ -221,7 +221,7 @@ class ABTestMonitor:
         Args:
             days: Number of days to keep test data
         """
-        logger.info(f"🧹 Cleaning up tests older than {days} days...")
+        logger.info(f" Cleaning up tests older than {days} days...")
 
         db = get_multi_store_session(self.database_url)
         try:
@@ -251,10 +251,10 @@ class ABTestMonitor:
 
             db.commit()
 
-            logger.info(f"   ✅ Archived {len(old_tests)} old tests")
+            logger.info(f"   [SUCCESS] Archived {len(old_tests)} old tests")
 
         except Exception as e:
-            logger.error(f"   ❌ Cleanup failed: {e}")
+            logger.error(f"   [ERROR] Cleanup failed: {e}")
         finally:
             db.close()
 
@@ -267,7 +267,7 @@ class ABTestMonitor:
         - Tests with significant results
         - Tests requiring action
         """
-        logger.info("📧 Generating A/B test summary...")
+        logger.info("[EMAIL] Generating A/B test summary...")
 
         db = get_multi_store_session(self.database_url)
         try:
@@ -287,7 +287,7 @@ class ABTestMonitor:
                 "total_tests": len(all_tests)
             }
 
-            logger.info(f"   📊 A/B Test Summary:")
+            logger.info(f"   [STATS] A/B Test Summary:")
             logger.info(f"      Running: {running}")
             logger.info(f"      Paused: {paused}")
             logger.info(f"      Ended: {ended}")
@@ -296,7 +296,7 @@ class ABTestMonitor:
             # TODO: Send email/Slack notification with summary
 
         except Exception as e:
-            logger.error(f"   ❌ Summary generation failed: {e}")
+            logger.error(f"   [ERROR] Summary generation failed: {e}")
         finally:
             db.close()
 
@@ -349,10 +349,10 @@ def setup_abtesting_jobs(scheduler):
         replace_existing=True
     )
 
-    logger.info("✅ A/B Testing background jobs configured:")
+    logger.info("[SUCCESS] A/B Testing background jobs configured:")
     logger.info("   • Hourly test monitoring")
     logger.info("   • Daily test summary (8 AM)")
     logger.info("   • Weekly cleanup (Sunday 2 AM)")
 
 
-print("✅ A/B Testing background jobs loaded successfully")
+print("[SUCCESS] A/B Testing background jobs loaded successfully")

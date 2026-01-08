@@ -42,7 +42,7 @@ class TikTokShopScraper(ApifyConnector):
             return []
 
         search_term = keyword if keyword else niche
-        logger.info(f"📱 TikTok Discovery: Scraping products for '{search_term}'...")
+        logger.info(f"[MOBILE] TikTok Discovery: Scraping products for '{search_term}'...")
 
         run_input = {
             "searchQueries": [search_term],
@@ -57,7 +57,7 @@ class TikTokShopScraper(ApifyConnector):
             )
 
             if not items:
-                logger.warning("⚠️  No TikTok products found")
+                logger.warning("[WARNING]  No TikTok products found")
                 return []
 
             products = []
@@ -87,14 +87,14 @@ class TikTokShopScraper(ApifyConnector):
                     products.append(product)
 
                 except Exception as e:
-                    logger.error(f"⚠️  Error transforming TikTok product: {e}")
+                    logger.error(f"[WARNING]  Error transforming TikTok product: {e}")
                     continue
 
-            logger.info(f"✅ Found {len(products)} TikTok products")
+            logger.info(f"[SUCCESS] Found {len(products)} TikTok products")
             return products
 
         except Exception as e:
-            logger.error(f"❌ TikTok scraping failed: {e}")
+            logger.error(f"[ERROR] TikTok scraping failed: {e}")
             return []
 
     async def scrape_trending_products(
@@ -120,7 +120,7 @@ class TikTokShopScraper(ApifyConnector):
             logger.warning("TikTok Shop scraper not available - Apify not configured")
             return []
 
-        logger.info(f"🛍️ Scraping TikTok Shop: category={category}, max={max_products}")
+        logger.info(f"[SHOP] Scraping TikTok Shop: category={category}, max={max_products}")
 
         run_input = {
             "searchQueries": [category or "trending products"],
@@ -145,11 +145,11 @@ class TikTokShopScraper(ApifyConnector):
                     logger.error(f"Error parsing TikTok Shop product: {e}")
                     continue
 
-            logger.info(f"✅ Parsed {len(products)} products from TikTok Shop")
+            logger.info(f"[SUCCESS] Parsed {len(products)} products from TikTok Shop")
             return products
 
         except Exception as e:
-            logger.error(f"❌ TikTok Shop scraping failed: {e}")
+            logger.error(f"[ERROR] TikTok Shop scraping failed: {e}")
             return []
 
     async def scrape_hashtag_products(
@@ -174,7 +174,7 @@ class TikTokShopScraper(ApifyConnector):
             logger.warning("TikTok hashtag scraper not available")
             return []
 
-        logger.info(f"#️⃣ Scraping TikTok hashtag: #{hashtag}")
+        logger.info(f"#⃣ Scraping TikTok hashtag: #{hashtag}")
 
         run_input = {
             "hashtags": [hashtag],
@@ -193,11 +193,11 @@ class TikTokShopScraper(ApifyConnector):
             # Extract product mentions from video data
             products = self._extract_products_from_videos(items, hashtag)
 
-            logger.info(f"✅ Found {len(products)} product mentions from #{hashtag}")
+            logger.info(f"[SUCCESS] Found {len(products)} product mentions from #{hashtag}")
             return products
 
         except Exception as e:
-            logger.error(f"❌ TikTok hashtag scraping failed: {e}")
+            logger.error(f"[ERROR] TikTok hashtag scraping failed: {e}")
             return []
 
     async def scrape_creator_products(
@@ -221,7 +221,7 @@ class TikTokShopScraper(ApifyConnector):
             logger.warning("TikTok profile scraper not available")
             return []
 
-        logger.info(f"👤 Scraping TikTok creator: @{username}")
+        logger.info(f" Scraping TikTok creator: @{username}")
 
         run_input = {
             "profiles": [username],
@@ -238,11 +238,11 @@ class TikTokShopScraper(ApifyConnector):
             # Extract products from creator's videos
             products = self._extract_products_from_videos(items, f"@{username}")
 
-            logger.info(f"✅ Found {len(products)} products from @{username}")
+            logger.info(f"[SUCCESS] Found {len(products)} products from @{username}")
             return products
 
         except Exception as e:
-            logger.error(f"❌ TikTok creator scraping failed: {e}")
+            logger.error(f"[ERROR] TikTok creator scraping failed: {e}")
             return []
 
     async def _analyze_comments(self, video_id: str) -> Optional[Dict]:
@@ -256,7 +256,7 @@ class TikTokShopScraper(ApifyConnector):
             Sentiment analysis dictionary or None
         """
         try:
-            logger.info(f"   💬 Analyzing comments for video {video_id}...")
+            logger.info(f"   [CHAT] Analyzing comments for video {video_id}...")
 
             # This would call TikTok comment scraper
             # For now, return placeholder
@@ -273,7 +273,7 @@ class TikTokShopScraper(ApifyConnector):
             }
 
         except Exception as e:
-            logger.error(f"   ⚠️  Comment analysis failed: {e}")
+            logger.error(f"   [WARNING]  Comment analysis failed: {e}")
             return None
 
     def _calculate_viral_score(self, item: Dict) -> float:

@@ -42,7 +42,7 @@ class TwitterConnector(BaseConnector):
             Product candidates with Twitter engagement data
         """
         if not self.api_key:
-            print("⚠️  X_API_KEY not configured")
+            print("[WARNING]  X_API_KEY not configured")
             return []
 
         result_type = kwargs.get("result_type", "mixed")
@@ -54,7 +54,7 @@ class TwitterConnector(BaseConnector):
         # - Calculate engagement (likes + retweets + replies)
         # - Detect viral products (high engagement rate)
 
-        print(f"🐦 Twitter API call: search('{query}', count={count})")
+        print(f" Twitter API call: search('{query}', count={count})")
         return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
@@ -69,7 +69,7 @@ class TwitterConnector(BaseConnector):
             Trending products based on Twitter activity
         """
         if not self.api_key:
-            print("⚠️  X_API_KEY not configured")
+            print("[WARNING]  X_API_KEY not configured")
             return []
 
         # TODO: Implement trending topics discovery
@@ -77,7 +77,7 @@ class TwitterConnector(BaseConnector):
         # - Filter by product-related keywords
         # - Rank by tweet velocity (tweets per hour)
 
-        print(f"🐦 Twitter API call: get_trending(category={category})")
+        print(f" Twitter API call: get_trending(category={category})")
         return []
 
     async def analyze_sentiment(self, query: str) -> dict:

@@ -2,4 +2,7 @@
 
 from .amazon_paapi import AmazonPAAPIConnector
 
-__all__ = ['AmazonPAAPIConnector']
+# Alias for backward compatibility
+AmazonPAAPI = AmazonPAAPIConnector
+
+__all__ = ['AmazonPAAPIConnector', 'AmazonPAAPI']

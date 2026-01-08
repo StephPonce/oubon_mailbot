@@ -31,7 +31,7 @@ class IntelligenceScheduler:
 
     async def generate_morning_briefings(self):
         """Generate morning briefings for all users at 6 AM"""
-        logger.info("🌅 Generating morning briefings for all users...")
+        logger.info(" Generating morning briefings for all users...")
 
         try:
             briefing_engine = get_briefing_engine(self.db)
@@ -40,17 +40,17 @@ class IntelligenceScheduler:
             # In production, iterate through all active users
             briefing = await briefing_engine.generate_morning_briefing(user_id=1)
 
-            logger.info(f"✅ Morning briefing generated: {len(briefing.get('briefing_text', ''))} chars")
+            logger.info(f"[SUCCESS] Morning briefing generated: {len(briefing.get('briefing_text', ''))} chars")
 
             # TODO: Send notification/email with briefing
             # await send_briefing_notification(user_id=1, briefing=briefing)
 
         except Exception as e:
-            logger.error(f"❌ Failed to generate morning briefings: {e}")
+            logger.error(f"[ERROR] Failed to generate morning briefings: {e}")
 
     async def grade_all_products(self):
         """Grade all products for intelligence scoring"""
-        logger.info("📊 Starting product grading job...")
+        logger.info("[STATS] Starting product grading job...")
 
         try:
             from ospra_os.database.multi_store_models import Product
@@ -74,15 +74,15 @@ class IntelligenceScheduler:
                     continue
 
             self.db.commit()
-            logger.info(f"✅ Product grading complete: {graded_count}/{len(products)} products graded")
+            logger.info(f"[SUCCESS] Product grading complete: {graded_count}/{len(products)} products graded")
 
         except Exception as e:
-            logger.error(f"❌ Product grading job failed: {e}")
+            logger.error(f"[ERROR] Product grading job failed: {e}")
             self.db.rollback()
 
     async def update_product_progress(self):
         """Update product lifecycle progress for all products"""
-        logger.info("🔄 Updating product progress tracking...")
+        logger.info("[REFRESH] Updating product progress tracking...")
 
         try:
             from ospra_os.database.multi_store_models import Product
@@ -106,14 +106,14 @@ class IntelligenceScheduler:
                     logger.error(f"Failed to update progress for product {product.id}: {e}")
                     continue
 
-            logger.info(f"✅ Progress tracking updated: {updated_count}/{len(products)} products")
+            logger.info(f"[SUCCESS] Progress tracking updated: {updated_count}/{len(products)} products")
 
         except Exception as e:
-            logger.error(f"❌ Progress update job failed: {e}")
+            logger.error(f"[ERROR] Progress update job failed: {e}")
 
     def start(self):
         """Start the Intelligence Core scheduler"""
-        logger.info("🚀 Starting Intelligence Core scheduler...")
+        logger.info("[START] Starting Intelligence Core scheduler...")
 
         # Morning briefings at 6 AM daily
         self.scheduler.add_job(
@@ -123,7 +123,7 @@ class IntelligenceScheduler:
             name='Generate Morning Briefings',
             replace_existing=True
         )
-        logger.info("   📅 Morning briefings: Daily at 6:00 AM")
+        logger.info("    Morning briefings: Daily at 6:00 AM")
 
         # Product grading every 6 hours
         self.scheduler.add_job(
@@ -133,7 +133,7 @@ class IntelligenceScheduler:
             name='Grade All Products',
             replace_existing=True
         )
-        logger.info("   📅 Product grading: Every 6 hours")
+        logger.info("    Product grading: Every 6 hours")
 
         # Progress tracking updates daily at midnight
         self.scheduler.add_job(
@@ -143,17 +143,17 @@ class IntelligenceScheduler:
             name='Update Product Progress',
             replace_existing=True
         )
-        logger.info("   📅 Progress updates: Daily at midnight")
+        logger.info("    Progress updates: Daily at midnight")
 
         # Start scheduler
         self.scheduler.start()
-        logger.info("✅ Intelligence Core scheduler started")
+        logger.info("[SUCCESS] Intelligence Core scheduler started")
 
     def stop(self):
         """Stop the scheduler"""
         if self.scheduler.running:
             self.scheduler.shutdown()
-            logger.info("⏹️  Intelligence Core scheduler stopped")
+            logger.info("[STOP]  Intelligence Core scheduler stopped")
 
 
 # Singleton instance

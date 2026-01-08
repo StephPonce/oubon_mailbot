@@ -30,7 +30,7 @@ headers = {
 }
 
 print("=" * 70)
-print("🚀 AUTOMATED SHOPIFY STORE SETUP")
+print("[START] AUTOMATED SHOPIFY STORE SETUP")
 print("=" * 70)
 print()
 print(f"Store: {store_url}")
@@ -96,18 +96,18 @@ Hours: Monday-Friday, 9am-6pm EST</p>
 
 <p>We're here to help! Whether you have a question about an order, need product recommendations, or just want to say hi, we'd love to hear from you.</p>
 
-<h2>📧 Email Support</h2>
+<h2>[EMAIL] Email Support</h2>
 <p><strong>Primary:</strong> <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a><br>
 <strong>Orders & Tracking:</strong> <a href="mailto:support@oubonshop.com">support@oubonshop.com</a></p>
 
-<h2>⏰ Business Hours</h2>
+<h2>[ALARM] Business Hours</h2>
 <p>Monday - Friday: 9:00 AM - 6:00 PM EST<br>
 Saturday: 10:00 AM - 4:00 PM EST<br>
 Sunday: Closed</p>
 
 <p><em>We typically respond to emails within 24 hours during business days.</em></p>
 
-<h2>💬 What Can We Help You With?</h2>
+<h2>[CHAT] What Can We Help You With?</h2>
 <ul>
   <li><strong>Order Questions</strong> - Track your order, modify shipping address, or check order status</li>
   <li><strong>Product Inquiries</strong> - Questions about specific products, availability, or recommendations</li>
@@ -116,14 +116,14 @@ Sunday: Closed</p>
   <li><strong>General Questions</strong> - Anything else we can help with!</li>
 </ul>
 
-<h2>📦 Before You Contact Us About Orders</h2>
+<h2>[PACKAGE] Before You Contact Us About Orders</h2>
 <p>Please have your order number ready (found in your confirmation email). This helps us assist you faster!</p>
 
-<h2>🌐 Store Information</h2>
+<h2>[WEB] Store Information</h2>
 <p><strong>Website:</strong> <a href="https://oubonshop.com">oubonshop.com</a><br>
 <strong>Domain:</strong> Oubon Shop</p>
 
-<h2>📢 Follow Us</h2>
+<h2> Follow Us</h2>
 <p>Stay updated on new products, sales, and exclusive offers:</p>
 <ul>
   <li>Instagram: @oubonshop (coming soon)</li>
@@ -145,7 +145,7 @@ Sunday: Closed</p>
 
 <p>Find quick answers to common questions about shopping at Oubon Shop.</p>
 
-<h2>📦 Shipping & Delivery</h2>
+<h2>[PACKAGE] Shipping & Delivery</h2>
 
 <h3>How long does shipping take?</h3>
 <p><strong>Standard Shipping:</strong> 5-10 business days<br>
@@ -161,7 +161,7 @@ Sunday: Closed</p>
 <h3>How can I track my order?</h3>
 <p>Once your order ships, you'll receive a tracking number via email. You can also track your order by logging into your account on our website.</p>
 
-<h2>🔄 Returns & Exchanges</h2>
+<h2>[REFRESH] Returns & Exchanges</h2>
 
 <h3>What is your return policy?</h3>
 <p>We offer a <strong>30-day money-back guarantee</strong>. If you're not completely satisfied, you can return any unused item within 30 days of delivery for a full refund.</p>
@@ -175,7 +175,7 @@ Sunday: Closed</p>
 <h3>Can I exchange an item?</h3>
 <p>Absolutely! Contact us at <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a> to arrange an exchange.</p>
 
-<h2>💳 Payments & Pricing</h2>
+<h2>[PAYMENT] Payments & Pricing</h2>
 
 <h3>What payment methods do you accept?</h3>
 <p>We accept all major credit cards (Visa, Mastercard, American Express, Discover), PayPal, Apple Pay, and Google Pay.</p>
@@ -186,7 +186,7 @@ Sunday: Closed</p>
 <h3>Can I cancel my order?</h3>
 <p>If your order hasn't shipped yet, we can cancel it. Contact us immediately at <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a> with your order number.</p>
 
-<h2>🛍️ Products</h2>
+<h2>[SHOP] Products</h2>
 
 <h3>Are your products authentic?</h3>
 <p>Yes! We source all products directly from authorized distributors and manufacturers.</p>
@@ -197,7 +197,7 @@ Sunday: Closed</p>
 <h3>Can you help me choose the right product?</h3>
 <p>Of course! Email us at <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a> with your questions, and we'll be happy to help you find the perfect product.</p>
 
-<h2>📧 Contact & Support</h2>
+<h2>[EMAIL] Contact & Support</h2>
 
 <h3>How can I contact customer support?</h3>
 <p>Email: <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a><br>
@@ -223,7 +223,7 @@ Response Time: Within 24 hours</p>
 
 <p>Fast, reliable shipping to get your order to you quickly and safely.</p>
 
-<h2>📦 Shipping Methods & Rates</h2>
+<h2>[PACKAGE] Shipping Methods & Rates</h2>
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
   <thead>
@@ -257,10 +257,10 @@ Response Time: Within 24 hours</p>
   </tbody>
 </table>
 
-<h2>⏱️ Processing Time</h2>
+<h2>[TIMER] Processing Time</h2>
 <p>Orders are typically processed and shipped within <strong>1-2 business days</strong>. During peak seasons or sales events, processing may take up to 3 business days.</p>
 
-<h2>📍 Tracking Your Order</h2>
+<h2>[LOCATION] Tracking Your Order</h2>
 <p>Once your order ships, you'll receive:</p>
 <ul>
   <li>Email confirmation with tracking number</li>
@@ -275,7 +275,7 @@ Response Time: Within 24 hours</p>
   <li>Selecting your order to view tracking details</li>
 </ol>
 
-<h2>🌍 International Shipping</h2>
+<h2> International Shipping</h2>
 <p>We ship to most countries worldwide! International shipping includes:</p>
 <ul>
   <li><strong>Customs & Duties:</strong> May apply depending on your country (buyer responsible)</li>
@@ -284,7 +284,7 @@ Response Time: Within 24 hours</p>
   <li><strong>Restrictions:</strong> Some products may have shipping restrictions</li>
 </ul>
 
-<h2>📮 PO Boxes & Military Addresses</h2>
+<h2> PO Boxes & Military Addresses</h2>
 <p>Yes! We ship to:</p>
 <ul>
   <li>PO Boxes (Standard Shipping only)</li>
@@ -292,7 +292,7 @@ Response Time: Within 24 hours</p>
   <li>US Territories (Puerto Rico, Guam, US Virgin Islands, etc.)</li>
 </ul>
 
-<h2>❓ Shipping FAQs</h2>
+<h2>[QUESTION] Shipping FAQs</h2>
 
 <h3>Can I change my shipping address after ordering?</h3>
 <p>If your order hasn't shipped yet, we can update your address. Contact us immediately at <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a> with your order number.</p>
@@ -303,7 +303,7 @@ Response Time: Within 24 hours</p>
 <h3>Do you offer weekend delivery?</h3>
 <p>Our carriers deliver Monday-Saturday. Sunday delivery is not currently available.</p>
 
-<h2>📧 Questions About Shipping?</h2>
+<h2>[EMAIL] Questions About Shipping?</h2>
 <p>Contact our support team:<br>
 Email: <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a><br>
 Hours: Monday-Friday, 9am-6pm EST</p>
@@ -320,19 +320,19 @@ Hours: Monday-Friday, 9am-6pm EST</p>
 
 <p>Not completely satisfied? We've got you covered with our hassle-free 30-day return policy.</p>
 
-<h2>✅ 30-Day Money-Back Guarantee</h2>
+<h2>[SUCCESS] 30-Day Money-Back Guarantee</h2>
 <p>We want you to love your purchase! If you're not completely satisfied, return any unused item within <strong>30 days of delivery</strong> for a full refund - no questions asked.</p>
 
-<h2>📋 Return Requirements</h2>
+<h2>[LIST] Return Requirements</h2>
 <p>To be eligible for a return, items must be:</p>
 <ul>
-  <li>✓ Returned within 30 days of delivery</li>
-  <li>✓ In unused, like-new condition</li>
-  <li>✓ In original packaging (preferred but not required)</li>
-  <li>✓ Include all accessories and documentation</li>
+  <li>[OK] Returned within 30 days of delivery</li>
+  <li>[OK] In unused, like-new condition</li>
+  <li>[OK] In original packaging (preferred but not required)</li>
+  <li>[OK] Include all accessories and documentation</li>
 </ul>
 
-<h2>🔄 How to Start a Return</h2>
+<h2>[REFRESH] How to Start a Return</h2>
 <p>Returns are easy! Just follow these steps:</p>
 <ol>
   <li><strong>Contact Us</strong><br>
@@ -351,7 +351,7 @@ Hours: Monday-Friday, 9am-6pm EST</p>
   Once we receive and inspect the return, we'll process your refund within 5-7 business days</li>
 </ol>
 
-<h2>💰 Refund Information</h2>
+<h2>[PRICE] Refund Information</h2>
 <ul>
   <li><strong>Refund Method:</strong> Original payment method</li>
   <li><strong>Processing Time:</strong> 5-7 business days after we receive the return</li>
@@ -359,13 +359,13 @@ Hours: Monday-Friday, 9am-6pm EST</p>
   <li><strong>Bank Processing:</strong> May take an additional 3-5 business days to appear in your account</li>
 </ul>
 
-<h2>📦 Return Shipping Costs</h2>
+<h2>[PACKAGE] Return Shipping Costs</h2>
 <p><strong>Defective or Incorrect Items:</strong> We pay for return shipping<br>
 <strong>Change of Mind/Other Reasons:</strong> Customer pays for return shipping</p>
 
 <p><em>Tip: Use a trackable shipping method and save your receipt!</em></p>
 
-<h2>🔁 Exchanges</h2>
+<h2> Exchanges</h2>
 <p>Want to exchange for a different item? We're happy to help!</p>
 <ol>
   <li>Email us at <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a></li>
@@ -373,7 +373,7 @@ Hours: Monday-Friday, 9am-6pm EST</p>
   <li>We'll arrange the exchange and send you the new item</li>
 </ol>
 
-<h2>⚠️ Non-Returnable Items</h2>
+<h2>[WARNING] Non-Returnable Items</h2>
 <p>For hygiene and safety reasons, the following items cannot be returned:</p>
 <ul>
   <li>Personal care items (if opened)</li>
@@ -383,7 +383,7 @@ Hours: Monday-Friday, 9am-6pm EST</p>
   <li>Items marked as "final sale"</li>
 </ul>
 
-<h2>🛡️ Damaged or Defective Items</h2>
+<h2> Damaged or Defective Items</h2>
 <p>Received a damaged or defective item? We apologize!</p>
 <p>Contact us within <strong>7 days of delivery</strong> with:</p>
 <ul>
@@ -394,7 +394,7 @@ Hours: Monday-Friday, 9am-6pm EST</p>
 
 <p>We'll send you a replacement immediately or issue a full refund - your choice!</p>
 
-<h2>📧 Questions About Returns?</h2>
+<h2>[EMAIL] Questions About Returns?</h2>
 <p>Our customer service team is here to help:<br>
 Email: <a href="mailto:hello@oubonshop.com">hello@oubonshop.com</a><br>
 Hours: Monday-Friday, 9am-6pm EST<br>
@@ -426,7 +426,7 @@ for page_data in PAGES:
     if check_response.status_code == 200:
         existing = check_response.json().get('pages', [])
         if existing:
-            print(f"  ⏭️  Page already exists (ID: {existing[0]['id']})")
+            print(f"  ⏭  Page already exists (ID: {existing[0]['id']})")
             skipped_pages.append(page_data['title'])
             continue
 
@@ -441,7 +441,7 @@ for page_data in PAGES:
 
     if response.status_code == 201:
         page = response.json().get('page', {})
-        print(f"  ✅ Created! (ID: {page['id']}, Handle: {page['handle']})")
+        print(f"  [SUCCESS] Created! (ID: {page['id']}, Handle: {page['handle']})")
         created_pages.append({
             'title': page['title'],
             'id': page['id'],
@@ -449,34 +449,34 @@ for page_data in PAGES:
             'url': f"https://{store_url}/pages/{page['handle']}"
         })
     else:
-        print(f"  ❌ Failed: {response.status_code}")
+        print(f"  [ERROR] Failed: {response.status_code}")
         print(f"     {response.text[:200]}")
 
 print()
 print("=" * 70)
-print("📊 SETUP SUMMARY")
+print("[STATS] SETUP SUMMARY")
 print("=" * 70)
 print()
-print(f"✅ Created: {len(created_pages)} pages")
-print(f"⏭️  Skipped: {len(skipped_pages)} pages (already exist)")
+print(f"[SUCCESS] Created: {len(created_pages)} pages")
+print(f"⏭  Skipped: {len(skipped_pages)} pages (already exist)")
 print()
 
 if created_pages:
-    print("📄 NEW PAGES:")
+    print("[FILE] NEW PAGES:")
     for page in created_pages:
         print(f"  • {page['title']}")
         print(f"    URL: {page['url']}")
         print()
 
 print("=" * 70)
-print("🎯 NEXT STEPS")
+print("[TARGET] NEXT STEPS")
 print("=" * 70)
 print()
-print("1. ✅ Pages Created - Review and customize content if needed")
-print("2. 📋 Set up Navigation - Add pages to header/footer menus")
-print("3. 🔒 Configure Policies - Set up legal policies in Shopify Admin")
-print("4. 📦 Add Products - Use Ospra OS discovery system or add manually")
-print("5. 🚀 Launch Store - Remove password protection when ready")
+print("1. [SUCCESS] Pages Created - Review and customize content if needed")
+print("2. [LIST] Set up Navigation - Add pages to header/footer menus")
+print("3. [LOCKED] Configure Policies - Set up legal policies in Shopify Admin")
+print("4. [PACKAGE] Add Products - Use Ospra OS discovery system or add manually")
+print("5. [START] Launch Store - Remove password protection when ready")
 print()
 print("To view your new pages, visit:")
 print(f"  https://{store_url}/pages/about-us")
@@ -486,5 +486,5 @@ print(f"  https://{store_url}/pages/shipping-information")
 print(f"  https://{store_url}/pages/returns-exchanges")
 print()
 print("=" * 70)
-print("✨ STORE SETUP COMPLETE!")
+print("[NEW] STORE SETUP COMPLETE!")
 print("=" * 70)

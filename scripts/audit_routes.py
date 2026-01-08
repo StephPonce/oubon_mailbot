@@ -138,7 +138,7 @@ def audit_routes(project_root: str = ".") -> Dict[str, List[RouteInfo]]:
                     routes_by_file[str(file_path)] = auditor.routes
 
             except Exception as e:
-                print(f"⚠️  Error parsing {file_path}: {e}")
+                print(f"[WARNING]  Error parsing {file_path}: {e}")
 
     return routes_by_file
 
@@ -167,8 +167,8 @@ def generate_report(routes_by_file: Dict[str, List[RouteInfo]]) -> str:
         report.append("|--------|------|----------|------|------------|----------------|\n")
 
         for route in sorted(routes, key=lambda r: (r.path, r.method)):
-            auth = "✅" if route.has_auth else "❌"
-            valid = "✅" if route.has_validation else "❌"
+            auth = "[SUCCESS]" if route.has_auth else "[ERROR]"
+            valid = "[SUCCESS]" if route.has_validation else "[ERROR]"
             model = route.response_model or "-"
             report.append(f"| {route.method} | `{route.path}` | {route.function_name} | {auth} | {valid} | {model} |\n")
 
@@ -193,7 +193,7 @@ def generate_report(routes_by_file: Dict[str, List[RouteInfo]]) -> str:
         report.append("\n\n")
     else:
         report.append("### Routes Without Authentication\n\n")
-        report.append("✅ All non-GET routes have authentication!\n\n")
+        report.append("[SUCCESS] All non-GET routes have authentication!\n\n")
 
     # Check for routes without response model
     no_model = []
@@ -228,18 +228,18 @@ def generate_report(routes_by_file: Dict[str, List[RouteInfo]]) -> str:
         report.append("\n")
     else:
         report.append("### Duplicate Routes\n\n")
-        report.append("✅ No duplicate routes found!\n\n")
+        report.append("[SUCCESS] No duplicate routes found!\n\n")
 
     return "".join(report)
 
 
 if __name__ == "__main__":
-    print("🔍 Auditing API routes...\n")
+    print("[SEARCH] Auditing API routes...\n")
 
     routes = audit_routes("ospra_os")
 
     if not routes:
-        print("⚠️  No routes found! Make sure you're running from the project root.")
+        print("[WARNING]  No routes found! Make sure you're running from the project root.")
         exit(1)
 
     report = generate_report(routes)
@@ -253,4 +253,4 @@ if __name__ == "__main__":
         f.write(report)
 
     print(report)
-    print(f"\n✅ Report saved to {report_path}")
+    print(f"\n[SUCCESS] Report saved to {report_path}")

@@ -168,7 +168,7 @@ class ConfidenceEngine:
                 from ospra_os.services.learning_processor import LearningProcessor
                 self.learning_processor = LearningProcessor(db)
             except ImportError:
-                print("⚠️  LearningProcessor not available - using default weights")
+                print("[WARNING]  LearningProcessor not available - using default weights")
 
     def get_learned_weights(self) -> Dict[str, float]:
         """
@@ -726,7 +726,7 @@ class ConfidenceEngine:
                 value=12,
                 weight=0.8,
                 factor_type=FactorType.POSITIVE,
-                description=f"{rating:.1f}★ from {count:,} reviews",
+                description=f"{rating:.1f} from {count:,} reviews",
                 icon="star"
             )
         elif rating >= 4.0 and count >= 50:
@@ -736,7 +736,7 @@ class ConfidenceEngine:
                 value=8,
                 weight=0.7,
                 factor_type=FactorType.POSITIVE,
-                description=f"{rating:.1f}★ from {count:,} reviews",
+                description=f"{rating:.1f} from {count:,} reviews",
                 icon="star"
             )
         elif rating < 3.5:
@@ -746,7 +746,7 @@ class ConfidenceEngine:
                 value=-15,
                 weight=0.9,
                 factor_type=FactorType.NEGATIVE,
-                description=f"{rating:.1f}★ indicates quality issues",
+                description=f"{rating:.1f} indicates quality issues",
                 icon="alert-triangle"
             )
         elif count < 10:
@@ -765,7 +765,7 @@ class ConfidenceEngine:
             value=3,
             weight=0.6,
             factor_type=FactorType.NEUTRAL,
-            description=f"{rating:.1f}★ from {count} reviews",
+            description=f"{rating:.1f} from {count} reviews",
             icon="star"
         )
 

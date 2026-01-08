@@ -2332,6 +2332,7 @@ dependencies = [
     { name = "pytz" },
     { name = "rembg" },
     { name = "requests" },
+    { name = "resend" },
     { name = "schedule" },
     { name = "sentry-sdk", extra = ["fastapi", "httpx", "sqlalchemy"] },
     { name = "slack-sdk" },
@@ -2401,6 +2402,7 @@ requires-dist = [
     { name = "redis", marker = "extra == 'worker'", specifier = ">=5.0.8" },
     { name = "rembg", specifier = ">=2.0.69" },
     { name = "requests", specifier = ">=2.32.3" },
+    { name = "resend", specifier = ">=2.19.0" },
     { name = "rq", marker = "extra == 'worker'", specifier = ">=1.16.2" },
     { name = "schedule", specifier = ">=1.2.2" },
     { name = "sentry-sdk", extras = ["fastapi", "httpx", "sqlalchemy"], specifier = ">=2.47.0" },
@@ -3361,6 +3363,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload-time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
+name = "resend"
+version = "2.19.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d8/21/1ddb4c221fc8310a99956f55c2e5e21b548378bde4a662473dcdda6f4018/resend-2.19.0.tar.gz", hash = "sha256:b11191561cdb0ed7aa193212b7c8865bf635013c4d11bd81caf471d1b362be02", size = 30604, upload-time = "2025-10-31T13:59:32.274Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/1f/f53acaad9299a72671c4314fd42c0b332464eaf0d20ea5303e75b8a9a963/resend-2.19.0-py2.py3-none-any.whl", hash = "sha256:1a8b9fcacbe058876ebce757ac2542103ed7227caec10e5c58613ee58615acaa", size = 50881, upload-time = "2025-10-31T13:59:31.015Z" },
 ]
 
 [[package]]

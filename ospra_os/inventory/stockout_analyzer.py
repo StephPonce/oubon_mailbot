@@ -286,17 +286,17 @@ class StockoutAnalyzer:
         recommendations = []
 
         if risk_level == "CRITICAL":
-            recommendations.append("🚨 URGENT: Place restock order immediately")
+            recommendations.append(" URGENT: Place restock order immediately")
             recommendations.append("Consider expedited shipping to reduce lead time")
             recommendations.append("Review sales channels - may need to pause sales")
 
         elif risk_level == "HIGH":
-            recommendations.append("⚠️  Place restock order within 1-2 days")
+            recommendations.append("[WARNING]  Place restock order within 1-2 days")
             if seasonal_adjustment > 1.2:
                 recommendations.append(f"Order {int((seasonal_adjustment-1)*100)}% extra for seasonal surge")
 
         elif risk_level == "MEDIUM":
-            recommendations.append("📋 Schedule restock order for next week")
+            recommendations.append("[LIST] Schedule restock order for next week")
             recommendations.append("Monitor stock levels daily")
 
         # Specific factor-based recommendations

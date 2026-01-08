@@ -76,10 +76,10 @@ class ImageProcessor:
 
         if api_key:
             self.openai = OpenAI(api_key=api_key)
-            logger.info("✅ Image Processor initialized with DALL-E")
+            logger.info("[SUCCESS] Image Processor initialized with DALL-E")
         else:
             self.openai = None
-            logger.warning("⚠️  OPENAI_API_KEY not set - DALL-E disabled")
+            logger.warning("[WARNING]  OPENAI_API_KEY not set - DALL-E disabled")
 
     async def generate_lifestyle_image(
         self,
@@ -93,7 +93,7 @@ class ImageProcessor:
 
         try:
             prompt = self._create_lifestyle_prompt(product_name, product_category)
-            logger.info(f"🎨 Generating DALL-E image for: {product_name[:50]}...")
+            logger.info(f" Generating DALL-E image for: {product_name[:50]}...")
 
             response = self.openai.images.generate(
                 model="dall-e-3",
@@ -104,7 +104,7 @@ class ImageProcessor:
             )
 
             image_url = response.data[0].url
-            logger.info(f"✅ Generated lifestyle image")
+            logger.info(f"[SUCCESS] Generated lifestyle image")
             return image_url
 
         except Exception as e:
@@ -150,7 +150,7 @@ Composition: Rule of thirds, product as focal point
     ) -> Optional[bytes]:
         """Download image and optimize for web."""
         try:
-            logger.info(f"📥 Downloading image from: {image_url[:60]}...")
+            logger.info(f" Downloading image from: {image_url[:60]}...")
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(image_url, timeout=15) as response:
@@ -194,7 +194,7 @@ Composition: Rule of thirds, product as focal point
 
                 quality -= 10
 
-            logger.info(f"✅ Optimized image: {size_kb:.1f}KB at quality {quality}")
+            logger.info(f"[SUCCESS] Optimized image: {size_kb:.1f}KB at quality {quality}")
             return output.getvalue()
 
         except Exception as e:

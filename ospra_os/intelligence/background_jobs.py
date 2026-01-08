@@ -61,7 +61,7 @@ class IntelligenceScheduler:
         self.alerts = deque(maxlen=1000)  # Keep last 1000 alerts
         self.job_history = {}
 
-        logger.info("🧠 Intelligence Scheduler initialized")
+        logger.info("[BRAIN] Intelligence Scheduler initialized")
 
     def start(self):
         """Start background jobs in separate thread"""
@@ -71,7 +71,7 @@ class IntelligenceScheduler:
             return
 
         if not self.ai_agent.enabled:
-            logger.warning("⚠️  AI Research Agent disabled (no ANTHROPIC_API_KEY) - scheduler will run with limited functionality")
+            logger.warning("[WARNING]  AI Research Agent disabled (no ANTHROPIC_API_KEY) - scheduler will run with limited functionality")
 
         # Schedule jobs
         schedule.every(6).hours.do(self._job_wrapper, "analyze_products", self.analyze_products)
@@ -85,8 +85,8 @@ class IntelligenceScheduler:
         self.thread = threading.Thread(target=self._run_scheduler, daemon=True)
         self.thread.start()
 
-        logger.info("✅ Level 3 AI scheduler started")
-        logger.info("📋 Scheduled jobs:")
+        logger.info("[SUCCESS] Level 3 AI scheduler started")
+        logger.info("[LIST] Scheduled jobs:")
         logger.info("   • analyze_products - every 6 hours")
         logger.info("   • monitor_competitors - every 12 hours")
         logger.info("   • track_trends - daily at 9am")
@@ -106,12 +106,12 @@ class IntelligenceScheduler:
         if self.thread:
             self.thread.join(timeout=5)
 
-        logger.info("⏸️  Level 3 AI scheduler stopped")
+        logger.info("[PAUSE]  Level 3 AI scheduler stopped")
 
     def _run_scheduler(self):
         """Main scheduler loop (runs in background thread)"""
 
-        logger.info("🔄 Scheduler loop started")
+        logger.info("[REFRESH] Scheduler loop started")
 
         while self.running:
             try:
@@ -128,7 +128,7 @@ class IntelligenceScheduler:
     def _job_wrapper(self, job_name: str, job_func):
         """Wrapper to track job execution and handle errors"""
 
-        logger.info(f"🚀 Running job: {job_name}")
+        logger.info(f"[START] Running job: {job_name}")
         start_time = datetime.now()
 
         try:
@@ -141,10 +141,10 @@ class IntelligenceScheduler:
                 'duration_seconds': duration
             }
 
-            logger.info(f"✅ Job completed: {job_name} ({duration:.1f}s)")
+            logger.info(f"[SUCCESS] Job completed: {job_name} ({duration:.1f}s)")
 
         except Exception as e:
-            logger.error(f"❌ Job failed: {job_name} - {e}")
+            logger.error(f"[ERROR] Job failed: {job_name} - {e}")
 
             self.job_history[job_name] = {
                 'last_run': start_time.isoformat(),
@@ -170,7 +170,7 @@ class IntelligenceScheduler:
         - Products to test/optimize
         """
 
-        logger.info("📊 Analyzing product performance...")
+        logger.info("[STATS] Analyzing product performance...")
 
         try:
             # Import here to avoid circular dependency
@@ -282,7 +282,7 @@ class IntelligenceScheduler:
                         }
                     )
 
-                logger.info("✅ Product analysis complete")
+                logger.info("[SUCCESS] Product analysis complete")
 
         except Exception as e:
             logger.error(f"Product analysis failed: {e}")
@@ -294,7 +294,7 @@ class IntelligenceScheduler:
         Track pricing, new products, and generate alerts
         """
 
-        logger.info("🔍 Monitoring competitors...")
+        logger.info("[SEARCH] Monitoring competitors...")
 
         try:
             import asyncio
@@ -347,10 +347,10 @@ class IntelligenceScheduler:
                             new_products = len(new_product_activities)
                             total_new_products += new_products
 
-                            logger.info(f"    ✅ {price_changes} price changes, {new_products} new products")
+                            logger.info(f"    [SUCCESS] {price_changes} price changes, {new_products} new products")
 
                         except Exception as e:
-                            logger.error(f"    ❌ Error monitoring {competitor['name']}: {e}")
+                            logger.error(f"    [ERROR] Error monitoring {competitor['name']}: {e}")
                             continue
 
                     return {
@@ -382,7 +382,7 @@ class IntelligenceScheduler:
                     {'scanned_competitors': results['scanned']}
                 )
 
-            logger.info(f"✅ Competitor monitoring complete: {results}")
+            logger.info(f"[SUCCESS] Competitor monitoring complete: {results}")
 
         except Exception as e:
             logger.error(f"Competitor monitoring failed: {e}")
@@ -399,7 +399,7 @@ class IntelligenceScheduler:
         Track market trends and identify opportunities
         """
 
-        logger.info("📈 Tracking market trends...")
+        logger.info("[TREND] Tracking market trends...")
 
         try:
             # In production, this would:
@@ -426,7 +426,7 @@ class IntelligenceScheduler:
         Generate weekly performance report
         """
 
-        logger.info("📊 Generating weekly report...")
+        logger.info("[STATS] Generating weekly report...")
 
         try:
             # In production, this would:
@@ -457,7 +457,7 @@ class IntelligenceScheduler:
         Runs daily at 3 AM to keep database updated with latest trending products
         """
 
-        logger.info("🔍 Auto-discovering fresh products with Google Trends...")
+        logger.info("[SEARCH] Auto-discovering fresh products with Google Trends...")
 
         try:
             import asyncio
@@ -487,10 +487,10 @@ class IntelligenceScheduler:
             # Process each niche's products
             for niche, products in niche_products.items():
                 if not products:
-                    logger.warning(f"  ⚠️  No products found for {niche}")
+                    logger.warning(f"  [WARNING]  No products found for {niche}")
                     continue
 
-                logger.info(f"  ✅ Found {len(products)} products for {niche}")
+                logger.info(f"  [SUCCESS] Found {len(products)} products for {niche}")
                 total_discovered += len(products)
 
                 # Save to database (replace old products for this niche)
@@ -537,10 +537,10 @@ class IntelligenceScheduler:
                             session.add(product)
 
                         session.commit()
-                        logger.info(f"  💾 Saved {len(products[:20])} products to database for {niche}")
+                        logger.info(f"   Saved {len(products[:20])} products to database for {niche}")
 
                 except Exception as e:
-                    logger.error(f"  ❌ Failed to save products for {niche}: {e}")
+                    logger.error(f"  [ERROR] Failed to save products for {niche}: {e}")
                     continue
 
             # Generate summary alert
@@ -556,7 +556,7 @@ class IntelligenceScheduler:
                         'timestamp': datetime.now().isoformat()
                     }
                 )
-                logger.info(f"✅ Auto-discovery complete: {total_discovered} products from Google Trends")
+                logger.info(f"[SUCCESS] Auto-discovery complete: {total_discovered} products from Google Trends")
             else:
                 self.add_alert(
                     'warning',
@@ -564,7 +564,7 @@ class IntelligenceScheduler:
                     'No new products discovered - Google Trends may be rate limiting',
                     {'attempted_niches': list(niche_products.keys())}
                 )
-                logger.warning("⚠️  Auto-discovery completed but no products found")
+                logger.warning("[WARNING]  Auto-discovery completed but no products found")
 
         except Exception as e:
             logger.error(f"Auto-discovery failed: {e}")
@@ -588,11 +588,11 @@ class IntelligenceScheduler:
 
         # Log based on severity
         if severity == 'critical':
-            logger.error(f"🚨 {title}: {message}")
+            logger.error(f" {title}: {message}")
         elif severity == 'warning':
-            logger.warning(f"⚠️  {title}: {message}")
+            logger.warning(f"[WARNING]  {title}: {message}")
         else:
-            logger.info(f"ℹ️  {title}: {message}")
+            logger.info(f"[INFO]  {title}: {message}")
 
     def get_alerts(
         self,
@@ -684,7 +684,7 @@ class IntelligenceScheduler:
         if job_name not in job_map:
             raise ValueError(f"Unknown job: {job_name}")
 
-        logger.info(f"🎯 Manually triggering job: {job_name}")
+        logger.info(f"[TARGET] Manually triggering job: {job_name}")
 
         # Run in background thread to avoid blocking API
         thread = threading.Thread(

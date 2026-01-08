@@ -27,7 +27,7 @@ class AutoDeployJob:
     def __init__(self):
         self.deployer = AutoDeployer()
         self.scheduler = AsyncIOScheduler()
-        logger.info("✅ AutoDeployJob initialized")
+        logger.info("[SUCCESS] AutoDeployJob initialized")
 
     async def run_check(self):
         """
@@ -37,7 +37,7 @@ class AutoDeployJob:
         try:
             logger.info("")
             logger.info("=" * 70)
-            logger.info(f"🤖 AUTO-DEPLOY JOB: Starting at {datetime.now()}")
+            logger.info(f"[AI] AUTO-DEPLOY JOB: Starting at {datetime.now()}")
             logger.info("=" * 70)
 
             result = await self.deployer.check_and_deploy()
@@ -45,17 +45,17 @@ class AutoDeployJob:
             if result.get("success"):
                 deployed = result.get("deployed", 0)
                 if deployed > 0:
-                    logger.info(f"✅ Auto-deploy job completed: {deployed} products deployed")
+                    logger.info(f"[SUCCESS] Auto-deploy job completed: {deployed} products deployed")
                 else:
-                    logger.info(f"ℹ️  Auto-deploy job completed: {result.get('reason', 'No action taken')}")
+                    logger.info(f"[INFO]  Auto-deploy job completed: {result.get('reason', 'No action taken')}")
             else:
-                logger.warning(f"⚠️  Auto-deploy job completed with issues: {result.get('reason', 'Unknown')}")
+                logger.warning(f"[WARNING]  Auto-deploy job completed with issues: {result.get('reason', 'Unknown')}")
 
             logger.info("=" * 70)
             return result
 
         except Exception as e:
-            logger.error(f"❌ Auto-deploy job failed: {e}")
+            logger.error(f"[ERROR] Auto-deploy job failed: {e}")
             import traceback
             traceback.print_exc()
             return {"success": False, "error": str(e)}
@@ -66,7 +66,7 @@ class AutoDeployJob:
 
         # Skip scheduler in test mode to avoid event loop conflicts
         if os.getenv("APP_ENV") == "testing":
-            logger.debug("🧪 Skipping auto-deploy scheduler in test mode")
+            logger.debug("[TEST] Skipping auto-deploy scheduler in test mode")
             return
 
         try:
@@ -82,27 +82,27 @@ class AutoDeployJob:
             )
 
             self.scheduler.start()
-            logger.info("✅ Auto-deploy scheduler started (runs every hour)")
+            logger.info("[SUCCESS] Auto-deploy scheduler started (runs every hour)")
 
             # Log next run time
             job = self.scheduler.get_job("auto_deploy_hourly_check")
             if job and job.next_run_time:
-                logger.info(f"   📅 Next auto-deploy check: {job.next_run_time}")
+                logger.info(f"    Next auto-deploy check: {job.next_run_time}")
 
         except (RuntimeError, Exception) as e:
             # Silently handle event loop errors in test environments
             if "Event loop is closed" in str(e) or "no running event loop" in str(e).lower():
-                logger.debug(f"⚠️  Scheduler not started (event loop unavailable): {e}")
+                logger.debug(f"[WARNING]  Scheduler not started (event loop unavailable): {e}")
             else:
-                logger.error(f"❌ Failed to start auto-deploy scheduler: {e}")
+                logger.error(f"[ERROR] Failed to start auto-deploy scheduler: {e}")
 
     def stop(self):
         """Stop the scheduler"""
         try:
             self.scheduler.shutdown()
-            logger.info("⏸️  Auto-deploy scheduler stopped")
+            logger.info("[PAUSE]  Auto-deploy scheduler stopped")
         except Exception as e:
-            logger.error(f"❌ Failed to stop auto-deploy scheduler: {e}")
+            logger.error(f"[ERROR] Failed to stop auto-deploy scheduler: {e}")
 
 
 # Global instance

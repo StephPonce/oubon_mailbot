@@ -68,4 +68,4 @@ class VelocityAnalyzer:
             'review_velocity': review_velocity
         }
 
-print("✅ Velocity analyzer created")
+print("[SUCCESS] Velocity analyzer created")

@@ -83,7 +83,7 @@ def get_raw_db(db: Session = Depends(get_db)) -> Session:
     """
     Get raw database session (NOT tenant-scoped).
 
-    ⚠️ USE WITH EXTREME CAUTION ⚠️
+    [WARNING] USE WITH EXTREME CAUTION [WARNING]
 
     This bypasses tenant isolation. Only use for:
     - System administration

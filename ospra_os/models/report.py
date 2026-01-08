@@ -119,4 +119,4 @@ class ReportSchedule(Base):
 def init_report_tables(engine):
     """Create all report tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Report tables created")
+    print("[SUCCESS] Report tables created")

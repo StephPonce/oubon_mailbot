@@ -35,21 +35,21 @@ async def test_database_tables():
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
-    print(f"\n✓ Found {len(tables)} tables in database")
+    print(f"\n[OK] Found {len(tables)} tables in database")
 
     # Check for velocity table
     if 'product_velocity' in tables:
-        print(f"✓ product_velocity table exists")
+        print(f"[OK] product_velocity table exists")
 
         # Check columns
         columns = [c['name'] for c in inspector.get_columns('product_velocity')]
-        print(f"\n✓ product_velocity columns ({len(columns)}):")
+        print(f"\n[OK] product_velocity columns ({len(columns)}):")
         for col in columns:
             print(f"  - {col}")
 
         return True
     else:
-        print(f"✗ MISSING product_velocity table")
+        print(f" MISSING product_velocity table")
         return False
 
 
@@ -120,7 +120,7 @@ async def create_test_data():
         ).first()
 
         if existing:
-            print(f"✓ Product '{product['name']}' already exists (ID: {existing.id})")
+            print(f"[OK] Product '{product['name']}' already exists (ID: {existing.id})")
             product_ids.append(existing.id)
             continue
 
@@ -136,12 +136,12 @@ async def create_test_data():
         session.flush()
 
         product_ids.append(saturation.id)
-        print(f"✓ Created product: {product['name']} (ID: {saturation.id}, Age: {product['age_days']} days)")
+        print(f"[OK] Created product: {product['name']} (ID: {saturation.id}, Age: {product['age_days']} days)")
 
     session.commit()
     session.close()
 
-    print(f"\n✓ Created/verified {len(test_products)} test products")
+    print(f"\n[OK] Created/verified {len(test_products)} test products")
     return test_products
 
 
@@ -178,7 +178,7 @@ async def test_velocity_detector():
             reddit_mentions_30d=product_data['reddit_30d']
         )
 
-        print(f"✓ {product.product_name}")
+        print(f"[OK] {product.product_name}")
         print(f"  Phase: {velocity.phase}")
         print(f"  Velocity Score: {velocity.viral_coefficient:.1f}")
         print(f"  Growth Rate: {velocity.search_growth_rate:.1f}%")
@@ -191,19 +191,19 @@ async def test_velocity_detector():
 
     for phase in phases:
         products = await detector.get_products_by_phase(phase, limit=5)
-        print(f"✓ {phase}: {len(products)} products")
+        print(f"[OK] {phase}: {len(products)} products")
 
     print("\n[Test 3.3] Testing tier-based filtering...")
     tiers = ['free', 'starter', 'pro', 'enterprise']
 
     for tier in tiers:
         products = await detector.get_tier_appropriate_products(tier, limit=10)
-        print(f"✓ {tier}: {len(products)} products")
+        print(f"[OK] {tier}: {len(products)} products")
 
     print("\n[Test 3.4] Getting velocity statistics...")
     stats = await detector.get_velocity_stats()
-    print(f"✓ Total products tracked: {stats['total_products']}")
-    print(f"✓ Phase breakdown:")
+    print(f"[OK] Total products tracked: {stats['total_products']}")
+    print(f"[OK] Phase breakdown:")
     for phase, data in stats['phases'].items():
         print(f"  - {phase}: {data['count']} products (avg velocity: {data['avg_velocity_score']})")
 
@@ -229,16 +229,16 @@ async def test_api_endpoints():
             data = response.json()
 
             if data.get('success'):
-                print(f"✓ API responded successfully")
+                print(f"[OK] API responded successfully")
                 print(f"  Total phases: {len(data.get('stats', {}))}")
                 if 'velocity_overview' in data:
                     print(f"  Total products: {data['velocity_overview']['total_products']}")
             else:
-                print(f"✗ API error: {data.get('error')}")
+                print(f" API error: {data.get('error')}")
                 return False
 
         except Exception as e:
-            print(f"✗ Failed to connect: {e}")
+            print(f" Failed to connect: {e}")
             print("  (Backend might not be running)")
             return False
 
@@ -249,15 +249,15 @@ async def test_api_endpoints():
             data = response.json()
 
             if data.get('success'):
-                print(f"✓ API responded successfully")
+                print(f"[OK] API responded successfully")
                 print(f"  Tier: {data.get('tier')}")
                 print(f"  Products: {data.get('count')}")
                 print(f"  Tier Info: {data.get('tier_info')}")
             else:
-                print(f"✗ API error: {data.get('error')}")
+                print(f" API error: {data.get('error')}")
 
         except Exception as e:
-            print(f"✗ Request failed: {e}")
+            print(f" Request failed: {e}")
 
         # Test 3: Phase-specific endpoint
         print("\n[Test 4.3] GET /api/velocity/phase/early_spike")
@@ -266,23 +266,23 @@ async def test_api_endpoints():
             data = response.json()
 
             if data.get('success'):
-                print(f"✓ API responded successfully")
+                print(f"[OK] API responded successfully")
                 print(f"  Phase: {data.get('phase')}")
                 print(f"  Products: {data.get('count')}")
             else:
-                print(f"✗ API error: {data.get('error')}")
+                print(f" API error: {data.get('error')}")
 
         except Exception as e:
-            print(f"✗ Request failed: {e}")
+            print(f" Request failed: {e}")
 
     return True
 
 
 async def main():
     """Run all tests"""
-    print("\n" + "█"*60)
+    print("\n" + ""*60)
     print("VELOCITY DETECTION SYSTEM VERIFICATION")
-    print("█"*60)
+    print(""*60)
 
     try:
         # Test 1: Database tables
@@ -301,32 +301,32 @@ async def main():
         print("\n" + "="*60)
         print("TEST SUMMARY")
         print("="*60)
-        print(f"✓ Database Tables: {'PASSED' if test1_passed else 'FAILED'}")
-        print(f"✓ VelocityDetector Service: {'PASSED' if test3_passed else 'FAILED'}")
-        print(f"✓ API Endpoints: {'PASSED' if test4_passed else 'FAILED'}")
+        print(f"[OK] Database Tables: {'PASSED' if test1_passed else 'FAILED'}")
+        print(f"[OK] VelocityDetector Service: {'PASSED' if test3_passed else 'FAILED'}")
+        print(f"[OK] API Endpoints: {'PASSED' if test4_passed else 'FAILED'}")
 
         all_passed = test1_passed and test3_passed and test4_passed
 
         if all_passed:
-            print("\n" + "█"*60)
-            print("🎉 ALL TESTS PASSED - SYSTEM READY!")
-            print("█"*60)
+            print("\n" + ""*60)
+            print("[LAUNCH] ALL TESTS PASSED - SYSTEM READY!")
+            print(""*60)
             print("\nVelocity detection is now active:")
-            print("  ✓ Products tracked by lifecycle phase")
-            print("  ✓ Tier-based early access working")
-            print("  ✓ 5 phases: discovery → early_spike → growth → maturity → decline")
-            print("  ✓ Higher tiers get earlier access")
+            print("  [OK] Products tracked by lifecycle phase")
+            print("  [OK] Tier-based early access working")
+            print("  [OK] 5 phases: discovery → early_spike → growth → maturity → decline")
+            print("  [OK] Higher tiers get earlier access")
             print("\nAPI Endpoints:")
             print("  • GET /api/velocity/stats")
             print("  • GET /api/velocity/tier-products?tier=pro&niche=fitness")
             print("  • GET /api/velocity/phase/early_spike")
             return 0
         else:
-            print("\n❌ SOME TESTS FAILED")
+            print("\n[ERROR] SOME TESTS FAILED")
             return 1
 
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\n[ERROR] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return 1

@@ -22,7 +22,7 @@ class InventorySyncService:
         Returns updated stock and price info
         """
         try:
-            print(f"🔄 Syncing product {aliexpress_product_id}")
+            print(f"[REFRESH] Syncing product {aliexpress_product_id}")
 
             # Check AliExpress availability
             availability = await self.client.check_product_availability(
@@ -30,7 +30,7 @@ class InventorySyncService:
             )
 
             if not availability['available']:
-                print("⚠️  Product no longer available on AliExpress")
+                print("[WARNING]  Product no longer available on AliExpress")
 
                 # TODO: Disable product in Shopify
 
@@ -54,12 +54,12 @@ class InventorySyncService:
                 'available': True
             }
 
-            print(f"✅ Synced - Stock: {result['stock']}, Price: ${result['price']:.2f}")
+            print(f"[SUCCESS] Synced - Stock: {result['stock']}, Price: ${result['price']:.2f}")
 
             return result
 
         except Exception as e:
-            print(f"❌ Sync error: {e}")
+            print(f"[ERROR] Sync error: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -72,7 +72,7 @@ class InventorySyncService:
         """Sync inventory for multiple products"""
         import asyncio
 
-        print(f"\n🔄 Syncing {len(products)} products...")
+        print(f"\n[REFRESH] Syncing {len(products)} products...")
 
         results = []
 
@@ -85,7 +85,7 @@ class InventorySyncService:
 
             await asyncio.sleep(1)  # Rate limit
 
-        print(f"\n✅ Synced {len(results)} products")
+        print(f"\n[SUCCESS] Synced {len(results)} products")
 
         return results
 
@@ -104,7 +104,7 @@ class InventorySyncService:
         Returns:
             List of products with significant changes
         """
-        print(f"\n💰 Monitoring prices for {len(products)} products...")
+        print(f"\n[PRICE] Monitoring prices for {len(products)} products...")
 
         alerts = []
 
@@ -131,9 +131,9 @@ class InventorySyncService:
                         'change_percent': change_percent
                     })
 
-                    print(f"⚠️  Price change alert: {product.get('name', 'Unknown')}")
+                    print(f"[WARNING]  Price change alert: {product.get('name', 'Unknown')}")
                     print(f"   ${old_price:.2f} → ${current_price:.2f} ({change_percent:+.1f}%)")
 
-        print(f"\n📊 Found {len(alerts)} significant price changes")
+        print(f"\n[STATS] Found {len(alerts)} significant price changes")
 
         return alerts

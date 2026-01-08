@@ -15,8 +15,8 @@ try:
     products = data.get("products", [])
     data_source = data.get("data_source", "Unknown")
     
-    print(f"✅ Data Source: {data_source}")
-    print(f"✅ Found {len(products)} products\n")
+    print(f"[SUCCESS] Data Source: {data_source}")
+    print(f"[SUCCESS] Found {len(products)} products\n")
     
     if products:
         print("Top 5 Products with Velocity Scores:")
@@ -35,17 +35,17 @@ try:
         velocities = [p.get("velocity_score", 0) for p in products]
         avg_velocity = sum(velocities) / len(velocities) if velocities else 0
         
-        print(f"📊 Average Velocity Score: {avg_velocity:.1f}/100")
+        print(f"[STATS] Average Velocity Score: {avg_velocity:.1f}/100")
         
         if data_source == "ADVANCED_SCRAPING":
-            print("\n✅ ADVANCED PLAYWRIGHT SCRAPER IS ACTIVE!")
+            print("\n[SUCCESS] ADVANCED PLAYWRIGHT SCRAPER IS ACTIVE!")
         elif data_source == "REAL_TIME_API":
-            print("\n✅ REAL-TIME API IS ACTIVE (TikTok/AliExpress)")
+            print("\n[SUCCESS] REAL-TIME API IS ACTIVE (TikTok/AliExpress)")
         else:
-            print(f"\n⚠️  Using fallback data source: {data_source}")
+            print(f"\n[WARNING]  Using fallback data source: {data_source}")
             
     else:
-        print("❌ No products returned")
+        print("[ERROR] No products returned")
         
 except Exception as e:
-    print(f"❌ Test failed: {e}")
+    print(f"[ERROR] Test failed: {e}")

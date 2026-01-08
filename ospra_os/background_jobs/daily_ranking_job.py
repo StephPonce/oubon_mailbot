@@ -76,7 +76,7 @@ class DailyRankingJob:
             if not self.scheduler.running:
                 self.scheduler.start()
 
-            logger.info(f"✅ Daily ranking job scheduled for {hour:02d}:{minute:02d}")
+            logger.info(f"[SUCCESS] Daily ranking job scheduled for {hour:02d}:{minute:02d}")
 
         except Exception as e:
             logger.error(f"Failed to schedule ranking job: {e}")
@@ -95,7 +95,7 @@ class DailyRankingJob:
         Internal method that runs the daily ranking calculation.
         Called by scheduler.
         """
-        logger.info("🏆 Starting daily product ranking job...")
+        logger.info("[TOP] Starting daily product ranking job...")
 
         try:
             # Get database session
@@ -116,7 +116,7 @@ class DailyRankingJob:
                 previous_rankings
             )
 
-            logger.info(f"✅ Daily ranking job complete: {len(current_rankings)} products ranked")
+            logger.info(f"[SUCCESS] Daily ranking job complete: {len(current_rankings)} products ranked")
 
             return {
                 "success": True,
@@ -217,12 +217,12 @@ class DailyRankingJob:
                 # Top 10 entry: product wasn't in top 10 before, now is
                 if current_rank <= 10 and (previous_rank is None or previous_rank > 10):
                     top_10_entries.append((product, previous_rank))
-                    logger.info(f"🏆 Product {product_id} entered Top 10 at rank #{current_rank}")
+                    logger.info(f"[TOP] Product {product_id} entered Top 10 at rank #{current_rank}")
 
                 # ELITE tier entry: product reached top 3
                 if current_rank <= 3 and (previous_rank is None or previous_rank > 3):
                     elite_entries.append(product)
-                    logger.info(f"👑 Product {product_id} entered ELITE tier at rank #{current_rank}")
+                    logger.info(f" Product {product_id} entered ELITE tier at rank #{current_rank}")
 
             session.commit()
             logger.info(f"Stored {len(current_rankings)} ranking history records")
@@ -288,7 +288,7 @@ class DailyRankingJob:
                     logger.error(f"Failed to send ELITE notification for product {product.get('product_id')}: {e}")
 
             if top_10_entries or elite_entries:
-                logger.info(f"✉️  Sent {len(top_10_entries)} Top 10 and {len(elite_entries)} ELITE notifications")
+                logger.info(f"[EMAIL]  Sent {len(top_10_entries)} Top 10 and {len(elite_entries)} ELITE notifications")
 
         except Exception as e:
             logger.error(f"Error sending ranking notifications: {e}")
@@ -359,4 +359,4 @@ def start_daily_ranking_scheduler(
     return job
 
 
-logger.info("✅ DailyRankingJob module loaded")
+logger.info("[SUCCESS] DailyRankingJob module loaded")

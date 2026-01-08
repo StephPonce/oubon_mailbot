@@ -34,7 +34,7 @@ class AdCopyGenerator:
             List of ad copy variations with headlines and body text
         """
         try:
-            print(f"✍️  Generating ad copy for: {product.get('name', 'Product')[:50]}")
+            print(f"  Generating ad copy for: {product.get('name', 'Product')[:50]}")
 
             prompt = self._build_prompt(product, target_audience, tone, max_variations)
 
@@ -53,12 +53,12 @@ class AdCopyGenerator:
             # Parse response into variations
             variations = self._parse_variations(response_text)
 
-            print(f"✅ Generated {len(variations)} ad variations")
+            print(f"[SUCCESS] Generated {len(variations)} ad variations")
 
             return variations
 
         except Exception as e:
-            print(f"❌ Ad generation error: {e}")
+            print(f"[ERROR] Ad generation error: {e}")
 
             # Return fallback ad copy
             return self._generate_fallback_copy(product)
@@ -153,7 +153,7 @@ Focus on benefits, not features. Make it scroll-stopping."""
             return variations
 
         except Exception as e:
-            print(f"⚠️  Parse error: {e}")
+            print(f"[WARNING]  Parse error: {e}")
             return []
 
     def _generate_fallback_copy(self, product: Dict) -> List[Dict]:
@@ -165,17 +165,17 @@ Focus on benefits, not features. Make it scroll-stopping."""
         return [
             {
                 'headline': f"Transform Your Home with {name[:20]}",
-                'body': f"✨ Trending now! Limited stock. Get yours for just ${price:.2f}. Free shipping!",
+                'body': f"[NEW] Trending now! Limited stock. Get yours for just ${price:.2f}. Free shipping!",
                 'angle': 'Scarcity + Social Proof'
             },
             {
                 'headline': f"Don't Miss Out: {name[:25]}",
-                'body': f"🔥 Thousands sold! Premium quality for only ${price:.2f}. Shop now!",
+                'body': f"[HOT] Thousands sold! Premium quality for only ${price:.2f}. Shop now!",
                 'angle': 'FOMO + Value'
             },
             {
                 'headline': f"Upgrade Your Space Today",
-                'body': f"⭐ Rated 4.5/5 stars. {name[:30]} at ${price:.2f}. Order now!",
+                'body': f"[STAR] Rated 4.5/5 stars. {name[:30]} at ${price:.2f}. Order now!",
                 'angle': 'Social Proof + Urgency'
             }
         ]

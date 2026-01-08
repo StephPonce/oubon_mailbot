@@ -49,13 +49,13 @@ class SmartRecommendationEngine:
         # Try to initialize with Claude AI, fall back to template-only mode if API key not available
         try:
             self.angle_generator = MarketingAngleGenerator(ai_provider='claude')
-            logger.info("✅ MarketingAngleGenerator initialized with Claude AI")
+            logger.info("[SUCCESS] MarketingAngleGenerator initialized with Claude AI")
         except Exception as e:
             logger.warning(f"Claude API key not configured, using template-only mode: {e}")
             # Marketing angles still work with templates, AI is optional
             self.angle_generator = None
 
-        logger.info("✅ SmartRecommendationEngine initialized with all systems")
+        logger.info("[SUCCESS] SmartRecommendationEngine initialized with all systems")
 
     async def get_personalized_recommendations(
         self,
@@ -418,4 +418,4 @@ class SmartRecommendationEngine:
         await self.saturation_tracker.close()
         await self.velocity_detector.close()
         await self.tier_manager.close()
-        logger.info("✅ SmartRecommendationEngine closed")
+        logger.info("[SUCCESS] SmartRecommendationEngine closed")

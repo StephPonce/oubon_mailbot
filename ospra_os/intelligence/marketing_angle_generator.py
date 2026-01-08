@@ -143,7 +143,7 @@ class MarketingAngleGenerator:
             api_key: Optional API key (uses env vars if not provided)
         """
         self.ai = AIFactory.get_provider(ai_provider, api_key)
-        logger.info(f"✅ MarketingAngleGenerator initialized with {ai_provider}")
+        logger.info(f"[SUCCESS] MarketingAngleGenerator initialized with {ai_provider}")
 
     async def generate_unique_angle(
         self,
@@ -209,7 +209,7 @@ class MarketingAngleGenerator:
                 niche=niche
             )
 
-            logger.info(f"✅ Generated AI angle: {angle}")
+            logger.info(f"[SUCCESS] Generated AI angle: {angle}")
             return angle_data
 
         except Exception as e:
@@ -380,7 +380,7 @@ IMPORTANT: Return ONLY the JSON object, nothing else."""
                 logger.error(f"Failed to generate angle {i+1}: {e}")
                 continue
 
-        logger.info(f"✅ Generated {len(angles)} unique angles")
+        logger.info(f"[SUCCESS] Generated {len(angles)} unique angles")
         return angles
 
     def get_available_angles(self, niche: str) -> List[str]:

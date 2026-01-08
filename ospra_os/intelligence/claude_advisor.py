@@ -56,7 +56,7 @@ class ClaudeBusinessAdvisor:
         if not date:
             date = datetime.now().strftime('%Y-%m-%d')
 
-        logger.info(f"📊 Generating daily briefing for {date}")
+        logger.info(f"[STATS] Generating daily briefing for {date}")
 
         # Gather business metrics
         data = await self._gather_business_metrics(date)
@@ -94,19 +94,19 @@ Generate a daily briefing for {date}.
 1. **TL;DR** (2 sentences max)
    - Quick overview of today's performance
 
-2. **✅ What Worked Today**
+2. **[SUCCESS] What Worked Today**
    - Specific wins and successes
    - What the data tells us is working
 
-3. **⚠️ What Needs Attention**
+3. **[WARNING] What Needs Attention**
    - Issues, problems, or concerning trends
    - What requires immediate action
 
-4. **🎯 Top 3 Action Items for Tomorrow**
+4. **[TARGET] Top 3 Action Items for Tomorrow**
    - Specific, actionable tasks
    - Prioritized by impact
 
-5. **💡 One Key Learning**
+5. **[TIP] One Key Learning**
    - What the data taught us today
    - How this improves our strategy
 
@@ -122,7 +122,7 @@ Use bullet points. Be concise but insightful.
             )
 
             briefing = response.content[0].text
-            logger.info("✅ Daily briefing generated")
+            logger.info("[SUCCESS] Daily briefing generated")
             return briefing
 
         except Exception as e:
@@ -136,7 +136,7 @@ Use bullet points. Be concise but insightful.
         Returns:
             Formatted weekly report with AI insights
         """
-        logger.info("📈 Generating weekly learning report")
+        logger.info("[TREND] Generating weekly learning report")
 
         # Gather weekly metrics
         data = await self._gather_weekly_metrics()
@@ -189,28 +189,28 @@ Generate a WEEKLY LEARNING REPORT analyzing what we learned this week.
 
 ## YOUR COMPREHENSIVE REPORT SHOULD INCLUDE:
 
-### 🧠 What We Learned This Week
+### [BRAIN] What We Learned This Week
 
 #### Key Insights
 Provide 3-5 major insights from the data. Focus on patterns and correlations.
 
-#### ✅ What Worked
+#### [SUCCESS] What Worked
 Specific tactics, products, or strategies that succeeded. Explain WHY they worked.
 
-#### ❌ What Didn't Work
+#### [ERROR] What Didn't Work
 What failed and why. What does the data tell us about these failures?
 
-#### 🤖 AI Learning Updates
+#### [AI] AI Learning Updates
 How is the AI adjusting its recommendations based on this week's results?
 - Weight adjustments made
 - New patterns discovered
 - Confidence score updates
 
-#### 🎯 Recommendations for Next Week
+#### [TARGET] Recommendations for Next Week
 Provide specific, actionable recommendations for the coming week.
 Prioritize by expected impact.
 
-#### 📊 Confidence Scores (Updated)
+#### [STATS] Confidence Scores (Updated)
 Update confidence scores for:
 - Product types (which categories work best)
 - Price points (optimal pricing)
@@ -229,7 +229,7 @@ Focus on continuous improvement and data-driven insights.
             )
 
             report = response.content[0].text
-            logger.info("✅ Weekly report generated")
+            logger.info("[SUCCESS] Weekly report generated")
             return report
 
         except Exception as e:
@@ -247,7 +247,7 @@ Focus on continuous improvement and data-driven insights.
         Returns:
             Claude's response
         """
-        logger.info(f"💬 Chat message: {user_message[:50]}...")
+        logger.info(f"[CHAT] Chat message: {user_message[:50]}...")
 
         # Get current business context if not provided
         if not context:
@@ -309,7 +309,7 @@ If you don't have enough data to answer, say so honestly.
             if len(self.conversation_history) > 20:
                 self.conversation_history = self.conversation_history[-20:]
 
-            logger.info("✅ Chat response generated")
+            logger.info("[SUCCESS] Chat response generated")
             return answer
 
         except Exception as e:
@@ -319,7 +319,7 @@ If you don't have enough data to answer, say so honestly.
     def reset_conversation(self):
         """Reset conversation history"""
         self.conversation_history = []
-        logger.info("🔄 Conversation history reset")
+        logger.info("[REFRESH] Conversation history reset")
 
     async def _gather_business_metrics(self, date: str) -> Dict:
         """Gather business metrics for a specific date"""

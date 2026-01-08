@@ -7,7 +7,7 @@ def test_image_download():
     """Test downloading product images"""
 
     print("=" * 80)
-    print("🖼️  IMAGE HANDLER TEST")
+    print("  IMAGE HANDLER TEST")
     print("=" * 80)
     print()
 
@@ -33,7 +33,7 @@ def test_image_download():
     results = []
 
     for test in test_cases:
-        print(f"📥 Test: {test['name']}")
+        print(f" Test: {test['name']}")
         print(f"   URL: {test['url'][:60]}...")
         print()
 
@@ -43,22 +43,22 @@ def test_image_download():
             if local_path:
                 import os
                 file_size = os.path.getsize(local_path)
-                print(f"   ✅ Downloaded: {local_path}")
-                print(f"   📦 Size: {file_size:,} bytes")
+                print(f"   [SUCCESS] Downloaded: {local_path}")
+                print(f"   [PACKAGE] Size: {file_size:,} bytes")
                 results.append(True)
             else:
-                print(f"   ❌ Download failed")
+                print(f"   [ERROR] Download failed")
                 results.append(False)
 
         except Exception as e:
-            print(f"   ❌ Error: {e}")
+            print(f"   [ERROR] Error: {e}")
             results.append(False)
 
         print()
 
     # Summary
     print("=" * 80)
-    print("📊 RESULTS")
+    print("[STATS] RESULTS")
     print("=" * 80)
     print()
 
@@ -69,7 +69,7 @@ def test_image_download():
     print()
 
     if success_count > 0:
-        print("✅ Image handler is working!")
+        print("[SUCCESS] Image handler is working!")
         print()
         print("Cache directory:")
         print(f"   {handler.cache_dir}")
@@ -81,7 +81,7 @@ def test_image_download():
             size = os.path.getsize(filepath)
             print(f"   • {f} ({size:,} bytes)")
     else:
-        print("❌ All downloads failed")
+        print("[ERROR] All downloads failed")
         print()
         print("Common issues:")
         print("   • Network connectivity")

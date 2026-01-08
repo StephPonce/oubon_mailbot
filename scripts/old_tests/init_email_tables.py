@@ -22,17 +22,17 @@ def main():
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
-    print(f"\n📊 Total tables in database: {len(tables)}")
-    print("\n✅ Tables:")
+    print(f"\n[STATS] Total tables in database: {len(tables)}")
+    print("\n[SUCCESS] Tables:")
     for table in sorted(tables):
         print(f"   • {table}")
 
     # Check specifically for email tables
-    print("\n🔍 Email-related tables:")
+    print("\n[SEARCH] Email-related tables:")
     email_tables = ['user_email_accounts', 'emails']
     for table_name in email_tables:
         if table_name in tables:
-            print(f"   ✅ {table_name}")
+            print(f"   [SUCCESS] {table_name}")
 
             # Show columns
             columns = inspector.get_columns(table_name)
@@ -40,11 +40,11 @@ def main():
             for col in columns:
                 print(f"         - {col['name']} ({col['type']})")
         else:
-            print(f"   ❌ {table_name} - MISSING!")
+            print(f"   [ERROR] {table_name} - MISSING!")
 
     print()
     print("=" * 70)
-    print("✅ Database initialization complete!")
+    print("[SUCCESS] Database initialization complete!")
     print("=" * 70)
 
 if __name__ == '__main__':

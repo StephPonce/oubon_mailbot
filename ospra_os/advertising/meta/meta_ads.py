@@ -56,7 +56,7 @@ class MetaAdsManager:
             Campaign info dict
         """
         try:
-            print(f"📱 Creating Meta ad campaign for: {product_name}")
+            print(f"[MOBILE] Creating Meta ad campaign for: {product_name}")
 
             # Step 1: Create Campaign
             campaign = self._create_campaign(
@@ -88,7 +88,7 @@ class MetaAdsManager:
                 name=f"{product_name} - Ad"
             )
 
-            print(f"✅ Meta campaign created: {campaign['id']}")
+            print(f"[SUCCESS] Meta campaign created: {campaign['id']}")
 
             return {
                 'success': True,
@@ -101,7 +101,7 @@ class MetaAdsManager:
             }
 
         except Exception as e:
-            print(f"❌ Meta campaign creation failed: {e}")
+            print(f"[ERROR] Meta campaign creation failed: {e}")
             return {
                 'success': False,
                 'error': str(e)

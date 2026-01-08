@@ -43,7 +43,7 @@ class AmazonAPI:
         Returns:
             List of product dicts with full data
         """
-        logger.info(f"🔍 Searching Amazon Best Sellers: {category}")
+        logger.info(f"[SEARCH] Searching Amazon Best Sellers: {category}")
 
         # If API keys not configured, return mock data with realistic variation
         if not self.access_key:
@@ -174,7 +174,7 @@ class AmazonAPI:
                 'category': category
             })
 
-        logger.info(f"✅ Generated {len(products)} mock Amazon products with realistic variation")
+        logger.info(f"[SUCCESS] Generated {len(products)} mock Amazon products with realistic variation")
         return products
 
     async def get_product_details(self, asin: str) -> Optional[Dict]:

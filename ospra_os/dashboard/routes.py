@@ -1,5 +1,5 @@
 """
-🎛️ REAL-TIME DASHBOARD ROUTES V2
+ REAL-TIME DASHBOARD ROUTES V2
 Complete API with REAL cross-source intelligence
 """
 
@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 try:
     # V5: REAL Cross-Source Intelligence Engine
     from ospra_os.intelligence.product_intelligence_v5 import OspraIntelligenceEngine as ProductIntelligenceEngine
-    logger.info("✅ Ospra Intelligence V5 loaded - Cross-source intelligence enabled")
+    logger.info("[SUCCESS] Ospra Intelligence V5 loaded - Cross-source intelligence enabled")
 except ImportError as e:
     logger.warning(f"V5 not available ({e}), trying V4...")
     try:
         from ospra_os.intelligence.product_intelligence_v4 import ProductIntelligenceEngine
-        logger.info("⚠️ Using V4 fallback - Limited intelligence")
+        logger.info("[WARNING] Using V4 fallback - Limited intelligence")
     except ImportError as e2:
         logger.warning(f"ProductIntelligenceEngine not available: {e2}")
         ProductIntelligenceEngine = None
@@ -62,7 +62,7 @@ router = APIRouter(prefix="/api/dashboard/v2", tags=["Dashboard V2"])
 try:
     if ProductIntelligenceEngine is not None:
         product_discovery = ProductIntelligenceEngine()
-        logger.info("✅ ProductIntelligenceEngine initialized")
+        logger.info("[SUCCESS] ProductIntelligenceEngine initialized")
     else:
         product_discovery = None
 
@@ -72,20 +72,20 @@ try:
         claude_analyzer = None
 
     if product_discovery and claude_analyzer:
-        logger.info("✅ Real-time services initialized (V5 Intelligence)")
+        logger.info("[SUCCESS] Real-time services initialized (V5 Intelligence)")
     elif product_discovery:
-        logger.info("✅ Product discovery ready (analyzer not available)")
+        logger.info("[SUCCESS] Product discovery ready (analyzer not available)")
     else:
-        logger.warning("⚠️  Some services not available (missing dependencies)")
+        logger.warning("[WARNING]  Some services not available (missing dependencies)")
 except Exception as e:
-    logger.error(f"❌ Failed to initialize services: {e}")
+    logger.error(f"[ERROR] Failed to initialize services: {e}")
     product_discovery = None
     claude_analyzer = None
 
 try:
     if ShopifyClient is not None:
         shopify_client = ShopifyClient()
-        logger.info("✅ Shopify client initialized")
+        logger.info("[SUCCESS] Shopify client initialized")
     else:
         shopify_client = None
         logger.warning("Shopify client class not available")

@@ -23,9 +23,9 @@ class SaturationScorer:
     Calculate product saturation scores to avoid oversaturated markets.
 
     Saturation Score (0-100):
-    - 0-30: Blue ocean (low competition) ✅ DEPLOY
-    - 31-60: Moderate competition ⚠️ CAUTION
-    - 61-100: Saturated (high competition) ❌ SKIP
+    - 0-30: Blue ocean (low competition) [SUCCESS] DEPLOY
+    - 31-60: Moderate competition [WARNING] CAUTION
+    - 61-100: Saturated (high competition) [ERROR] SKIP
 
     Based on Amazon data (more reliable than Shopify scraping):
     - Seller count
@@ -98,9 +98,9 @@ class SaturationScorer:
                         break
 
                 if not amazon_data:
-                    print(f"⚠️  Product '{product_name}' not found in Amazon bestsellers")
+                    print(f"[WARNING]  Product '{product_name}' not found in Amazon bestsellers")
             except Exception as e:
-                print(f"⚠️  Amazon scraper failed: {e}")
+                print(f"[WARNING]  Amazon scraper failed: {e}")
                 amazon_data = None
 
         # Calculate saturation components
@@ -343,38 +343,38 @@ class SaturationScorer:
         # Determine recommendation tier
         if saturation_score <= 30:
             recommendation = "deploy"
-            reasons.append("✅ Blue ocean opportunity - low competition detected")
+            reasons.append("[SUCCESS] Blue ocean opportunity - low competition detected")
 
             if seller_count < 10:
-                reasons.append(f"✅ Only {seller_count} competing sellers")
+                reasons.append(f"[SUCCESS] Only {seller_count} competing sellers")
             if review_velocity < 2:
-                reasons.append("✅ Low review velocity - market not mature")
+                reasons.append("[SUCCESS] Low review velocity - market not mature")
             if bsr > 50000:
-                reasons.append("✅ BSR indicates emerging niche")
+                reasons.append("[SUCCESS] BSR indicates emerging niche")
 
         elif saturation_score <= 60:
             recommendation = "caution"
-            reasons.append("⚠️  Moderate competition - proceed with caution")
+            reasons.append("[WARNING]  Moderate competition - proceed with caution")
 
             if seller_count >= 10 and seller_count < 30:
-                reasons.append(f"⚠️  {seller_count} competing sellers (moderate)")
+                reasons.append(f"[WARNING]  {seller_count} competing sellers (moderate)")
             if review_velocity >= 2 and review_velocity < 10:
-                reasons.append("⚠️  Moderate review velocity - market developing")
+                reasons.append("[WARNING]  Moderate review velocity - market developing")
 
-            reasons.append("💡 Recommend: Differentiate with better images/copy/pricing")
+            reasons.append("[TIP] Recommend: Differentiate with better images/copy/pricing")
 
         else:  # saturation_score > 60
             recommendation = "skip"
-            reasons.append("❌ Market saturated - high risk of failure")
+            reasons.append("[ERROR] Market saturated - high risk of failure")
 
             if seller_count >= 30:
-                reasons.append(f"❌ {seller_count} competing sellers (very high)")
+                reasons.append(f"[ERROR] {seller_count} competing sellers (very high)")
             if review_velocity >= 10:
-                reasons.append("❌ High review velocity - mature market")
+                reasons.append("[ERROR] High review velocity - mature market")
             if bsr < 10000:
-                reasons.append("❌ Strong BSR indicates established competition")
+                reasons.append("[ERROR] Strong BSR indicates established competition")
 
-            reasons.append("💡 Recommend: Find alternative product in less saturated niche")
+            reasons.append("[TIP] Recommend: Find alternative product in less saturated niche")
 
         return recommendation, reasons
 

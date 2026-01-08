@@ -72,7 +72,7 @@ class RankingNotifier:
             composite_score = product.get('composite_score', 0)
 
             # Create email subject
-            subject = f"🏆 {product_name} entered Top 10 at rank #{rank}!"
+            subject = f"[TOP] {product_name} entered Top 10 at rank #{rank}!"
 
             # Create email body
             body = self._create_email_body(product, previous_rank)
@@ -110,9 +110,9 @@ class RankingNotifier:
             product_name = product.get('product_name', f"Product #{product.get('product_id')}")
 
             # Emoji for each elite rank
-            rank_emoji = {1: '🥇', 2: '🥈', 3: '🥉'}
+            rank_emoji = {1: '[FIRST]', 2: '[SECOND]', 3: '[THIRD]'}
 
-            subject = f"{rank_emoji.get(rank, '🏆')} ELITE: {product_name} reached #{rank}!"
+            subject = f"{rank_emoji.get(rank, '[TOP]')} ELITE: {product_name} reached #{rank}!"
 
             body = f"""
 <!DOCTYPE html>
@@ -128,7 +128,7 @@ class RankingNotifier:
 </head>
 <body>
     <div class="header">
-        <h1>{rank_emoji.get(rank, '🏆')} ELITE TIER ACHIEVEMENT</h1>
+        <h1>{rank_emoji.get(rank, '[TOP]')} ELITE TIER ACHIEVEMENT</h1>
         <p style="font-size: 18px;">Product has entered the elite top 3 rankings!</p>
     </div>
 
@@ -156,7 +156,7 @@ class RankingNotifier:
         <p><strong>Profit Margin:</strong> {product.get('profit_margin', 0):.1f}%</p>
 
         <p style="margin-top: 30px; padding: 15px; background: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b;">
-            🎯 <strong>Action Required:</strong> This is an elite-performing product. Consider increasing inventory,
+            [TARGET] <strong>Action Required:</strong> This is an elite-performing product. Consider increasing inventory,
             optimizing listings, and maximizing advertising budget for this product.
         </p>
     </div>
@@ -187,12 +187,12 @@ class RankingNotifier:
 
         # Determine rank change message
         if previous_rank is None:
-            rank_change_msg = "🆕 <strong>Brand new entry</strong> to the rankings!"
+            rank_change_msg = "[NEW] <strong>Brand new entry</strong> to the rankings!"
         elif previous_rank > 20:
-            rank_change_msg = f"📈 <strong>Jumped from #{previous_rank}</strong> (outside top 20)"
+            rank_change_msg = f"[TREND] <strong>Jumped from #{previous_rank}</strong> (outside top 20)"
         else:
             positions_gained = previous_rank - rank
-            rank_change_msg = f"📈 <strong>Rose {positions_gained} positions</strong> from #{previous_rank}"
+            rank_change_msg = f"[TREND] <strong>Rose {positions_gained} positions</strong> from #{previous_rank}"
 
         return f"""
 <!DOCTYPE html>
@@ -209,7 +209,7 @@ class RankingNotifier:
 </head>
 <body>
     <div class="header">
-        <h1>🏆 Top 10 Achievement!</h1>
+        <h1>[TOP] Top 10 Achievement!</h1>
         <p style="font-size: 18px;">A product has entered the Top 10 rankings</p>
     </div>
 
@@ -289,4 +289,4 @@ class RankingNotifier:
             raise
 
 
-logger.info("✅ RankingNotifier module loaded")
+logger.info("[SUCCESS] RankingNotifier module loaded")

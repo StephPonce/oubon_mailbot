@@ -53,7 +53,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ AliExpress token storage initialized")
+    print("[SUCCESS] AliExpress token storage initialized")
 
 
 def save_token(api_type: str, access_token: str, refresh_token: str, expires_in: int):
@@ -88,10 +88,10 @@ def save_token(api_type: str, access_token: str, refresh_token: str, expires_in:
             db.add(token)
 
         db.commit()
-        print(f"✅ Saved {api_type} token to database")
+        print(f"[SUCCESS] Saved {api_type} token to database")
         return True
     except Exception as e:
-        print(f"❌ Failed to save token: {e}")
+        print(f"[ERROR] Failed to save token: {e}")
         db.rollback()
         return False
     finally:

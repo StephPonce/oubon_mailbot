@@ -16,33 +16,33 @@ def test_gemini_provider():
     print("1. Testing import...")
     try:
         from ospra_os.ai.providers import GeminiProvider
-        print("✅ GeminiProvider import successful")
+        print("[SUCCESS] GeminiProvider import successful")
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return
 
     # Test 2: Initialization
     print("\n2. Testing initialization...")
     try:
         provider = GeminiProvider(api_key="test-key-12345")
-        print("✅ GeminiProvider initialization successful")
+        print("[SUCCESS] GeminiProvider initialization successful")
     except Exception as e:
-        print(f"❌ Initialization failed: {e}")
+        print(f"[ERROR] Initialization failed: {e}")
         return
 
     # Test 3: Provider info
     print("\n3. Testing provider info...")
     try:
         assert provider.provider_name == "gemini", "Provider name should be 'gemini'"
-        print(f"✅ Provider: {provider.provider_name}")
+        print(f"[SUCCESS] Provider: {provider.provider_name}")
 
         assert provider.model_name == "gemini-1.5-flash", "Model should be gemini-1.5-flash"
-        print(f"✅ Model: {provider.model_name}")
+        print(f"[SUCCESS] Model: {provider.model_name}")
 
         assert provider.cost_per_1k == 0.00025, "Cost should be $0.00025 per 1K"
-        print(f"✅ Cost per 1K: ${provider.cost_per_1k}")
+        print(f"[SUCCESS] Cost per 1K: ${provider.cost_per_1k}")
     except AssertionError as e:
-        print(f"❌ Provider info test failed: {e}")
+        print(f"[ERROR] Provider info test failed: {e}")
         return
 
     # Test 4: Model info method
@@ -52,12 +52,12 @@ def test_gemini_provider():
         assert "provider" in info
         assert "model" in info
         assert "cost_per_1k_tokens" in info
-        print("✅ Model info working")
+        print("[SUCCESS] Model info working")
         print(f"   Provider: {info['provider']}")
         print(f"   Model: {info['model']}")
         print(f"   Cost/1K: ${info['cost_per_1k_tokens']}")
     except Exception as e:
-        print(f"❌ get_model_info() failed: {e}")
+        print(f"[ERROR] get_model_info() failed: {e}")
         return
 
     # Test 5: Cost calculation
@@ -66,9 +66,9 @@ def test_gemini_provider():
         cost = provider.calculate_cost(5000)  # 5K tokens
         expected = 5000 / 1000 * 0.00025  # $0.00125
         assert abs(cost - expected) < 0.0001, f"Cost should be {expected}, got {cost}"
-        print(f"✅ Cost calculation: ${cost} for 5K tokens")
+        print(f"[SUCCESS] Cost calculation: ${cost} for 5K tokens")
     except Exception as e:
-        print(f"❌ Cost calculation failed: {e}")
+        print(f"[ERROR] Cost calculation failed: {e}")
         return
 
     # Test 6: Data validation
@@ -80,17 +80,17 @@ def test_gemini_provider():
             "niche": "electronics"
         }
         provider.validate_product_data(valid_data)
-        print("✅ Product data validation working")
+        print("[SUCCESS] Product data validation working")
 
         # Invalid data (missing name)
         invalid_data = {"niche": "electronics"}
         try:
             provider.validate_product_data(invalid_data)
-            print("❌ Should have raised ValueError for missing name")
+            print("[ERROR] Should have raised ValueError for missing name")
         except ValueError:
-            print("✅ Correctly rejects invalid data")
+            print("[SUCCESS] Correctly rejects invalid data")
     except Exception as e:
-        print(f"❌ Data validation test failed: {e}")
+        print(f"[ERROR] Data validation test failed: {e}")
         return
 
     # Test 7: JSON extraction (used for parsing responses)
@@ -106,16 +106,16 @@ def test_gemini_provider():
         import json
         parsed = json.loads(extracted)
         assert parsed["score"] == 8.5
-        print(f"✅ JSON extraction from markdown works: {parsed['score']}")
+        print(f"[SUCCESS] JSON extraction from markdown works: {parsed['score']}")
 
         # Test without markdown
         response_without_markdown = '{"score": 9.0}'
         extracted = provider._extract_json_from_response(response_without_markdown)
         parsed = json.loads(extracted)
         assert parsed["score"] == 9.0
-        print(f"✅ JSON extraction without markdown works: {parsed['score']}")
+        print(f"[SUCCESS] JSON extraction without markdown works: {parsed['score']}")
     except Exception as e:
-        print(f"❌ JSON extraction failed: {e}")
+        print(f"[ERROR] JSON extraction failed: {e}")
         return
 
     # Test 8: Compare costs with other providers
@@ -140,17 +140,17 @@ def test_gemini_provider():
         print(f"   Gemini vs OpenAI: {openai_cost/gemini_cost:.0f}x cheaper")
 
     except Exception as e:
-        print(f"⚠️  Cost comparison skipped: {e}")
+        print(f"[WARNING]  Cost comparison skipped: {e}")
 
     print("\n" + "=" * 60)
-    print("✅ All basic tests passed!")
+    print("[SUCCESS] All basic tests passed!")
     print("=" * 60)
     print()
-    print("📝 Note: Actual API calls require valid GOOGLE_API_KEY")
+    print("[NOTE] Note: Actual API calls require valid GOOGLE_API_KEY")
     print("   Set environment variable to test real functionality:")
     print("   export GOOGLE_API_KEY=your-api-key")
     print()
-    print("💡 Gemini is the MOST cost-effective option:")
+    print("[TIP] Gemini is the MOST cost-effective option:")
     print("   - 12x cheaper than Claude")
     print("   - 60x cheaper than OpenAI")
     print("   - Fast response times (gemini-1.5-flash)")

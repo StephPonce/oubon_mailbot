@@ -73,38 +73,38 @@ __version__ = "2.1.0"  # Added usage tracking
 # ==================== QUICK REFERENCE ====================
 
 TIER_QUICK_REF = """
-╔══════════════════════════════════════════════════════════════════╗
-║                    OSPRA TIER QUICK REFERENCE                    ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  🪺 NEST (Free)       - See what's possible                      ║
-║  ✈️ FLIGHT ($29/mo)   - Start selling smarter                   ║
-║  🦅 SOAR ($79/mo)     - Run your business, not just a store     ║
-║  🌌 STRATOSPHERE ($199) - Your AI-powered operations team       ║
-║                                                                  ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  Usage Examples:                                                 ║
-║                                                                  ║
-║  from ospra_os.core import (                                     ║
-║      SubscriptionTier,                                           ║
-║      TierEnforcer,                                               ║
-║      get_tier_feature,                                           ║
-║      TierUsageEnforcer,                                          ║
-║      get_enforcer,                                               ║
-║  )                                                               ║
-║                                                                  ║
-║  # Check if user can perform action (with usage tracking)        ║
-║  enforcer = get_enforcer(db_session)                             ║
-║  result = enforcer.can_perform(user_id=1, action="aliexpress_search")
-║  if result["allowed"]:                                           ║
-║      enforcer.record_action(user_id=1, action="aliexpress_search")
-║      perform_search()                                            ║
-║  else:                                                           ║
-║      show_upgrade_prompt(result["upgrade_suggestion"])           ║
-║                                                                  ║
-║  # Get usage dashboard                                           ║
-║  dashboard = enforcer.get_usage_dashboard(user_id=1)             ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+
+                    OSPRA TIER QUICK REFERENCE                    
+
+                                                                  
+   NEST (Free)       - See what's possible                      
+   FLIGHT ($29/mo)   - Start selling smarter                   
+   SOAR ($79/mo)     - Run your business, not just a store     
+   STRATOSPHERE ($199) - Your AI-powered operations team       
+                                                                  
+
+                                                                  
+  Usage Examples:                                                 
+                                                                  
+  from ospra_os.core import (                                     
+      SubscriptionTier,                                           
+      TierEnforcer,                                               
+      get_tier_feature,                                           
+      TierUsageEnforcer,                                          
+      get_enforcer,                                               
+  )                                                               
+                                                                  
+  # Check if user can perform action (with usage tracking)        
+  enforcer = get_enforcer(db_session)                             
+  result = enforcer.can_perform(user_id=1, action="aliexpress_search")
+  if result["allowed"]:                                           
+      enforcer.record_action(user_id=1, action="aliexpress_search")
+      perform_search()                                            
+  else:                                                           
+      show_upgrade_prompt(result["upgrade_suggestion"])           
+                                                                  
+  # Get usage dashboard                                           
+  dashboard = enforcer.get_usage_dashboard(user_id=1)             
+                                                                  
+
 """

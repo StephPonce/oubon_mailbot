@@ -31,7 +31,7 @@ class ReportEngine:
         Returns:
             Complete report data ready for rendering
         """
-        logger.info(f"🚀 Generating report: {config.get('name', 'Unnamed')}")
+        logger.info(f"[START] Generating report: {config.get('name', 'Unnamed')}")
         start_time = datetime.utcnow()
 
         sections_data = {}
@@ -40,7 +40,7 @@ class ReportEngine:
 
         # Generate each requested section
         for section_type in sections_to_generate:
-            logger.info(f"  📊 Generating section: {section_type}")
+            logger.info(f"  [STATS] Generating section: {section_type}")
 
             if section_type == 'executive_summary':
                 sections_data['executive_summary'] = await self.generate_executive_summary(filters)
@@ -71,7 +71,7 @@ class ReportEngine:
             'sections': sections_data
         }
 
-        logger.info(f"✅ Report generated in {report_data['metadata']['generation_time_ms']}ms")
+        logger.info(f"[SUCCESS] Report generated in {report_data['metadata']['generation_time_ms']}ms")
         return report_data
 
     async def generate_executive_summary(self, filters: Dict) -> Dict:
@@ -87,7 +87,7 @@ class ReportEngine:
         - Areas of concern
         - Recommendations
         """
-        logger.info("📈 Generating executive summary...")
+        logger.info("[TREND] Generating executive summary...")
 
         # Get date range
         date_range = self._parse_date_range(filters.get('date_range', {}))
@@ -153,7 +153,7 @@ class ReportEngine:
         - Revenue trends (daily breakdown)
         - Projections
         """
-        logger.info("💰 Generating revenue report...")
+        logger.info("[PRICE] Generating revenue report...")
 
         date_range = self._parse_date_range(filters.get('date_range', {}))
 
@@ -179,7 +179,7 @@ class ReportEngine:
         - Net profit
         - Profit margin trends
         """
-        logger.info("📊 Generating P&L report...")
+        logger.info("[STATS] Generating P&L report...")
 
         return {
             'gross_revenue': 0,
@@ -206,7 +206,7 @@ class ReportEngine:
         - New products performance
         - Product recommendations
         """
-        logger.info("📦 Generating product report...")
+        logger.info("[PACKAGE] Generating product report...")
 
         return {
             'top_performers': {
@@ -234,7 +234,7 @@ class ReportEngine:
         - Best performing ads
         - Budget recommendations
         """
-        logger.info("📣 Generating ad performance report...")
+        logger.info(" Generating ad performance report...")
 
         return {
             'total_spend': 0,
@@ -263,7 +263,7 @@ class ReportEngine:
         - Gap analysis
         - Competitive threats
         """
-        logger.info("🎯 Generating competitor analysis...")
+        logger.info("[TARGET] Generating competitor analysis...")
 
         return {
             'market_position': '',  # Leader, Challenger, Follower
@@ -283,7 +283,7 @@ class ReportEngine:
         - Velocity by product
         - Stockout risk
         """
-        logger.info("📦 Generating inventory report...")
+        logger.info("[PACKAGE] Generating inventory report...")
 
         return {
             'total_sku_count': 0,
@@ -303,7 +303,7 @@ class ReportEngine:
         - LTV analysis
         - Retention metrics
         """
-        logger.info("👥 Generating customer insights...")
+        logger.info(" Generating customer insights...")
 
         return {
             'total_customers': 0,

@@ -2,7 +2,14 @@
 
 import logging
 from typing import List, Optional, Dict, Any
-from amazon.paapi import AmazonAPI
+
+try:
+    from amazon_paapi import AmazonApi
+    AMAZON_PAAPI_AVAILABLE = True
+except ImportError:
+    AMAZON_PAAPI_AVAILABLE = False
+    AmazonApi = None
+
 from ..base import BaseConnector, ProductCandidate
 
 logger = logging.getLogger(__name__)
@@ -49,13 +56,21 @@ class AmazonPAAPIConnector(BaseConnector):
 
         # Initialize Amazon API client if credentials provided
         self.client = None
+        
+        if not AMAZON_PAAPI_AVAILABLE:
+            self.enabled = False
+            logger.warning("amazon_paapi package not installed - run: pip install python-amazon-paapi")
+            return
+            
         if access_key and secret_key and partner_tag:
             try:
-                self.client = AmazonAPI(
-                    access_key=access_key,
-                    secret_key=secret_key,
+                # python-amazon-paapi uses 'key' and 'secret' parameters
+                self.client = AmazonApi(
+                    key=access_key,
+                    secret=secret_key,
                     tag=partner_tag,
-                    country=country
+                    country=country,
+                    throttling=1.0  # 1 request per second to avoid rate limits
                 )
                 self.enabled = True
                 logger.info(f"Amazon PA-API connector initialized for {country} marketplace")
@@ -103,37 +118,30 @@ class AmazonPAAPIConnector(BaseConnector):
             return []
 
         try:
-            # Build search parameters
-            search_params = {
-                "Keywords": query,
-                "ItemCount": min(limit, 10),  # PA-API max is 10 per request
-                "Resources": [
-                    "ItemInfo.Title",
-                    "ItemInfo.Features",
-                    "ItemInfo.ProductInfo",
-                    "Images.Primary.Large",
-                    "Offers.Listings.Price",
-                    "Offers.Listings.Availability",
-                    "BrowseNodeInfo.BrowseNodes",
-                ]
+            # Execute search using python-amazon-paapi library
+            logger.info(f"Searching Amazon for: {query} (limit={limit})")
+            
+            # Build search kwargs
+            search_kwargs = {
+                "keywords": query,
+                "item_count": min(limit, 10),  # PA-API max is 10 per request
             }
-
+            
             # Add optional filters
             if category:
-                search_params["SearchIndex"] = category
+                search_kwargs["search_index"] = category
             if min_price:
-                search_params["MinPrice"] = int(min_price)
+                search_kwargs["min_price"] = int(min_price)
             if max_price:
-                search_params["MaxPrice"] = int(max_price)
+                search_kwargs["max_price"] = int(max_price)
 
-            # Execute search
-            logger.info(f"Searching Amazon for: {query} (limit={limit})")
-            response = self.client.search_items(**search_params)
+            # Execute search - python-amazon-paapi returns SearchResult object
+            search_result = self.client.search_items(**search_kwargs)
 
             # Parse results
             products = []
-            if response and hasattr(response, 'items'):
-                for item in response.items:
+            if search_result and hasattr(search_result, 'items') and search_result.items:
+                for item in search_result.items:
                     product = self._parse_item(item)
                     if product:
                         products.append(product)
@@ -199,21 +207,11 @@ class AmazonPAAPIConnector(BaseConnector):
 
         try:
             logger.info(f"Fetching Amazon product: {asin}")
-            response = self.client.get_items(
-                item_ids=[asin],
-                resources=[
-                    "ItemInfo.Title",
-                    "ItemInfo.Features",
-                    "ItemInfo.ProductInfo",
-                    "Images.Primary.Large",
-                    "Offers.Listings.Price",
-                    "Offers.Listings.Availability",
-                    "BrowseNodeInfo.BrowseNodes",
-                ]
-            )
+            # python-amazon-paapi uses get_items with ASIN string or list
+            items = self.client.get_items(asin)
 
-            if response and hasattr(response, 'items') and response.items:
-                return self._parse_item(response.items[0])
+            if items and len(items) > 0:
+                return self._parse_item(items[0])
 
             logger.warning(f"Product not found: {asin}")
             return None
@@ -233,10 +231,11 @@ class AmazonPAAPIConnector(BaseConnector):
             ProductCandidate or None if parsing fails
         """
         try:
-            # Extract basic info
+            # Extract basic info - python-amazon-paapi item structure
             name = None
-            if hasattr(item, 'item_info') and hasattr(item.item_info, 'title'):
-                name = item.item_info.title.display_value
+            if hasattr(item, 'item_info') and item.item_info:
+                if hasattr(item.item_info, 'title') and item.item_info.title:
+                    name = item.item_info.title.display_value
 
             if not name:
                 logger.warning("Skipping item without name")
@@ -245,28 +244,38 @@ class AmazonPAAPIConnector(BaseConnector):
             # Extract price
             price = None
             currency = "USD"
-            if hasattr(item, 'offers') and hasattr(item.offers, 'listings'):
-                if item.offers.listings and len(item.offers.listings) > 0:
-                    listing = item.offers.listings[0]
-                    if hasattr(listing, 'price'):
-                        price = listing.price.amount
-                        currency = listing.price.currency
+            if hasattr(item, 'offers') and item.offers:
+                if hasattr(item.offers, 'listings') and item.offers.listings:
+                    if len(item.offers.listings) > 0:
+                        listing = item.offers.listings[0]
+                        if hasattr(listing, 'price') and listing.price:
+                            price = listing.price.amount
+                            if hasattr(listing.price, 'currency'):
+                                currency = listing.price.currency
 
             # Extract image
             image_url = None
-            if hasattr(item, 'images') and hasattr(item.images, 'primary'):
-                if hasattr(item.images.primary, 'large'):
-                    image_url = item.images.primary.large.url
+            if hasattr(item, 'images') and item.images:
+                if hasattr(item.images, 'primary') and item.images.primary:
+                    if hasattr(item.images.primary, 'large') and item.images.primary.large:
+                        image_url = item.images.primary.large.url
 
             # Extract ASIN and build URL
-            asin = item.asin if hasattr(item, 'asin') else None
+            asin = getattr(item, 'asin', None)
             url = f"https://www.amazon.com/dp/{asin}" if asin else None
+            
+            # Also try detail_page_url if available (affiliate link)
+            if hasattr(item, 'detail_page_url') and item.detail_page_url:
+                url = item.detail_page_url
 
             # Extract category
             category = None
-            if hasattr(item, 'browse_node_info') and hasattr(item.browse_node_info, 'browse_nodes'):
-                if item.browse_node_info.browse_nodes and len(item.browse_node_info.browse_nodes) > 0:
-                    category = item.browse_node_info.browse_nodes[0].display_name
+            if hasattr(item, 'browse_node_info') and item.browse_node_info:
+                if hasattr(item.browse_node_info, 'browse_nodes') and item.browse_node_info.browse_nodes:
+                    if len(item.browse_node_info.browse_nodes) > 0:
+                        node = item.browse_node_info.browse_nodes[0]
+                        if hasattr(node, 'display_name'):
+                            category = node.display_name
 
             # Build ProductCandidate
             return ProductCandidate(
@@ -278,11 +287,10 @@ class AmazonPAAPIConnector(BaseConnector):
                 image_url=image_url,
                 category=category,
                 tags=[asin] if asin else [],
-                # Amazon doesn't provide trend scores directly
                 trend_score=None,
                 search_volume=None,
                 supplier_name="Amazon",
-                supplier_rating=None,  # Would need additional API call
+                supplier_rating=None,
             )
 
         except Exception as e:

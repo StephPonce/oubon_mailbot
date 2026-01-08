@@ -19,12 +19,12 @@ class AIPricingGenerator:
         if api_key:
             try:
                 self.client = anthropic.Anthropic(api_key=api_key)
-                print("✅ AI Pricing Generator initialized with Claude")
+                print("[SUCCESS] AI Pricing Generator initialized with Claude")
             except Exception as e:
-                print(f"⚠️  Claude API initialization failed: {e}")
+                print(f"[WARNING]  Claude API initialization failed: {e}")
                 self.client = None
         else:
-            print("⚠️  ANTHROPIC_API_KEY not found - using rule-based pricing")
+            print("[WARNING]  ANTHROPIC_API_KEY not found - using rule-based pricing")
 
     def generate_realistic_pricing(self, product_name: str, niche: str) -> Dict:
         """
@@ -50,7 +50,7 @@ class AIPricingGenerator:
             try:
                 return self._ai_powered_pricing(product_name, niche)
             except Exception as e:
-                print(f"⚠️  AI pricing failed for {product_name}: {e}")
+                print(f"[WARNING]  AI pricing failed for {product_name}: {e}")
                 # Fall back to rule-based
 
         # Rule-based fallback pricing

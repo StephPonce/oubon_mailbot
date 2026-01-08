@@ -27,7 +27,7 @@ class InventoryHistoricalTracking:
         # Initialize database
         self._init_database()
 
-        logger.info(f"✅ Historical tracking initialized: {db_path}")
+        logger.info(f"[SUCCESS] Historical tracking initialized: {db_path}")
 
     def _init_database(self):
         """Create database tables if they don't exist"""
@@ -114,7 +114,7 @@ class InventoryHistoricalTracking:
             conn.commit()
             conn.close()
 
-            logger.debug(f"✅ Saved snapshot {snapshot_id} for {forecast.get('product_name')}")
+            logger.debug(f"[SUCCESS] Saved snapshot {snapshot_id} for {forecast.get('product_name')}")
 
             return {
                 "success": True,
@@ -124,7 +124,7 @@ class InventoryHistoricalTracking:
             }
 
         except Exception as e:
-            logger.error(f"❌ Failed to save snapshot: {e}")
+            logger.error(f"[ERROR] Failed to save snapshot: {e}")
             return {
                 "success": False,
                 "error": str(e)
@@ -147,7 +147,7 @@ class InventoryHistoricalTracking:
 
         successful = [r for r in results if r.get('success')]
 
-        logger.info(f"✅ Saved {len(successful)}/{len(forecasts)} snapshots")
+        logger.info(f"[SUCCESS] Saved {len(successful)}/{len(forecasts)} snapshots")
 
         return {
             "success": True,
@@ -196,12 +196,12 @@ class InventoryHistoricalTracking:
 
             history = [dict(row) for row in rows]
 
-            logger.debug(f"📊 Retrieved {len(history)} snapshots for {product_id}")
+            logger.debug(f"[STATS] Retrieved {len(history)} snapshots for {product_id}")
 
             return history
 
         except Exception as e:
-            logger.error(f"❌ Failed to get product history: {e}")
+            logger.error(f"[ERROR] Failed to get product history: {e}")
             return []
 
     def get_all_recent_snapshots(self, hours: int = 24) -> List[Dict]:
@@ -238,12 +238,12 @@ class InventoryHistoricalTracking:
 
             snapshots = [dict(row) for row in rows]
 
-            logger.debug(f"📊 Retrieved {len(snapshots)} recent snapshots")
+            logger.debug(f"[STATS] Retrieved {len(snapshots)} recent snapshots")
 
             return snapshots
 
         except Exception as e:
-            logger.error(f"❌ Failed to get recent snapshots: {e}")
+            logger.error(f"[ERROR] Failed to get recent snapshots: {e}")
             return []
 
     def get_trend_analysis(self, product_id: str, days: int = 30) -> Dict:
@@ -340,7 +340,7 @@ class InventoryHistoricalTracking:
             conn.commit()
             conn.close()
 
-            logger.info(f"🗑️  Cleaned up {deleted_count} old snapshots (older than {days} days)")
+            logger.info(f"  Cleaned up {deleted_count} old snapshots (older than {days} days)")
 
             return {
                 "success": True,
@@ -349,7 +349,7 @@ class InventoryHistoricalTracking:
             }
 
         except Exception as e:
-            logger.error(f"❌ Failed to cleanup snapshots: {e}")
+            logger.error(f"[ERROR] Failed to cleanup snapshots: {e}")
             return {
                 "success": False,
                 "error": str(e)

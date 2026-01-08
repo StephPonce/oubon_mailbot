@@ -153,7 +153,7 @@ class RefundProcessor:
 
 <p>We're sorry to hear about the issue with your order #{order_id}.</p>
 
-<p><strong>✅ Refund Approved</strong><br>
+<p><strong>[SUCCESS] Refund Approved</strong><br>
 We've processed a full refund of <strong>${refund_decision['refund_amount']:.2f}</strong> to your original payment method.
 You should see it within 5-7 business days.</p>
 

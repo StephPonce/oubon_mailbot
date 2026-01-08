@@ -41,7 +41,7 @@ async def auto_discover_competitors(
     db: AsyncSession = Depends(get_multi_store_session)
 ):
     """
-    🤖 AI AUTO-DISCOVERS COMPETITORS
+    [AI] AI AUTO-DISCOVERS COMPETITORS
 
     Tell AI your niche and products, it finds competitors automatically:
     - Google search for niche keywords
@@ -59,7 +59,7 @@ async def auto_discover_competitors(
     """
     from ospra_os.intelligence.auto_competitor_discovery import auto_discover_and_add_competitors
 
-    logger.info(f"🔍 Auto-discovering competitors for niche: {request.niche}")
+    logger.info(f"[SEARCH] Auto-discovering competitors for niche: {request.niche}")
 
     try:
         competitors = await auto_discover_and_add_competitors(
@@ -737,4 +737,4 @@ async def get_intelligence_jobs_status():
         }
 
 
-logger.info("✅ Competitor Intelligence routes initialized")
+logger.info("[SUCCESS] Competitor Intelligence routes initialized")

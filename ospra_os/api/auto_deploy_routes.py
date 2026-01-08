@@ -38,7 +38,7 @@ def get_auto_deployer():
     if _auto_deployer is None:
         from ospra_os.services.auto_deployer import AutoDeployer
         _auto_deployer = AutoDeployer()
-        logger.info("✅ AutoDeployer initialized")
+        logger.info("[SUCCESS] AutoDeployer initialized")
     return _auto_deployer
 
 
@@ -98,7 +98,7 @@ class RunNowResponse(BaseModel):
 @router.post("/enable")
 async def enable_auto_deploy():
     """
-    ✅ Enable Auto-Deployment
+    [SUCCESS] Enable Auto-Deployment
 
     Enables the automated product deployment system. Products that meet
     the configured criteria will be automatically deployed to Shopify.
@@ -123,7 +123,7 @@ async def enable_auto_deploy():
         deployer = get_auto_deployer()
         deployer.enable()
 
-        logger.info("✅ Auto-deployment ENABLED by admin")
+        logger.info("[SUCCESS] Auto-deployment ENABLED by admin")
 
         return {
             "success": True,
@@ -138,7 +138,7 @@ async def enable_auto_deploy():
 @router.post("/disable")
 async def disable_auto_deploy():
     """
-    ⏸️ Disable Auto-Deployment
+    [PAUSE] Disable Auto-Deployment
 
     Disables the automated product deployment system. The scheduler will
     continue to run but will skip deployment checks.
@@ -155,7 +155,7 @@ async def disable_auto_deploy():
         deployer = get_auto_deployer()
         deployer.disable()
 
-        logger.info("⏸️  Auto-deployment DISABLED by admin")
+        logger.info("[PAUSE]  Auto-deployment DISABLED by admin")
 
         return {
             "success": True,
@@ -169,7 +169,7 @@ async def disable_auto_deploy():
 @router.get("/status", response_model=StatusResponse)
 async def get_auto_deploy_status():
     """
-    📊 Get Auto-Deploy Status
+    [STATS] Get Auto-Deploy Status
 
     Returns current status, criteria, and statistics.
 
@@ -213,7 +213,7 @@ async def get_auto_deploy_status():
 @router.put("/criteria")
 async def update_criteria(criteria: CriteriaUpdate):
     """
-    ⚙️ Update Deployment Criteria
+    [CONFIG] Update Deployment Criteria
 
     Update the criteria used to filter products for auto-deployment.
     Only provided fields will be updated.
@@ -251,7 +251,7 @@ async def update_criteria(criteria: CriteriaUpdate):
 
         deployer.update_criteria(updates)
 
-        logger.info(f"✅ Criteria updated by admin: {updates}")
+        logger.info(f"[SUCCESS] Criteria updated by admin: {updates}")
 
         return {
             "success": True,
@@ -268,7 +268,7 @@ async def update_criteria(criteria: CriteriaUpdate):
 @router.get("/history", response_model=List[DeploymentHistoryItem])
 async def get_deployment_history(limit: int = 50):
     """
-    📜 Get Deployment History
+     Get Deployment History
 
     Returns the history of auto-deployed products.
 
@@ -309,7 +309,7 @@ async def get_deployment_history(limit: int = 50):
 @router.post("/run-now", response_model=RunNowResponse)
 async def run_deployment_now(background_tasks: BackgroundTasks):
     """
-    ▶️ Run Deployment Check Now
+     Run Deployment Check Now
 
     Manually trigger an auto-deployment check. This runs the same logic
     as the scheduled task but can be triggered on-demand.
@@ -335,7 +335,7 @@ async def run_deployment_now(background_tasks: BackgroundTasks):
     try:
         deployer = get_auto_deployer()
 
-        logger.info("🚀 Manual deployment check triggered by admin")
+        logger.info("[START] Manual deployment check triggered by admin")
 
         # Run deployment check
         result = await deployer.check_and_deploy()
@@ -377,7 +377,7 @@ async def run_deployment_now(background_tasks: BackgroundTasks):
 @router.get("/health")
 async def auto_deploy_health():
     """
-    🏥 Health Check
+     Health Check
 
     Check if auto-deployment service is operational.
 

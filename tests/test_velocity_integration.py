@@ -14,7 +14,7 @@ def test_velocity_integration():
     """Test velocity scoring with a new niche to bypass cache"""
 
     print("=" * 80)
-    print("🧪 TESTING VELOCITY SCORING INTEGRATION")
+    print("[TEST] TESTING VELOCITY SCORING INTEGRATION")
     print("=" * 80)
     print()
 
@@ -37,7 +37,7 @@ def test_velocity_integration():
         )
 
         if response.status_code != 200:
-            print(f"❌ Request failed: {response.status_code}")
+            print(f"[ERROR] Request failed: {response.status_code}")
             print(response.text)
             return
 
@@ -45,22 +45,22 @@ def test_velocity_integration():
 
         # Display results
         print("=" * 80)
-        print("📊 RESULTS")
+        print("[STATS] RESULTS")
         print("=" * 80)
         print()
 
-        print(f"🔍 Data Source: {data.get('data_source')}")
-        print(f"📦 Total Products: {data.get('total', 0)}")
+        print(f"[SEARCH] Data Source: {data.get('data_source')}")
+        print(f"[PACKAGE] Total Products: {data.get('total', 0)}")
         print()
 
         if data.get('data_source') == 'ADVANCED_SCRAPING':
-            print("✨ ✨ ✨ ADVANCED SCRAPER ACTIVATED! ✨ ✨ ✨")
+            print("[NEW] [NEW] [NEW] ADVANCED SCRAPER ACTIVATED! [NEW] [NEW] [NEW]")
             print()
 
         products = data.get('products', [])
 
         if not products:
-            print("⚠️  No products returned")
+            print("[WARNING]  No products returned")
             print()
             print("This could mean:")
             print("  • Cache is being used (try a different niche)")
@@ -79,11 +79,11 @@ def test_velocity_integration():
             velocities.append(velocity)
 
             print(f"\n{i}. {product['name'][:60]}")
-            print(f"   💰 Price: ${product['price']}")
-            print(f"   📈 Velocity: {velocity}/100")
-            print(f"   ⭐ Rating: {product['rating']}/5")
-            print(f"   📦 Orders: {product['orders']:,}")
-            print(f"   🔗 Source: {product['source']}")
+            print(f"   [PRICE] Price: ${product['price']}")
+            print(f"   [TREND] Velocity: {velocity}/100")
+            print(f"   [STAR] Rating: {product['rating']}/5")
+            print(f"   [PACKAGE] Orders: {product['orders']:,}")
+            print(f"   [LINK] Source: {product['source']}")
 
         print()
         print("-" * 80)
@@ -93,7 +93,7 @@ def test_velocity_integration():
             avg_velocity = sum(velocities) / len(velocities)
             velocity_range = max(velocities) - min(velocities)
 
-            print(f"\n📊 Velocity Statistics:")
+            print(f"\n[STATS] Velocity Statistics:")
             print(f"   Average: {avg_velocity:.1f}/100")
             print(f"   Min: {min(velocities)}")
             print(f"   Max: {max(velocities)}")
@@ -101,36 +101,36 @@ def test_velocity_integration():
             print()
 
             if velocity_range > 5:
-                print("   ✅ Good variation (likely real Google Trends data)")
+                print("   [SUCCESS] Good variation (likely real Google Trends data)")
             else:
-                print("   ⚠️  Low variation (might be fallback scores)")
+                print("   [WARNING]  Low variation (might be fallback scores)")
 
             print()
             print("=" * 80)
 
             # Final verdict
             if data.get('data_source') == 'ADVANCED_SCRAPING' and avg_velocity > 0:
-                print("✅ SUCCESS! Velocity scoring integration working:")
+                print("[SUCCESS] SUCCESS! Velocity scoring integration working:")
                 print("   • Advanced Scraper: Activated")
                 print("   • Google Trends: Scraped with Playwright")
                 print("   • Velocity Scores: Applied to products")
                 print("   • Anti-bot detection: BYPASSED")
             elif data.get('data_source') == 'DATABASE':
-                print("ℹ️  Using cached data (expected behavior)")
+                print("[INFO]  Using cached data (expected behavior)")
                 print("   To test scraper, try a different niche or clear cache:")
                 print("   rm data/product_cache.db")
             else:
-                print(f"ℹ️  Data source: {data.get('data_source')}")
+                print(f"[INFO]  Data source: {data.get('data_source')}")
                 print("   Check backend logs for details")
 
         print()
         print("=" * 80)
 
     except requests.exceptions.Timeout:
-        print("❌ Request timed out (scraping takes 30-60 seconds)")
+        print("[ERROR] Request timed out (scraping takes 30-60 seconds)")
         print("Check backend logs for scraping activity")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
 

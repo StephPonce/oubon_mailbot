@@ -25,7 +25,7 @@ class ApifyClient:
     
     async def scrape_amazon_quick(self, keyword: str, max_items: int = 5) -> List[Dict]:
         """Quick Amazon product scrape"""
-        print(f"🔍 Apify: Searching Amazon for '{keyword}'...")
+        print(f"[SEARCH] Apify: Searching Amazon for '{keyword}'...")
         
         # Simplified mock for now - replace with actual Apify actor call
         # when you're ready to use paid Apify actors
@@ -43,4 +43,4 @@ class ApifyClient:
             for i in range(min(max_items, 3))
         ]
 
-print("✅ Apify client created")
+print("[SUCCESS] Apify client created")

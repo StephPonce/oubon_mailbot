@@ -34,9 +34,9 @@ def test_client_initialization():
 
     if client.enabled:
         print(f"Base URL: {client.base_url}")
-        print("\n✅ Client initialized successfully!")
+        print("\n[SUCCESS] Client initialized successfully!")
     else:
-        print("\n⚠️  Client not enabled - missing credentials")
+        print("\n[WARNING]  Client not enabled - missing credentials")
 
     return client
 
@@ -70,7 +70,7 @@ def test_description_generation():
     print("-" * 60)
     print(description)
     print("-" * 60)
-    print("\n✅ Description generated successfully!")
+    print("\n[SUCCESS] Description generated successfully!")
 
 
 def test_product_creation_format():
@@ -115,7 +115,7 @@ def test_product_creation_format():
     import json
     print("\nShopify Product Format:")
     print(json.dumps(shopify_product, indent=2))
-    print("\n✅ Product format is correct!")
+    print("\n[SUCCESS] Product format is correct!")
 
 
 def test_list_products():
@@ -127,7 +127,7 @@ def test_list_products():
     client = ShopifyClient()
 
     if not client.enabled:
-        print("⚠️  Skipping - client not enabled")
+        print("[WARNING]  Skipping - client not enabled")
         print("To enable: Set SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN in .env")
         return
 
@@ -135,11 +135,11 @@ def test_list_products():
     products = client.list_products(limit=5)
 
     if products:
-        print(f"\n✅ Found {len(products)} products:")
+        print(f"\n[SUCCESS] Found {len(products)} products:")
         for i, product in enumerate(products, 1):
             print(f"{i}. {product['title']} - ${product['variants'][0]['price']}")
     else:
-        print("⚠️  No products found or API error")
+        print("[WARNING]  No products found or API error")
 
 
 def main():
@@ -166,7 +166,7 @@ def main():
         print("=" * 60)
 
     except Exception as e:
-        print(f"\n❌ Error during testing: {e}")
+        print(f"\n[ERROR] Error during testing: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

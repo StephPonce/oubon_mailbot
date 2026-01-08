@@ -9,7 +9,7 @@ def audit_app_directory():
     app_dir = Path("app")
 
     if not app_dir.exists():
-        print("❌ No app/ directory found")
+        print("[ERROR] No app/ directory found")
         return
 
     # Categorize files

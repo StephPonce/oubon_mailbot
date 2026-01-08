@@ -208,7 +208,7 @@ class AliExpressOAuth:
         self.session.add(token)
         self.session.commit()
 
-        print(f"✅ AliExpress token stored, expires at {expires_at}")
+        print(f"[SUCCESS] AliExpress token stored, expires at {expires_at}")
 
     def get_valid_token(self) -> Optional[str]:
         """
@@ -226,7 +226,7 @@ class AliExpressOAuth:
 
         # Check if expired
         if datetime.utcnow() >= token.expires_at:
-            print("⚠️  Token expired, attempting refresh...")
+            print("[WARNING]  Token expired, attempting refresh...")
             # Try to refresh
             if token.refresh_token:
                 refreshed = self.refresh_access_token(token.refresh_token)
@@ -336,4 +336,4 @@ def init_aliexpress_oauth_db(database_url: str):
     sync_url = database_url.replace("+aiosqlite", "")
     engine = create_engine(sync_url, echo=False)
     Base.metadata.create_all(engine)
-    print("✅ AliExpress OAuth database initialized")
+    print("[SUCCESS] AliExpress OAuth database initialized")

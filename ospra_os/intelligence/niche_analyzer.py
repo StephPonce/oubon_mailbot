@@ -123,7 +123,7 @@ class NicheAnalyzer:
         Returns:
             Complete analysis dict with health score, lifecycle stage, recommendations
         """
-        logger.info(f"🔍 Analyzing niche: {niche_id}")
+        logger.info(f"[SEARCH] Analyzing niche: {niche_id}")
 
         async with self.async_session() as session:
             # Get or create niche record

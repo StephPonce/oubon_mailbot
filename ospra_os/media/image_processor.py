@@ -36,7 +36,7 @@ class ImageProcessor:
             Processed image as bytes (PNG format)
         """
         try:
-            logger.info(f"🎨 Processing image: {image_url[:50]}...")
+            logger.info(f" Processing image: {image_url[:50]}...")
 
             # Download original image
             response = requests.get(image_url, timeout=10)
@@ -53,7 +53,7 @@ class ImageProcessor:
             output = io.BytesIO()
             processed.save(output, format='PNG', quality=95, optimize=True)
 
-            logger.info("✅ Image processed successfully")
+            logger.info("[SUCCESS] Image processed successfully")
             return output.getvalue()
 
         except Exception as e:

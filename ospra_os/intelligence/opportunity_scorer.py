@@ -7,10 +7,10 @@ This is what separates Ospra from AutoDS. We don't just find "hot products" -
 we find products with RISING demand AND LOW competition.
 
 The Sweet Spot:
-- High Demand + Low Competition = 🎯 OPPORTUNITY
-- High Demand + High Competition = ❌ TOO LATE
-- Low Demand + Low Competition = ❌ DEAD PRODUCT
-- Low Demand + High Competition = ❌ WORST CASE
+- High Demand + Low Competition = [TARGET] OPPORTUNITY
+- High Demand + High Competition = [ERROR] TOO LATE
+- Low Demand + Low Competition = [ERROR] DEAD PRODUCT
+- Low Demand + High Competition = [ERROR] WORST CASE
 
 Author: Ospra Intelligence
 Version: 2.0.0
@@ -247,15 +247,15 @@ class OpportunityScorer:
         try:
             from ospra_os.intelligence.advanced_scraper import AdvancedProductScraper
             self.advanced_scraper = AdvancedProductScraper()
-            logger.info("✅ Google Trends (Advanced Scraper) connected")
+            logger.info("[SUCCESS] Google Trends (Advanced Scraper) connected")
         except Exception as e:
-            logger.warning(f"⚠️ Advanced Scraper not available: {e}")
+            logger.warning(f"[WARNING] Advanced Scraper not available: {e}")
         
         # Apify
         self.apify_token = os.getenv('APIFY_API_TOKEN') or os.getenv('OUBONSHOP_APIFY_API_TOKEN')
         if self.apify_token:
             self.apify_available = True
-            logger.info("✅ Apify connected")
+            logger.info("[SUCCESS] Apify connected")
         
         # Internal trackers
         try:
@@ -265,9 +265,9 @@ class OpportunityScorer:
             db_url = os.getenv('DATABASE_URL', 'sqlite:///ospra_os.db')
             self.saturation_tracker = SaturationTracker(db_url)
             self.velocity_detector = VelocityDetector(db_url)
-            logger.info("✅ Internal trackers connected")
+            logger.info("[SUCCESS] Internal trackers connected")
         except Exception as e:
-            logger.warning(f"⚠️ Internal trackers not available: {e}")
+            logger.warning(f"[WARNING] Internal trackers not available: {e}")
     
     # =========================================================================
     # DEMAND SCORING
@@ -642,16 +642,16 @@ class OpportunityScorer:
             OpportunityScore with complete analysis
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"🎯 OPPORTUNITY SCORING: {product_name[:40]}...")
+        logger.info(f"[TARGET] OPPORTUNITY SCORING: {product_name[:40]}...")
         logger.info(f"{'='*60}")
         
         # Calculate demand
-        logger.info("📈 Calculating demand metrics...")
+        logger.info("[TREND] Calculating demand metrics...")
         demand = await self.calculate_demand(product_name, search_keywords, raw_data)
         logger.info(f"   Demand Score: {demand.demand_score:.1f}")
         
         # Calculate competition
-        logger.info("🏃 Calculating competition metrics...")
+        logger.info(" Calculating competition metrics...")
         competition = await self.calculate_competition(product_name, search_keywords, raw_data)
         logger.info(f"   Competition Score: {competition.competition_score:.1f}")
         
@@ -661,13 +661,13 @@ class OpportunityScorer:
         # But we need to normalize since both are 0-100
         #
         # If demand = 80 and competition = 20:
-        #   opportunity = 80 * (1 - 0.2) = 80 * 0.8 = 64 ✅ Good
+        #   opportunity = 80 * (1 - 0.2) = 80 * 0.8 = 64 [SUCCESS] Good
         #
         # If demand = 80 and competition = 80:
-        #   opportunity = 80 * (1 - 0.8) = 80 * 0.2 = 16 ❌ Bad
+        #   opportunity = 80 * (1 - 0.8) = 80 * 0.2 = 16 [ERROR] Bad
         #
         # If demand = 30 and competition = 20:
-        #   opportunity = 30 * (1 - 0.2) = 30 * 0.8 = 24 ❌ Bad (low demand)
+        #   opportunity = 30 * (1 - 0.2) = 30 * 0.8 = 24 [ERROR] Bad (low demand)
         
         competition_penalty = competition.competition_score / 100  # 0-1
         opportunity_score = demand.demand_score * (1 - competition_penalty * 0.7)
@@ -690,7 +690,7 @@ class OpportunityScorer:
                 tier = t
                 break
         
-        logger.info(f"🎯 Opportunity Score: {opportunity_score:.1f} ({tier.value})")
+        logger.info(f"[TARGET] Opportunity Score: {opportunity_score:.1f} ({tier.value})")
         
         # Build the result
         result = OpportunityScore(
@@ -737,7 +737,7 @@ class OpportunityScorer:
             List of OpportunityScore objects, sorted by score
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"📊 BATCH SCORING: {len(products)} products")
+        logger.info(f"[STATS] BATCH SCORING: {len(products)} products")
         logger.info(f"{'='*60}")
         
         scores = []
@@ -774,7 +774,7 @@ class OpportunityScorer:
             tier = s.opportunity_tier.value
             tiers[tier] = tiers.get(tier, 0) + 1
         
-        logger.info(f"\n📊 Scoring Summary:")
+        logger.info(f"\n[STATS] Scoring Summary:")
         for tier, count in tiers.items():
             logger.info(f"   {tier}: {count} products")
         
@@ -795,30 +795,30 @@ class OpportunityScorer:
         
         # Demand reasons
         if demand.velocity_score >= 70:
-            reasons.append("🚀 Demand is growing rapidly")
+            reasons.append("[START] Demand is growing rapidly")
         elif demand.velocity_score >= 50:
-            reasons.append("📈 Steady demand growth")
+            reasons.append("[TREND] Steady demand growth")
         
         if demand.volume_score >= 70:
-            reasons.append("💎 High search volume indicates strong market interest")
+            reasons.append(" High search volume indicates strong market interest")
         
         if demand.momentum_score >= 60:
-            reasons.append("⚡ Trend is accelerating")
+            reasons.append("[FAST] Trend is accelerating")
         
         # Competition reasons
         if competition.seller_density_score < 30:
-            reasons.append("🏆 Low seller competition - room to capture market")
+            reasons.append("[TOP] Low seller competition - room to capture market")
         elif competition.seller_density_score > 70:
-            reasons.append("⚠️ High seller competition")
+            reasons.append("[WARNING] High seller competition")
         
         if competition.timing_score < 30:
-            reasons.append("⏰ Early to the trend - first mover advantage")
+            reasons.append("[ALARM] Early to the trend - first mover advantage")
         
         # Tier-specific
         if tier == OpportunityTier.GOLDEN:
-            reasons.insert(0, "✨ RARE OPPORTUNITY: Perfect demand/competition ratio")
+            reasons.insert(0, "[NEW] RARE OPPORTUNITY: Perfect demand/competition ratio")
         elif tier == OpportunityTier.EXCELLENT:
-            reasons.insert(0, "🎯 Strong opportunity with favorable conditions")
+            reasons.insert(0, "[TARGET] Strong opportunity with favorable conditions")
         
         return reasons[:5]  # Limit to 5 reasons
     
@@ -831,19 +831,19 @@ class OpportunityScorer:
         risks = []
         
         if demand.data_quality < 0.5:
-            risks.append("📊 Limited data - confidence is lower")
+            risks.append("[STATS] Limited data - confidence is lower")
         
         if demand.momentum_score < 40:
-            risks.append("📉 Trend may be slowing down")
+            risks.append("[DECLINE] Trend may be slowing down")
         
         if competition.timing_score > 60:
             risks.append("⏳ Late to the trend - competition is building")
         
         if competition.internal_saturation > competition.saturation_threshold * 0.7:
-            risks.append(f"⚠️ {int(competition.internal_saturation / competition.saturation_threshold * 100)}% internal saturation")
+            risks.append(f"[WARNING] {int(competition.internal_saturation / competition.saturation_threshold * 100)}% internal saturation")
         
         if competition.seller_density_score > 60:
-            risks.append("🏪 Crowded market - differentiation required")
+            risks.append(" Crowded market - differentiation required")
         
         return risks
     
@@ -855,30 +855,30 @@ class OpportunityScorer:
     ) -> str:
         """Generate actionable recommendation"""
         if tier == OpportunityTier.GOLDEN:
-            return "🔥 ACT NOW: This is a rare golden opportunity. Deploy immediately before competition increases."
+            return "[HOT] ACT NOW: This is a rare golden opportunity. Deploy immediately before competition increases."
         elif tier == OpportunityTier.EXCELLENT:
-            return "✅ STRONG BUY: Excellent opportunity with good risk/reward. Proceed with deployment."
+            return "[SUCCESS] STRONG BUY: Excellent opportunity with good risk/reward. Proceed with deployment."
         elif tier == OpportunityTier.GOOD:
-            return "👍 CONSIDER: Good opportunity but monitor competition. Test with limited inventory first."
+            return "[GOOD] CONSIDER: Good opportunity but monitor competition. Test with limited inventory first."
         elif tier == OpportunityTier.FAIR:
-            return "⚠️ CAUTION: Marginal opportunity. Only proceed if you have a strong differentiation strategy."
+            return "[WARNING] CAUTION: Marginal opportunity. Only proceed if you have a strong differentiation strategy."
         elif tier == OpportunityTier.POOR:
-            return "🚫 SKIP: Risk outweighs potential reward. Look for better opportunities."
+            return "[BLOCKED] SKIP: Risk outweighs potential reward. Look for better opportunities."
         else:
-            return "❌ AVOID: This product does not meet opportunity criteria."
+            return "[ERROR] AVOID: This product does not meet opportunity criteria."
     
     def _generate_timing_advice(self, competition: CompetitionMetrics) -> str:
         """Generate timing-specific advice"""
         days = competition.days_since_trend_start
         
         if days < 7:
-            return "🌱 Very early stage - high reward but also higher risk. Monitor for 1-2 more weeks."
+            return " Very early stage - high reward but also higher risk. Monitor for 1-2 more weeks."
         elif days < 30:
-            return "🚀 Perfect timing - trend is established but not saturated. Move quickly."
+            return "[START] Perfect timing - trend is established but not saturated. Move quickly."
         elif days < 60:
-            return "📈 Good timing - still opportunity but competition is building. Don't delay."
+            return "[TREND] Good timing - still opportunity but competition is building. Don't delay."
         elif days < 90:
-            return "⏰ Getting late - proceed only with strong differentiation or lower costs."
+            return "[ALARM] Getting late - proceed only with strong differentiation or lower costs."
         else:
             return "⏳ Late stage - most opportunity has passed. Consider alternatives."
     

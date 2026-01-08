@@ -1,5 +1,5 @@
 """
-📊 PRODUCT MONITORING BACKGROUND JOB
+[STATS] PRODUCT MONITORING BACKGROUND JOB
 Tracks product changes and sends notifications using SQLite database
 """
 
@@ -23,7 +23,7 @@ class ProductMonitor:
         self.discovery = ProductIntelligenceEngine()
         self.email_notifier = EmailNotifier()
         self.slack_notifier = SlackNotifier()
-        logger.info("✅ Product monitor initialized with notifications")
+        logger.info("[SUCCESS] Product monitor initialized with notifications")
 
     def check_all_products(self, niches: List[str] = None) -> List[Dict]:
         """
@@ -38,7 +38,7 @@ class ProductMonitor:
         if niches is None:
             niches = ['smart_home', 'fitness', 'kitchen', 'beauty', 'pet']
 
-        logger.info("🔍 Starting product change detection...")
+        logger.info("[SEARCH] Starting product change detection...")
 
         all_changes = []
 
@@ -58,19 +58,19 @@ class ProductMonitor:
                 logger.error(f"Error checking {niche}: {e}")
                 continue
 
-        logger.info(f"✅ Scan complete. {len(all_changes)} changes detected.")
+        logger.info(f"[SUCCESS] Scan complete. {len(all_changes)} changes detected.")
 
         # Send notifications if changes detected
         if all_changes:
             # Send email notification
             email_sent = self.email_notifier.send_change_alert(all_changes)
             if email_sent:
-                logger.info("📧 Email notification sent")
+                logger.info("[EMAIL] Email notification sent")
 
             # Send Slack notification
             slack_sent = self.slack_notifier.send_change_alert(all_changes)
             if slack_sent:
-                logger.info("💬 Slack notification sent")
+                logger.info("[CHAT] Slack notification sent")
 
         return all_changes
 
@@ -114,7 +114,7 @@ class ProductMonitor:
                 severity=severity
             )
 
-            emoji = "📈" if new_velocity > old_velocity else "📉"
+            emoji = "[TREND]" if new_velocity > old_velocity else "[DECLINE]"
             changes.append({
                 "product_name": product_name,
                 "product_id": product_id,
@@ -143,7 +143,7 @@ class ProductMonitor:
                 severity=severity
             )
 
-            emoji = "💰" if new_price > old_price else "💸"
+            emoji = "[PRICE]" if new_price > old_price else ""
             changes.append({
                 "product_name": product_name,
                 "product_id": product_id,
@@ -173,7 +173,7 @@ class ProductMonitor:
                     severity=severity
                 )
 
-                emoji = "⭐" if new_score > old_score else "⚠️"
+                emoji = "[STAR]" if new_score > old_score else "[WARNING]"
                 changes.append({
                     "product_name": product_name,
                     "product_id": product_id,
@@ -209,9 +209,9 @@ class ProductMonitor:
         low_priority = [c for c in changes if c['severity'] == 'low']
 
         message = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 PRODUCT CHANGE ALERT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ PRODUCT CHANGE ALERT
+
 
 Total Changes: {len(changes)}
 Scan Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -219,14 +219,14 @@ Scan Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 """
 
         if high_priority:
-            message += f"🔴 HIGH PRIORITY ({len(high_priority)}):\n"
+            message += f" HIGH PRIORITY ({len(high_priority)}):\n"
             for change in high_priority:
                 message += f"  • {change['product_name']}\n"
                 message += f"    {change['message']}\n"
             message += "\n"
 
         if medium_priority:
-            message += f"🟡 MEDIUM PRIORITY ({len(medium_priority)}):\n"
+            message += f" MEDIUM PRIORITY ({len(medium_priority)}):\n"
             for change in medium_priority[:5]:  # Limit to 5
                 message += f"  • {change['product_name']}: {change['message']}\n"
             if len(medium_priority) > 5:
@@ -234,13 +234,13 @@ Scan Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
             message += "\n"
 
         if low_priority:
-            message += f"🟢 LOW PRIORITY ({len(low_priority)}):\n"
+            message += f" LOW PRIORITY ({len(low_priority)}):\n"
             for change in low_priority[:3]:  # Limit to 3
                 message += f"  • {change['product_name']}: {change['message']}\n"
             if len(low_priority) > 3:
                 message += f"  ... and {len(low_priority) - 3} more\n"
 
-        message += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        message += "\n"
 
         return message
 
@@ -258,7 +258,7 @@ def run_monitoring_loop(interval_hours: int = 6):
     """
     monitor = ProductMonitor()
 
-    logger.info(f"🚀 Product monitoring started (checking every {interval_hours} hours)")
+    logger.info(f"[START] Product monitoring started (checking every {interval_hours} hours)")
 
     while True:
         try:
@@ -279,7 +279,7 @@ def run_monitoring_loop(interval_hours: int = 6):
 
             # Show stats
             stats = monitor.get_stats()
-            logger.info(f"📊 Stats: {stats['tracked_products']} products tracked, "
+            logger.info(f"[STATS] Stats: {stats['tracked_products']} products tracked, "
                        f"{stats['total_snapshots']} snapshots, "
                        f"{stats['total_changes']} total changes")
 
@@ -287,7 +287,7 @@ def run_monitoring_loop(interval_hours: int = 6):
             logger.error(f"Monitoring error: {e}", exc_info=True)
 
         # Wait for next check
-        logger.info(f"⏰ Next check in {interval_hours} hours...")
+        logger.info(f"[ALARM] Next check in {interval_hours} hours...")
         time.sleep(interval_hours * 60 * 60)
 
 

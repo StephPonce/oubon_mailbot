@@ -154,7 +154,7 @@ class CustomerCohort(Base):
 def init_customer_tables(engine):
     """Create all customer analytics tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Customer analytics tables created")
+    print("[SUCCESS] Customer analytics tables created")
     print("   - customers")
     print("   - customer_snapshots")
     print("   - customer_events")

@@ -45,7 +45,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Timing pattern analysis
         """
-        logger.info(f"⏰ Analyzing timing patterns for: {customer_id}")
+        logger.info(f"[ALARM] Analyzing timing patterns for: {customer_id}")
 
         if not orders:
             return {
@@ -97,7 +97,7 @@ class PurchasePatternAnalyzer:
             "total_orders": len(orders)
         }
 
-        logger.info(f"✅ Timing patterns: {preferred_day} at {preferred_hour}")
+        logger.info(f"[SUCCESS] Timing patterns: {preferred_day} at {preferred_hour}")
 
         return result
 
@@ -111,7 +111,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Global timing insights
         """
-        logger.info("📊 Analyzing global timing patterns...")
+        logger.info("[STATS] Analyzing global timing patterns...")
 
         if not all_orders:
             return {"peak_days": [], "peak_hours": [], "seasonal_trends": {}}
@@ -151,7 +151,7 @@ class PurchasePatternAnalyzer:
             "seasonal_trends": seasonal_trends
         }
 
-        logger.info(f"✅ Peak day: {peak_days[0]['day']}, Peak hour: {peak_hours[0]['hour']}")
+        logger.info(f"[SUCCESS] Peak day: {peak_days[0]['day']}, Peak hour: {peak_hours[0]['hour']}")
 
         return result
 
@@ -172,7 +172,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Product preference analysis
         """
-        logger.info(f"🛍️ Analyzing product preferences for: {customer_id}")
+        logger.info(f"[SHOP] Analyzing product preferences for: {customer_id}")
 
         if not orders:
             return {
@@ -245,7 +245,7 @@ class PurchasePatternAnalyzer:
             "avg_item_price": round(statistics.mean(all_prices), 2) if all_prices else 0
         }
 
-        logger.info(f"✅ Top category: {favorite_categories[0]['category'] if favorite_categories else 'None'}")
+        logger.info(f"[SUCCESS] Top category: {favorite_categories[0]['category'] if favorite_categories else 'None'}")
 
         return result
 
@@ -266,7 +266,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Frequency analysis
         """
-        logger.info(f"📅 Analyzing purchase frequency for: {customer_id}")
+        logger.info(f" Analyzing purchase frequency for: {customer_id}")
 
         if len(orders) < 2:
             return {
@@ -335,7 +335,7 @@ class PurchasePatternAnalyzer:
             "order_gaps": [round(g, 1) for g in gaps]
         }
 
-        logger.info(f"✅ Avg frequency: {avg_gap:.1f} days, Trend: {trend}")
+        logger.info(f"[SUCCESS] Avg frequency: {avg_gap:.1f} days, Trend: {trend}")
 
         return result
 
@@ -356,7 +356,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Cart behavior analysis
         """
-        logger.info(f"🛒 Analyzing cart behavior for: {customer_id}")
+        logger.info(f"[CART] Analyzing cart behavior for: {customer_id}")
 
         if not orders:
             return {
@@ -407,7 +407,7 @@ class PurchasePatternAnalyzer:
             "max_order_value": round(max(order_values), 2) if order_values else 0
         }
 
-        logger.info(f"✅ Avg items: {avg_items:.1f}, Avg value: ${avg_value:.2f}")
+        logger.info(f"[SUCCESS] Avg items: {avg_items:.1f}, Avg value: ${avg_value:.2f}")
 
         return result
 
@@ -428,7 +428,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Discount sensitivity analysis
         """
-        logger.info(f"💰 Analyzing discount sensitivity for: {customer_id}")
+        logger.info(f"[PRICE] Analyzing discount sensitivity for: {customer_id}")
 
         if not orders:
             return {
@@ -468,7 +468,7 @@ class PurchasePatternAnalyzer:
             "total_orders": len(orders)
         }
 
-        logger.info(f"✅ Discount usage: {usage_rate:.1f}%, Sensitivity: {sensitivity}")
+        logger.info(f"[SUCCESS] Discount usage: {usage_rate:.1f}%, Sensitivity: {sensitivity}")
 
         return result
 
@@ -492,7 +492,7 @@ class PurchasePatternAnalyzer:
         Returns:
             List of recommended products
         """
-        logger.info(f"🎯 Identifying cross-sell opportunities for: {customer_id}")
+        logger.info(f"[TARGET] Identifying cross-sell opportunities for: {customer_id}")
 
         # Extract customer's purchased products
         purchased_products = set()
@@ -545,7 +545,7 @@ class PurchasePatternAnalyzer:
             for product, count in similar_customer_products.most_common(10)
         ]
 
-        logger.info(f"✅ Found {len(recommendations)} cross-sell opportunities")
+        logger.info(f"[SUCCESS] Found {len(recommendations)} cross-sell opportunities")
 
         return recommendations
 
@@ -561,7 +561,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Product affinity matrix
         """
-        logger.info("🔗 Analyzing product affinity...")
+        logger.info("[LINK] Analyzing product affinity...")
 
         # Build co-purchase matrix
         product_pairs = Counter()
@@ -587,7 +587,7 @@ class PurchasePatternAnalyzer:
             for pair, count in product_pairs.most_common(20)
         ]
 
-        logger.info(f"✅ Found {len(affinity_pairs)} product affinity pairs")
+        logger.info(f"[SUCCESS] Found {len(affinity_pairs)} product affinity pairs")
 
         return {
             "top_pairs": affinity_pairs,
@@ -611,7 +611,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Category flow analysis
         """
-        logger.info(f"📊 Analyzing category flow for: {customer_id}")
+        logger.info(f"[STATS] Analyzing category flow for: {customer_id}")
 
         if len(orders) < 2:
             return {
@@ -669,7 +669,7 @@ class PurchasePatternAnalyzer:
             "total_unique_categories": len(all_categories)
         }
 
-        logger.info(f"✅ Category loyalty: {loyalty_rate:.1f}%, Exploration: {exploration_rate:.2f}")
+        logger.info(f"[SUCCESS] Category loyalty: {loyalty_rate:.1f}%, Exploration: {exploration_rate:.2f}")
 
         return result
 
@@ -692,7 +692,7 @@ class PurchasePatternAnalyzer:
         Returns:
             Complete pattern analysis
         """
-        logger.info(f"📊 Building complete pattern profile for: {customer_id}")
+        logger.info(f"[STATS] Building complete pattern profile for: {customer_id}")
 
         orders = customer_data.get('orders', [])
 
@@ -725,7 +725,7 @@ class PurchasePatternAnalyzer:
             "analyzed_at": datetime.utcnow().isoformat()
         }
 
-        logger.info(f"✅ Complete pattern profile generated")
+        logger.info(f"[SUCCESS] Complete pattern profile generated")
 
         return result
 
@@ -741,4 +741,4 @@ def get_purchase_pattern_analyzer(db_session=None):
     return _purchase_pattern_analyzer
 
 
-logger.info("✅ Purchase Pattern Analyzer module loaded")
+logger.info("[SUCCESS] Purchase Pattern Analyzer module loaded")

@@ -40,16 +40,22 @@ class OpenAIProvider(AIProvider):
         cost_per_1k (float): 0.015 (USD per 1K tokens)
     """
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None):
         """
         Initialize OpenAI provider with API key.
 
         Args:
-            api_key: OpenAI API key (starts with "sk-")
+            api_key: OpenAI API key (starts with "sk-").
+                     If not provided, uses OPENAI_API_KEY env var.
 
         Raises:
             APIKeyError: If API key is invalid or missing
         """
+        import os
+        api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise APIKeyError("OPENAI_API_KEY not configured")
+            
         super().__init__(api_key)
 
         # Set provider details

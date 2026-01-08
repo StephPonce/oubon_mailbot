@@ -272,6 +272,7 @@ class AIAction:
     def to_dict(self) -> Dict[str, Any]:
         """Convert action to dictionary for API responses."""
         return {
+            "id": self.action_id,  # Alias for compatibility
             "action_id": self.action_id,
             "action_type": self.action_type.value,
             "title": self.title,
@@ -492,3 +493,102 @@ def get_action_manager(db: Session) -> AIActionManager:
         _action_manager = AIActionManager(db)
 
     return _action_manager
+
+
+# Wrapper functions for backwards compatibility with nl_routes.py
+def propose_action(
+    user_id: int,
+    action_type: ActionType,
+    title: str,
+    description: str,
+    impact_summary: str,
+    parameters: Dict[str, Any],
+    confidence: float,
+    execution_function: Optional[Callable] = None,
+    db: Optional[Session] = None
+) -> Optional[AIAction]:
+    """
+    Propose a new AI action.
+
+    This is a wrapper function for nl_routes.py compatibility.
+    Creates an action using the AIActionManager.
+
+    Args:
+        user_id: User ID proposing the action
+        action_type: Type of action to create
+        title: Action title
+        description: Action description
+        impact_summary: Summary of expected impact
+        parameters: Action parameters
+        confidence: Confidence score (0.0 - 1.0)
+        execution_function: Optional custom execution function
+        db: Optional database session (will use global manager if None)
+
+    Returns:
+        AIAction instance if successful, None otherwise
+    """
+    try:
+        # If no db provided, we need to get one from the global context
+        # For now, create a simple in-memory action without db
+        if db is None:
+            # Create action without manager (stateless mode)
+            action_id = str(uuid.uuid4())
+            action = AIAction(
+                action_id=action_id,
+                action_type=action_type,
+                title=title,
+                description=description,
+                impact_summary=impact_summary,
+                parameters=parameters,
+                confidence=confidence,
+                execution_function=execution_function
+            )
+            return action
+        else:
+            # Use manager when db is available
+            manager = get_action_manager(db)
+            return manager.create_action(
+                action_type=action_type,
+                title=title,
+                description=description,
+                impact_summary=impact_summary,
+                parameters=parameters,
+                confidence=confidence,
+                execution_function=execution_function
+            )
+    except Exception as e:
+        print(f"Error proposing action: {e}")
+        return None
+
+
+def get_pending_actions(
+    user_id: Optional[int] = None,
+    min_confidence: float = 0.7,
+    db: Optional[Session] = None
+) -> List[AIAction]:
+    """
+    Get pending AI actions.
+
+    This is a wrapper function for nl_routes.py compatibility.
+
+    Args:
+        user_id: Filter by user ID (optional)
+        min_confidence: Minimum confidence threshold
+        db: Optional database session
+
+    Returns:
+        List of pending AIAction instances
+    """
+    try:
+        if db is None:
+            # Return empty list if no db (stateless mode)
+            return []
+
+        manager = get_action_manager(db)
+        return manager.get_pending_actions(
+            user_id=user_id,
+            min_confidence=min_confidence
+        )
+    except Exception as e:
+        print(f"Error getting pending actions: {e}")
+        return []

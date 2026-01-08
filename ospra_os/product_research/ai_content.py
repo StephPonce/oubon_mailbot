@@ -38,7 +38,7 @@ class AIContentGenerator:
             }
         """
 
-        print(f"📝 Generating AI content for: {product_name}")
+        print(f"[NOTE] Generating AI content for: {product_name}")
 
         prompt = f"""
 You are an expert e-commerce copywriter for a dropshipping store.
@@ -84,14 +84,14 @@ Make it persuasive, benefit-focused, and optimized for conversions.
 
             content = json.loads(response.choices[0].message.content)
 
-            print(f"✅ Generated content for {product_name}")
+            print(f"[SUCCESS] Generated content for {product_name}")
             print(f"   Title: {content['title'][:60]}...")
             print(f"   Bullets: {len(content['bullet_points'])} points")
 
             return content
 
         except Exception as e:
-            print(f"❌ Content generation failed: {e}")
+            print(f"[ERROR] Content generation failed: {e}")
             # Return fallback content instead of failing
             return {
                 "title": f"{product_name} - Premium Quality",

@@ -339,7 +339,7 @@ class AutoDiscoveryJob:
             # self.db.commit()
 
             logger.info(
-                f"✅ Discovery complete for user {user_id}: "
+                f"[SUCCESS] Discovery complete for user {user_id}: "
                 f"{len(saved_products)} saved, {deployed_count} deployed, "
                 f"{duration_seconds:.1f}s"
             )
@@ -427,7 +427,7 @@ class AutoDiscoveryJob:
             }
 
             logger.info(
-                f"✅ Discovery complete for all users: "
+                f"[SUCCESS] Discovery complete for all users: "
                 f"{len(successful)}/{len(users)} successful, "
                 f"{total_products_saved} products saved, "
                 f"{total_products_deployed} deployed, "
@@ -469,7 +469,7 @@ class AutoDiscoveryJob:
                     max_instances=1  # Prevent overlapping runs
                 )
 
-                logger.info(f"✅ Scheduled discovery every {interval_hours} hours")
+                logger.info(f"[SUCCESS] Scheduled discovery every {interval_hours} hours")
 
             else:
                 # Daily at specific time
@@ -483,12 +483,12 @@ class AutoDiscoveryJob:
                     max_instances=1
                 )
 
-                logger.info(f"✅ Scheduled daily discovery at {hour:02d}:{minute:02d}")
+                logger.info(f"[SUCCESS] Scheduled daily discovery at {hour:02d}:{minute:02d}")
 
             # Start scheduler if not already running
             if not self.scheduler.running:
                 self.scheduler.start()
-                logger.info("✅ Scheduler started")
+                logger.info("[SUCCESS] Scheduler started")
 
         except Exception as e:
             logger.error(f"Failed to schedule discovery: {e}")
@@ -504,7 +504,7 @@ class AutoDiscoveryJob:
                 except Exception:
                     pass
 
-            logger.info("✅ All discovery jobs unscheduled")
+            logger.info("[SUCCESS] All discovery jobs unscheduled")
 
         except Exception as e:
             logger.error(f"Failed to unschedule: {e}")
@@ -661,7 +661,7 @@ class AutoDiscoveryJob:
                 store_names += f" and {len(stores) - 2} more"
 
             message = (
-                f"🔥 Found {high_priority_count} high-priority products "
+                f"[HOT] Found {high_priority_count} high-priority products "
                 f"for your {store_names} store{'s' if len(stores) > 1 else ''}!"
             )
 

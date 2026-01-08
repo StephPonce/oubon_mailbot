@@ -166,7 +166,7 @@ class TestPlatformFactory:
 
     def test_list_adapters(self):
         """Test listing all available adapters."""
-        print("\n🧪 Testing PlatformFactory.list_adapters()")
+        print("\n[TEST] Testing PlatformFactory.list_adapters()")
 
         adapters = PlatformFactory.list_adapters()
 
@@ -175,11 +175,11 @@ class TestPlatformFactory:
         assert "woocommerce" in adapters
         assert len(adapters) == 3
 
-        print(f"✅ Found {len(adapters)} adapters: {', '.join(adapters)}")
+        print(f"[SUCCESS] Found {len(adapters)} adapters: {', '.join(adapters)}")
 
     def test_get_available_platforms(self):
         """Test getting platform metadata."""
-        print("\n🧪 Testing PlatformFactory.get_available_platforms()")
+        print("\n[TEST] Testing PlatformFactory.get_available_platforms()")
 
         platforms = PlatformFactory.get_available_platforms()
 
@@ -191,14 +191,14 @@ class TestPlatformFactory:
             assert "complexity" in platform
             assert "features" in platform
 
-            print(f"✅ {platform['display_name']}")
+            print(f"[SUCCESS] {platform['display_name']}")
             print(f"   Complexity: {platform['complexity']}")
             print(f"   Credentials: {platform['credentials_count']}")
             print(f"   Setup time: {platform['setup_time_minutes']} min")
 
     def test_validate_credentials_shopify(self):
         """Test Shopify credential validation."""
-        print("\n🧪 Testing credential validation for Shopify")
+        print("\n[TEST] Testing credential validation for Shopify")
 
         # Valid credentials
         result = PlatformFactory.validate_credentials("shopify", {
@@ -207,7 +207,7 @@ class TestPlatformFactory:
         })
 
         assert result["valid"] is True
-        print("✅ Valid credentials accepted")
+        print("[SUCCESS] Valid credentials accepted")
 
         # Missing field
         result = PlatformFactory.validate_credentials("shopify", {
@@ -216,25 +216,25 @@ class TestPlatformFactory:
 
         assert result["valid"] is False
         assert len(result["missing_fields"]) == 1
-        print(f"✅ Missing field detected: {result['missing_fields'][0]['field']}")
+        print(f"[SUCCESS] Missing field detected: {result['missing_fields'][0]['field']}")
 
     def test_get_required_credentials(self):
         """Test getting credential schema."""
-        print("\n🧪 Testing PlatformFactory.get_required_credentials()")
+        print("\n[TEST] Testing PlatformFactory.get_required_credentials()")
 
         for platform in ["shopify", "amazon", "woocommerce"]:
             fields = PlatformFactory.get_required_credentials(platform)
 
             assert len(fields) > 0
 
-            print(f"\n✅ {platform.title()} requires {len(fields)} credential fields:")
+            print(f"\n[SUCCESS] {platform.title()} requires {len(fields)} credential fields:")
             for field in fields:
                 required = "required" if field["required"] else "optional"
                 print(f"   - {field['label']} ({required})")
 
     def test_compare_platforms(self):
         """Test platform comparison."""
-        print("\n🧪 Testing PlatformFactory.compare_platforms()")
+        print("\n[TEST] Testing PlatformFactory.compare_platforms()")
 
         comparison = PlatformFactory.compare_platforms()
 
@@ -242,7 +242,7 @@ class TestPlatformFactory:
         assert "complexity" in comparison
         assert "features_matrix" in comparison
 
-        print(f"\n✅ Compared {len(comparison['platforms'])} platforms")
+        print(f"\n[SUCCESS] Compared {len(comparison['platforms'])} platforms")
         print(f"\nComplexity:")
         for platform, complexity in comparison["complexity"].items():
             print(f"   {platform}: {complexity}")
@@ -262,7 +262,7 @@ class TestShopify:
     @pytest.mark.asyncio
     async def test_shopify_connection(self, shopify_adapter):
         """Test Shopify connection."""
-        print("\n🧪 Testing Shopify connection")
+        print("\n[TEST] Testing Shopify connection")
         start_time = time.time()
 
         result = await shopify_adapter.test_connection()
@@ -272,14 +272,14 @@ class TestShopify:
         assert result["success"] is True
         assert "store_name" in result
 
-        print(f"✅ Connected to: {result['store_name']}")
+        print(f"[SUCCESS] Connected to: {result['store_name']}")
         print(f"   Store URL: {result.get('store_url', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_shopify_get_store_info(self, shopify_adapter):
         """Test getting Shopify store info."""
-        print("\n🧪 Testing Shopify get_store_info()")
+        print("\n[TEST] Testing Shopify get_store_info()")
         start_time = time.time()
 
         result = await shopify_adapter.get_store_info()
@@ -290,16 +290,16 @@ class TestShopify:
         assert "store_name" in result
         assert "currency" in result
 
-        print(f"✅ Store info retrieved")
+        print(f"[SUCCESS] Store info retrieved")
         print(f"   Name: {result['store_name']}")
         print(f"   Currency: {result['currency']}")
         print(f"   Country: {result.get('country', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_shopify_get_products(self, shopify_adapter):
         """Test fetching Shopify products."""
-        print("\n🧪 Testing Shopify get_products()")
+        print("\n[TEST] Testing Shopify get_products()")
         start_time = time.time()
 
         result = await shopify_adapter.get_products(limit=5)
@@ -310,15 +310,15 @@ class TestShopify:
         assert "products" in result
         assert "total_count" in result
 
-        print(f"✅ Retrieved {result['total_count']} products")
+        print(f"[SUCCESS] Retrieved {result['total_count']} products")
         for product in result["products"][:3]:
             print(f"   - {product['title']}: ${product['price']}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_shopify_get_orders(self, shopify_adapter):
         """Test fetching Shopify orders."""
-        print("\n🧪 Testing Shopify get_orders()")
+        print("\n[TEST] Testing Shopify get_orders()")
         start_time = time.time()
 
         result = await shopify_adapter.get_orders(limit=5)
@@ -328,15 +328,15 @@ class TestShopify:
         assert result["success"] is True
         assert "orders" in result
 
-        print(f"✅ Retrieved {result['total_count']} orders")
+        print(f"[SUCCESS] Retrieved {result['total_count']} orders")
         for order in result["orders"][:3]:
             print(f"   - Order {order['order_number']}: ${order['total_price']}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_shopify_sync_orders(self, shopify_adapter):
         """Test syncing Shopify orders."""
-        print("\n🧪 Testing Shopify sync_orders()")
+        print("\n[TEST] Testing Shopify sync_orders()")
         start_time = time.time()
 
         # Sync last 7 days
@@ -349,10 +349,10 @@ class TestShopify:
         assert "metrics" in result
 
         metrics = result["metrics"]
-        print(f"✅ Synced {result['orders_synced']} orders")
+        print(f"[SUCCESS] Synced {result['orders_synced']} orders")
         print(f"   Total Revenue: ${metrics.get('total_revenue', 0):.2f}")
         print(f"   Avg Order Value: ${metrics.get('avg_order_value', 0):.2f}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
 
 # ============================================================================
@@ -365,7 +365,7 @@ class TestAmazon:
     @pytest.mark.asyncio
     async def test_amazon_connection(self, amazon_adapter):
         """Test Amazon connection."""
-        print("\n🧪 Testing Amazon connection")
+        print("\n[TEST] Testing Amazon connection")
         start_time = time.time()
 
         result = await amazon_adapter.test_connection()
@@ -375,14 +375,14 @@ class TestAmazon:
         assert result["success"] is True
         assert "store_name" in result
 
-        print(f"✅ Connected to: {result['store_name']}")
+        print(f"[SUCCESS] Connected to: {result['store_name']}")
         print(f"   Marketplace: {result.get('marketplace_id', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_amazon_get_store_info(self, amazon_adapter):
         """Test getting Amazon store info."""
-        print("\n🧪 Testing Amazon get_store_info()")
+        print("\n[TEST] Testing Amazon get_store_info()")
         start_time = time.time()
 
         result = await amazon_adapter.get_store_info()
@@ -391,16 +391,16 @@ class TestAmazon:
 
         assert result["success"] is True
 
-        print(f"✅ Store info retrieved")
+        print(f"[SUCCESS] Store info retrieved")
         print(f"   Name: {result.get('store_name', 'N/A')}")
         print(f"   Currency: {result.get('currency', 'N/A')}")
         print(f"   Country: {result.get('country', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_amazon_get_orders(self, amazon_adapter):
         """Test fetching Amazon orders."""
-        print("\n🧪 Testing Amazon get_orders()")
+        print("\n[TEST] Testing Amazon get_orders()")
         start_time = time.time()
 
         result = await amazon_adapter.get_orders(limit=5)
@@ -410,15 +410,15 @@ class TestAmazon:
         assert result["success"] is True
         assert "orders" in result
 
-        print(f"✅ Retrieved {result['total_count']} orders")
+        print(f"[SUCCESS] Retrieved {result['total_count']} orders")
         for order in result["orders"][:3]:
             print(f"   - Order {order['order_number']}: ${order['total_price']}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_amazon_sync_orders(self, amazon_adapter):
         """Test syncing Amazon orders."""
-        print("\n🧪 Testing Amazon sync_orders()")
+        print("\n[TEST] Testing Amazon sync_orders()")
         start_time = time.time()
 
         # Sync last 30 days (Amazon default)
@@ -430,10 +430,10 @@ class TestAmazon:
         assert "metrics" in result
 
         metrics = result["metrics"]
-        print(f"✅ Synced {result['orders_synced']} orders")
+        print(f"[SUCCESS] Synced {result['orders_synced']} orders")
         print(f"   Total Revenue: ${metrics.get('total_revenue', 0):.2f}")
         print(f"   Avg Order Value: ${metrics.get('avg_order_value', 0):.2f}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
 
 # ============================================================================
@@ -446,7 +446,7 @@ class TestWooCommerce:
     @pytest.mark.asyncio
     async def test_woocommerce_connection(self, woocommerce_adapter):
         """Test WooCommerce connection."""
-        print("\n🧪 Testing WooCommerce connection")
+        print("\n[TEST] Testing WooCommerce connection")
         start_time = time.time()
 
         result = await woocommerce_adapter.test_connection()
@@ -456,15 +456,15 @@ class TestWooCommerce:
         assert result["success"] is True
         assert "store_name" in result
 
-        print(f"✅ Connected to: {result['store_name']}")
+        print(f"[SUCCESS] Connected to: {result['store_name']}")
         print(f"   Platform: {result.get('platform_version', 'N/A')}")
         print(f"   WordPress: {result.get('wordpress_version', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_woocommerce_get_store_info(self, woocommerce_adapter):
         """Test getting WooCommerce store info."""
-        print("\n🧪 Testing WooCommerce get_store_info()")
+        print("\n[TEST] Testing WooCommerce get_store_info()")
         start_time = time.time()
 
         result = await woocommerce_adapter.get_store_info()
@@ -473,16 +473,16 @@ class TestWooCommerce:
 
         assert result["success"] is True
 
-        print(f"✅ Store info retrieved")
+        print(f"[SUCCESS] Store info retrieved")
         print(f"   Name: {result.get('store_name', 'N/A')}")
         print(f"   Currency: {result.get('currency', 'N/A')}")
         print(f"   WooCommerce: {result.get('woocommerce_version', 'N/A')}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_woocommerce_get_products(self, woocommerce_adapter):
         """Test fetching WooCommerce products."""
-        print("\n🧪 Testing WooCommerce get_products()")
+        print("\n[TEST] Testing WooCommerce get_products()")
         start_time = time.time()
 
         result = await woocommerce_adapter.get_products(limit=5)
@@ -492,15 +492,15 @@ class TestWooCommerce:
         assert result["success"] is True
         assert "products" in result
 
-        print(f"✅ Retrieved {result['total_count']} products")
+        print(f"[SUCCESS] Retrieved {result['total_count']} products")
         for product in result["products"][:3]:
             print(f"   - {product['title']}: ${product['price']}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_woocommerce_get_orders(self, woocommerce_adapter):
         """Test fetching WooCommerce orders."""
-        print("\n🧪 Testing WooCommerce get_orders()")
+        print("\n[TEST] Testing WooCommerce get_orders()")
         start_time = time.time()
 
         result = await woocommerce_adapter.get_orders(limit=5)
@@ -510,15 +510,15 @@ class TestWooCommerce:
         assert result["success"] is True
         assert "orders" in result
 
-        print(f"✅ Retrieved {result['total_count']} orders")
+        print(f"[SUCCESS] Retrieved {result['total_count']} orders")
         for order in result["orders"][:3]:
             print(f"   - Order #{order['order_number']}: ${order['total_price']}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
     @pytest.mark.asyncio
     async def test_woocommerce_sync_orders(self, woocommerce_adapter):
         """Test syncing WooCommerce orders."""
-        print("\n🧪 Testing WooCommerce sync_orders()")
+        print("\n[TEST] Testing WooCommerce sync_orders()")
         start_time = time.time()
 
         # Sync last 7 days
@@ -531,10 +531,10 @@ class TestWooCommerce:
         assert "metrics" in result
 
         metrics = result["metrics"]
-        print(f"✅ Synced {result['orders_synced']} orders")
+        print(f"[SUCCESS] Synced {result['orders_synced']} orders")
         print(f"   Total Revenue: ${metrics.get('total_revenue', 0):.2f}")
         print(f"   Avg Order Value: ${metrics.get('avg_order_value', 0):.2f}")
-        print(f"   ⏱️  Time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Time: {elapsed:.2f}s")
 
 
 # ============================================================================
@@ -547,7 +547,7 @@ class TestPerformance:
     @pytest.mark.asyncio
     async def test_concurrent_store_info(self):
         """Test fetching store info from multiple platforms concurrently."""
-        print("\n🧪 Testing concurrent store info retrieval")
+        print("\n[TEST] Testing concurrent store info retrieval")
 
         adapters = []
         platform_names = []
@@ -574,15 +574,15 @@ class TestPerformance:
         # Check results
         successful = sum(1 for r in results if isinstance(r, dict) and r.get("success"))
 
-        print(f"✅ Retrieved info from {successful}/{len(adapters)} platforms concurrently")
+        print(f"[SUCCESS] Retrieved info from {successful}/{len(adapters)} platforms concurrently")
         print(f"   Platforms: {', '.join(platform_names)}")
-        print(f"   ⏱️  Total time: {elapsed:.2f}s")
-        print(f"   ⏱️  Avg per platform: {elapsed/len(adapters):.2f}s")
+        print(f"   [TIMER]  Total time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Avg per platform: {elapsed/len(adapters):.2f}s")
 
     @pytest.mark.asyncio
     async def test_rate_limit_handling(self, shopify_adapter):
         """Test rate limit handling with rapid requests."""
-        print("\n🧪 Testing rate limit handling")
+        print("\n[TEST] Testing rate limit handling")
 
         start_time = time.time()
         request_count = 5
@@ -598,9 +598,9 @@ class TestPerformance:
 
         assert successful == request_count
 
-        print(f"✅ Completed {successful}/{request_count} rapid requests")
-        print(f"   ⏱️  Total time: {elapsed:.2f}s")
-        print(f"   ⏱️  Avg per request: {elapsed/request_count:.2f}s")
+        print(f"[SUCCESS] Completed {successful}/{request_count} rapid requests")
+        print(f"   [TIMER]  Total time: {elapsed:.2f}s")
+        print(f"   [TIMER]  Avg per request: {elapsed/request_count:.2f}s")
         print(f"   Rate limiting working correctly")
 
 
@@ -613,7 +613,7 @@ class TestIntegration:
 
     def test_factory_get_adapter(self):
         """Test factory adapter creation."""
-        print("\n🧪 Testing factory adapter creation")
+        print("\n[TEST] Testing factory adapter creation")
 
         # Mock credentials for each platform
         test_creds = {
@@ -643,17 +643,17 @@ class TestIntegration:
             assert adapter is not None
             assert adapter.platform_name == platform
 
-            print(f"✅ Created {platform} adapter")
+            print(f"[SUCCESS] Created {platform} adapter")
 
     def test_platform_comparison(self):
         """Test platform comparison functionality."""
-        print("\n🧪 Testing platform comparison")
+        print("\n[TEST] Testing platform comparison")
 
         comparison = PlatformFactory.compare_platforms()
 
         assert len(comparison["platforms"]) == 3
 
-        print(f"\n✅ Platform Comparison:")
+        print(f"\n[SUCCESS] Platform Comparison:")
         print(f"\n   Complexity:")
         for platform, complexity in comparison["complexity"].items():
             print(f"      {platform}: {complexity}")

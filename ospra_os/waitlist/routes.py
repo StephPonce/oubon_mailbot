@@ -59,7 +59,7 @@ async def join_stratosphere_waitlist(
         return result
         
     except Exception as e:
-        logger.error(f"❌ Waitlist signup error: {e}")
+        logger.error(f"[ERROR] Waitlist signup error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

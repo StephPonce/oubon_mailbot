@@ -18,7 +18,7 @@ async def test_smart_recommendations():
     """Test the smart recommendations engine"""
 
     print("\n" + "=" * 70)
-    print("🧪 TESTING COMPLETE DIFFERENTIATION SYSTEM")
+    print("[TEST] TESTING COMPLETE DIFFERENTIATION SYSTEM")
     print("=" * 70)
 
     settings = get_settings()
@@ -27,7 +27,7 @@ async def test_smart_recommendations():
     # Test for user ID 1
     user_id = 1
 
-    print(f"\n📊 TEST 1: Getting recommendations for user {user_id}...")
+    print(f"\n[STATS] TEST 1: Getting recommendations for user {user_id}...")
     print("-" * 70)
 
     try:
@@ -39,7 +39,7 @@ async def test_smart_recommendations():
         )
 
         if recommendations.get('success'):
-            print(f"\n✅ RECOMMENDATIONS SUCCESSFUL!")
+            print(f"\n[SUCCESS] RECOMMENDATIONS SUCCESSFUL!")
             print(f"\n   User Information:")
             print(f"   • Tier: {recommendations['user_tier']}")
             print(f"   • Phase Access: {recommendations['tier_info']['phase_access']}")
@@ -70,21 +70,21 @@ async def test_smart_recommendations():
                     print(f"      • Personalized Title: {angle.get('title', 'N/A')}")
                     print(f"      • Target Audience: {angle.get('target_audience', 'N/A')}")
         else:
-            print(f"\n❌ RECOMMENDATIONS FAILED")
+            print(f"\n[ERROR] RECOMMENDATIONS FAILED")
             print(f"   Error: {recommendations.get('error', 'Unknown error')}")
             if 'traceback' in recommendations:
                 print(f"\n   Traceback:")
                 print(recommendations['traceback'])
 
     except Exception as e:
-        print(f"\n❌ TEST FAILED WITH EXCEPTION")
+        print(f"\n[ERROR] TEST FAILED WITH EXCEPTION")
         print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
 
     # Test analytics
     print(f"\n" + "-" * 70)
-    print(f"📈 TEST 2: Getting analytics for user {user_id}...")
+    print(f"[TREND] TEST 2: Getting analytics for user {user_id}...")
     print("-" * 70)
 
     try:
@@ -114,7 +114,7 @@ async def test_smart_recommendations():
                 print(f"   • {angle.get('angle')}: {angle.get('success_rate', 0):.1f}% success rate")
 
     except Exception as e:
-        print(f"\n❌ ANALYTICS TEST FAILED")
+        print(f"\n[ERROR] ANALYTICS TEST FAILED")
         print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
@@ -123,7 +123,7 @@ async def test_smart_recommendations():
     await engine.close()
 
     print("\n" + "=" * 70)
-    print("✅ DIFFERENTIATION SYSTEM TEST COMPLETE")
+    print("[SUCCESS] DIFFERENTIATION SYSTEM TEST COMPLETE")
     print("=" * 70)
 
 
@@ -131,19 +131,19 @@ async def test_individual_systems():
     """Test each system individually"""
 
     print("\n" + "=" * 70)
-    print("🔬 TESTING INDIVIDUAL SYSTEMS")
+    print(" TESTING INDIVIDUAL SYSTEMS")
     print("=" * 70)
 
     settings = get_settings()
 
     # Test 1: Saturation Tracker
-    print("\n📊 TEST: Saturation Tracker")
+    print("\n[STATS] TEST: Saturation Tracker")
     print("-" * 70)
     try:
         from ospra_os.intelligence.saturation_tracker import SaturationTracker
 
         tracker = SaturationTracker(settings.database_url)
-        print("✅ SaturationTracker initialized successfully")
+        print("[SUCCESS] SaturationTracker initialized successfully")
 
         # Test filtering
         test_products = [
@@ -151,21 +151,21 @@ async def test_individual_systems():
             {'id': 'test_2', 'name': 'Test Product 2'}
         ]
         filtered = await tracker.filter_saturated_products(test_products, max_users_per_product=50)
-        print(f"✅ Filtering works - {len(filtered)} products passed saturation filter")
+        print(f"[SUCCESS] Filtering works - {len(filtered)} products passed saturation filter")
 
         await tracker.close()
 
     except Exception as e:
-        print(f"❌ SaturationTracker failed: {e}")
+        print(f"[ERROR] SaturationTracker failed: {e}")
 
     # Test 2: Velocity Detector
-    print("\n📊 TEST: Velocity Detector")
+    print("\n[STATS] TEST: Velocity Detector")
     print("-" * 70)
     try:
         from ospra_os.intelligence.velocity_detector import VelocityDetector
 
         detector = VelocityDetector(settings.database_url)
-        print("✅ VelocityDetector initialized successfully")
+        print("[SUCCESS] VelocityDetector initialized successfully")
 
         # Test velocity calculation
         test_product = {
@@ -177,49 +177,49 @@ async def test_individual_systems():
             'days_since_first_seen': 15
         }
         velocity = await detector.calculate_velocity_score(test_product)
-        print(f"✅ Velocity calculation works - Score: {velocity['velocity_score']:.2f}, Phase: {velocity['phase']}")
+        print(f"[SUCCESS] Velocity calculation works - Score: {velocity['velocity_score']:.2f}, Phase: {velocity['phase']}")
 
         await detector.close()
 
     except Exception as e:
-        print(f"❌ VelocityDetector failed: {e}")
+        print(f"[ERROR] VelocityDetector failed: {e}")
 
     # Test 3: Tier Manager
-    print("\n📊 TEST: Tier Manager")
+    print("\n[STATS] TEST: Tier Manager")
     print("-" * 70)
     try:
         from ospra_os.subscription.tier_manager import TierManager
 
         tier_mgr = TierManager(settings.database_url)
-        print("✅ TierManager initialized successfully")
+        print("[SUCCESS] TierManager initialized successfully")
 
         # Test tier info
         tier_info = await tier_mgr.get_tier_info(user_id=1)
-        print(f"✅ Tier info works - User tier: {tier_info['tier_name']}")
+        print(f"[SUCCESS] Tier info works - User tier: {tier_info['tier_name']}")
 
         await tier_mgr.close()
 
     except Exception as e:
-        print(f"❌ TierManager failed: {e}")
+        print(f"[ERROR] TierManager failed: {e}")
 
     # Test 4: Marketing Angle Generator
-    print("\n📊 TEST: Marketing Angle Generator")
+    print("\n[STATS] TEST: Marketing Angle Generator")
     print("-" * 70)
     try:
         from ospra_os.intelligence.marketing_angle_generator import MarketingAngleGenerator
 
         generator = MarketingAngleGenerator(ai_provider='claude')
-        print("✅ MarketingAngleGenerator initialized successfully")
+        print("[SUCCESS] MarketingAngleGenerator initialized successfully")
 
         # Test available angles
         angles = generator.get_available_angles('smart_home')
-        print(f"✅ Angle generation works - {len(angles)} angles available for smart_home niche")
+        print(f"[SUCCESS] Angle generation works - {len(angles)} angles available for smart_home niche")
 
     except Exception as e:
-        print(f"❌ MarketingAngleGenerator failed: {e}")
+        print(f"[ERROR] MarketingAngleGenerator failed: {e}")
 
     print("\n" + "=" * 70)
-    print("✅ INDIVIDUAL SYSTEMS TEST COMPLETE")
+    print("[SUCCESS] INDIVIDUAL SYSTEMS TEST COMPLETE")
     print("=" * 70)
 
 
@@ -232,17 +232,17 @@ async def main():
     # Test integrated smart recommendations
     await test_smart_recommendations()
 
-    print("\n" + "█" * 70)
-    print("🎉 ALL DIFFERENTIATION TESTS COMPLETE!")
-    print("█" * 70)
+    print("\n" + "" * 70)
+    print("[LAUNCH] ALL DIFFERENTIATION TESTS COMPLETE!")
+    print("" * 70)
     print("\nThe Complete Anti-AutoDS System is operational:")
-    print("  ✅ Saturation Tracking - Prevents oversaturation")
-    print("  ✅ Velocity Detection - Tier-based early access")
-    print("  ✅ Subscription Tiers - Different access levels")
-    print("  ✅ Marketing Angles - Unique positioning")
-    print("  ✅ Smart Recommendations - Master integration")
-    print("\n🚀 Users will NEVER compete directly!")
-    print("█" * 70 + "\n")
+    print("  [SUCCESS] Saturation Tracking - Prevents oversaturation")
+    print("  [SUCCESS] Velocity Detection - Tier-based early access")
+    print("  [SUCCESS] Subscription Tiers - Different access levels")
+    print("  [SUCCESS] Marketing Angles - Unique positioning")
+    print("  [SUCCESS] Smart Recommendations - Master integration")
+    print("\n[START] Users will NEVER compete directly!")
+    print("" * 70 + "\n")
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ class TikTokClient:
             self.enabled = False
         else:
             self.enabled = True
-            logger.info("✅ TikTok Client initialized")
+            logger.info("[SUCCESS] TikTok Client initialized")
 
         self.base_url = "https://open.tiktokapis.com/v2"
         self.auth_url = "https://www.tiktok.com/v2/auth/authorize"
@@ -105,7 +105,7 @@ class TikTokClient:
 
             if response.status_code == 200:
                 token_data = response.json()
-                logger.info("✅ TikTok access token obtained")
+                logger.info("[SUCCESS] TikTok access token obtained")
                 return token_data
             else:
                 logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
@@ -139,7 +139,7 @@ class TikTokClient:
         all_products = []
 
         for keyword in keywords:
-            logger.info(f"🔍 Searching TikTok for: {keyword}")
+            logger.info(f"[SEARCH] Searching TikTok for: {keyword}")
 
             # Search videos for this keyword
             videos = self._search_videos(keyword, limit=20)

@@ -43,7 +43,7 @@ async def get_customer_overview():
 
     Returns summary metrics for dashboard
     """
-    logger.info("📊 GET /api/customers/overview")
+    logger.info("[STATS] GET /api/customers/overview")
 
     # TODO: Replace with actual database queries
     mock_customers = get_mock_customers()
@@ -81,7 +81,7 @@ async def get_customer_segments():
 
     Returns RFM segments with customer counts and metrics
     """
-    logger.info("📊 GET /api/customers/segments")
+    logger.info("[STATS] GET /api/customers/segments")
 
     mock_customers = get_mock_customers()
     analytics = CustomerAnalytics()
@@ -104,7 +104,7 @@ async def get_customer_profile(customer_id: str):
 
     Includes: RFM scores, segment, LTV, churn risk, purchase patterns
     """
-    logger.info(f"👤 GET /api/customers/{customer_id}/profile")
+    logger.info(f" GET /api/customers/{customer_id}/profile")
 
     # TODO: Fetch from database
     mock_customers = get_mock_customers()
@@ -126,7 +126,7 @@ async def get_customer_ltv(customer_id: str):
 
     Includes historical, predicted, and confidence scores
     """
-    logger.info(f"💰 GET /api/customers/{customer_id}/ltv")
+    logger.info(f"[PRICE] GET /api/customers/{customer_id}/ltv")
 
     mock_customers = get_mock_customers()
     customer_data = next((c for c in mock_customers if c['customer_id'] == customer_id), None)
@@ -150,7 +150,7 @@ async def get_customer_churn_risk(customer_id: str):
 
     Includes probability, risk factors, and recommended actions
     """
-    logger.info(f"⚠️  GET /api/customers/{customer_id}/churn-risk")
+    logger.info(f"[WARNING]  GET /api/customers/{customer_id}/churn-risk")
 
     mock_customers = get_mock_customers()
     customer_data = next((c for c in mock_customers if c['customer_id'] == customer_id), None)
@@ -174,7 +174,7 @@ async def get_customer_purchase_patterns(customer_id: str):
 
     Includes timing patterns, product preferences, cart behavior
     """
-    logger.info(f"🛍️ GET /api/customers/{customer_id}/purchase-patterns")
+    logger.info(f"[SHOP] GET /api/customers/{customer_id}/purchase-patterns")
 
     mock_customers = get_mock_customers()
     customer_data = next((c for c in mock_customers if c['customer_id'] == customer_id), None)
@@ -204,7 +204,7 @@ async def get_at_risk_customers(
 
     Sorted by churn probability (high LTV customers first)
     """
-    logger.info(f"⚠️  GET /api/customers/at-risk (threshold: {threshold}, limit: {limit})")
+    logger.info(f"[WARNING]  GET /api/customers/at-risk (threshold: {threshold}, limit: {limit})")
 
     mock_customers = get_mock_customers()
     churn_predictor = get_churn_predictor()
@@ -231,7 +231,7 @@ async def get_cohort_analysis(
 
     Shows retention rates by acquisition cohort over time
     """
-    logger.info(f"📊 GET /api/customers/cohorts (type: {cohort_type}, periods: {periods})")
+    logger.info(f"[STATS] GET /api/customers/cohorts (type: {cohort_type}, periods: {periods})")
 
     mock_customers = get_mock_customers()
     cohort_analyzer = get_cohort_analyzer()
@@ -248,7 +248,7 @@ async def get_cohort_ltv():
 
     Shows average LTV per acquisition cohort
     """
-    logger.info("💰 GET /api/customers/cohorts/ltv")
+    logger.info("[PRICE] GET /api/customers/cohorts/ltv")
 
     mock_customers = get_mock_customers()
     cohort_analyzer = get_cohort_analyzer()
@@ -268,7 +268,7 @@ async def get_best_cohorts():
 
     Returns cohorts with highest retention and LTV
     """
-    logger.info("🏆 GET /api/customers/cohorts/best")
+    logger.info("[TOP] GET /api/customers/cohorts/best")
 
     mock_customers = get_mock_customers()
     cohort_analyzer = get_cohort_analyzer()
@@ -285,7 +285,7 @@ async def get_ltv_by_segment():
     """
     Get average LTV by customer segment
     """
-    logger.info("📊 GET /api/customers/ltv/by-segment")
+    logger.info("[STATS] GET /api/customers/ltv/by-segment")
 
     mock_customers = get_mock_customers()
     ltv_calculator = get_ltv_calculator()
@@ -303,7 +303,7 @@ async def get_ltv_by_source():
     """
     Get average LTV by acquisition source
     """
-    logger.info("📊 GET /api/customers/ltv/by-source")
+    logger.info("[STATS] GET /api/customers/ltv/by-source")
 
     mock_customers = get_mock_customers()
     ltv_calculator = get_ltv_calculator()
@@ -323,7 +323,7 @@ async def get_top_customers_by_ltv(
     """
     Get top customers by LTV
     """
-    logger.info(f"🏆 GET /api/customers/ltv/top-customers (limit: {limit})")
+    logger.info(f"[TOP] GET /api/customers/ltv/top-customers (limit: {limit})")
 
     mock_customers = get_mock_customers()
 
@@ -348,7 +348,7 @@ async def get_ltv_distribution():
     """
     Get LTV distribution bucketed by ranges
     """
-    logger.info("📊 GET /api/customers/ltv/distribution")
+    logger.info("[STATS] GET /api/customers/ltv/distribution")
 
     mock_customers = get_mock_customers()
 
@@ -400,7 +400,7 @@ async def get_global_timing_patterns():
 
     Shows peak days and hours across all customers
     """
-    logger.info("⏰ GET /api/customers/patterns/timing")
+    logger.info("[ALARM] GET /api/customers/patterns/timing")
 
     mock_customers = get_mock_customers()
     all_orders = []
@@ -420,7 +420,7 @@ async def get_product_affinity():
 
     Shows which products are frequently bought together
     """
-    logger.info("🔗 GET /api/customers/patterns/product-affinity")
+    logger.info("[LINK] GET /api/customers/patterns/product-affinity")
 
     mock_customers = get_mock_customers()
     all_orders = []
@@ -446,7 +446,7 @@ async def sync_from_shopify(
 
     Fetches customers and orders, calculates metrics, saves to database
     """
-    logger.info(f"🔄 POST /api/customers/sync/shopify (store: {shopify_store}, full: {full_sync})")
+    logger.info(f"[REFRESH] POST /api/customers/sync/shopify (store: {shopify_store}, full: {full_sync})")
 
     try:
         sync = create_customer_sync(shopify_store, shopify_token)
@@ -470,7 +470,7 @@ async def sync_from_shopify(
         }
 
     except Exception as e:
-        logger.error(f"❌ Sync error: {e}")
+        logger.error(f"[ERROR] Sync error: {e}")
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
@@ -483,7 +483,7 @@ async def sync_single_customer(
     """
     Sync a single customer from Shopify
     """
-    logger.info(f"🔄 POST /api/customers/sync/shopify/{customer_id}")
+    logger.info(f"[REFRESH] POST /api/customers/sync/shopify/{customer_id}")
 
     try:
         sync = create_customer_sync(shopify_store, shopify_token)
@@ -501,7 +501,7 @@ async def sync_single_customer(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Sync error: {e}")
+        logger.error(f"[ERROR] Sync error: {e}")
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
@@ -515,7 +515,7 @@ async def search_customers(
     """
     Search customers by email, name, or customer ID
     """
-    logger.info(f"🔍 GET /api/customers/search (query: {query})")
+    logger.info(f"[SEARCH] GET /api/customers/search (query: {query})")
 
     mock_customers = get_mock_customers()
 
@@ -536,4 +536,4 @@ async def search_customers(
     }
 
 
-logger.info("✅ Customer Analytics API routes loaded")
+logger.info("[SUCCESS] Customer Analytics API routes loaded")

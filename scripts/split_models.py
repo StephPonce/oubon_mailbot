@@ -74,10 +74,10 @@ from .base import (
         if model_def:
             model_defs.append(model_def)
         else:
-            print(f"⚠️  Warning: Could not find model {model_name}")
+            print(f"[WARNING]  Warning: Could not find model {model_name}")
 
     if not model_defs:
-        print(f"❌ No models found for {filename}")
+        print(f"[ERROR] No models found for {filename}")
         return
 
     # Combine header and models
@@ -88,7 +88,7 @@ from .base import (
     with open(output_path, 'w') as f:
         f.write(content)
 
-    print(f"✅ Created {filename} with {len(model_defs)} models: {', '.join(models[:3])}{'...' if len(models) > 3 else ''}")
+    print(f"[SUCCESS] Created {filename} with {len(model_defs)} models: {', '.join(models[:3])}{'...' if len(models) > 3 else ''}")
 
 
 def extract_helper_functions(original_content: str) -> str:
@@ -111,13 +111,13 @@ def main():
     print()
 
     # Read original file
-    print("📖 Reading ospra_os/database/multi_store_models.py...")
+    print(" Reading ospra_os/database/multi_store_models.py...")
     original_content = read_models_file()
     print(f"   File size: {len(original_content)} characters")
     print()
 
     # Create each model file
-    print("📝 Creating modular model files...")
+    print("[NOTE] Creating modular model files...")
     print()
 
     for filename, models in MODEL_CATEGORIES.items():
@@ -129,7 +129,7 @@ def main():
 
     print()
     print("=" * 70)
-    print("✨ Model files created successfully!")
+    print("[NEW] Model files created successfully!")
     print("=" * 70)
     print()
     print("Next steps:")

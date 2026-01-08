@@ -183,7 +183,7 @@ class LemonSqueezyClient:
                     "product_options": {
                         "redirect_url": success_url,
                         "receipt_button_text": "Launch Dashboard",
-                        "receipt_thank_you_note": f"Welcome to Ospra {tier_info['name']}! {tier_info['emoji']} Your journey to the stars begins now. 🚀"
+                        "receipt_thank_you_note": f"Welcome to Ospra {tier_info['name']}! {tier_info['emoji']} Your journey to the stars begins now. [START]"
                     }
                 },
                 "relationships": {
@@ -259,7 +259,7 @@ class LemonSqueezyClient:
         if error:
             return False, error
         
-        logger.info(f"✅ Cancelled subscription: {subscription_id}")
+        logger.info(f"[SUCCESS] Cancelled subscription: {subscription_id}")
         return True, None
     
     async def resume_subscription(
@@ -309,7 +309,7 @@ class LemonSqueezyClient:
         if error:
             return False, error
         
-        logger.info(f"✅ Changed subscription {subscription_id} to {new_tier}")
+        logger.info(f"[SUCCESS] Changed subscription {subscription_id} to {new_tier}")
         return True, None
     
     async def get_customer_portal_url(
@@ -365,7 +365,7 @@ async def handle_webhook_event(event: Dict) -> Dict:
     data = event.get("data", {}).get("attributes", {})
     custom_data = event.get("meta", {}).get("custom_data", {})
     
-    logger.info(f"📥 LemonSqueezy webhook: {event_name}")
+    logger.info(f" LemonSqueezy webhook: {event_name}")
     
     result = {
         "event": event_name,
@@ -433,45 +433,45 @@ async def handle_webhook_event(event: Dict) -> Dict:
 
 def get_setup_instructions() -> str:
     return """
-╔══════════════════════════════════════════════════════════════════╗
-║              OSPRA LEMONSQUEEZY SETUP INSTRUCTIONS               ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  1. Log into LemonSqueezy: https://app.lemonsqueezy.com         ║
-║                                                                  ║
-║  2. Create 3 Products:                                          ║
-║     ✈️  Flight       - $29/month                                 ║
-║     🦅  Soar         - $79/month (mark as featured)             ║
-║     🌌  Stratosphere - $199/month                               ║
-║                                                                  ║
-║  3. Copy Variant IDs from each product                          ║
-║                                                                  ║
-║  4. Create API Key: Settings → API                              ║
-║                                                                  ║
-║  5. Set up Webhook: Settings → Webhooks                         ║
-║     URL: https://your-domain.com/api/payments/webhook           ║
-║     Events: All subscription events                             ║
-║                                                                  ║
-║  6. Add to .env:                                                ║
-║     LEMONSQUEEZY_API_KEY=ls_xxxxxxxx                            ║
-║     LEMONSQUEEZY_STORE_ID=xxxxx                                 ║
-║     LEMONSQUEEZY_WEBHOOK_SECRET=xxxxx                           ║
-║     LS_VARIANT_FLIGHT=xxxxx                                     ║
-║     LS_VARIANT_SOAR=xxxxx                                       ║
-║     LS_VARIANT_STRATOSPHERE=xxxxx                               ║
-║                                                                  ║
-║  🪺 NEST (Free) - No product needed, it's the default           ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+
+              OSPRA LEMONSQUEEZY SETUP INSTRUCTIONS               
+
+                                                                  
+  1. Log into LemonSqueezy: https://app.lemonsqueezy.com         
+                                                                  
+  2. Create 3 Products:                                          
+       Flight       - $29/month                                 
+       Soar         - $79/month (mark as featured)             
+       Stratosphere - $199/month                               
+                                                                  
+  3. Copy Variant IDs from each product                          
+                                                                  
+  4. Create API Key: Settings → API                              
+                                                                  
+  5. Set up Webhook: Settings → Webhooks                         
+     URL: https://your-domain.com/api/payments/webhook           
+     Events: All subscription events                             
+                                                                  
+  6. Add to .env:                                                
+     LEMONSQUEEZY_API_KEY=ls_xxxxxxxx                            
+     LEMONSQUEEZY_STORE_ID=xxxxx                                 
+     LEMONSQUEEZY_WEBHOOK_SECRET=xxxxx                           
+     LS_VARIANT_FLIGHT=xxxxx                                     
+     LS_VARIANT_SOAR=xxxxx                                       
+     LS_VARIANT_STRATOSPHERE=xxxxx                               
+                                                                  
+   NEST (Free) - No product needed, it's the default           
+                                                                  
+
 """
 
 
 if __name__ == "__main__":
     print(get_setup_instructions())
-    print("\n📊 Ospra Pricing Tiers:\n")
+    print("\n[STATS] Ospra Pricing Tiers:\n")
     for plan in get_pricing_table():
         print(f"{plan['emoji']} {plan['name']} - {plan['price_display']}")
         print(f"   \"{plan['tagline']}\"")
         for feature in plan['features'][:3]:
-            print(f"   ✓ {feature}")
+            print(f"   [OK] {feature}")
         print()

@@ -1,5 +1,5 @@
 """
-⚠️ DEPRECATED - Use ospra_os.learning.hybrid_learning_engine instead
+[WARNING] DEPRECATED - Use ospra_os.learning.hybrid_learning_engine instead
 
 This file is maintained for backward compatibility only.
 All learning logic has been unified in the Hybrid Learning Engine.
@@ -51,7 +51,7 @@ class SelfLearningEngine:
             stacklevel=2
         )
         self._engine = HybridLearningEngine()
-        logger.warning("⚠️ Using deprecated SelfLearningEngine - migrate to HybridLearningEngine")
+        logger.warning("[WARNING] Using deprecated SelfLearningEngine - migrate to HybridLearningEngine")
     
     def analyze_product_patterns(self, days: int = 30):
         """Deprecated: Use HybridLearningEngine.get_global_weights()"""

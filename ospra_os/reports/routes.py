@@ -98,7 +98,7 @@ async def generate_report(request: GenerateReportRequest):
     Returns the report data (JSON by default) or download URL for PDF
     """
     try:
-        logger.info(f"📄 Generating report: {request.name}")
+        logger.info(f"[FILE] Generating report: {request.name}")
 
         # Get report engine
         engine = get_report_engine()
@@ -124,7 +124,7 @@ async def generate_report(request: GenerateReportRequest):
             }
         elif request.format == 'pdf':
             # Render as PDF
-            logger.info("📄 Rendering report as PDF...")
+            logger.info("[FILE] Rendering report as PDF...")
             pdf_renderer = create_pdf_renderer(request.branding.dict() if request.branding else None)
             pdf_bytes = pdf_renderer.render(report_data)
 
@@ -136,7 +136,7 @@ async def generate_report(request: GenerateReportRequest):
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_bytes)
 
-            logger.info(f"✅ PDF saved to {pdf_path}")
+            logger.info(f"[SUCCESS] PDF saved to {pdf_path}")
 
             # Return PDF as downloadable file
             return Response(
@@ -154,7 +154,7 @@ async def generate_report(request: GenerateReportRequest):
             }
 
     except Exception as e:
-        logger.error(f"❌ Report generation failed: {e}")
+        logger.error(f"[ERROR] Report generation failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -173,7 +173,7 @@ async def list_templates():
             'report_type': 'executive',
             'sections': ['executive_summary'],
             'is_system': True,
-            'icon': '📊'
+            'icon': '[STATS]'
         },
         {
             'template_id': 'tpl_weekly_summary',
@@ -182,7 +182,7 @@ async def list_templates():
             'report_type': 'full',
             'sections': ['executive_summary', 'revenue', 'products', 'ads'],
             'is_system': True,
-            'icon': '📈'
+            'icon': '[TREND]'
         },
         {
             'template_id': 'tpl_revenue',
@@ -191,7 +191,7 @@ async def list_templates():
             'report_type': 'revenue',
             'sections': ['revenue'],
             'is_system': True,
-            'icon': '💰'
+            'icon': '[PRICE]'
         },
         {
             'template_id': 'tpl_product',
@@ -200,7 +200,7 @@ async def list_templates():
             'report_type': 'product',
             'sections': ['products'],
             'is_system': True,
-            'icon': '📦'
+            'icon': '[PACKAGE]'
         },
         {
             'template_id': 'tpl_ads',
@@ -209,7 +209,7 @@ async def list_templates():
             'report_type': 'ad',
             'sections': ['ads'],
             'is_system': True,
-            'icon': '📣'
+            'icon': ''
         },
         {
             'template_id': 'tpl_pnl',
@@ -218,7 +218,7 @@ async def list_templates():
             'report_type': 'pnl',
             'sections': ['profit_loss'],
             'is_system': True,
-            'icon': '💵'
+            'icon': '[MONEY]'
         }
     ]
 
@@ -321,7 +321,7 @@ async def create_schedule(request: CreateScheduleRequest):
         # TODO: Save to database
         # TODO: Calculate next_run based on frequency
 
-        logger.info(f"✅ Created schedule: {schedule_id}")
+        logger.info(f"[SUCCESS] Created schedule: {schedule_id}")
 
         return {
             'success': True,
@@ -330,7 +330,7 @@ async def create_schedule(request: CreateScheduleRequest):
         }
 
     except Exception as e:
-        logger.error(f"❌ Failed to create schedule: {e}")
+        logger.error(f"[ERROR] Failed to create schedule: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -408,4 +408,4 @@ async def run_schedule(schedule_id: str, background_tasks: BackgroundTasks):
     }
 
 
-logger.info("✅ Report routes loaded successfully")
+logger.info("[SUCCESS] Report routes loaded successfully")

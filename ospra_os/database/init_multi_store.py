@@ -38,22 +38,22 @@ def print_header(text: str):
 
 def print_success(text: str):
     """Print success message"""
-    print(f"✅ {text}")
+    print(f"[SUCCESS] {text}")
 
 
 def print_error(text: str):
     """Print error message"""
-    print(f"❌ {text}")
+    print(f"[ERROR] {text}")
 
 
 def print_warning(text: str):
     """Print warning message"""
-    print(f"⚠️  {text}")
+    print(f"[WARNING]  {text}")
 
 
 def print_info(text: str):
     """Print info message"""
-    print(f"ℹ️  {text}")
+    print(f"[INFO]  {text}")
 
 
 def get_table_list(engine) -> list:
@@ -95,10 +95,10 @@ def initialize_database(database_url: str) -> bool:
         all_tables = get_table_list(engine)
 
         print_success(f"Database initialized!")
-        print(f"\n📊 Total tables: {len(all_tables)}")
+        print(f"\n[STATS] Total tables: {len(all_tables)}")
 
         if new_tables:
-            print(f"\n🆕 New tables created ({len(new_tables)}):")
+            print(f"\n[NEW] New tables created ({len(new_tables)}):")
             for table in sorted(new_tables):
                 print(f"   • {table}")
 
@@ -107,9 +107,9 @@ def initialize_database(database_url: str) -> bool:
                               'ai_usage', 'user_settings']
         existing_multi_store = [t for t in multi_store_tables if t in all_tables]
 
-        print(f"\n✨ Multi-store tables ({len(existing_multi_store)}/{len(multi_store_tables)}):")
+        print(f"\n[NEW] Multi-store tables ({len(existing_multi_store)}/{len(multi_store_tables)}):")
         for table in multi_store_tables:
-            status = "✅" if table in all_tables else "❌"
+            status = "[SUCCESS]" if table in all_tables else "[ERROR]"
             print(f"   {status} {table}")
 
         return True
@@ -152,7 +152,7 @@ def migrate_existing_store(database_url: str, auto_confirm: bool = False) -> boo
 
         # Show what will be migrated
         print_info("Migration Plan:")
-        print("\n1️⃣  Create Default User:")
+        print("\n1⃣  Create Default User:")
         print(f"   Email: steph@oubonshop.com")
         print(f"   Name: Stephen Ponce")
         print(f"   Tier: PRO")
@@ -160,7 +160,7 @@ def migrate_existing_store(database_url: str, auto_confirm: bool = False) -> boo
         print(f"   Monthly AI Budget: $200")
         print(f"   Product Limit: 1000")
 
-        print("\n2️⃣  Create Oubon Shop Store:")
+        print("\n2⃣  Create Oubon Shop Store:")
         print(f"   Name: Oubon Shop")
         print(f"   Platform: Shopify")
         print(f"   Store URL: {shopify_store}")
@@ -263,7 +263,7 @@ def migrate_existing_store(database_url: str, auto_confirm: bool = False) -> boo
             # Show final status
             print_header("MIGRATION COMPLETE")
 
-            print("📊 Migration Summary:\n")
+            print("[STATS] Migration Summary:\n")
             print(f"User:")
             print(f"   • Email: {user.email}")
             print(f"   • Tier: {user.subscription_tier.value}")
@@ -318,17 +318,17 @@ def show_status(database_url: str) -> bool:
 
         # Get tables
         tables = get_table_list(engine)
-        print(f"\n📊 Total tables: {len(tables)}")
+        print(f"\n[STATS] Total tables: {len(tables)}")
 
         # Check for multi-store tables
         required_tables = ['users', 'stores', 'products', 'product_deployments',
                           'ai_usage', 'user_settings']
 
-        print(f"\n✨ Multi-store tables:")
+        print(f"\n[NEW] Multi-store tables:")
         all_exist = True
         for table in required_tables:
             exists = table in tables
-            status = "✅" if exists else "❌"
+            status = "[SUCCESS]" if exists else "[ERROR]"
             print(f"   {status} {table}")
             if not exists:
                 all_exist = False
@@ -348,7 +348,7 @@ def show_status(database_url: str) -> bool:
             product_count = session.query(Product).count()
             deployment_count = session.query(ProductDeployment).count()
 
-            print("\n📈 Database Statistics:\n")
+            print("\n[TREND] Database Statistics:\n")
             print(f"   Users: {user_count}")
             print(f"   Stores: {store_count}")
             print(f"   Products: {product_count}")
@@ -356,7 +356,7 @@ def show_status(database_url: str) -> bool:
 
             # Show users
             if user_count > 0:
-                print("\n👥 Users:")
+                print("\n Users:")
                 users = session.query(User).all()
                 for user in users:
                     print(f"\n   • {user.email}")
@@ -368,10 +368,10 @@ def show_status(database_url: str) -> bool:
 
             # Show stores
             if store_count > 0:
-                print("\n🏪 Stores:")
+                print("\n Stores:")
                 stores = session.query(Store).order_by(Store.rank_position).all()
                 for store in stores:
-                    active_emoji = "🟢" if store.is_active else "🔴"
+                    active_emoji = "" if store.is_active else ""
                     # Count products for this store
                     products_count = session.query(Product).filter(Product.store_id == store.id).count()
 
@@ -390,9 +390,9 @@ def show_status(database_url: str) -> bool:
             print_success("Database is operational!")
 
             if user_count == 0:
-                print("\n💡 Next step: python init_multi_store.py --migrate")
+                print("\n[TIP] Next step: python init_multi_store.py --migrate")
             else:
-                print("\n💡 Access API: http://localhost:8001/api/portfolio/overview")
+                print("\n[TIP] Access API: http://localhost:8001/api/portfolio/overview")
 
             return True
 

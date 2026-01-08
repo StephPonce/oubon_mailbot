@@ -9,7 +9,7 @@ env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path, override=True)
 
 # Debug: Print if OAuth vars are loaded
-print(f"🔑 GOOGLE_OAUTH_CLIENT_ID loaded: {bool(os.getenv('GOOGLE_OAUTH_CLIENT_ID'))}")
+print(f" GOOGLE_OAUTH_CLIENT_ID loaded: {bool(os.getenv('GOOGLE_OAUTH_CLIENT_ID'))}")
 
 from fastapi import FastAPI, Depends, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -31,9 +31,9 @@ try:
     from ospra_os.observability.middleware import RequestLoggingMiddleware
     from ospra_os.observability.exception_handlers import register_exception_handlers
     _HAS_OBSERVABILITY = True
-    print("✅ Observability system loaded successfully")
+    print("[SUCCESS] Observability system loaded successfully")
 except Exception as e:
-    print(f"⚠️  Observability system not loaded: {e}")
+    print(f"[WARNING]  Observability system not loaded: {e}")
     _HAS_OBSERVABILITY = False
     # Fallback to standard logging
     import logging
@@ -47,45 +47,45 @@ logger = get_logger(__name__) if _HAS_OBSERVABILITY else logging.getLogger(__nam
 try:
     from ospra_os.platforms.factory import PlatformFactory
     _HAS_PLATFORM_FACTORY = True
-    print("✅ Platform Factory loaded successfully")
+    print("[SUCCESS] Platform Factory loaded successfully")
 except Exception as e:
-    print(f"⚠️  Platform Factory not loaded: {e}")
+    print(f"[WARNING]  Platform Factory not loaded: {e}")
     PlatformFactory = None
     _HAS_PLATFORM_FACTORY = False
 
 try:
     from ospra_os.deployment import UnifiedProductDeployer
     _HAS_UNIFIED_DEPLOYER = True
-    print("✅ Unified Product Deployer loaded successfully")
+    print("[SUCCESS] Unified Product Deployer loaded successfully")
 except Exception as e:
-    print(f"⚠️  Unified Product Deployer not loaded: {e}")
+    print(f"[WARNING]  Unified Product Deployer not loaded: {e}")
     UnifiedProductDeployer = None
     _HAS_UNIFIED_DEPLOYER = False
 
 try:
     from ospra_os.ai.factory import AIFactory
     _HAS_AI_FACTORY = True
-    print("✅ AI Factory loaded successfully")
+    print("[SUCCESS] AI Factory loaded successfully")
 except Exception as e:
-    print(f"⚠️  AI Factory not loaded: {e}")
+    print(f"[WARNING]  AI Factory not loaded: {e}")
     AIFactory = None
     _HAS_AI_FACTORY = False
 
 try:
     from ospra_os.background_jobs import start_auto_discovery_scheduler
     _HAS_AUTO_DISCOVERY = True
-    print("✅ Auto-Discovery system loaded successfully")
+    print("[SUCCESS] Auto-Discovery system loaded successfully")
 except Exception as e:
-    print(f"⚠️  Auto-Discovery not loaded: {e}")
+    print(f"[WARNING]  Auto-Discovery not loaded: {e}")
     start_auto_discovery_scheduler = None
     _HAS_AUTO_DISCOVERY = False
 
 try:
     from ospra_os.utils.health_monitor import HealthMonitor
     _HAS_HEALTH_MONITOR = True
-    print("✅ Health Monitor loaded successfully")
+    print("[SUCCESS] Health Monitor loaded successfully")
 except Exception as e:
-    print(f"⚠️  Health Monitor not loaded: {e}")
+    print(f"[WARNING]  Health Monitor not loaded: {e}")
     HealthMonitor = None
     _HAS_HEALTH_MONITOR = False
 
@@ -93,37 +93,47 @@ except Exception as e:
 try:
     from ospra_os.api.auth_routes import router as auth_router  # type: ignore
     _HAS_AUTH = True
-    print("✅ Authentication router loaded successfully")
+    print("[SUCCESS] Authentication router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Authentication router not loaded: {e}")
+    print(f"[WARNING]  Authentication router not loaded: {e}")
     auth_router = None
     _HAS_AUTH = False
+
+# Password Reset router (required for forgot password flow)
+try:
+    from ospra_os.api.password_reset_routes import router as password_reset_router  # type: ignore
+    _HAS_PASSWORD_RESET = True
+    print("[SUCCESS] Password reset router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  Password reset router not loaded: {e}")
+    password_reset_router = None
+    _HAS_PASSWORD_RESET = False
 
 # Frontend Compatibility router (provides missing endpoint aliases)
 try:
     from ospra_os.api.frontend_compat_routes import router as frontend_compat_router  # type: ignore
     _HAS_FRONTEND_COMPAT = True
-    print("✅ Frontend compatibility router loaded successfully")
+    print("[SUCCESS] Frontend compatibility router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Frontend compatibility router not loaded: {e}")
+    print(f"[WARNING]  Frontend compatibility router not loaded: {e}")
     frontend_compat_router = None
     _HAS_FRONTEND_COMPAT = False
 
 # Gmail OAuth router (optional)
 try:
     from ospra_os.gmail.routes import router as gmail_oauth_router  # type: ignore
-    print("✅ Gmail OAuth router loaded successfully")
+    print("[SUCCESS] Gmail OAuth router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Gmail OAuth router not loaded: {e}")
+    print(f"[WARNING]  Gmail OAuth router not loaded: {e}")
     gmail_oauth_router = None
 
 # TikTok router is optional — don't crash if it's not present
 try:
     from ospra_os.tiktok.routes import router as tiktok_router  # type: ignore
     _HAS_TIKTOK = True
-    print("✅ TikTok router loaded successfully")
+    print("[SUCCESS] TikTok router loaded successfully")
 except Exception as e:  # ImportError, etc.
-    print(f"⚠️  TikTok router not loaded: {e}")
+    print(f"[WARNING]  TikTok router not loaded: {e}")
     print("   This is expected if TikTok integration is not yet enabled")
     tiktok_router = None
     _HAS_TIKTOK = False
@@ -132,9 +142,9 @@ except Exception as e:  # ImportError, etc.
 try:
     from ospra_os.product_research.routes import router as research_router  # type: ignore
     _HAS_RESEARCH = True
-    print("✅ Product Research router loaded successfully")
+    print("[SUCCESS] Product Research router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Product Research router not loaded: {e}")
+    print(f"[WARNING]  Product Research router not loaded: {e}")
     research_router = None
     _HAS_RESEARCH = False
 
@@ -142,9 +152,9 @@ except Exception as e:
 try:
     from ospra_os.admin.routes import router as admin_router  # type: ignore
     _HAS_ADMIN = True
-    print("✅ Admin Dashboard router loaded successfully")
+    print("[SUCCESS] Admin Dashboard router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Admin Dashboard router not loaded: {e}")
+    print(f"[WARNING]  Admin Dashboard router not loaded: {e}")
     admin_router = None
     _HAS_ADMIN = False
 
@@ -152,9 +162,9 @@ except Exception as e:
 try:
     from ospra_os.advertising.routes import router as advertising_router  # type: ignore
     _HAS_ADVERTISING = True
-    print("✅ Advertising Automation router loaded successfully")
+    print("[SUCCESS] Advertising Automation router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Advertising router not loaded: {e}")
+    print(f"[WARNING]  Advertising router not loaded: {e}")
     advertising_router = None
     _HAS_ADVERTISING = False
 
@@ -162,9 +172,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.oauth.routes import router as email_oauth_router  # type: ignore
     _HAS_EMAIL_OAUTH = True
-    print("✅ Email OAuth router loaded successfully")
+    print("[SUCCESS] Email OAuth router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Email OAuth router not loaded: {e}")
+    print(f"[WARNING]  Email OAuth router not loaded: {e}")
     email_oauth_router = None
     _HAS_EMAIL_OAUTH = False
 
@@ -172,9 +182,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.analytics_routes import router as email_analytics_router  # type: ignore
     _HAS_EMAIL_ANALYTICS = True
-    print("✅ Email Analytics router loaded successfully")
+    print("[SUCCESS] Email Analytics router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Email Analytics router not loaded: {e}")
+    print(f"[WARNING]  Email Analytics router not loaded: {e}")
     email_analytics_router = None
     _HAS_EMAIL_ANALYTICS = False
 
@@ -182,9 +192,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.sync_routes import router as email_sync_router  # type: ignore
     _HAS_EMAIL_SYNC = True
-    print("✅ Email Sync router loaded successfully")
+    print("[SUCCESS] Email Sync router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Email Sync router not loaded: {e}")
+    print(f"[WARNING]  Email Sync router not loaded: {e}")
     email_sync_router = None
     _HAS_EMAIL_SYNC = False
 
@@ -192,9 +202,9 @@ except Exception as e:
 try:
     from ospra_os.api.email_automation_routes import router as email_automation_router  # type: ignore
     _HAS_EMAIL_AUTOMATION = True
-    print("✅ Email Automation router loaded successfully (/api/email-automation/*)")
+    print("[SUCCESS] Email Automation router loaded successfully (/api/email-automation/*)")
 except Exception as e:
-    print(f"⚠️  Email Automation router not loaded: {e}")
+    print(f"[WARNING]  Email Automation router not loaded: {e}")
     email_automation_router = None
     _HAS_EMAIL_AUTOMATION = False
 
@@ -202,9 +212,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.settings_routes import router as email_settings_router  # type: ignore
     _HAS_EMAIL_SETTINGS = True
-    print("✅ Email User Settings router loaded successfully")
+    print("[SUCCESS] Email User Settings router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Email User Settings router not loaded: {e}")
+    print(f"[WARNING]  Email User Settings router not loaded: {e}")
     email_settings_router = None
     _HAS_EMAIL_SETTINGS = False
 
@@ -212,9 +222,9 @@ except Exception as e:
 try:
     from ospra_os.dashboard.routes import router as dashboard_v2_router  # type: ignore
     _HAS_DASHBOARD_V2 = True
-    print("✅ Dashboard V2 REAL-TIME router loaded successfully")
+    print("[SUCCESS] Dashboard V2 REAL-TIME router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Dashboard V2 REAL-TIME router not loaded: {e}")
+    print(f"[WARNING]  Dashboard V2 REAL-TIME router not loaded: {e}")
     import traceback
     traceback.print_exc()
     dashboard_v2_router = None
@@ -224,9 +234,9 @@ except Exception as e:
 try:
     from ospra_os.dashboard.routes_multi_store import router as multi_store_router  # type: ignore
     _HAS_MULTI_STORE = True
-    print("✅ Multi-Store Portfolio router loaded successfully")
+    print("[SUCCESS] Multi-Store Portfolio router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Multi-Store Portfolio router not loaded: {e}")
+    print(f"[WARNING]  Multi-Store Portfolio router not loaded: {e}")
     multi_store_router = None
     _HAS_MULTI_STORE = False
 
@@ -234,9 +244,9 @@ except Exception as e:
 try:
     from ospra_os.aliexpress.routes import router as aliexpress_router  # type: ignore
     _HAS_ALIEXPRESS = True
-    print("✅ AliExpress OAuth router loaded successfully")
+    print("[SUCCESS] AliExpress OAuth router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AliExpress OAuth router not loaded: {e}")
+    print(f"[WARNING]  AliExpress OAuth router not loaded: {e}")
     aliexpress_router = None
     _HAS_ALIEXPRESS = False
 
@@ -244,9 +254,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_oauth import router as aliexpress_callback_router  # type: ignore
     _HAS_ALIEXPRESS_CALLBACK = True
-    print("✅ AliExpress Dropshipping API callback router loaded successfully")
+    print("[SUCCESS] AliExpress Dropshipping API callback router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AliExpress callback router not loaded: {e}")
+    print(f"[WARNING]  AliExpress callback router not loaded: {e}")
     aliexpress_callback_router = None
     _HAS_ALIEXPRESS_CALLBACK = False
 
@@ -254,9 +264,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_affiliate_oauth import router as aliexpress_affiliate_callback_router  # type: ignore
     _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = True
-    print("✅ AliExpress Affiliate API callback router loaded successfully")
+    print("[SUCCESS] AliExpress Affiliate API callback router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AliExpress Affiliate callback router not loaded: {e}")
+    print(f"[WARNING]  AliExpress Affiliate callback router not loaded: {e}")
     aliexpress_affiliate_callback_router = None
     _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = False
 
@@ -264,9 +274,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_token_routes import router as aliexpress_token_router  # type: ignore
     _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = True
-    print("✅ AliExpress Token Management router loaded successfully")
+    print("[SUCCESS] AliExpress Token Management router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AliExpress Token Management router not loaded: {e}")
+    print(f"[WARNING]  AliExpress Token Management router not loaded: {e}")
     aliexpress_token_router = None
     _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = False
 
@@ -274,9 +284,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_product_routes import router as aliexpress_product_router  # type: ignore
     _HAS_ALIEXPRESS_PRODUCTS = True
-    print("✅ AliExpress Product Scraping router loaded successfully")
+    print("[SUCCESS] AliExpress Product Scraping router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AliExpress Product Scraping router not loaded: {e}")
+    print(f"[WARNING]  AliExpress Product Scraping router not loaded: {e}")
     aliexpress_product_router = None
     _HAS_ALIEXPRESS_PRODUCTS = False
 
@@ -284,9 +294,9 @@ except Exception as e:
 try:
     from ospra_os.auth.tiktok_oauth import router as tiktok_oauth_router  # type: ignore
     _HAS_TIKTOK_OAUTH = True
-    print("✅ TikTok OAuth router loaded successfully")
+    print("[SUCCESS] TikTok OAuth router loaded successfully")
 except Exception as e:
-    print(f"⚠️  TikTok OAuth router not loaded: {e}")
+    print(f"[WARNING]  TikTok OAuth router not loaded: {e}")
     tiktok_oauth_router = None
     _HAS_TIKTOK_OAUTH = False
 
@@ -294,9 +304,9 @@ except Exception as e:
 try:
     from ospra_os.webhooks.shopify_webhooks import router as shopify_webhooks_router  # type: ignore
     _HAS_SHOPIFY_WEBHOOKS = True
-    print("✅ Shopify webhooks router loaded successfully")
+    print("[SUCCESS] Shopify webhooks router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Shopify webhooks router not loaded: {e}")
+    print(f"[WARNING]  Shopify webhooks router not loaded: {e}")
     shopify_webhooks_router = None
     _HAS_SHOPIFY_WEBHOOKS = False
 
@@ -305,25 +315,45 @@ except Exception as e:
 # For now, disabled as the module doesn't exist yet
 _HAS_SHOPIFY_OAUTH = False
 shopify_oauth_router = None
-print("⚠️  Shopify OAuth router not implemented yet")
+print("[WARNING]  Shopify OAuth router not implemented yet")
 
 # Shopify Deployment router (AI-Enhanced Shopify Integration)
 try:
     from ospra_os.integrations.shopify.routes import router as shopify_deployment_router  # type: ignore
     _HAS_SHOPIFY_DEPLOYMENT = True
-    print("✅ Shopify Deployment router loaded successfully (AI-powered)")
+    print("[SUCCESS] Shopify Deployment router loaded successfully (AI-powered)")
 except Exception as e:
-    print(f"⚠️  Shopify Deployment router not loaded: {e}")
+    print(f"[WARNING]  Shopify Deployment router not loaded: {e}")
     shopify_deployment_router = None
     _HAS_SHOPIFY_DEPLOYMENT = False
+
+# Shopify Store Management router (OAuth, store data, real-time sync)
+try:
+    from ospra_os.api.shopify_routes import router as shopify_store_router  # type: ignore
+    _HAS_SHOPIFY_STORES = True
+    print("[SUCCESS] Shopify Store Management router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  Shopify Store Management router not loaded: {e}")
+    shopify_store_router = None
+    _HAS_SHOPIFY_STORES = False
+
+# WooCommerce Store Management router (Universal OAuth - No app registration needed)
+try:
+    from ospra_os.api.woocommerce_routes import router as woocommerce_router  # type: ignore
+    _HAS_WOOCOMMERCE = True
+    print("[SUCCESS] WooCommerce Store Management router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  WooCommerce Store Management router not loaded: {e}")
+    woocommerce_router = None
+    _HAS_WOOCOMMERCE = False
 
 # Meta Ads router (Real API integration - No demo data)
 try:
     from ospra_os.integrations.meta.routes import router as meta_ads_router  # type: ignore
     _HAS_META_ADS = True
-    print("✅ Meta Ads router loaded successfully (Real API only)")
+    print("[SUCCESS] Meta Ads router loaded successfully (Real API only)")
 except Exception as e:
-    print(f"⚠️  Meta Ads router not loaded: {e}")
+    print(f"[WARNING]  Meta Ads router not loaded: {e}")
     meta_ads_router = None
     _HAS_META_ADS = False
 
@@ -331,9 +361,9 @@ except Exception as e:
 try:
     from ospra_os.api.deployment_routes import router as deployment_router  # type: ignore
     _HAS_DEPLOYMENT = True
-    print("✅ Unified Deployment router loaded successfully (AI-powered)")
+    print("[SUCCESS] Unified Deployment router loaded successfully (AI-powered)")
 except Exception as e:
-    print(f"⚠️  Deployment router not loaded: {e}")
+    print(f"[WARNING]  Deployment router not loaded: {e}")
     deployment_router = None
     _HAS_DEPLOYMENT = False
 
@@ -341,9 +371,9 @@ except Exception as e:
 try:
     from ospra_os.api.auto_deploy_routes import router as auto_deploy_router  # type: ignore
     _HAS_AUTO_DEPLOY = True
-    print("✅ Auto-Deploy router loaded successfully")
+    print("[SUCCESS] Auto-Deploy router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Auto-Deploy router not loaded: {e}")
+    print(f"[WARNING]  Auto-Deploy router not loaded: {e}")
     auto_deploy_router = None
     _HAS_AUTO_DEPLOY = False
 
@@ -351,9 +381,9 @@ except Exception as e:
 try:
     from ospra_os.analytics.routes import router as analytics_router  # type: ignore
     _HAS_ANALYTICS = True
-    print("✅ Analytics router loaded successfully")
+    print("[SUCCESS] Analytics router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Analytics router not loaded: {e}")
+    print(f"[WARNING]  Analytics router not loaded: {e}")
     analytics_router = None
     _HAS_ANALYTICS = False
 
@@ -361,9 +391,9 @@ except Exception as e:
 try:
     from ospra_os.analytics.customer_routes import router as customer_analytics_router  # type: ignore
     _HAS_CUSTOMER_ANALYTICS = True
-    print("✅ Customer Analytics router loaded successfully")
+    print("[SUCCESS] Customer Analytics router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Customer Analytics router not loaded: {e}")
+    print(f"[WARNING]  Customer Analytics router not loaded: {e}")
     customer_analytics_router = None
     _HAS_CUSTOMER_ANALYTICS = False
 
@@ -371,9 +401,9 @@ except Exception as e:
 try:
     from ospra_os.jobs.routes import router as jobs_router  # type: ignore
     _HAS_JOBS = True
-    print("✅ Background Jobs router loaded successfully")
+    print("[SUCCESS] Background Jobs router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Background Jobs router not loaded: {e}")
+    print(f"[WARNING]  Background Jobs router not loaded: {e}")
     jobs_router = None
     _HAS_JOBS = False
 
@@ -381,9 +411,9 @@ except Exception as e:
 try:
     from ospra_os.services.notification_routes import router as notifications_router  # type: ignore
     _HAS_NOTIFICATIONS = True
-    print("✅ Notifications router loaded successfully")
+    print("[SUCCESS] Notifications router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Notifications router not loaded: {e}")
+    print(f"[WARNING]  Notifications router not loaded: {e}")
     notifications_router = None
     _HAS_NOTIFICATIONS = False
 
@@ -391,9 +421,9 @@ except Exception as e:
 try:
     from ospra_os.monitoring.routes import router as health_monitor_router  # type: ignore
     _HAS_HEALTH_MONITOR = True
-    print("✅ System Health Monitoring router loaded successfully")
+    print("[SUCCESS] System Health Monitoring router loaded successfully")
 except Exception as e:
-    print(f"⚠️  System Health Monitoring router not loaded: {e}")
+    print(f"[WARNING]  System Health Monitoring router not loaded: {e}")
     health_monitor_router = None
     _HAS_HEALTH_MONITOR = False
 
@@ -401,9 +431,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.niche_routes import router as niche_router  # type: ignore
     _HAS_NICHE_ANALYSIS = True
-    print("✅ Niche Analysis router loaded successfully")
+    print("[SUCCESS] Niche Analysis router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Niche Analysis router not loaded: {e}")
+    print(f"[WARNING]  Niche Analysis router not loaded: {e}")
     niche_router = None
     _HAS_NICHE_ANALYSIS = False
 
@@ -411,9 +441,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.routes import router as competitor_router  # type: ignore
     _HAS_COMPETITOR_INTEL = True
-    print("✅ Competitor Intelligence router loaded successfully")
+    print("[SUCCESS] Competitor Intelligence router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Competitor Intelligence router not loaded: {e}")
+    print(f"[WARNING]  Competitor Intelligence router not loaded: {e}")
     competitor_router = None
     _HAS_COMPETITOR_INTEL = False
 
@@ -421,9 +451,9 @@ except Exception as e:
 try:
     from ospra_os.reports.routes import router as report_router  # type: ignore
     _HAS_REPORTS = True
-    print("✅ Report Engine router loaded successfully")
+    print("[SUCCESS] Report Engine router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Report Engine router not loaded: {e}")
+    print(f"[WARNING]  Report Engine router not loaded: {e}")
     report_router = None
     _HAS_REPORTS = False
 
@@ -431,9 +461,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.unified_discovery_routes import router as unified_discovery_router  # type: ignore
     _HAS_UNIFIED_DISCOVERY = True
-    print("✅ Unified Product Discovery router loaded successfully")
+    print("[SUCCESS] Unified Product Discovery router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Unified Product Discovery router not loaded: {e}")
+    print(f"[WARNING]  Unified Product Discovery router not loaded: {e}")
     unified_discovery_router = None
     _HAS_UNIFIED_DISCOVERY = False
 
@@ -441,9 +471,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.intelligence_core_routes import router as intelligence_core_router  # type: ignore
     _HAS_INTELLIGENCE_CORE = True
-    print("✅ Intelligence Core router loaded successfully")
+    print("[SUCCESS] Intelligence Core router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Intelligence Core router not loaded: {e}")
+    print(f"[WARNING]  Intelligence Core router not loaded: {e}")
     intelligence_core_router = None
     _HAS_INTELLIGENCE_CORE = False
 
@@ -451,19 +481,40 @@ except Exception as e:
 try:
     from ospra_os.learning.learning_routes import router as learning_router  # type: ignore
     _HAS_LEARNING = True
-    print("✅ Learning System router loaded successfully")
+    print("[SUCCESS] Learning System router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Learning System router not loaded: {e}")
+    print(f"[WARNING]  Learning System router not loaded: {e}")
     learning_router = None
     _HAS_LEARNING = False
+
+# Oi AI Assistant router (The Brain of Ospra Intelligence)
+try:
+    from ospra_os.api.oi_routes import router as oi_router  # type: ignore
+    _HAS_OI = True
+    print("[SUCCESS] Oi AI Assistant router loaded successfully [BRAIN]")
+except Exception as e:
+    print(f"[WARNING]  Oi AI Assistant router not loaded: {e}")
+    oi_router = None
+    _HAS_OI = False
+
+# Oi Alerts router (Real-time notifications for Oi AI)
+try:
+    from ospra_os.api.alert_routes import router as alert_router, ws_router as alert_ws_router  # type: ignore
+    _HAS_ALERTS = True
+    print("[SUCCESS] Oi Alerts router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  Oi Alerts router not loaded: {e}")
+    alert_router = None
+    alert_ws_router = None
+    _HAS_ALERTS = False
 
 # Inventory Forecasting router
 try:
     from ospra_os.inventory.routes import router as inventory_router  # type: ignore
     _HAS_INVENTORY = True
-    print("✅ Inventory Forecasting router loaded successfully")
+    print("[SUCCESS] Inventory Forecasting router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Inventory Forecasting router not loaded: {e}")
+    print(f"[WARNING]  Inventory Forecasting router not loaded: {e}")
     inventory_router = None
     _HAS_INVENTORY = False
 
@@ -471,9 +522,9 @@ except Exception as e:
 try:
     from ospra_os.testing.routes import router as abtesting_router  # type: ignore
     _HAS_ABTESTING = True
-    print("✅ A/B Testing router loaded successfully")
+    print("[SUCCESS] A/B Testing router loaded successfully")
 except Exception as e:
-    print(f"⚠️  A/B Testing router not loaded: {e}")
+    print(f"[WARNING]  A/B Testing router not loaded: {e}")
     abtesting_router = None
     _HAS_ABTESTING = False
 
@@ -481,9 +532,9 @@ except Exception as e:
 try:
     from ospra_os.api.image_routes import router as image_router  # type: ignore
     _HAS_IMAGE_PROCESSING = True
-    print("✅ Image Processing router loaded successfully")
+    print("[SUCCESS] Image Processing router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Image Processing router not loaded: {e}")
+    print(f"[WARNING]  Image Processing router not loaded: {e}")
     image_router = None
     _HAS_IMAGE_PROCESSING = False
 
@@ -491,19 +542,29 @@ except Exception as e:
 try:
     from ospra_os.api.ai_chat_routes import router as ai_chat_router  # type: ignore
     _HAS_AI_CHAT = True
-    print("✅ AI Chat router loaded successfully")
+    print("[SUCCESS] AI Chat router loaded successfully")
 except Exception as e:
-    print(f"⚠️  AI Chat router not loaded: {e}")
+    print(f"[WARNING]  AI Chat router not loaded: {e}")
     ai_chat_router = None
     _HAS_AI_CHAT = False
+
+# AI Image Generation router (DALL-E 3 brand images for Oubon Shop)
+try:
+    from ospra_os.api.image_generation_routes import router as image_generation_router  # type: ignore
+    _HAS_IMAGE_GENERATION = True
+    print("[SUCCESS] AI Image Generation router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  AI Image Generation router not loaded: {e}")
+    image_generation_router = None
+    _HAS_IMAGE_GENERATION = False
 
 # Actions Queue router (AI-generated actions that require approval)
 try:
     from ospra_os.api.actions_routes import router as actions_router  # type: ignore
     _HAS_ACTIONS = True
-    print("✅ Actions Queue router loaded successfully")
+    print("[SUCCESS] Actions Queue router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Actions Queue router not loaded: {e}")
+    print(f"[WARNING]  Actions Queue router not loaded: {e}")
     actions_router = None
     _HAS_ACTIONS = False
 
@@ -511,9 +572,9 @@ except Exception as e:
 try:
     from ospra_os.api.daily_brief_routes import router as daily_brief_router  # type: ignore
     _HAS_DAILY_BRIEF = True
-    print("✅ Daily Brief router loaded successfully")
+    print("[SUCCESS] Daily Brief router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Daily Brief router not loaded: {e}")
+    print(f"[WARNING]  Daily Brief router not loaded: {e}")
     daily_brief_router = None
     _HAS_DAILY_BRIEF = False
 
@@ -521,9 +582,9 @@ except Exception as e:
 try:
     from ospra_os.api.auto_pilot_routes import router as auto_pilot_router  # type: ignore
     _HAS_AUTO_PILOT = True
-    print("✅ Auto-Pilot router loaded successfully")
+    print("[SUCCESS] Auto-Pilot router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Auto-Pilot router not loaded: {e}")
+    print(f"[WARNING]  Auto-Pilot router not loaded: {e}")
     auto_pilot_router = None
     _HAS_AUTO_PILOT = False
 
@@ -531,9 +592,9 @@ except Exception as e:
 try:
     from ospra_os.api.voice_routes import router as voice_router  # type: ignore
     _HAS_VOICE = True
-    print("✅ Voice Commands router loaded successfully")
+    print("[SUCCESS] Voice Commands router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Voice Commands router not loaded: {e}")
+    print(f"[WARNING]  Voice Commands router not loaded: {e}")
     voice_router = None
     _HAS_VOICE = False
 
@@ -541,9 +602,9 @@ except Exception as e:
 try:
     from ospra_os.api.store_routes import router as store_router  # type: ignore
     _HAS_STORES = True
-    print("✅ Store Management router loaded successfully")
+    print("[SUCCESS] Store Management router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Store Management router not loaded: {e}")
+    print(f"[WARNING]  Store Management router not loaded: {e}")
     store_router = None
     _HAS_STORES = False
 
@@ -551,9 +612,9 @@ except Exception as e:
 try:
     from ospra_os.api.template_routes import router as template_router  # type: ignore
     _HAS_TEMPLATES = True
-    print("✅ Template Vault router loaded successfully")
+    print("[SUCCESS] Template Vault router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Template Vault router not loaded: {e}")
+    print(f"[WARNING]  Template Vault router not loaded: {e}")
     template_router = None
     _HAS_TEMPLATES = False
 
@@ -561,9 +622,9 @@ except Exception as e:
 try:
     from ospra_os.api.task_routes import router as task_router  # type: ignore
     _HAS_TASKS = True
-    print("✅ Task Monitoring router loaded successfully")
+    print("[SUCCESS] Task Monitoring router loaded successfully")
 except Exception as e:
-    print(f"⚠️  Task Monitoring router not loaded: {e}")
+    print(f"[WARNING]  Task Monitoring router not loaded: {e}")
     task_router = None
     _HAS_TASKS = False
 
@@ -571,9 +632,9 @@ except Exception as e:
 try:
     from ospra_os.api.ml_routes import router as ml_router  # type: ignore
     _HAS_ML = True
-    print("✅ ML System router loaded successfully (Cost-optimized AI)")
+    print("[SUCCESS] ML System router loaded successfully (Cost-optimized AI)")
 except Exception as e:
-    print(f"⚠️  ML System router not loaded: {e}")
+    print(f"[WARNING]  ML System router not loaded: {e}")
     ml_router = None
     _HAS_ML = False
 
@@ -581,9 +642,9 @@ except Exception as e:
 try:
     from ospra_os.api.amazon_routes import router as amazon_router  # type: ignore
     _HAS_AMAZON = True
-    print("✅ Amazon FBA router loaded successfully (Multi-Marketplace)")
+    print("[SUCCESS] Amazon FBA router loaded successfully (Multi-Marketplace)")
 except Exception as e:
-    print(f"⚠️  Amazon FBA router not loaded: {e}")
+    print(f"[WARNING]  Amazon FBA router not loaded: {e}")
     amazon_router = None
     _HAS_AMAZON = False
 
@@ -592,9 +653,9 @@ try:
     from ospra_os.federated.routes import get_federated_router
     federated_router = get_federated_router()
     _HAS_FEDERATED = True
-    print("✅ Federated Learning router loaded successfully (Privacy-Preserving)")
+    print("[SUCCESS] Federated Learning router loaded successfully (Privacy-Preserving)")
 except Exception as e:
-    print(f"⚠️  Federated Learning router not loaded: {e}")
+    print(f"[WARNING]  Federated Learning router not loaded: {e}")
     federated_router = None
     _HAS_FEDERATED = False
 
@@ -603,9 +664,9 @@ try:
     from ospra_os.whitelabel.routes import get_whitelabel_router
     whitelabel_router = get_whitelabel_router()
     _HAS_WHITELABEL = True
-    print("✅ White-Label SaaS router loaded successfully (Agency Rebrand B2B2C)")
+    print("[SUCCESS] White-Label SaaS router loaded successfully (Agency Rebrand B2B2C)")
 except Exception as e:
-    print(f"⚠️  White-Label SaaS router not loaded: {e}")
+    print(f"[WARNING]  White-Label SaaS router not loaded: {e}")
     whitelabel_router = None
     _HAS_WHITELABEL = False
 
@@ -613,26 +674,26 @@ except Exception as e:
 try:
     from ospra_os.api.feedback_routes import router as feedback_router  # type: ignore
     _HAS_FEEDBACK = True
-    print("✅ Feedback Loop router loaded successfully (G4: AI learns from sales)")
+    print("[SUCCESS] Feedback Loop router loaded successfully (G4: AI learns from sales)")
 except Exception as e:
-    print(f"⚠️  Feedback Loop router not loaded: {e}")
+    print(f"[WARNING]  Feedback Loop router not loaded: {e}")
     feedback_router = None
     _HAS_FEEDBACK = False
 
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
-    print("✅ GmailClient loaded from app.gmail_client")
+    print("[SUCCESS] GmailClient loaded from app.gmail_client")
 except Exception as e:
-    print(f"⚠️  Could not import GmailClient: {e}")
+    print(f"[WARNING]  Could not import GmailClient: {e}")
     GmailClient = None
 
 app = FastAPI(title="OspraOS API", version="0.1")
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # OBSERVABILITY SETUP (TECHNICAL FIX T5)
 # Must be configured BEFORE other middleware for proper request tracking
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 if _HAS_OBSERVABILITY:
     settings = get_settings()
 
@@ -657,7 +718,7 @@ if _HAS_OBSERVABILITY:
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
-    logger.info("✅ Observability initialized successfully")
+    logger.info("[SUCCESS] Observability initialized successfully")
 
 # CORS middleware - Allow frontend to connect
 app.add_middleware(
@@ -696,7 +757,7 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 # Order matters: Tenant middleware must come after CORS/Proxy but before routes
 app.add_middleware(StoreContextMiddleware)  # Extract store_id from query params/headers
 app.add_middleware(TenantMiddleware)  # Extract tenant_id from JWT token
-print("✅ Tenant isolation middleware registered (GROK #14)")
+print("[SUCCESS] Tenant isolation middleware registered (GROK #14)")
 
 # Mount static files for product images (only if directory exists)
 import os
@@ -705,7 +766,7 @@ from pathlib import Path
 images_dir = Path("data/images")
 if not images_dir.exists():
     os.makedirs(images_dir, exist_ok=True)
-    print(f"✅ Created images directory: {images_dir}")
+    print(f"[SUCCESS] Created images directory: {images_dir}")
 
 app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
 
@@ -770,11 +831,11 @@ async def startup_event():
 
     # Skip startup initialization in test mode
     if os.getenv("APP_ENV") == "testing":
-        print("🧪 Test mode detected - skipping startup initialization")
+        print("[TEST] Test mode detected - skipping startup initialization")
         return
 
     startup_start = time.time()
-    print(f"🚀 Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[START] Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     settings = get_settings()
 
@@ -782,33 +843,33 @@ async def startup_event():
     try:
         from app.models import init_followup_db
         init_followup_db(settings.database_url)
-        print("✅ Follow-up database initialized")
+        print("[SUCCESS] Follow-up database initialized")
     except Exception as e:
-        print(f"⚠️  Follow-up database initialization failed: {e}")
+        print(f"[WARNING]  Follow-up database initialization failed: {e}")
 
     # Initialize analytics database
     try:
         from app.analytics import init_analytics_db
         init_analytics_db(settings.database_url)
-        print("✅ Analytics database initialized")
+        print("[SUCCESS] Analytics database initialized")
     except Exception as e:
-        print(f"⚠️  Analytics database initialization failed: {e}")
+        print(f"[WARNING]  Analytics database initialization failed: {e}")
 
     # Initialize AliExpress OAuth database
     try:
         from ospra_os.aliexpress.oauth import init_aliexpress_oauth_db
         init_aliexpress_oauth_db(settings.database_url)
-        print("✅ AliExpress OAuth database initialized")
+        print("[SUCCESS] AliExpress OAuth database initialized")
     except Exception as e:
-        print(f"⚠️  AliExpress OAuth database initialization failed: {e}")
+        print(f"[WARNING]  AliExpress OAuth database initialization failed: {e}")
 
     # Initialize Multi-Store database
     try:
         from ospra_os.database import init_multi_store_db
         init_multi_store_db(settings.database_url)
-        print("✅ Multi-Store database initialized")
+        print("[SUCCESS] Multi-Store database initialized")
     except Exception as e:
-        print(f"⚠️  Multi-Store database initialization failed: {e}")
+        print(f"[WARNING]  Multi-Store database initialization failed: {e}")
 
     # Initialize Ad Schedule database
     try:
@@ -816,9 +877,9 @@ async def startup_event():
         from sqlalchemy import create_engine
         engine = create_engine(settings.database_url)
         Base.metadata.create_all(engine)
-        print("✅ Ad Schedule database initialized")
+        print("[SUCCESS] Ad Schedule database initialized")
     except Exception as e:
-        print(f"⚠️  Ad Schedule database initialization failed: {e}")
+        print(f"[WARNING]  Ad Schedule database initialization failed: {e}")
 
     # Initialize Report database
     try:
@@ -826,26 +887,26 @@ async def startup_event():
         from sqlalchemy import create_engine
         engine = create_engine(settings.database_url)
         init_report_tables(engine)
-        print("✅ Report database initialized")
+        print("[SUCCESS] Report database initialized")
     except Exception as e:
-        print(f"⚠️  Report database initialization failed: {e}")
+        print(f"[WARNING]  Report database initialization failed: {e}")
 
     # Start report scheduler
     try:
         from ospra_os.reports.scheduler import get_scheduler
         scheduler = get_scheduler()
         await scheduler.start()
-        print("✅ Report scheduler started")
+        print("[SUCCESS] Report scheduler started")
     except Exception as e:
-        print(f"⚠️  Report scheduler failed to start: {e}")
+        print(f"[WARNING]  Report scheduler failed to start: {e}")
 
     # Start background schedule processor
     try:
         from ospra_os.jobs.schedule_processor import start_schedule_processor
         start_schedule_processor()
-        print("✅ Schedule processor started (runs every 5 minutes)")
+        print("[SUCCESS] Schedule processor started (runs every 5 minutes)")
     except Exception as e:
-        print(f"⚠️  Schedule processor failed to start: {e}")
+        print(f"[WARNING]  Schedule processor failed to start: {e}")
 
     # DEPRECATED: APScheduler replaced by Celery Beat (GROK #13)
     # Background email checking is now handled by Celery tasks
@@ -854,10 +915,10 @@ async def startup_event():
     # try:
     #     from app.scheduler import start_scheduler
     #     start_scheduler()
-    #     print("✅ Background scheduler started")
+    #     print("[SUCCESS] Background scheduler started")
     # except Exception as e:
-    #     print(f"⚠️  Scheduler failed to start: {e}")
-    print("ℹ️  Email scheduling managed by Celery Beat (see /api/tasks/beat-schedule)")
+    #     print(f"[WARNING]  Scheduler failed to start: {e}")
+    print("[INFO]  Email scheduling managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start product monitoring in background thread
     try:
@@ -873,11 +934,11 @@ async def startup_event():
             """Background task to monitor product changes every 6 hours"""
             while True:
                 try:
-                    logger.info("🔍 Running product change detection...")
+                    logger.info("[SEARCH] Running product change detection...")
                     changes = monitor.check_all_products()
 
                     if changes:
-                        logger.info(f"✅ Detected {len(changes)} product changes")
+                        logger.info(f"[SUCCESS] Detected {len(changes)} product changes")
                         notification = monitor.format_notification(changes)
                         print(notification)
 
@@ -886,7 +947,7 @@ async def startup_event():
 
                     # Show stats
                     stats = monitor.get_stats()
-                    logger.info(f"📊 Monitor stats: {stats['tracked_products']} products tracked")
+                    logger.info(f"[STATS] Monitor stats: {stats['tracked_products']} products tracked")
 
                 except Exception as e:
                     logger.error(f"Product monitoring error: {e}")
@@ -897,10 +958,10 @@ async def startup_event():
         # Start monitoring thread
         monitor_thread = Thread(target=monitoring_task, daemon=True)
         monitor_thread.start()
-        print("✅ Product monitoring started (6-hour intervals)")
+        print("[SUCCESS] Product monitoring started (6-hour intervals)")
 
     except Exception as e:
-        print(f"⚠️  Product monitoring failed to start: {e}")
+        print(f"[WARNING]  Product monitoring failed to start: {e}")
 
     # Start Level 3 AI background jobs
     try:
@@ -910,10 +971,10 @@ async def startup_event():
         logger = logging.getLogger(__name__)
 
         start_background_jobs()
-        logger.info("✅ Level 3 AI activated - background monitoring enabled")
-        print("✅ Level 3 AI activated - background monitoring enabled")
+        logger.info("[SUCCESS] Level 3 AI activated - background monitoring enabled")
+        print("[SUCCESS] Level 3 AI activated - background monitoring enabled")
     except Exception as e:
-        print(f"⚠️  Level 3 AI not available - continuing without background monitoring: {e}")
+        print(f"[WARNING]  Level 3 AI not available - continuing without background monitoring: {e}")
 
     # Start auto-discovery background scheduler
     if _HAS_AUTO_DISCOVERY and start_auto_discovery_scheduler:
@@ -932,18 +993,18 @@ async def startup_event():
                         database_url=settings.database_url,
                         interval_hours=int(discovery_interval)
                     )
-                    print(f"✅ Auto-discovery scheduler started (every {discovery_interval} hours)")
+                    print(f"[SUCCESS] Auto-discovery scheduler started (every {discovery_interval} hours)")
                 else:
                     # Daily scheduling
                     start_auto_discovery_scheduler(
                         database_url=settings.database_url,
                         hour=discovery_hour
                     )
-                    print(f"✅ Auto-discovery scheduler started (daily at {discovery_hour:02d}:00)")
+                    print(f"[SUCCESS] Auto-discovery scheduler started (daily at {discovery_hour:02d}:00)")
             else:
-                print("⚠️  Auto-discovery disabled in environment or no database URL")
+                print("[WARNING]  Auto-discovery disabled in environment or no database URL")
         except Exception as e:
-            print(f"⚠️  Auto-discovery scheduler failed to start: {e}")
+            print(f"[WARNING]  Auto-discovery scheduler failed to start: {e}")
             import traceback
             traceback.print_exc()
 
@@ -965,11 +1026,11 @@ async def startup_event():
                 hour=ranking_hour,
                 minute=ranking_minute
             )
-            print(f"✅ Daily ranking scheduler started (daily at {ranking_hour:02d}:{ranking_minute:02d})")
+            print(f"[SUCCESS] Daily ranking scheduler started (daily at {ranking_hour:02d}:{ranking_minute:02d})")
         else:
-            print("⚠️  Daily ranking disabled in environment or no database URL")
+            print("[WARNING]  Daily ranking disabled in environment or no database URL")
     except Exception as e:
-        print(f"⚠️  Daily ranking scheduler failed to start: {e}")
+        print(f"[WARNING]  Daily ranking scheduler failed to start: {e}")
         import traceback
         traceback.print_exc()
 
@@ -978,9 +1039,9 @@ async def startup_event():
         from ospra_os.intelligence.realtime_updater import start_realtime_updates
 
         await start_realtime_updates()
-        print("✅ Realtime momentum updater started (5-minute intervals)")
+        print("[SUCCESS] Realtime momentum updater started (5-minute intervals)")
     except Exception as e:
-        print(f"⚠️  Realtime momentum updater failed to start: {e}")
+        print(f"[WARNING]  Realtime momentum updater failed to start: {e}")
         import traceback
         traceback.print_exc()
 
@@ -991,10 +1052,10 @@ async def startup_event():
     # try:
     #     from ospra_os.jobs.scheduler import start_scheduler as start_customer_scheduler
     #     start_customer_scheduler()
-    #     print("✅ Customer analytics scheduler started")
+    #     print("[SUCCESS] Customer analytics scheduler started")
     # except Exception as e:
-    #     print(f"⚠️  Customer analytics scheduler failed to start: {e}")
-    print("ℹ️  Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
+    #     print(f"[WARNING]  Customer analytics scheduler failed to start: {e}")
+    print("[INFO]  Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start AliExpress token refresh scheduler
     try:
@@ -1002,29 +1063,29 @@ async def startup_event():
         start_token_refresh_scheduler()
         # Check tokens immediately on startup
         await check_tokens_on_startup()
-        print("✅ AliExpress token refresh scheduler started")
+        print("[SUCCESS] AliExpress token refresh scheduler started")
     except Exception as e:
-        print(f"⚠️  AliExpress token refresh scheduler failed to start: {e}")
+        print(f"[WARNING]  AliExpress token refresh scheduler failed to start: {e}")
 
     # Start Auto-Deploy scheduler
     try:
         from ospra_os.background_jobs.auto_deploy_job import start_auto_deploy_scheduler
         start_auto_deploy_scheduler()
-        print("✅ Auto-deploy scheduler started (runs every hour)")
+        print("[SUCCESS] Auto-deploy scheduler started (runs every hour)")
     except Exception as e:
-        print(f"⚠️  Auto-deploy scheduler failed to start: {e}")
+        print(f"[WARNING]  Auto-deploy scheduler failed to start: {e}")
 
     # Start Learning Summary background jobs
     try:
         from ospra_os.learning.summary_jobs import setup_summary_jobs
         setup_summary_jobs()
-        print("✅ Learning summary jobs started (nightly at 3:00 AM UTC)")
+        print("[SUCCESS] Learning summary jobs started (nightly at 3:00 AM UTC)")
     except Exception as e:
-        print(f"⚠️  Learning summary jobs failed to start: {e}")
+        print(f"[WARNING]  Learning summary jobs failed to start: {e}")
 
     # Log startup completion with timing
     startup_duration = time.time() - startup_start
-    print(f"✅ Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"[SUCCESS] Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 # ---------------------------------------------------------------
@@ -1036,69 +1097,69 @@ async def shutdown_event():
     import logging
 
     logger = logging.getLogger(__name__)
-    logger.info("⏸️  Shutting down Ospra Intelligence...")
-    print("⏸️  Shutting down Ospra Intelligence...")
+    logger.info("[PAUSE]  Shutting down Ospra Intelligence...")
+    print("[PAUSE]  Shutting down Ospra Intelligence...")
 
     # Stop Level 3 AI background jobs
     try:
         from ospra_os.intelligence.background_jobs import stop_background_jobs
         stop_background_jobs()
-        logger.info("✅ Background jobs stopped")
-        print("✅ Background jobs stopped")
+        logger.info("[SUCCESS] Background jobs stopped")
+        print("[SUCCESS] Background jobs stopped")
     except Exception as e:
         logger.error(f"Error stopping background jobs: {e}")
-        print(f"⚠️  Error stopping background jobs: {e}")
+        print(f"[WARNING]  Error stopping background jobs: {e}")
 
     # Stop learning summary jobs
     try:
         from ospra_os.learning.summary_jobs import shutdown_summary_jobs
         shutdown_summary_jobs()
-        logger.info("✅ Learning summary jobs stopped")
-        print("✅ Learning summary jobs stopped")
+        logger.info("[SUCCESS] Learning summary jobs stopped")
+        print("[SUCCESS] Learning summary jobs stopped")
     except Exception as e:
         logger.error(f"Error stopping summary jobs: {e}")
-        print(f"⚠️  Error stopping summary jobs: {e}")
+        print(f"[WARNING]  Error stopping summary jobs: {e}")
 
     # Stop realtime momentum updater
     try:
         from ospra_os.intelligence.realtime_updater import stop_realtime_updates
         await stop_realtime_updates()
-        logger.info("✅ Realtime momentum updater stopped")
-        print("✅ Realtime momentum updater stopped")
+        logger.info("[SUCCESS] Realtime momentum updater stopped")
+        print("[SUCCESS] Realtime momentum updater stopped")
     except Exception as e:
         logger.error(f"Error stopping realtime updater: {e}")
-        print(f"⚠️  Error stopping realtime updater: {e}")
+        print(f"[WARNING]  Error stopping realtime updater: {e}")
 
     # Stop AliExpress token refresh scheduler
     try:
         from ospra_os.api.aliexpress_token_scheduler import stop_token_refresh_scheduler
         stop_token_refresh_scheduler()
-        logger.info("✅ AliExpress token refresh scheduler stopped")
-        print("✅ AliExpress token refresh scheduler stopped")
+        logger.info("[SUCCESS] AliExpress token refresh scheduler stopped")
+        print("[SUCCESS] AliExpress token refresh scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping token refresh scheduler: {e}")
-        print(f"⚠️  Error stopping token refresh scheduler: {e}")
+        print(f"[WARNING]  Error stopping token refresh scheduler: {e}")
 
     # Stop report scheduler
     try:
         from ospra_os.reports.scheduler import get_scheduler
         scheduler = get_scheduler()
         await scheduler.stop()
-        logger.info("✅ Report scheduler stopped")
-        print("✅ Report scheduler stopped")
+        logger.info("[SUCCESS] Report scheduler stopped")
+        print("[SUCCESS] Report scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping report scheduler: {e}")
-        print(f"⚠️  Error stopping report scheduler: {e}")
+        print(f"[WARNING]  Error stopping report scheduler: {e}")
 
     # Stop customer analytics scheduler
     try:
         from ospra_os.jobs.scheduler import stop_scheduler as stop_customer_scheduler
         stop_customer_scheduler()
-        logger.info("✅ Customer analytics scheduler stopped")
-        print("✅ Customer analytics scheduler stopped")
+        logger.info("[SUCCESS] Customer analytics scheduler stopped")
+        print("[SUCCESS] Customer analytics scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping customer analytics scheduler: {e}")
-        print(f"⚠️  Error stopping customer analytics scheduler: {e}")
+        print(f"[WARNING]  Error stopping customer analytics scheduler: {e}")
 
 
 if gmail_oauth_router:
@@ -1106,6 +1167,9 @@ if gmail_oauth_router:
 
 if _HAS_AUTH and auth_router:
     app.include_router(auth_router)  # exposes /api/auth/* (registration, login, JWT)
+
+if _HAS_PASSWORD_RESET and password_reset_router:
+    app.include_router(password_reset_router)  # exposes /api/auth/forgot-password, /api/auth/reset-password
 
 if _HAS_FRONTEND_COMPAT and frontend_compat_router:
     app.include_router(frontend_compat_router)  # exposes /auth/* aliases + missing endpoints
@@ -1155,6 +1219,12 @@ if _HAS_SHOPIFY_OAUTH and shopify_oauth_router:
 
 if _HAS_SHOPIFY_DEPLOYMENT and shopify_deployment_router:
     app.include_router(shopify_deployment_router)  # exposes /api/shopify/* (AI-powered deployment)
+
+if _HAS_SHOPIFY_STORES and shopify_store_router:
+    app.include_router(shopify_store_router)  # exposes /api/shopify/* (Store management & OAuth)
+
+if _HAS_WOOCOMMERCE and woocommerce_router:
+    app.include_router(woocommerce_router)  # exposes /api/woocommerce/* (Universal OAuth - any WC store)
 
 # Meta Ads Router (Real API only - No demo data)
 if _HAS_META_ADS and meta_ads_router:
@@ -1217,6 +1287,16 @@ if _HAS_INTELLIGENCE_CORE and intelligence_core_router:
 if _HAS_LEARNING and learning_router:
     app.include_router(learning_router)  # exposes /api/learning/*
 
+# Oi AI Assistant (The Brain of Ospra Intelligence)
+if _HAS_OI and oi_router:
+    app.include_router(oi_router)  # exposes /api/oi/* (AI chat, actions, context)
+
+# Oi Alerts (Real-time notifications for Oi AI)
+if _HAS_ALERTS and alert_router:
+    app.include_router(alert_router)  # exposes /api/oi/alerts/* (CRUD endpoints)
+if _HAS_ALERTS and alert_ws_router:
+    app.include_router(alert_ws_router)  # exposes /ws/oi/alerts (WebSocket)
+
 if _HAS_INVENTORY and inventory_router:
     app.include_router(inventory_router)  # exposes /api/inventory/*
 
@@ -1228,6 +1308,9 @@ if _HAS_IMAGE_PROCESSING and image_router:
 
 if _HAS_AI_CHAT and ai_chat_router:
     app.include_router(ai_chat_router)  # exposes /api/ai/chat and /api/claude/chat
+
+if _HAS_IMAGE_GENERATION and image_generation_router:
+    app.include_router(image_generation_router)  # exposes /api/images/generate, /api/images/status (AI product images)
 
 if _HAS_ACTIONS and actions_router:
     app.include_router(actions_router)  # exposes /api/actions/* (AI action queue)
@@ -1823,7 +1906,7 @@ async def get_dashboard_products(
                 "description": p.get("ai_explanation", "")[:200] + "..." if p.get("ai_explanation") else "No description",
                 "features": [
                     f"Supplier: {display.get('supplier_orders', 0):,} orders",
-                    f"Rating: {display.get('supplier_rating', 0)}★",
+                    f"Rating: {display.get('supplier_rating', 0)}",
                     f"Profit: ${display.get('estimated_profit', 0):.2f} per sale"
                 ],
                 "supplier_url": display.get("supplier_url", ""),
@@ -2616,7 +2699,7 @@ async def discover_multi_niche(
     settings: Settings = Depends(get_settings)
 ):
     """
-    🔥 Discover trending products using Google Trends (NO REDDIT REQUIRED).
+    [HOT] Discover trending products using Google Trends (NO REDDIT REQUIRED).
 
     **WORKS ON RENDER** - uses Google Trends instead of Reddit!
 
@@ -2635,11 +2718,11 @@ async def discover_multi_niche(
     **Data Source:** Google Trends (shows REAL buying intent)
 
     **Why this is better than Reddit:**
-    - ✅ Works on Render (no IP blocking)
-    - ✅ Shows real search behavior (not just discussions)
-    - ✅ Millions of data points
-    - ✅ No rate limits
-    - ✅ Free forever
+    - [SUCCESS] Works on Render (no IP blocking)
+    - [SUCCESS] Shows real search behavior (not just discussions)
+    - [SUCCESS] Millions of data points
+    - [SUCCESS] No rate limits
+    - [SUCCESS] Free forever
 
     Example request body:
     {
@@ -2840,7 +2923,7 @@ async def deploy_to_shopify(
     settings: Settings = Depends(get_settings)
 ):
     """
-    🚀 ONE-CLICK SHOPIFY DEPLOYMENT
+    [START] ONE-CLICK SHOPIFY DEPLOYMENT
 
     Complete automated pipeline:
     1. Generate AI-powered product content
@@ -2897,7 +2980,7 @@ async def generate_product_content(
     settings: Settings = Depends(get_settings)
 ):
     """
-    📝 AI PRODUCT CONTENT GENERATOR
+    [NOTE] AI PRODUCT CONTENT GENERATOR
 
     Generate SEO-optimized product content using AI:
     - Product title (SEO-optimized)
@@ -2988,7 +3071,7 @@ async def optimize_product_price(
     settings: Settings = Depends(get_settings)
 ):
     """
-    💰 AI PRICE OPTIMIZER
+    [PRICE] AI PRICE OPTIMIZER
 
     Optimize pricing with AI-powered competitor analysis:
     - Suggested price (with .99 endings)
@@ -3050,7 +3133,7 @@ class DiscoverRequest(BaseModel):
 @app.post("/api/intelligence/saturation")
 async def check_product_saturation(product_name: str):
     """
-    🎯 PRODUCT SATURATION CHECKER
+    [TARGET] PRODUCT SATURATION CHECKER
 
     Analyze market saturation using Amazon data to avoid deploying
     products that are already oversaturated.
@@ -3075,9 +3158,9 @@ async def check_product_saturation(product_name: str):
         }
 
     Saturation Scores:
-    - 0-30: ✅ DEPLOY - Blue ocean (low competition)
-    - 31-60: ⚠️  CAUTION - Moderate competition
-    - 61-100: ❌ SKIP - Saturated (high competition)
+    - 0-30: [SUCCESS] DEPLOY - Blue ocean (low competition)
+    - 31-60: [WARNING]  CAUTION - Moderate competition
+    - 61-100: [ERROR] SKIP - Saturated (high competition)
     """
     try:
         from ospra_os.intelligence.saturation_scorer import calculate_saturation_score
@@ -3102,7 +3185,7 @@ async def check_product_saturation(product_name: str):
 @app.post("/api/intelligence/discover")
 async def discover_winning_products_unified(request: DiscoverRequest):
     """
-    🚀 UNIFIED PRODUCT DISCOVERY - One endpoint for everything!
+    [START] UNIFIED PRODUCT DISCOVERY - One endpoint for everything!
 
     Combines ALL data sources:
     - Google Trends → Trending keywords (buying intent)
@@ -3111,7 +3194,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
     - TikTok (Apify) → Viral scores
     - Reddit (Apify) → Sentiment analysis
 
-    ⚠️ IMPORTANT: Amazon data is for RESEARCH ONLY!
+    [WARNING] IMPORTANT: Amazon data is for RESEARCH ONLY!
     - Use Amazon for velocity, reviews, and market validation
     - DO NOT dropship from Amazon (violates TOS, causes account bans)
     - Always use AliExpress URLs for actual dropshipping
@@ -3136,7 +3219,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
         # Determine niches to search
         niches_to_search = request.niches or ["smart_lighting", "home_security", "cleaning_gadgets"]
 
-        print(f"\n🚀 UNIFIED QUAD-SOURCE DISCOVERY API Request:")
+        print(f"\n[START] UNIFIED QUAD-SOURCE DISCOVERY API Request:")
         print(f"   Niches: {niches_to_search}")
         print(f"   Max per niche: {request.max_per_niche}")
         print(f"   PRIMARY Sources: TikTok Shop + Amazon Bestsellers + Shopify Competitors + Google Trends")
@@ -3163,7 +3246,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                 'timeout': True
             }
 
-        print(f"\n✅ Unified discovery complete: {len(products)} total products")
+        print(f"\n[SUCCESS] Unified discovery complete: {len(products)} total products")
 
         # Helper functions for platform scoring and badges
         def _generate_platform_badges(product):
@@ -3177,7 +3260,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "tiktok",
                     "label": "Hot on TikTok",
                     "level": "hot",
-                    "emoji": "🔥",
+                    "emoji": "[HOT]",
                     "color": "#FF0050",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/tiktok/FF0050",
@@ -3192,7 +3275,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "tiktok",
                     "label": "Trending on TikTok",
                     "level": "trending",
-                    "emoji": "📈",
+                    "emoji": "[TREND]",
                     "color": "#00F2EA",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/tiktok/00F2EA",
@@ -3207,7 +3290,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "tiktok",
                     "label": "On TikTok",
                     "level": "active",
-                    "emoji": "⭐",
+                    "emoji": "[STAR]",
                     "color": "#000000",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/tiktok/000000",
@@ -3227,7 +3310,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                         "platform": "amazon",
                         "label": "Amazon Top 10",
                         "level": "top",
-                        "emoji": "👑",
+                        "emoji": "",
                         "color": "#FF9900",
                         "logo": {
                             "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
@@ -3242,7 +3325,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                         "platform": "amazon",
                         "label": "Amazon Bestseller",
                         "level": "bestseller",
-                        "emoji": "🏆",
+                        "emoji": "[TOP]",
                         "color": "#FF9900",
                         "logo": {
                             "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
@@ -3257,7 +3340,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                         "platform": "amazon",
                         "label": "Amazon Top 100",
                         "level": "popular",
-                        "emoji": "📊",
+                        "emoji": "[STATS]",
                         "color": "#FF9900",
                         "logo": {
                             "cdn": "https://cdn.simpleicons.org/amazon/FF9900",
@@ -3274,7 +3357,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "shopify",
                     "label": "Proven Winner",
                     "level": "proven",
-                    "emoji": "🏪",
+                    "emoji": "",
                     "color": "#96BF48",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/shopify/96BF48",
@@ -3292,7 +3375,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "google",
                     "label": "Trending",
                     "level": "hot",
-                    "emoji": "🚀",
+                    "emoji": "[START]",
                     "color": "#4285F4",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/google/4285F4",
@@ -3307,7 +3390,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "google",
                     "label": "Rising",
                     "level": "rising",
-                    "emoji": "📈",
+                    "emoji": "[TREND]",
                     "color": "#4285F4",
                     "logo": {
                         "cdn": "https://cdn.simpleicons.org/google/4285F4",
@@ -3325,7 +3408,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "multi",
                     "label": "4 SOURCES!",
                     "level": "jackpot",
-                    "emoji": "🎯",
+                    "emoji": "[TARGET]",
                     "color": "#FFD700",
                     "logo": {
                         "cdn": None,  # Custom icon
@@ -3341,7 +3424,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "multi",
                     "label": "3 Sources",
                     "level": "strong",
-                    "emoji": "🔥",
+                    "emoji": "[HOT]",
                     "color": "#FF6B35",
                     "logo": {
                         "cdn": None,
@@ -3357,7 +3440,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
                     "platform": "multi",
                     "label": "2 Sources",
                     "level": "good",
-                    "emoji": "⭐",
+                    "emoji": "[STAR]",
                     "color": "#4ECDC4",
                     "logo": {
                         "cdn": None,
@@ -3514,17 +3597,9 @@ async def discover_winning_products_unified(request: DiscoverRequest):
         # Sort by final score
         all_products.sort(key=lambda x: x['final_score'], reverse=True)
 
-        # FALLBACK: If no products found, return demo data so UI works
+        # No fallback - return empty if no products found
         if len(all_products) == 0:
-            print("⚠️  No products discovered - returning DEMO fallback data")
-            demo_products = [
-                {"id": "demo-1", "name": "Smart LED Strip Lights", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 29.99, "cost": 8.50, "profit": 21.49, "profit_margin": 71.7, "final_score": 89.5, "velocity_score": 92, "trend_score": 88, "priority": "HIGH", "recommendation": "BUY - Strong opportunity", "image_url": "https://images.unsplash.com/photo-1550985616-10810253b84d?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
-                {"id": "demo-2", "name": "Wireless Security Camera", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 49.99, "cost": 15.99, "profit": 34.00, "profit_margin": 68.0, "final_score": 85.2, "velocity_score": 87, "trend_score": 82, "priority": "HIGH", "recommendation": "CONSIDER - Good potential", "image_url": "https://images.unsplash.com/photo-1558002038-1055907df827?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
-                {"id": "demo-3", "name": "Smart Door Lock", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 79.99, "cost": 28.50, "profit": 51.49, "profit_margin": 64.4, "final_score": 82.8, "velocity_score": 85, "trend_score": 79, "priority": "MEDIUM", "recommendation": "CONSIDER - Verify pricing", "image_url": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
-                {"id": "demo-4", "name": "Motion Sensor Light", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 24.99, "cost": 7.25, "profit": 17.74, "profit_margin": 71.0, "final_score": 78.5, "velocity_score": 80, "trend_score": 75, "priority": "MEDIUM", "recommendation": "CONSIDER - Good margins", "image_url": "https://images.unsplash.com/photo-1509266272358-7701da638078?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]},
-                {"id": "demo-5", "name": "Smart Thermostat", "niche": niches_to_search[0] if niches_to_search else "smart_home", "price": 129.99, "cost": 45.00, "profit": 84.99, "profit_margin": 65.4, "final_score": 75.3, "velocity_score": 78, "trend_score": 72, "priority": "MEDIUM", "recommendation": "MAYBE - Higher investment", "image_url": "https://images.unsplash.com/photo-1545259742-75a8c0c4e6ea?w=400", "source": "DEMO_FALLBACK", "platform_badges": [{"platform": "demo", "label": "Demo Product", "level": "info", "emoji": "🎭", "color": "#FFB800"}]}
-            ]
-            all_products = demo_products
+            print("WARNING: No products discovered - APIs may be unavailable or returned no results")
 
         return {
             'success': True,
@@ -3539,8 +3614,7 @@ async def discover_winning_products_unified(request: DiscoverRequest):
             },
             'niches_searched': niches_to_search,
             'timestamp': datetime.utcnow().isoformat(),
-            'note': 'Amazon data is for RESEARCH ONLY - Use AliExpress URLs for dropshipping!',
-            'demo_mode': len(products) == 0  # Flag to indicate demo data
+            'note': 'Amazon data is for RESEARCH ONLY - Use AliExpress URLs for dropshipping!'
         }
 
     except Exception as e:
@@ -3561,14 +3635,14 @@ async def discover_winning_products_unified(request: DiscoverRequest):
 @app.post("/api/intelligence/discover-enriched")
 async def discover_products_enriched_endpoint(request: Dict):
     """
-    ⚠️ DEPRECATED - Use /api/intelligence/discover instead!
+    [WARNING] DEPRECATED - Use /api/intelligence/discover instead!
 
     This endpoint has been merged into the unified discovery endpoint.
     The new endpoint combines ALL data sources in one call.
 
     This endpoint now redirects to the unified discovery for backward compatibility.
     """
-    print("⚠️  /api/intelligence/discover-enriched is deprecated!")
+    print("[WARNING]  /api/intelligence/discover-enriched is deprecated!")
     print("   Redirecting to unified /api/intelligence/discover endpoint...")
 
     # Convert Dict request to DiscoverRequest format
@@ -3591,7 +3665,7 @@ async def test_product_discovery(
         from ospra_os.intelligence.product_intelligence import ProductIntelligenceEngine
         from datetime import datetime
 
-        print(f"🧪 Testing discovery for niche: {niche}")
+        print(f"[TEST] Testing discovery for niche: {niche}")
 
         engine = ProductIntelligenceEngine()
         products = await engine.discover_winning_products(
@@ -3599,7 +3673,7 @@ async def test_product_discovery(
             max_per_niche=max_products
         )
 
-        print(f"✅ Found {len(products)} products")
+        print(f"[SUCCESS] Found {len(products)} products")
 
         return {
             "success": True,
@@ -3614,7 +3688,7 @@ async def test_product_discovery(
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        print(f"❌ Discovery error: {e}")
+        print(f"[ERROR] Discovery error: {e}")
         print(error_trace)
 
         return {
@@ -4048,7 +4122,7 @@ async def claude_chat(request: ChatRequest):
                     for email in emails_list:
                         from_addr = email.get('from_address', 'Unknown')
                         subject = email.get('subject', '(No subject)')[:50]
-                        read_status = "✓" if email.get('is_read') else "●"
+                        read_status = "[OK]" if email.get('is_read') else ""
                         context_summary += f"{read_status} From: {from_addr} - {subject}\n"
                     context_summary += "\n"
 
@@ -4352,7 +4426,7 @@ async def get_smart_recommendations(
         # Close engine
         await engine.close()
 
-        logger.info(f"✅ Smart recommendations complete: {recommendations.get('count', 0)} products")
+        logger.info(f"[SUCCESS] Smart recommendations complete: {recommendations.get('count', 0)} products")
 
         return recommendations
 
@@ -4406,7 +4480,7 @@ async def get_recommendation_analytics(
         # Close engine
         await engine.close()
 
-        logger.info(f"✅ Analytics retrieved: {analytics.get('total_recommendations', 0)} total recommendations")
+        logger.info(f"[SUCCESS] Analytics retrieved: {analytics.get('total_recommendations', 0)} total recommendations")
 
         return analytics
 
@@ -4469,7 +4543,7 @@ async def deploy_to_shopify(
         return result
 
     except Exception as e:
-        print(f"❌ Deploy endpoint error: {e}")
+        print(f"[ERROR] Deploy endpoint error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -4533,7 +4607,7 @@ async def bulk_deploy_to_shopify(
         }
 
     except Exception as e:
-        print(f"❌ Bulk deploy error: {e}")
+        print(f"[ERROR] Bulk deploy error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -4573,7 +4647,7 @@ async def list_shopify_products(
         }
 
     except Exception as e:
-        print(f"❌ List products error: {e}")
+        print(f"[ERROR] List products error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4615,7 +4689,7 @@ async def delete_shopify_product(
             }
 
     except Exception as e:
-        print(f"❌ Delete product error: {e}")
+        print(f"[ERROR] Delete product error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4662,7 +4736,7 @@ async def search_aliexpress(
         }
 
     except Exception as e:
-        print(f"❌ AliExpress search error: {e}")
+        print(f"[ERROR] AliExpress search error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4706,7 +4780,7 @@ async def generate_affiliate_links(
         }
 
     except Exception as e:
-        print(f"❌ Affiliate link error: {e}")
+        print(f"[ERROR] Affiliate link error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4749,7 +4823,7 @@ async def fulfill_order(
         return result
 
     except Exception as e:
-        print(f"❌ Order fulfillment error: {e}")
+        print(f"[ERROR] Order fulfillment error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -4797,7 +4871,7 @@ async def sync_inventory(
         }
 
     except Exception as e:
-        print(f"❌ Inventory sync error: {e}")
+        print(f"[ERROR] Inventory sync error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4846,16 +4920,16 @@ async def monitor_prices(
         }
 
     except Exception as e:
-        print(f"❌ Price monitoring error: {e}")
+        print(f"[ERROR] Price monitoring error: {e}")
         return {
             'success': False,
             'error': str(e)
         }
 
 
-# ═══════════════════════════════════════════════════════════
+# 
 # META (FACEBOOK/INSTAGRAM) AD AUTOMATION
-# ═══════════════════════════════════════════════════════════
+# 
 
 @app.post("/api/meta/create-campaign")
 async def create_meta_campaign(
@@ -4891,7 +4965,7 @@ async def create_meta_campaign(
         return result
 
     except Exception as e:
-        print(f"❌ Campaign creation error: {e}")
+        print(f"[ERROR] Campaign creation error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -5040,9 +5114,9 @@ async def update_ad_set_budget(
         }
 
 
-# ═══════════════════════════════════════════════════════════
+# 
 # AD SCHEDULING & AUTOMATION
-# ═══════════════════════════════════════════════════════════
+# 
 
 @app.post("/api/schedule/create")
 async def create_ad_schedule(
@@ -5091,7 +5165,7 @@ async def create_ad_schedule(
         return result
 
     except Exception as e:
-        print(f"❌ Schedule creation error: {e}")
+        print(f"[ERROR] Schedule creation error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -5290,9 +5364,9 @@ async def get_budget_forecast(
             'success': False,
             'error': str(e)
         }
-# ═══════════════════════════════════════════════════════════
+# 
 # LIVE TRENDS DASHBOARD - REAL-TIME PRODUCT MOMENTUM
-# ═══════════════════════════════════════════════════════════
+# 
 
 @app.get("/api/trends/live")
 async def get_live_trending_products(
@@ -5555,9 +5629,9 @@ async def get_momentum_heatmap(
         }
 
 
-# ═══════════════════════════════════════════════════════════
+# 
 # PRODUCT RANKINGS API
-# ═══════════════════════════════════════════════════════════
+# 
 
 @app.get("/api/rankings/top")
 async def get_top_rankings(
@@ -5624,13 +5698,13 @@ async def get_top_rankings(
         # Helper to determine tier
         def get_tier(rank: int):
             if 1 <= rank <= 3:
-                return {"name": "ELITE", "emoji": "🏆", "color": "#FFD700"}
+                return {"name": "ELITE", "emoji": "[TOP]", "color": "#FFD700"}
             elif 4 <= rank <= 10:
-                return {"name": "TOP", "emoji": "🥇", "color": "#C0C0C0"}
+                return {"name": "TOP", "emoji": "[FIRST]", "color": "#C0C0C0"}
             elif 11 <= rank <= 20:
-                return {"name": "RISING", "emoji": "🥈", "color": "#CD7F32"}
+                return {"name": "RISING", "emoji": "[SECOND]", "color": "#CD7F32"}
             else:
-                return {"name": "UNRANKED", "emoji": "📊", "color": "#808080"}
+                return {"name": "UNRANKED", "emoji": "[STATS]", "color": "#808080"}
 
         # Format rankings
         rankings = []
@@ -5984,7 +6058,7 @@ async def trends_websocket(websocket: WebSocket):
     from datetime import datetime
 
     await websocket.accept()
-    logger.info("✅ WebSocket client connected to /ws/trends")
+    logger.info("[SUCCESS] WebSocket client connected to /ws/trends")
 
     try:
         from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
@@ -6053,9 +6127,9 @@ async def trends_websocket(websocket: WebSocket):
             pass
 
 
-# ═══════════════════════════════════════════════════════════
+# 
 # SHOPIFY WEBHOOKS
-# ═══════════════════════════════════════════════════════════
+# 
 
 @app.post("/webhooks/shopify/orders/create")
 async def shopify_order_webhook(request: Request):
@@ -6076,7 +6150,7 @@ async def shopify_order_webhook(request: Request):
         return {'received': True, 'result': result}
 
     except Exception as e:
-        print(f"❌ Webhook error: {e}")
+        print(f"[ERROR] Webhook error: {e}")
         import traceback
         traceback.print_exc()
         return {'received': False, 'error': str(e)}
@@ -6094,7 +6168,7 @@ async def shopify_order_cancelled_webhook(request: Request):
         order_data = await request.json()
         order_id = order_data.get('id')
 
-        print(f"📦 Order cancelled webhook received for order #{order_id}")
+        print(f"[PACKAGE] Order cancelled webhook received for order #{order_id}")
         # TODO: Implement AliExpress order cancellation via API
         # For now, just log and acknowledge receipt
 
@@ -6105,7 +6179,7 @@ async def shopify_order_cancelled_webhook(request: Request):
         }
 
     except Exception as e:
-        print(f"❌ Webhook error: {e}")
+        print(f"[ERROR] Webhook error: {e}")
         return {'received': False, 'error': str(e)}
 
 
@@ -6113,4 +6187,4 @@ async def shopify_order_cancelled_webhook(request: Request):
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
 except Exception as e:
-    print(f"⚠️  Static files not mounted: {e}")
+    print(f"[WARNING]  Static files not mounted: {e}")

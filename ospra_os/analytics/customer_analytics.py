@@ -47,7 +47,7 @@ class CustomerAnalytics:
         Returns:
             Complete customer profile dictionary
         """
-        logger.info(f"📊 Getting profile for customer: {customer_id}")
+        logger.info(f"[STATS] Getting profile for customer: {customer_id}")
 
         # TODO: Fetch from database
         # For now, return mock data
@@ -127,7 +127,7 @@ class CustomerAnalytics:
         Returns:
             RFM scores and segment assignment
         """
-        logger.info(f"📊 Calculating RFM score for: {customer_id}")
+        logger.info(f"[STATS] Calculating RFM score for: {customer_id}")
 
         # TODO: Calculate from actual data
         # For now, return mock score
@@ -209,7 +209,7 @@ class CustomerAnalytics:
         Returns:
             Segment counts and metrics
         """
-        logger.info("📊 Calculating segment breakdown...")
+        logger.info("[STATS] Calculating segment breakdown...")
 
         # TODO: Calculate from database
         # For now, return empty data until customers are synced
@@ -219,7 +219,7 @@ class CustomerAnalytics:
             "segments": [
                 {
                     "segment": "CHAMPION",
-                    "icon": "🏆",
+                    "icon": "[TOP]",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -228,7 +228,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "LOYAL",
-                    "icon": "💎",
+                    "icon": "",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -237,7 +237,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "POTENTIAL_LOYALIST",
-                    "icon": "🌟",
+                    "icon": "[FEATURED]",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -246,7 +246,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "NEW_CUSTOMER",
-                    "icon": "🆕",
+                    "icon": "[NEW]",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -255,7 +255,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "AT_RISK",
-                    "icon": "💤",
+                    "icon": "",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -264,7 +264,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "HIBERNATING",
-                    "icon": "😴",
+                    "icon": "",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -273,7 +273,7 @@ class CustomerAnalytics:
                 },
                 {
                     "segment": "LOST",
-                    "icon": "👋",
+                    "icon": "",
                     "count": 0,
                     "percentage": 0.0,
                     "avg_ltv": 0.00,
@@ -304,7 +304,7 @@ class CustomerAnalytics:
         Returns:
             Churn probability (0.0 to 1.0)
         """
-        logger.info(f"🔮 Predicting churn for: {customer_id}")
+        logger.info(f" Predicting churn for: {customer_id}")
 
         # TODO: Implement actual prediction
         # For now, return mock probability based on segment
@@ -334,7 +334,7 @@ class CustomerAnalytics:
         Returns:
             List of at-risk customers with details
         """
-        logger.info(f"⚠️ Finding at-risk customers (threshold: {threshold})...")
+        logger.info(f"[WARNING] Finding at-risk customers (threshold: {threshold})...")
 
         # TODO: Query database for at-risk customers
         # For now, return mock data
@@ -398,7 +398,7 @@ class CustomerAnalytics:
         Returns:
             LTV metrics
         """
-        logger.info(f"💰 Calculating LTV for: {customer_id}")
+        logger.info(f"[PRICE] Calculating LTV for: {customer_id}")
 
         # TODO: Calculate from orders
         # For now, return mock data
@@ -426,7 +426,7 @@ class CustomerAnalytics:
         Returns:
             Distribution buckets with counts
         """
-        logger.info("📊 Calculating LTV distribution...")
+        logger.info("[STATS] Calculating LTV distribution...")
 
         distribution = {
             "buckets": [
@@ -459,7 +459,7 @@ class CustomerAnalytics:
         Returns:
             List of top customers
         """
-        logger.info(f"🏆 Getting top {limit} customers by {metric}...")
+        logger.info(f"[TOP] Getting top {limit} customers by {metric}...")
 
         # TODO: Query database
         # For now, return mock data
@@ -504,7 +504,7 @@ class CustomerAnalytics:
         Returns:
             Cohort retention table
         """
-        logger.info(f"📊 Generating {cohort_type} cohort analysis for {periods} periods...")
+        logger.info(f"[STATS] Generating {cohort_type} cohort analysis for {periods} periods...")
 
         # TODO: Calculate from database
         # For now, return mock data
@@ -554,7 +554,7 @@ class CustomerAnalytics:
         Returns:
             Purchase pattern analysis
         """
-        logger.info(f"🔍 Analyzing purchase patterns for: {customer_id}")
+        logger.info(f"[SEARCH] Analyzing purchase patterns for: {customer_id}")
 
         patterns = {
             "timing": {
@@ -594,7 +594,7 @@ class CustomerAnalytics:
         Returns:
             List of recommended products with affinity scores
         """
-        logger.info(f"🎯 Calculating product affinity for: {customer_id}")
+        logger.info(f"[TARGET] Calculating product affinity for: {customer_id}")
 
         # TODO: Calculate based on purchase history and similar customers
 
@@ -624,7 +624,7 @@ class CustomerAnalytics:
         Returns:
             Customer acquisition metrics
         """
-        logger.info("💰 Calculating customer acquisition metrics...")
+        logger.info("[PRICE] Calculating customer acquisition metrics...")
 
         metrics = {
             "customer_acquisition_cost": 15.50,
@@ -666,7 +666,7 @@ class CustomerAnalytics:
         Returns:
             Retention rate as decimal
         """
-        logger.info(f"📊 Calculating {period} retention rate...")
+        logger.info(f"[STATS] Calculating {period} retention rate...")
 
         # TODO: Calculate from database
         # For now, return mock rate
@@ -683,7 +683,7 @@ class CustomerAnalytics:
         Returns:
             Churn rate as decimal
         """
-        logger.info(f"📊 Calculating {period} churn rate...")
+        logger.info(f"[STATS] Calculating {period} churn rate...")
 
         # TODO: Calculate from database
         # For now, return mock rate
@@ -700,7 +700,7 @@ class CustomerAnalytics:
         Returns:
             New vs returning metrics
         """
-        logger.info("📊 Calculating new vs returning customers...")
+        logger.info("[STATS] Calculating new vs returning customers...")
 
         breakdown = {
             "new_customers": {
@@ -748,4 +748,4 @@ def get_customer_analytics(db_session=None):
     return _customer_analytics
 
 
-logger.info("✅ Customer Analytics module loaded")
+logger.info("[SUCCESS] Customer Analytics module loaded")

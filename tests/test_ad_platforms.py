@@ -8,19 +8,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 print("="*70)
-print("🧪 TESTING AD PLATFORMS INTEGRATION")
+print("[TEST] TESTING AD PLATFORMS INTEGRATION")
 print("="*70)
 print()
 
 # Test Meta Ads Platform
-print("1️⃣  Testing Meta (Facebook/Instagram) Ads Platform...")
+print("1⃣  Testing Meta (Facebook/Instagram) Ads Platform...")
 print()
 
 try:
     from ospra_os.advertising.meta import MetaAdsManager
-    print("   ✅ MetaAdsManager imported successfully")
+    print("   [SUCCESS] MetaAdsManager imported successfully")
 except ImportError as e:
-    print(f"   ❌ Failed to import MetaAdsManager: {e}")
+    print(f"   [ERROR] Failed to import MetaAdsManager: {e}")
     meta_available = False
 else:
     # Check credentials
@@ -35,7 +35,7 @@ else:
     print("   Checking credentials:")
     all_present = True
     for key, value in meta_credentials.items():
-        status = "✅" if value else "❌"
+        status = "[SUCCESS]" if value else "[ERROR]"
         print(f"      {status} {key}: {'Set' if value else 'Not set'}")
         if not value:
             all_present = False
@@ -47,26 +47,26 @@ else:
                 os.environ[key] = value
 
             meta = MetaAdsManager()
-            print("   ✅ MetaAdsManager initialized successfully")
+            print("   [SUCCESS] MetaAdsManager initialized successfully")
             meta_available = True
         except Exception as e:
-            print(f"   ❌ Failed to initialize MetaAdsManager: {e}")
+            print(f"   [ERROR] Failed to initialize MetaAdsManager: {e}")
             meta_available = False
     else:
-        print("   ⚠️  Meta Ads credentials not configured")
+        print("   [WARNING]  Meta Ads credentials not configured")
         meta_available = False
 
 print()
 
 # Test TikTok Ads Platform
-print("2️⃣  Testing TikTok Ads Platform...")
+print("2⃣  Testing TikTok Ads Platform...")
 print()
 
 try:
     from ospra_os.advertising.tiktok import TikTokAdsManager
-    print("   ✅ TikTokAdsManager imported successfully")
+    print("   [SUCCESS] TikTokAdsManager imported successfully")
 except ImportError as e:
-    print(f"   ❌ Failed to import TikTokAdsManager: {e}")
+    print(f"   [ERROR] Failed to import TikTokAdsManager: {e}")
     tiktok_available = False
 else:
     # Check credentials
@@ -80,7 +80,7 @@ else:
     print("   Checking credentials:")
     all_present = True
     for key, value in tiktok_credentials.items():
-        status = "✅" if value else "❌"
+        status = "[SUCCESS]" if value else "[ERROR]"
         print(f"      {status} {key}: {'Set' if value else 'Not set'}")
         if not value:
             all_present = False
@@ -92,25 +92,25 @@ else:
                 os.environ[key] = value
 
             tiktok = TikTokAdsManager()
-            print("   ✅ TikTokAdsManager initialized successfully")
+            print("   [SUCCESS] TikTokAdsManager initialized successfully")
             tiktok_available = True
         except Exception as e:
-            print(f"   ❌ Failed to initialize TikTokAdsManager: {e}")
+            print(f"   [ERROR] Failed to initialize TikTokAdsManager: {e}")
             tiktok_available = False
     else:
-        print("   ⚠️  TikTok Ads credentials not configured")
+        print("   [WARNING]  TikTok Ads credentials not configured")
         tiktok_available = False
 
 print()
 print("="*70)
-print("✅ AD PLATFORMS TEST COMPLETE")
+print("[SUCCESS] AD PLATFORMS TEST COMPLETE")
 print("="*70)
 print()
 
 # Summary
 print("Summary:")
-print(f"  {'✅' if meta_available else '⚠️ '} Meta (Facebook/Instagram) Ads: {'Available' if meta_available else 'Not configured'}")
-print(f"  {'✅' if tiktok_available else '⚠️ '} TikTok Ads: {'Available' if tiktok_available else 'Not configured'}")
+print(f"  {'[SUCCESS]' if meta_available else '[WARNING] '} Meta (Facebook/Instagram) Ads: {'Available' if meta_available else 'Not configured'}")
+print(f"  {'[SUCCESS]' if tiktok_available else '[WARNING] '} TikTok Ads: {'Available' if tiktok_available else 'Not configured'}")
 print()
 
 if not meta_available and not tiktok_available:
@@ -134,7 +134,7 @@ if not meta_available and not tiktok_available:
     print("  3. Get TikTok credentials from: https://ads.tiktok.com/marketing_api/apps")
     print()
 elif meta_available and tiktok_available:
-    print("🎉 Both ad platforms are ready to use!")
+    print("[LAUNCH] Both ad platforms are ready to use!")
     print()
     print("You can now:")
     print("  • Create automated ad campaigns for products")
@@ -145,6 +145,6 @@ elif meta_available and tiktok_available:
 else:
     platform_name = "Meta Ads" if meta_available else "TikTok Ads"
     other_platform = "TikTok Ads" if meta_available else "Meta Ads"
-    print(f"✅ {platform_name} is ready!")
-    print(f"⚠️  Configure {other_platform} to enable multi-platform advertising")
+    print(f"[SUCCESS] {platform_name} is ready!")
+    print(f"[WARNING]  Configure {other_platform} to enable multi-platform advertising")
     print()

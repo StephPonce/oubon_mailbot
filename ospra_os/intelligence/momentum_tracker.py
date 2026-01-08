@@ -23,13 +23,13 @@ class MomentumTracker:
 
     # Momentum indicators based on velocity score
     INDICATORS = {
-        "EXPLOSIVE": {"emoji": "🚀", "threshold": 50.0, "color": "#00FF41"},
-        "FAST": {"emoji": "⚡", "threshold": 30.0, "color": "#00FF00"},
-        "HOT": {"emoji": "🔥", "threshold": 15.0, "color": "#7FFF00"},
-        "RISING": {"emoji": "📈", "threshold": 5.0, "color": "#ADFF2F"},
+        "EXPLOSIVE": {"emoji": "[START]", "threshold": 50.0, "color": "#00FF41"},
+        "FAST": {"emoji": "[FAST]", "threshold": 30.0, "color": "#00FF00"},
+        "HOT": {"emoji": "[HOT]", "threshold": 15.0, "color": "#7FFF00"},
+        "RISING": {"emoji": "[TREND]", "threshold": 5.0, "color": "#ADFF2F"},
         "STABLE": {"emoji": "→", "threshold": -5.0, "color": "#808080"},
-        "FALLING": {"emoji": "📉", "threshold": -15.0, "color": "#FF8C00"},
-        "SLOW": {"emoji": "🐌", "threshold": float('-inf'), "color": "#FF0000"}
+        "FALLING": {"emoji": "[DECLINE]", "threshold": -15.0, "color": "#FF8C00"},
+        "SLOW": {"emoji": "", "threshold": float('-inf'), "color": "#FF0000"}
     }
 
     def __init__(self):

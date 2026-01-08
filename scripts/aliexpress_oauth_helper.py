@@ -40,13 +40,13 @@ def step1_get_authorization_url():
     auth_url = f"{AUTHORIZE_URL}?{urlencode(params)}"
 
     print("\n" + "="*70)
-    print("🔐 ALIEXPRESS OAUTH - STEP 1: AUTHORIZATION")
+    print("[SECURE] ALIEXPRESS OAUTH - STEP 1: AUTHORIZATION")
     print("="*70)
     print("")
     print(f"App Key: {APP_KEY}")
     print(f"Redirect URI: {REDIRECT_URI}")
     print("")
-    print("📋 INSTRUCTIONS:")
+    print("[LIST] INSTRUCTIONS:")
     print("-" * 70)
     print("")
     print("1. Copy this URL and open it in your browser:")
@@ -73,7 +73,7 @@ def step2_exchange_code_for_token(authorization_code):
     """Exchange authorization code for access token"""
 
     print("\n" + "="*70)
-    print("🔐 ALIEXPRESS OAUTH - STEP 2: TOKEN EXCHANGE")
+    print("[SECURE] ALIEXPRESS OAUTH - STEP 2: TOKEN EXCHANGE")
     print("="*70)
     print("")
     print(f"Authorization Code: {authorization_code[:20]}...")
@@ -88,7 +88,7 @@ def step2_exchange_code_for_token(authorization_code):
         'redirect_uri': REDIRECT_URI,
     }
 
-    print("📡 Requesting access token from AliExpress...")
+    print(" Requesting access token from AliExpress...")
     print("")
 
     try:
@@ -105,7 +105,7 @@ def step2_exchange_code_for_token(authorization_code):
                 expires_in = data.get('expires_in', 'unknown')
                 refresh_token = data.get('refresh_token', 'N/A')
 
-                print("✅ SUCCESS! Got new access token")
+                print("[SUCCESS] SUCCESS! Got new access token")
                 print("")
                 print(f"Access Token: {access_token[:30]}...{access_token[-10:]}")
                 print(f"Expires In: {expires_in} seconds")
@@ -116,10 +116,10 @@ def step2_exchange_code_for_token(authorization_code):
                 env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
                 set_key(env_path, 'ALIEXPRESS_ACCESS_TOKEN', access_token)
 
-                print("✅ Updated .env file with new access token!")
+                print("[SUCCESS] Updated .env file with new access token!")
                 print("")
                 print("="*70)
-                print("🎉 OAUTH COMPLETE!")
+                print("[LAUNCH] OAUTH COMPLETE!")
                 print("="*70)
                 print("")
                 print("You can now use the AliExpress Dropshipping API.")
@@ -127,20 +127,20 @@ def step2_exchange_code_for_token(authorization_code):
 
                 return True
             else:
-                print("❌ Error: No access_token in response")
+                print("[ERROR] Error: No access_token in response")
                 print("")
                 print("Response:")
                 print(response.text)
                 return False
         else:
-            print(f"❌ Token request failed: {response.status_code}")
+            print(f"[ERROR] Token request failed: {response.status_code}")
             print("")
             print("Response:")
             print(response.text)
             return False
 
     except Exception as e:
-        print(f"❌ Error during token exchange: {e}")
+        print(f"[ERROR] Error during token exchange: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -150,7 +150,7 @@ def main():
     """Main OAuth flow"""
 
     if not APP_KEY or not APP_SECRET:
-        print("❌ Error: ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET must be set in .env")
+        print("[ERROR] Error: ALIEXPRESS_APP_KEY and ALIEXPRESS_APP_SECRET must be set in .env")
         sys.exit(1)
 
     # Check if user provided authorization code

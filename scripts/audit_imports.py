@@ -241,7 +241,7 @@ class ImportAuditor:
     def generate_report(self) -> str:
         """Generate a markdown report of all issues."""
         if not self.issues:
-            return "# Import Audit Report\n\n✅ No import issues found!"
+            return "# Import Audit Report\n\n[SUCCESS] No import issues found!"
 
         report = ["# Import Audit Report\n"]
         report.append(f"Found **{len(self.issues)}** issues\n")
@@ -305,10 +305,10 @@ def main():
 
     # Return exit code based on issues
     if issues:
-        print(f"\n❌ Found {len(issues)} import issues")
+        print(f"\n[ERROR] Found {len(issues)} import issues")
         sys.exit(1)
     else:
-        print("\n✅ No import issues found")
+        print("\n[SUCCESS] No import issues found")
         sys.exit(0)
 
 

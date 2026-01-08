@@ -48,7 +48,7 @@ def generate_daily_summaries(user_id: int, db: Session = None) -> Dict[str, Any]
         should_close = False
 
     try:
-        logger.info(f"📊 Generating summary for user {user_id}...")
+        logger.info(f"[STATS] Generating summary for user {user_id}...")
 
         # Fetch all learning events for this user
         events = db.query(LearningEvent).filter(
@@ -139,7 +139,7 @@ def generate_daily_summaries(user_id: int, db: Session = None) -> Dict[str, Any]
 
         db.commit()
 
-        logger.info(f"✅ Summary generated for user {user_id} (~{estimated_tokens} tokens)")
+        logger.info(f"[SUCCESS] Summary generated for user {user_id} (~{estimated_tokens} tokens)")
 
         return summary_data
 
@@ -546,7 +546,7 @@ async def generate_all_user_summaries():
         users_with_events = db.query(LearningEvent.user_id).distinct().all()
         user_ids = [u[0] for u in users_with_events if u[0] is not None]
 
-        logger.info(f"📊 Generating summaries for {len(user_ids)} users...")
+        logger.info(f"[STATS] Generating summaries for {len(user_ids)} users...")
 
         for user_id in user_ids:
             try:
@@ -554,7 +554,7 @@ async def generate_all_user_summaries():
             except Exception as e:
                 logger.error(f"Failed to generate summary for user {user_id}: {e}")
 
-        logger.info(f"✅ Generated summaries for {len(user_ids)} users")
+        logger.info(f"[SUCCESS] Generated summaries for {len(user_ids)} users")
 
     finally:
         db.close()

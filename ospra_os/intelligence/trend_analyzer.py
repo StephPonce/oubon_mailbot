@@ -41,9 +41,9 @@ class TrendAnalyzer:
         if HAS_PYTRENDS:
             try:
                 self.pytrends = TrendReq(hl='en-US', tz=360)
-                logger.info("✅ Google Trends initialized")
+                logger.info("[SUCCESS] Google Trends initialized")
             except Exception as e:
-                logger.warning(f"⚠️  Google Trends init failed: {e}")
+                logger.warning(f"[WARNING]  Google Trends init failed: {e}")
                 self.pytrends = None
         else:
             self.pytrends = None
@@ -51,30 +51,30 @@ class TrendAnalyzer:
         # Instagram Graph API
         self.instagram_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
         if self.instagram_token:
-            logger.info("✅ Instagram API token found")
+            logger.info("[SUCCESS] Instagram API token found")
         else:
-            logger.warning("⚠️  INSTAGRAM_ACCESS_TOKEN not set")
+            logger.warning("[WARNING]  INSTAGRAM_ACCESS_TOKEN not set")
 
         # TikTok API
         self.tiktok_client_key = os.getenv('TIKTOK_CLIENT_KEY')
         if self.tiktok_client_key:
-            logger.info("✅ TikTok API credentials found")
+            logger.info("[SUCCESS] TikTok API credentials found")
         else:
-            logger.warning("⚠️  TIKTOK_CLIENT_KEY not set")
+            logger.warning("[WARNING]  TIKTOK_CLIENT_KEY not set")
 
         # Claude AI for product analysis
         self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if HAS_ANTHROPIC and self.anthropic_key:
             try:
                 self.claude_client = Anthropic(api_key=self.anthropic_key)
-                logger.info("✅ Claude AI initialized for product analysis")
+                logger.info("[SUCCESS] Claude AI initialized for product analysis")
             except Exception as e:
-                logger.warning(f"⚠️  Claude AI init failed: {e}")
+                logger.warning(f"[WARNING]  Claude AI init failed: {e}")
                 self.claude_client = None
         else:
             self.claude_client = None
             if not self.anthropic_key:
-                logger.warning("⚠️  ANTHROPIC_API_KEY not set - AI analysis unavailable")
+                logger.warning("[WARNING]  ANTHROPIC_API_KEY not set - AI analysis unavailable")
 
     async def analyze_product_trends(self, product: Dict) -> Dict:
         """
@@ -142,7 +142,7 @@ Format your response as JSON:
   "risks": ["Risk 1", "Risk 2"]
 }}"""
 
-            logger.info(f"🤖 Analyzing product with Claude: {product_name}")
+            logger.info(f"[AI] Analyzing product with Claude: {product_name}")
 
             response = self.claude_client.messages.create(
                 model="claude-sonnet-4-5-20250929",
@@ -173,7 +173,7 @@ Format your response as JSON:
                     "risks": ["Unable to complete full analysis"]
                 }
 
-            logger.info(f"✅ Analysis complete - Score: {analysis.get('score')}/10, Recommendation: {analysis.get('recommendation')}")
+            logger.info(f"[SUCCESS] Analysis complete - Score: {analysis.get('score')}/10, Recommendation: {analysis.get('recommendation')}")
 
             return analysis
 
@@ -429,16 +429,16 @@ Communication Style:
 - Direct and concise - get to the point
 - Use data to support insights, not decorate them
 - Organize information with clear hierarchy
-- NO decorative emoji - Do not use 🎧, 📹, 🔥, 💡, 🚀, 📊, 💰, or any product/category emoji
-- ONLY use ✓ and ⚠ when marking status or warnings
+- NO decorative emoji - Do not use , , [HOT], [TIP], [START], [STATS], [PRICE], or any product/category emoji
+- ONLY use [OK] and [WARNING] when marking status or warnings
 - Speak in complete sentences, not bullet-point fragments
 - When presenting options, be clear about your recommendation and why
 
 Format Guidelines:
 - Use headers sparingly and only for major sections
 - Bold for emphasis on key metrics or actions only
-- Present numbers cleanly: "$45,678" not "**$45,678** 💰"
-- Product names are plain text: "Smart Home Security Camera" NOT "🔥 Smart Home Security Camera 📹"
+- Present numbers cleanly: "$45,678" not "**$45,678** [PRICE]"
+- Product names are plain text: "Smart Home Security Camera" NOT "[HOT] Smart Home Security Camera "
 - If listing items, use clean numbered lists or brief paragraphs
 - End with a clear next step or question when appropriate
 
@@ -521,7 +521,7 @@ Your role is to surface what matters, recommend actions, and help the CEO make i
 
             # DEBUG: Print what Claude receives
             print("=" * 80)
-            print("🔍 CLAUDE RECEIVES THIS CONTEXT:")
+            print("[SEARCH] CLAUDE RECEIVES THIS CONTEXT:")
             print("=" * 80)
             print(f"System Prompt: {system_prompt[:200]}...")
             print("-" * 80)

@@ -1,66 +1,48 @@
-export interface Product {
-  id: string;
-  name: string;
-  category: string;
-  niche: string;
-  price: number;
-  cost: number;
-  shipping_cost?: number;
-  shopify_fee?: number;
-  total_costs?: number;
-  score: number;
-  profit_margin: number;
-  rating: number;
-  orders: number;
-  image_url?: string;
-  aliexpress_url?: string;
-  supplier_url?: string;
-  description?: string;
-  ai_analysis?: string;
-  features?: string[];
-  estimated_profit?: number;
-  velocity_score?: number;  // Can be at root level OR in market_intelligence
-  market_intelligence?: {
-    ai_analysis: string;
-    google_trends: {
-      average_interest: number;
-      current_interest: number;
-      trend_direction: string;
-    };
-    demand_level: string;
-    market_saturation: string;
-    growth_potential: string;
-    velocity_score?: number;
-  };
+// 
+// OSPRA INTELLIGENCE V5 - TYPE DEFINITIONS
+// 
+
+// User type - handles both `tier` and `subscription_tier` from backend
+export interface User {
+  id: number;
+  email: string;
+  name?: string;
+  username?: string;  // Legacy alias for name
+  tier?: string;      // Subscription tier: nest, flight, soar, stratosphere
+  subscription_tier?: string; // Backend returns this
+  created_at?: string;
+  last_login?: string;
 }
 
-export interface DashboardStats {
-  total_products: number;
-  avg_score: number;
-  avg_margin: number;
-  trending_up: number;
-  high_potential: number;
-  total_pages?: number;
-  avg_profit_margin?: number;
-  total_revenue?: number;
+// Auth types
+export interface LoginCredentials {
+  email: string;
+  password: string;
+  remember_me?: boolean;
 }
 
-export interface EmailMetrics {
-  total_processed: number;
-  auto_replied: number;
-  pending: number;
-  response_rate: number;
-  categories: Array<{
-    name: string;
-    count: number;
-  }>;
+export interface RegisterCredentials {
+  email: string;
+  password: string;
+  name?: string;
+  username?: string;  // Legacy alias
 }
 
-export interface Niche {
-  key: string;
-  name: string;
-  description?: string;
-  product_count: number;
-  avg_score?: number;
-  target_audience?: string;
+export interface AuthResponse {
+  success: boolean;
+  access_token?: string;
+  token_type?: string;
+  user?: User;
+  error?: string;
+  detail?: string;
+}
+
+// Auth context type
+export interface AuthContextType {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  checkAuth: () => Promise<void>;
 }

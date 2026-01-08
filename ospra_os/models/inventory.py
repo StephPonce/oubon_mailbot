@@ -241,7 +241,7 @@ class StockoutEvent(Base):
 def init_inventory_tables(engine):
     """Create all inventory tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Inventory tables created")
+    print("[SUCCESS] Inventory tables created")
     print("   - inventory_levels")
     print("   - inventory_snapshots")
     print("   - restock_orders")

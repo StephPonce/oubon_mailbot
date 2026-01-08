@@ -199,10 +199,10 @@ async def show_manual_entry_form():
     </head>
     <body>
         <div class="container">
-            <h1>🔑 Manual Token Entry</h1>
+            <h1> Manual Token Entry</h1>
 
             <div class="warning">
-                <strong>⚠️ OAuth Not Working?</strong>
+                <strong>[WARNING] OAuth Not Working?</strong>
                 <p>Use this form if the OAuth flow returns "appkey not exists" error. You can obtain tokens from:</p>
                 <ul>
                     <li>AliExpress Developer Console (if tokens are displayed there)</li>
@@ -212,7 +212,7 @@ async def show_manual_entry_form():
             </div>
 
             <div class="info">
-                <strong>📋 What You Need:</strong>
+                <strong>[LIST] What You Need:</strong>
                 <ul>
                     <li><strong>Dropshipping API (520918):</strong> Access token from dropshipping app</li>
                     <li><strong>Affiliate API (522382):</strong> Access token from affiliate app</li>
@@ -249,7 +249,7 @@ async def show_manual_entry_form():
                     <small style="color: #666;">Default: 2592000 seconds = 30 days</small>
                 </div>
 
-                <button type="submit">💾 Save Token to Database</button>
+                <button type="submit"> Save Token to Database</button>
             </form>
 
             <div id="result" class="result"></div>
@@ -285,7 +285,7 @@ async def show_manual_entry_form():
                     if (response.ok) {
                         resultDiv.className = 'result success';
                         resultDiv.innerHTML = `
-                            <strong>✅ Success!</strong>
+                            <strong>[SUCCESS] Success!</strong>
                             <p>${data.message}</p>
                             <p>Token for <strong>${data.api_type}</strong> API saved to database.</p>
                             <p>Token will expire in ${Math.round(data.expires_in / 86400)} days.</p>
@@ -294,14 +294,14 @@ async def show_manual_entry_form():
                     } else {
                         resultDiv.className = 'result error';
                         resultDiv.innerHTML = `
-                            <strong>❌ Error</strong>
+                            <strong>[ERROR] Error</strong>
                             <p>${data.detail || 'Failed to save token'}</p>
                         `;
                     }
                 } catch (error) {
                     resultDiv.className = 'result error';
                     resultDiv.innerHTML = `
-                        <strong>❌ Error</strong>
+                        <strong>[ERROR] Error</strong>
                         <p>Network error: ${error.message}</p>
                     `;
                 }

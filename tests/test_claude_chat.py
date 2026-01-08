@@ -35,23 +35,23 @@ def test_claude_chat():
             print(json.dumps(data, indent=2))
 
             if data.get('success'):
-                print("\n✅ SUCCESS: Chat endpoint is working!")
+                print("\n[SUCCESS] SUCCESS: Chat endpoint is working!")
                 print(f"\nClaude's response:\n{data.get('message', 'No message')}")
             else:
-                print(f"\n❌ FAILED: {data.get('error', 'Unknown error')}")
+                print(f"\n[ERROR] FAILED: {data.get('error', 'Unknown error')}")
                 if 'traceback' in data:
                     print(f"\nTraceback:\n{data['traceback']}")
         else:
-            print(f"\n❌ HTTP Error {response.status_code}")
+            print(f"\n[ERROR] HTTP Error {response.status_code}")
             print(f"Response: {response.text}")
 
     except requests.exceptions.ConnectionError:
-        print("\n❌ CONNECTION ERROR: Backend not running on port 8000")
+        print("\n[ERROR] CONNECTION ERROR: Backend not running on port 8000")
         print("Start backend with: uvicorn ospra_os.main:app --port 8000")
     except requests.exceptions.Timeout:
-        print("\n❌ TIMEOUT: Request took longer than 30 seconds")
+        print("\n[ERROR] TIMEOUT: Request took longer than 30 seconds")
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\n[ERROR] ERROR: {e}")
 
     print("\n" + "=" * 60)
 

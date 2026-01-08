@@ -71,23 +71,23 @@ class ProductDeployer:
             shopify_token: Shopify API token (or from env)
         """
         # Initialize services
-        logger.info("🚀 Initializing ProductDeployer...")
+        logger.info("[START] Initializing ProductDeployer...")
 
         # Content generation
         try:
             self.content_generator = ProductContentGenerator()
-            logger.info("   ✅ Content generator ready (Claude Sonnet 4.5)")
+            logger.info("   [SUCCESS] Content generator ready (Claude Sonnet 4.5)")
         except Exception as e:
-            logger.warning(f"   ⚠️  Content generator unavailable: {e}")
+            logger.warning(f"   [WARNING]  Content generator unavailable: {e}")
             self.content_generator = None
 
         # Image enhancement
         try:
             self.image_processor = ProductImageProcessor()
             self.image_storage = ImageStorage()
-            logger.info("   ✅ Image processor ready (DALL-E 3 + rembg)")
+            logger.info("   [SUCCESS] Image processor ready (DALL-E 3 + rembg)")
         except Exception as e:
-            logger.warning(f"   ⚠️  Image processor unavailable: {e}")
+            logger.warning(f"   [WARNING]  Image processor unavailable: {e}")
             self.image_processor = None
             self.image_storage = None
 
@@ -106,12 +106,12 @@ class ProductDeployer:
                 "api_version": os.getenv("SHOPIFY_API_VERSION", "2025-01")
             }
             self.shopify = ShopifyAdapter(credentials)
-            logger.info(f"   ✅ Shopify client ready ({store})")
+            logger.info(f"   [SUCCESS] Shopify client ready ({store})")
         except Exception as e:
-            logger.warning(f"   ⚠️  Shopify client unavailable: {e}")
+            logger.warning(f"   [WARNING]  Shopify client unavailable: {e}")
             self.shopify = None
 
-        logger.info("✅ ProductDeployer initialized")
+        logger.info("[SUCCESS] ProductDeployer initialized")
 
     async def prepare_product(
         self,
@@ -135,7 +135,7 @@ class ProductDeployer:
             Complete product data ready for Shopify
         """
         logger.info(f"\n{'='*70}")
-        logger.info(f"🔧 PREPARING PRODUCT")
+        logger.info(f"[FIX] PREPARING PRODUCT")
         logger.info(f"{'='*70}")
 
         start_time = time.time()
@@ -160,7 +160,7 @@ class ProductDeployer:
 
         # Step 1: Generate AI content
         if auto_generate_content and self.content_generator:
-            logger.info("📝 Step 1: Generating AI content...")
+            logger.info("[NOTE] Step 1: Generating AI content...")
             try:
                 content = await self.content_generator.generate_complete_listing(
                     aliexpress_data=aliexpress_product,
@@ -173,19 +173,19 @@ class ProductDeployer:
                 stats = self.content_generator.get_usage_stats(last_n_hours=1)
                 costs["content"] = stats.get("total_cost", 0.02)
 
-                logger.info(f"   ✅ Content generated (cost: ${costs['content']:.4f})")
+                logger.info(f"   [SUCCESS] Content generated (cost: ${costs['content']:.4f})")
                 logger.info(f"   Title: {content['title'][:50]}")
 
             except Exception as e:
-                logger.error(f"   ❌ Content generation failed: {e}")
+                logger.error(f"   [ERROR] Content generation failed: {e}")
                 result["content"] = self._create_fallback_content(aliexpress_product, niche)
         else:
-            logger.info("📝 Step 1: Using fallback content (AI disabled)")
+            logger.info("[NOTE] Step 1: Using fallback content (AI disabled)")
             result["content"] = self._create_fallback_content(aliexpress_product, niche)
 
         # Step 2: Enhance images
         if auto_enhance_images and self.image_processor and images:
-            logger.info("\n🎨 Step 2: Enhancing images with AI...")
+            logger.info("\n Step 2: Enhancing images with AI...")
             enhanced_images = []
 
             try:
@@ -227,23 +227,23 @@ class ProductDeployer:
                         enhanced_images.append(full_url)
 
                         costs["images"] += enhancement_result.get("cost_estimate", 0.04)
-                        logger.info(f"   ✅ Primary image enhanced (cost: $0.04)")
+                        logger.info(f"   [SUCCESS] Primary image enhanced (cost: $0.04)")
 
                 # Add remaining original images
                 enhanced_images.extend(images[1:5])  # Max 5 total
 
                 result["images"] = enhanced_images
-                logger.info(f"   📸 Total images: {len(enhanced_images)}")
+                logger.info(f"    Total images: {len(enhanced_images)}")
 
             except Exception as e:
-                logger.error(f"   ❌ Image enhancement failed: {e}")
+                logger.error(f"   [ERROR] Image enhancement failed: {e}")
                 result["images"] = images[:5]
         else:
-            logger.info("\n🎨 Step 2: Using original images (enhancement disabled)")
+            logger.info("\n Step 2: Using original images (enhancement disabled)")
             result["images"] = images[:5]
 
         # Step 3: Calculate final pricing
-        logger.info("\n💰 Step 3: Calculating pricing...")
+        logger.info("\n[PRICE] Step 3: Calculating pricing...")
         pricing = result["content"].get("pricing", {})
         result["pricing"] = {
             "cost_price": cost_price,
@@ -268,7 +268,7 @@ class ProductDeployer:
         }
 
         logger.info(f"\n{'='*70}")
-        logger.info(f"✅ PREPARATION COMPLETE")
+        logger.info(f"[SUCCESS] PREPARATION COMPLETE")
         logger.info(f"{'='*70}")
         logger.info(f"Processing time: {processing_time:.2f}s")
         logger.info(f"AI costs: ${result['meta']['total_cost']:.4f}")
@@ -296,7 +296,7 @@ class ProductDeployer:
             Deployment result with Shopify product ID and URLs
         """
         logger.info(f"\n{'='*70}")
-        logger.info(f"🚀 DEPLOYING PRODUCT TO SHOPIFY")
+        logger.info(f"[START] DEPLOYING PRODUCT TO SHOPIFY")
         logger.info(f"{'='*70}")
 
         if not self.shopify:
@@ -316,7 +316,7 @@ class ProductDeployer:
         )
 
         # Step 4: Create Shopify product
-        logger.info("🏪 Step 4: Creating product on Shopify...")
+        logger.info(" Step 4: Creating product on Shopify...")
 
         content = prepared["content"]
         pricing = prepared["pricing"]
@@ -350,10 +350,10 @@ class ProductDeployer:
             shopify_url = deploy_result["platform_url"]
             admin_url = deploy_result["admin_url"]
 
-            logger.info(f"   ✅ Product created: {product_id}")
-            logger.info(f"   ✅ Pricing set: ${pricing['suggested_price']:.2f}")
-            logger.info(f"   ✅ Images uploaded: {len(images)}")
-            logger.info("   ✅ SEO metadata set")
+            logger.info(f"   [SUCCESS] Product created: {product_id}")
+            logger.info(f"   [SUCCESS] Pricing set: ${pricing['suggested_price']:.2f}")
+            logger.info(f"   [SUCCESS] Images uploaded: {len(images)}")
+            logger.info("   [SUCCESS] SEO metadata set")
 
             # Build result
             processing_time = time.time() - start_time
@@ -377,7 +377,7 @@ class ProductDeployer:
             }
 
             logger.info(f"\n{'='*70}")
-            logger.info(f"✅ DEPLOYMENT SUCCESSFUL")
+            logger.info(f"[SUCCESS] DEPLOYMENT SUCCESSFUL")
             logger.info(f"{'='*70}")
             logger.info(f"Product ID: {product_id}")
             logger.info(f"URL: {result['shopify_url']}")
@@ -389,7 +389,7 @@ class ProductDeployer:
             return result
 
         except Exception as e:
-            logger.error(f"❌ Deployment failed: {e}")
+            logger.error(f"[ERROR] Deployment failed: {e}")
             import traceback
             traceback.print_exc()
 
@@ -418,7 +418,7 @@ class ProductDeployer:
             Bulk deployment summary
         """
         logger.info(f"\n{'='*70}")
-        logger.info(f"🚀 BULK DEPLOYMENT: {len(products)} products")
+        logger.info(f"[START] BULK DEPLOYMENT: {len(products)} products")
         logger.info(f"{'='*70}\n")
 
         start_time = time.time()
@@ -428,7 +428,7 @@ class ProductDeployer:
         total_cost = 0.0
 
         for idx, product in enumerate(products, 1):
-            logger.info(f"📦 [{idx}/{len(products)}] Processing: {product.get('title', 'Unknown')[:50]}")
+            logger.info(f"[PACKAGE] [{idx}/{len(products)}] Processing: {product.get('title', 'Unknown')[:50]}")
 
             try:
                 result = await self.deploy_product(
@@ -457,7 +457,7 @@ class ProductDeployer:
 
             except Exception as e:
                 failed += 1
-                logger.error(f"   ❌ Deployment failed: {e}")
+                logger.error(f"   [ERROR] Deployment failed: {e}")
                 results.append({
                     "product": product.get("title"),
                     "success": False,
@@ -481,7 +481,7 @@ class ProductDeployer:
         }
 
         logger.info(f"\n{'='*70}")
-        logger.info(f"✅ BULK DEPLOYMENT COMPLETE")
+        logger.info(f"[SUCCESS] BULK DEPLOYMENT COMPLETE")
         logger.info(f"{'='*70}")
         logger.info(f"Successful: {successful}/{len(products)}")
         logger.info(f"Failed: {failed}/{len(products)}")
@@ -508,7 +508,7 @@ class ProductDeployer:
         Returns:
             Preview of what would be deployed
         """
-        logger.info("👁️  Generating deployment preview...")
+        logger.info("  Generating deployment preview...")
 
         prepared = await self.prepare_product(
             aliexpress_product=aliexpress_product,
@@ -530,7 +530,7 @@ class ProductDeployer:
             "processing_time": prepared["meta"]["processing_time_seconds"]
         }
 
-        logger.info("✅ Preview generated")
+        logger.info("[SUCCESS] Preview generated")
 
         return preview
 

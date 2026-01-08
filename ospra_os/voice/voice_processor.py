@@ -22,7 +22,7 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-    print("⚠️  OpenAI not available. Voice commands will be disabled.")
+    print("[WARNING]  OpenAI not available. Voice commands will be disabled.")
 
 
 class VoiceCommandType(str, Enum):
@@ -55,7 +55,7 @@ class VoiceProcessor:
         except:
             self.claude = None
             self.claude_available = False
-            print("⚠️  Claude client not available. Using basic command interpretation.")
+            print("[WARNING]  Claude client not available. Using basic command interpretation.")
 
         # Command patterns for quick matching (before hitting Claude)
         self.quick_patterns = {

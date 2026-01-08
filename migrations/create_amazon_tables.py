@@ -67,7 +67,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     tables_to_create = [t for t in amazon_tables if t not in existing_tables]
 
     if not tables_to_create:
-        logger.info("✅ All Amazon tables already exist")
+        logger.info("[SUCCESS] All Amazon tables already exist")
         return
 
     logger.info(f"Creating tables: {tables_to_create}")
@@ -81,7 +81,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
 
     created_tables = [t for t in amazon_tables if t in new_tables]
 
-    logger.info(f"✅ Created {len(created_tables)} tables:")
+    logger.info(f"[SUCCESS] Created {len(created_tables)} tables:")
     for table in created_tables:
         # Get columns
         columns = inspector.get_columns(table)
@@ -89,7 +89,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
         logger.info(f"   - {table} ({len(column_names)} columns)")
 
     logger.info("")
-    logger.info("🎉 Amazon FBA migration complete!")
+    logger.info("[LAUNCH] Amazon FBA migration complete!")
     logger.info("")
     logger.info("Tables created:")
     logger.info("  amazon_accounts     - Amazon Seller Central connections")
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     try:
         run_migration(database_url)
     except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
+        logger.error(f"[ERROR] Migration failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

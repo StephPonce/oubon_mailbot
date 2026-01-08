@@ -11,23 +11,23 @@ import requests
 API_BASE = "http://localhost:8001/api/dashboard/v2"
 
 def test_sync_deployment():
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("🔄 TESTING DEPLOYMENT SYNC")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[REFRESH] TESTING DEPLOYMENT SYNC")
+    print("")
     print()
 
     # Step 1: Get a deployed product
-    print("1️⃣ Getting deployed products...")
+    print("1⃣ Getting deployed products...")
     response = requests.get(f"{API_BASE}/deployments")
 
     if not response.ok:
-        print(f"❌ Failed to get deployments: {response.status_code}")
+        print(f"[ERROR] Failed to get deployments: {response.status_code}")
         return
 
     deployments = response.json().get("deployments", [])
 
     if not deployments:
-        print("⚠️  No deployed products found")
+        print("[WARNING]  No deployed products found")
         print()
         print("To test:")
         print("1. Deploy a product first: uv run python deploy_with_ai.py")
@@ -39,54 +39,54 @@ def test_sync_deployment():
     product_id = deployment['product_id']
     shopify_id = deployment['shopify_product_id']
 
-    print(f"✅ Found deployed product:")
+    print(f"[SUCCESS] Found deployed product:")
     print(f"   Product ID: {product_id}")
     print(f"   Shopify ID: {shopify_id}")
     print(f"   Shopify URL: {deployment['shopify_url']}")
     print()
 
     # Step 2: Sync deployment status
-    print("2️⃣ Syncing deployment status with Shopify...")
+    print("2⃣ Syncing deployment status with Shopify...")
     print(f"   (Checking if product {shopify_id} still exists)")
     print()
 
     sync_response = requests.post(f"{API_BASE}/products/{product_id}/sync-deployment")
 
     if not sync_response.ok:
-        print(f"❌ Sync failed: {sync_response.status_code}")
+        print(f"[ERROR] Sync failed: {sync_response.status_code}")
         print(sync_response.text)
         return
 
     result = sync_response.json()
 
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("📊 SYNC RESULTS")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[STATS] SYNC RESULTS")
+    print("")
     print()
 
     if result.get("synced"):
         if result.get("deployed"):
-            print("✅ Product still exists on Shopify")
+            print("[SUCCESS] Product still exists on Shopify")
             print(f"   Shopify ID: {result['shopify_product_id']}")
             print(f"   Shopify URL: {result['shopify_url']}")
             print()
             print("Status: Deployment record is accurate")
         else:
-            print("⚠️  Product no longer exists on Shopify")
+            print("[WARNING]  Product no longer exists on Shopify")
             print(f"   Message: {result.get('message')}")
             print()
             print("Action: Deployment record has been marked as removed")
             print()
             print("The product can now be redeployed if needed")
     else:
-        print(f"⚠️  Could not sync: {result.get('message')}")
+        print(f"[WARNING]  Could not sync: {result.get('message')}")
 
     print()
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
 
     # Step 3: Show how to use this in practice
     print()
-    print("💡 PRACTICAL USE CASES:")
+    print("[TIP] PRACTICAL USE CASES:")
     print()
     print("1. Periodic Sync Job:")
     print("   Run this endpoint every hour to detect manual deletions")
@@ -101,7 +101,7 @@ def test_sync_deployment():
     print("   Remove stale deployment records from database")
 
     print()
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
 
 if __name__ == "__main__":
     test_sync_deployment()

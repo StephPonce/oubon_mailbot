@@ -212,7 +212,7 @@ def init_multi_store_db(database_url: str = "sqlite:///./multi_store.db"):
     # Create all tables
     Base.metadata.create_all(bind=engine)
 
-    print(f"✅ Multi-store database initialized at: {database_url}")
+    print(f"[SUCCESS] Multi-store database initialized at: {database_url}")
     print(f"   Tables created: {len(Base.metadata.tables)}")
 
     return engine
@@ -297,7 +297,7 @@ def migrate_existing_store(
 
         session.commit()
 
-        print(f"✅ Migration complete!")
+        print(f"[SUCCESS] Migration complete!")
         print(f"   User: {user.email} (ID: {user.id})")
         print(f"   Store: {store.store_name} (ID: {store.id})")
 
@@ -305,7 +305,7 @@ def migrate_existing_store(
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Migration failed: {e}")
+        print(f"[ERROR] Migration failed: {e}")
         raise
     finally:
         session.close()
@@ -361,18 +361,18 @@ def get_store_performance(session: Session, store_id: int) -> dict:
 
 if __name__ == "__main__":
     # Demo usage
-    print("🔧 Initializing Multi-Store Database...")
+    print("[FIX] Initializing Multi-Store Database...")
     engine = init_multi_store_db()
 
-    print("\n📊 Database Schema:")
+    print("\n[STATS] Database Schema:")
     for table_name in Base.metadata.tables.keys():
         print(f"   • {table_name}")
 
-    print("\n✅ Ready for multi-store, multi-platform e-commerce!")
+    print("\n[SUCCESS] Ready for multi-store, multi-platform e-commerce!")
 
-# ═══════════════════════════════════════════════════════
+# 
 # INTELLIGENCE LAYER - YOUR COMPETITIVE MOAT
-# ═══════════════════════════════════════════════════════
+# 
 
 class EmailFollowup(Base):
     """Track emails that need AI follow-up during operating hours."""
@@ -411,7 +411,7 @@ def get_followup_session(database_url: str):
     return Session()
 
 
-print("✅ Email Automation models added")
+print("[SUCCESS] Email Automation models added")
 
 
 # ============================================================================

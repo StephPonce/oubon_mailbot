@@ -82,7 +82,7 @@ class AdScheduler:
 
     async def start(self):
         """Start the scheduler with all automation jobs."""
-        logger.info("🚀 Starting Ad Automation Scheduler")
+        logger.info("[START] Starting Ad Automation Scheduler")
 
         # Daily performance check at 9 AM
         self.scheduler.add_job(
@@ -92,7 +92,7 @@ class AdScheduler:
             name='Daily Performance Check',
             replace_existing=True
         )
-        logger.info("✅ Scheduled: Daily performance check at 9:00 AM")
+        logger.info("[SUCCESS] Scheduled: Daily performance check at 9:00 AM")
 
         # Budget optimization every 6 hours
         self.scheduler.add_job(
@@ -102,7 +102,7 @@ class AdScheduler:
             name='Budget Optimization',
             replace_existing=True
         )
-        logger.info("✅ Scheduled: Budget optimization every 6 hours")
+        logger.info("[SUCCESS] Scheduled: Budget optimization every 6 hours")
 
         # Auto-pause poor performers every hour
         self.scheduler.add_job(
@@ -112,16 +112,16 @@ class AdScheduler:
             name='Auto-Pause Poor Performers',
             replace_existing=True
         )
-        logger.info("✅ Scheduled: Auto-pause check every hour")
+        logger.info("[SUCCESS] Scheduled: Auto-pause check every hour")
 
         # Start scheduler
         self.scheduler.start()
-        logger.info("🎯 Ad Scheduler is now running")
+        logger.info("[TARGET] Ad Scheduler is now running")
 
     async def stop(self):
         """Stop the scheduler."""
         self.scheduler.shutdown()
-        logger.info("⏹️  Ad Scheduler stopped")
+        logger.info("[STOP]  Ad Scheduler stopped")
 
     async def create_multi_platform_campaign(
         self,
@@ -157,8 +157,8 @@ class AdScheduler:
         if not platforms:
             platforms = ['meta', 'tiktok', 'google']
 
-        logger.info(f"🎬 Creating multi-platform campaigns for: {product_name}")
-        logger.info(f"📊 Platforms: {', '.join(platforms)}")
+        logger.info(f" Creating multi-platform campaigns for: {product_name}")
+        logger.info(f"[STATS] Platforms: {', '.join(platforms)}")
 
         results = {
             'product_id': product_id,
@@ -171,7 +171,7 @@ class AdScheduler:
         # Generate AI creatives for each platform
         for platform in platforms:
             try:
-                logger.info(f"🎨 Generating creative for {platform}...")
+                logger.info(f" Generating creative for {platform}...")
 
                 # Generate ad copy
                 if self.creative_generator:
@@ -216,10 +216,10 @@ class AdScheduler:
                         'created_at': datetime.utcnow()
                     }
 
-                logger.info(f"✅ {platform} campaign created: {campaign_result['campaign_id']}")
+                logger.info(f"[SUCCESS] {platform} campaign created: {campaign_result['campaign_id']}")
 
             except Exception as e:
-                logger.error(f"❌ Failed to create {platform} campaign: {e}")
+                logger.error(f"[ERROR] Failed to create {platform} campaign: {e}")
                 results['campaigns'][platform] = {
                     'success': False,
                     'error': str(e)
@@ -231,7 +231,7 @@ class AdScheduler:
         results['successful_platforms'] = successful
         results['total_platforms'] = len(platforms)
 
-        logger.info(f"🎉 Campaign creation complete: {successful}/{len(platforms)} platforms successful")
+        logger.info(f"[LAUNCH] Campaign creation complete: {successful}/{len(platforms)} platforms successful")
 
         return results
 
@@ -304,7 +304,7 @@ class AdScheduler:
 
         Reviews all active campaigns and generates performance report.
         """
-        logger.info("📊 Running daily performance check...")
+        logger.info("[STATS] Running daily performance check...")
 
         report = {
             'date': datetime.utcnow().isoformat(),
@@ -355,9 +355,9 @@ class AdScheduler:
             'average_ctr': round(total_clicks / total_impressions * 100, 2) if total_impressions > 0 else 0
         }
 
-        logger.info(f"✅ Daily check complete: {report['campaigns_checked']} campaigns")
-        logger.info(f"💰 Total spend: ${report['summary']['total_spend']}")
-        logger.info(f"📈 Total clicks: {report['summary']['total_clicks']}")
+        logger.info(f"[SUCCESS] Daily check complete: {report['campaigns_checked']} campaigns")
+        logger.info(f"[PRICE] Total spend: ${report['summary']['total_spend']}")
+        logger.info(f"[TREND] Total clicks: {report['summary']['total_clicks']}")
 
         return report
 
@@ -369,7 +369,7 @@ class AdScheduler:
         - High CTR (>2%) → Increase budget by 20%
         - Low CTR (<0.5%) → Decrease budget by 20%
         """
-        logger.info("💰 Running budget optimization...")
+        logger.info("[PRICE] Running budget optimization...")
 
         optimized_count = 0
 
@@ -397,12 +397,12 @@ class AdScheduler:
                 if ctr >= self.HIGH_CTR_THRESHOLD:
                     # High performer - increase budget
                     new_budget = current_budget * (1 + self.BUDGET_ADJUSTMENT_PERCENT)
-                    logger.info(f"📈 {platform} {campaign_id}: High CTR {ctr:.2%} → Increase budget ${current_budget:.2f} → ${new_budget:.2f}")
+                    logger.info(f"[TREND] {platform} {campaign_id}: High CTR {ctr:.2%} → Increase budget ${current_budget:.2f} → ${new_budget:.2f}")
 
                 elif ctr <= self.LOW_CTR_THRESHOLD and spend > current_budget * 0.5:
                     # Low performer with significant spend - decrease budget
                     new_budget = current_budget * (1 - self.BUDGET_ADJUSTMENT_PERCENT)
-                    logger.info(f"📉 {platform} {campaign_id}: Low CTR {ctr:.2%} → Decrease budget ${current_budget:.2f} → ${new_budget:.2f}")
+                    logger.info(f"[DECLINE] {platform} {campaign_id}: Low CTR {ctr:.2%} → Decrease budget ${current_budget:.2f} → ${new_budget:.2f}")
 
                 # Apply budget change if different
                 if abs(new_budget - current_budget) > 0.01:
@@ -413,7 +413,7 @@ class AdScheduler:
             except Exception as e:
                 logger.error(f"Error optimizing {platform} campaign {campaign_id}: {e}")
 
-        logger.info(f"✅ Budget optimization complete: {optimized_count} campaigns adjusted")
+        logger.info(f"[SUCCESS] Budget optimization complete: {optimized_count} campaigns adjusted")
 
     async def auto_pause_poor_performers(self):
         """
@@ -423,7 +423,7 @@ class AdScheduler:
         - CTR < 0.5% after 100+ impressions
         - ROAS < 1.0 after 10+ conversions
         """
-        logger.info("⏸️  Checking for poor performers...")
+        logger.info("[PAUSE]  Checking for poor performers...")
 
         paused_count = 0
         MIN_IMPRESSIONS_THRESHOLD = 100
@@ -463,7 +463,7 @@ class AdScheduler:
                         pause_reason = f"Low ROAS ({roas:.2f}) after {conversions} conversions"
 
                 if should_pause:
-                    logger.warning(f"⏸️  Pausing {platform} {campaign_id}: {pause_reason}")
+                    logger.warning(f"[PAUSE]  Pausing {platform} {campaign_id}: {pause_reason}")
 
                     # Pause campaign on platform
                     await self._pause_campaign(platform, campaign_id)
@@ -479,9 +479,9 @@ class AdScheduler:
                 logger.error(f"Error checking {platform} campaign {campaign_id}: {e}")
 
         if paused_count > 0:
-            logger.info(f"⏸️  Auto-paused {paused_count} poor performing campaigns")
+            logger.info(f"[PAUSE]  Auto-paused {paused_count} poor performing campaigns")
         else:
-            logger.info("✅ No campaigns needed pausing")
+            logger.info("[SUCCESS] No campaigns needed pausing")
 
     async def _get_campaign_metrics(self, platform: str, campaign_id: str) -> Optional[Dict]:
         """Get metrics for a campaign from the appropriate platform."""
@@ -530,7 +530,7 @@ class AdScheduler:
                     self.active_campaigns[campaign_key]['status'] = 'active'
                     self.active_campaigns[campaign_key]['activated_at'] = datetime.utcnow()
 
-                logger.info(f"▶️  Activated {platform} campaign: {campaign_id}")
+                logger.info(f"  Activated {platform} campaign: {campaign_id}")
 
             return success
 

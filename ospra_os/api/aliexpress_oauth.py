@@ -137,7 +137,7 @@ async def oauth_callback(
             </head>
             <body>
                 <div class="error">
-                    <h1>❌ Authorization Failed</h1>
+                    <h1>[ERROR] Authorization Failed</h1>
                     <p><strong>Error:</strong> {error}</p>
                     <p>Please try again or check your AliExpress app configuration.</p>
                 </div>
@@ -162,7 +162,7 @@ async def oauth_callback(
             </head>
             <body>
                 <div class="error">
-                    <h1>❌ Missing Authorization Code</h1>
+                    <h1>[ERROR] Missing Authorization Code</h1>
                     <p>No authorization code received from AliExpress.</p>
                 </div>
             </body>
@@ -199,7 +199,7 @@ async def oauth_callback(
             # Also generate MD5 wrapped signature for debugging
             md5_signature = generate_aliexpress_signature_md5_wrapped(params, ALIEXPRESS_APP_SECRET)
 
-            print(f"🔐 Signature Debug:")
+            print(f"[SECURE] Signature Debug:")
             print(f"   SHA256: {signature}")
             print(f"   MD5 (wrapped): {md5_signature}")
             print(f"   Parameters: {params}")
@@ -212,7 +212,7 @@ async def oauth_callback(
             )
 
             # Log response details for debugging
-            print(f"📡 Token Exchange Response:")
+            print(f" Token Exchange Response:")
             print(f"   Status Code: {response.status_code}")
             print(f"   Headers: {dict(response.headers)}")
             print(f"   Raw Body: {response.text[:500]}")
@@ -222,7 +222,7 @@ async def oauth_callback(
                 token_response = response.json()
             except Exception as json_error:
                 token_error = f"Failed to parse JSON response. Status: {response.status_code}, Body: {response.text}"
-                print(f"❌ {token_error}")
+                print(f"[ERROR] {token_error}")
                 raise Exception(token_error)
 
             # Store tokens if successful
@@ -238,17 +238,17 @@ async def oauth_callback(
                 )
 
                 if success:
-                    print(f"✅ AliExpress Dropshipping tokens saved to database")
+                    print(f"[SUCCESS] AliExpress Dropshipping tokens saved to database")
                 else:
-                    print(f"❌ Failed to save tokens to database")
+                    print(f"[ERROR] Failed to save tokens to database")
             else:
                 token_error = f"Token exchange failed: {response.status_code} - {response.text}"
-                print(f"❌ {token_error}")
+                print(f"[ERROR] {token_error}")
 
     except Exception as e:
         import traceback
         token_error = f"Exception during token exchange: {str(e)}\n\nFull traceback:\n{traceback.format_exc()}"
-        print(f"❌ {token_error}")
+        print(f"[ERROR] {token_error}")
 
     # Display result to user
     if token_response and "access_token" in token_response:
@@ -318,24 +318,24 @@ async def oauth_callback(
             </head>
             <body>
                 <div class="success">
-                    <h1>🎉 OAuth Successful!</h1>
+                    <h1>[LAUNCH] OAuth Successful!</h1>
 
                     <div class="info">
-                        <p><strong>✅ Tokens obtained and stored successfully!</strong></p>
-                        <p>📁 Saved to: <span class="highlight">.secrets/aliexpress_tokens.json</span></p>
-                        <p>🔑 Access Token: <span class="highlight">{token_response.get('access_token', '')[:20]}...</span></p>
-                        <p>🔄 Refresh Token: <span class="highlight">{token_response.get('refresh_token', '')[:20] if token_response.get('refresh_token') else 'N/A'}...</span></p>
-                        <p>⏱️ Expires In: <span class="highlight">{token_response.get('expires_in', 'N/A')} seconds</span></p>
+                        <p><strong>[SUCCESS] Tokens obtained and stored successfully!</strong></p>
+                        <p> Saved to: <span class="highlight">.secrets/aliexpress_tokens.json</span></p>
+                        <p> Access Token: <span class="highlight">{token_response.get('access_token', '')[:20]}...</span></p>
+                        <p>[REFRESH] Refresh Token: <span class="highlight">{token_response.get('refresh_token', '')[:20] if token_response.get('refresh_token') else 'N/A'}...</span></p>
+                        <p>[TIMER] Expires In: <span class="highlight">{token_response.get('expires_in', 'N/A')} seconds</span></p>
                     </div>
 
-                    <h3>📄 Full Token Response:</h3>
+                    <h3>[FILE] Full Token Response:</h3>
                     <div class="token-box" id="tokens">{token_json}</div>
 
-                    <button onclick="copyTokens()">📋 Copy Full Response</button>
-                    <button onclick="window.close()">✅ Done - Close Window</button>
+                    <button onclick="copyTokens()">[LIST] Copy Full Response</button>
+                    <button onclick="window.close()">[SUCCESS] Done - Close Window</button>
 
                     <div class="info">
-                        <p>🚀 <strong>Next Steps:</strong></p>
+                        <p>[START] <strong>Next Steps:</strong></p>
                         <ul>
                             <li>Tokens are automatically available for API calls</li>
                             <li>Check <span class="highlight">.secrets/aliexpress_tokens.json</span> for the full response</li>
@@ -348,7 +348,7 @@ async def oauth_callback(
                     function copyTokens() {{
                         const tokens = document.getElementById('tokens').textContent;
                         navigator.clipboard.writeText(tokens.trim()).then(() => {{
-                            alert('✅ Token response copied to clipboard!');
+                            alert('[SUCCESS] Token response copied to clipboard!');
                         }});
                     }}
                 </script>
@@ -374,7 +374,7 @@ async def oauth_callback(
             </head>
             <body>
                 <div class="error">
-                    <h1>❌ Token Exchange Failed</h1>
+                    <h1>[ERROR] Token Exchange Failed</h1>
                     <p><strong>Error:</strong> {error_msg}</p>
                     <p><strong>Authorization Code:</strong></p>
                     <div class="code-box">{code}</div>

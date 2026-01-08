@@ -9,4 +9,4 @@ try:
     __all__ = ['MetaAdsManager', 'TikTokAdsManager', 'GoogleAdsManager']
 except ImportError:
     __all__ = ['MetaAdsManager', 'TikTokAdsManager']
-    print("⚠️  Google Ads not available. Install: uv add google-ads==23.1.0")
+    print("[WARNING]  Google Ads not available. Install: uv add google-ads==23.1.0")

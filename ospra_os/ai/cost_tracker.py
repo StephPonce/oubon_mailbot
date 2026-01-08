@@ -327,7 +327,7 @@ class AICostTracker:
         if total_cost > monthly_budget:
             alert["status"] = "exceeded"
             alert["message"] = (
-                f"⚠️ Budget exceeded! You've spent ${total_cost:.2f} "
+                f"[WARNING] Budget exceeded! You've spent ${total_cost:.2f} "
                 f"of your ${monthly_budget:.2f} budget "
                 f"({percentage_used:.0f}%)."
             )
@@ -336,7 +336,7 @@ class AICostTracker:
         elif percentage_used > 80:
             alert["status"] = "warning"
             alert["message"] = (
-                f"⚠️ Budget warning: You've used {percentage_used:.0f}% "
+                f"[WARNING] Budget warning: You've used {percentage_used:.0f}% "
                 f"of your ${monthly_budget:.2f} monthly budget."
             )
             alert["recommendation"] = "Consider switching to a cheaper provider to stay within budget."
@@ -344,7 +344,7 @@ class AICostTracker:
         else:
             alert["status"] = "ok"
             alert["message"] = (
-                f"✅ Budget on track: ${total_cost:.2f} used "
+                f"[SUCCESS] Budget on track: ${total_cost:.2f} used "
                 f"of ${monthly_budget:.2f} ({percentage_used:.0f}%)."
             )
 
@@ -408,7 +408,7 @@ class AICostTracker:
             "cost_breakdown": costs['by_provider'],
             "potential_savings": round(potential_savings, 2),
             "recommendation": (
-                f"💡 Switch to {cheapest_provider_name} to save up to "
+                f"[TIP] Switch to {cheapest_provider_name} to save up to "
                 f"${potential_savings:.2f}/month ({days} day period)."
             ) if potential_savings > 1.0 else "You're already using cost-effective providers!"
         }
@@ -429,20 +429,20 @@ class AICostTracker:
         # If using expensive providers, recommend switching
         if 'openai' in providers:
             return (
-                "💡 Switch from OpenAI to Gemini to reduce costs by 60x. "
+                "[TIP] Switch from OpenAI to Gemini to reduce costs by 60x. "
                 "Gemini provides excellent quality at a fraction of the cost."
             )
 
         if 'claude' in providers and 'gemini' not in providers:
             return (
-                "💡 Switch from Claude to Gemini for high-volume tasks. "
+                "[TIP] Switch from Claude to Gemini for high-volume tasks. "
                 "Gemini is 12x cheaper while maintaining excellent quality. "
                 "Reserve Claude for critical analysis only."
             )
 
         if 'gemini' in providers:
             return (
-                "✅ You're already using Gemini, the most cost-effective provider. "
+                "[SUCCESS] You're already using Gemini, the most cost-effective provider. "
                 "Consider reducing usage frequency or optimizing prompts to reduce token usage."
             )
 

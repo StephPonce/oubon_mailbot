@@ -225,7 +225,7 @@ async def seed_realistic_data(db: SessionLocal):
     kitchen_revenue = sum([p * u for p, u in [(p, u) for _, p, u in kitchen_products]])
     total_revenue = smart_home_revenue + fitness_revenue + kitchen_revenue
 
-    print(f"✅ Seeded {len(events)} learning events")
+    print(f"[SUCCESS] Seeded {len(events)} learning events")
     print()
     print(f"Products deployed: {total_products}")
     print(f"Total sales: {total_sales}")
@@ -263,7 +263,7 @@ async def generate_summaries(db: SessionLocal):
     db.add(summary)
     db.commit()
 
-    print(f"✅ Summary generated: {summary_data['estimated_tokens']} tokens")
+    print(f"[SUCCESS] Summary generated: {summary_data['estimated_tokens']} tokens")
     print()
     print("Summary preview:")
     print(f"  Total revenue: ${summary_data['overall_performance']['total_revenue']:,.2f}")
@@ -274,7 +274,7 @@ async def generate_summaries(db: SessionLocal):
     print()
     print("Updating aggregated performance tables...")
     await update_aggregated_tables()
-    print("✅ Aggregated tables updated")
+    print("[SUCCESS] Aggregated tables updated")
 
 
 async def test_context_builder():
@@ -293,7 +293,7 @@ async def test_context_builder():
     db = SessionLocal()
     try:
         for query in test_queries:
-            print(f"\n📝 Query: \"{query}\"")
+            print(f"\n[NOTE] Query: \"{query}\"")
 
             # Parse intent
             intent = parse_query_intent(query)
@@ -307,9 +307,9 @@ async def test_context_builder():
             print(f"   Context size: ~{token_estimate} tokens")
 
             if token_estimate > 4000:
-                print(f"   ⚠️  Context exceeds 4000 token budget!")
+                print(f"   [WARNING]  Context exceeds 4000 token budget!")
             else:
-                print(f"   ✅ Context within budget")
+                print(f"   [SUCCESS] Context within budget")
 
     finally:
         db.close()
@@ -363,28 +363,28 @@ async def test_claude_chat():
                 references_count = 0
                 for found, description in indicators:
                     if found:
-                        print(f"  ✅ References {description}")
+                        print(f"  [SUCCESS] References {description}")
                         references_count += 1
                     else:
-                        print(f"  ⚠️  Does not reference {description}")
+                        print(f"  [WARNING]  Does not reference {description}")
 
                 print()
                 if references_count >= 4:
-                    print(f"✅ PASS: Claude is using REAL data!")
+                    print(f"[SUCCESS] PASS: Claude is using REAL data!")
                     print(f"   Found {references_count}/{len(indicators)} expected data points")
                     return True
                 else:
-                    print(f"⚠️  CONCERN: Claude may be hallucinating")
+                    print(f"[WARNING]  CONCERN: Claude may be hallucinating")
                     print(f"   Only found {references_count}/{len(indicators)} expected data points")
                     return False
 
             else:
-                print(f"❌ Chat request failed: {response.status_code}")
+                print(f"[ERROR] Chat request failed: {response.status_code}")
                 print(response.text)
                 return False
 
         except Exception as e:
-            print(f"❌ Failed to test Claude chat: {e}")
+            print(f"[ERROR] Failed to test Claude chat: {e}")
             return False
 
 
@@ -404,7 +404,7 @@ async def verify_unlimited_scaling():
         ).first()
 
         if not summary:
-            print("❌ No summary found")
+            print("[ERROR] No summary found")
             return False
 
         estimated_raw_tokens = total_events * 100  # ~100 tokens per event
@@ -420,14 +420,14 @@ async def verify_unlimited_scaling():
         print()
 
         if compression_ratio > 5:
-            print(f"✅ EXCELLENT compression! {compression_ratio:.1f}x reduction")
+            print(f"[SUCCESS] EXCELLENT compression! {compression_ratio:.1f}x reduction")
             print("   This system can scale to unlimited historical data!")
             return True
         elif compression_ratio > 2:
-            print(f"✅ Good compression: {compression_ratio:.1f}x reduction")
+            print(f"[SUCCESS] Good compression: {compression_ratio:.1f}x reduction")
             return True
         else:
-            print(f"⚠️  Low compression: {compression_ratio:.1f}x reduction")
+            print(f"[WARNING]  Low compression: {compression_ratio:.1f}x reduction")
             return False
 
     finally:
@@ -437,18 +437,18 @@ async def verify_unlimited_scaling():
 async def main():
     """Main test function"""
     print()
-    print("╔" + "═" * 78 + "╗")
-    print("║" + " " * 18 + "SCALABLE MEMORY SYSTEM TEST" + " " * 33 + "║")
-    print("║" + " " * 78 + "║")
-    print("║" + "  Testing unlimited historical knowledge without token limits" + " " * 16 + "║")
-    print("╚" + "═" * 78 + "╝")
+    print("" + "" * 78 + "")
+    print("" + " " * 18 + "SCALABLE MEMORY SYSTEM TEST" + " " * 33 + "")
+    print("" + " " * 78 + "")
+    print("" + "  Testing unlimited historical knowledge without token limits" + " " * 16 + "")
+    print("" + "" * 78 + "")
 
     # Create tables
     print_section("SETUP: CREATING DATABASE TABLES")
     from ospra_os.learning.summary_models import Base as SummaryBase
     Base.metadata.create_all(bind=db_engine)
     SummaryBase.metadata.create_all(bind=db_engine)
-    print("✅ Database tables created")
+    print("[SUCCESS] Database tables created")
 
     # Create DB session
     db = SessionLocal()
@@ -481,29 +481,29 @@ async def main():
         ]
 
         for test_name, passed in results:
-            status = "✅ PASS" if passed else "❌ FAIL"
+            status = "[SUCCESS] PASS" if passed else "[ERROR] FAIL"
             print(f"  {status}  {test_name}")
 
         print()
         all_passed = all(r[1] for r in results)
 
         if all_passed:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 22 + "✅ ALL TESTS PASSED! ✅" + " " * 29 + "║")
-            print("║" + " " * 78 + "║")
-            print("║" + "  The scalable memory system is working correctly!" + " " * 25 + "║")
-            print("║" + "  Claude now has unlimited historical knowledge without token limits." + " " * 8 + "║")
-            print("║" + "  Pre-computed summaries compress data efficiently." + " " * 25 + "║")
-            print("║" + "  Smart context builder serves only relevant data." + " " * 26 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 22 + "[SUCCESS] ALL TESTS PASSED! [SUCCESS]" + " " * 29 + "")
+            print("" + " " * 78 + "")
+            print("" + "  The scalable memory system is working correctly!" + " " * 25 + "")
+            print("" + "  Claude now has unlimited historical knowledge without token limits." + " " * 8 + "")
+            print("" + "  Pre-computed summaries compress data efficiently." + " " * 25 + "")
+            print("" + "  Smart context builder serves only relevant data." + " " * 26 + "")
+            print("" + "" * 78 + "")
         else:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 24 + "⚠️  SOME TESTS FAILED" + " " * 29 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 24 + "[WARNING]  SOME TESTS FAILED" + " " * 29 + "")
+            print("" + "" * 78 + "")
 
     except Exception as e:
         print()
-        print(f"❌ Test failed with error: {e}")
+        print(f"[ERROR] Test failed with error: {e}")
         import traceback
         traceback.print_exc()
     finally:

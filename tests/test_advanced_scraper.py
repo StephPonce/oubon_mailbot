@@ -8,7 +8,7 @@ def test_discovery():
     """Direct test of discovery engine (bypasses API/database)"""
 
     print("=" * 80)
-    print("🧪 DIRECT DISCOVERY ENGINE TEST")
+    print("[TEST] DIRECT DISCOVERY ENGINE TEST")
     print("=" * 80)
     print()
     print("This directly calls discover_products() - no API, no cache")
@@ -23,14 +23,14 @@ def test_discovery():
 
     print()
     print("=" * 80)
-    print("📊 RESULTS")
+    print("[STATS] RESULTS")
     print("=" * 80)
     print(f"Data Source: {result.get('data_source')}")
     print(f"Total Products: {result.get('total')}")
     print()
 
     if result.get('data_source') == 'ADVANCED_SCRAPING':
-        print("✅ ✅ ✅ ADVANCED SCRAPER WORKING! ✅ ✅ ✅")
+        print("[SUCCESS] [SUCCESS] [SUCCESS] ADVANCED SCRAPER WORKING! [SUCCESS] [SUCCESS] [SUCCESS]")
         print()
         print("First 3 products:")
         for i, product in enumerate(result.get('products', [])[:3], 1):
@@ -38,10 +38,10 @@ def test_discovery():
             print(f"   Velocity: {product.get('velocity_score', 'N/A')}/100")
             print(f"   Source: {product.get('source', 'unknown')}")
     elif result.get('data_source') == 'FALLBACK':
-        print("⚠️  Scraping failed - system fell back to default data")
+        print("[WARNING]  Scraping failed - system fell back to default data")
         print("This is OK - priority chain is working, scraping just failed")
     else:
-        print(f"❌ Unexpected data source: {result.get('data_source')}")
+        print(f"[ERROR] Unexpected data source: {result.get('data_source')}")
 
     print()
     print("=" * 80)

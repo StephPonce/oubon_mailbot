@@ -170,7 +170,7 @@ async def create_restock_order(order: dict):
 
         restock_orders.append(order_data)
 
-        logger.info(f"✅ Created restock order {order_id} for {order.get('product_name')}")
+        logger.info(f"[SUCCESS] Created restock order {order_id} for {order.get('product_name')}")
 
         return {
             "success": True,
@@ -586,7 +586,7 @@ async def sync_from_shopify():
             )
             forecasts.append(forecast)
 
-        logger.info(f"✅ Generated forecasts for {len(forecasts)} Shopify products")
+        logger.info(f"[SUCCESS] Generated forecasts for {len(forecasts)} Shopify products")
 
         return {
             "success": True,
@@ -697,7 +697,7 @@ async def save_forecast_snapshots():
         # Save snapshots
         result = historical_tracking.save_multiple_snapshots(forecasts)
 
-        logger.info(f"📸 Saved {result['saved']} forecast snapshots")
+        logger.info(f" Saved {result['saved']} forecast snapshots")
 
         return {
             "success": True,
@@ -723,7 +723,7 @@ async def get_recent_snapshots(
     try:
         snapshots = historical_tracking.get_all_recent_snapshots(hours)
 
-        logger.info(f"📊 Retrieved {len(snapshots)} recent snapshots")
+        logger.info(f"[STATS] Retrieved {len(snapshots)} recent snapshots")
 
         return {
             "success": True,
@@ -749,7 +749,7 @@ async def cleanup_old_snapshots(
     try:
         result = historical_tracking.cleanup_old_snapshots(days)
 
-        logger.info(f"🗑️  Cleaned up {result['deleted_count']} old snapshots")
+        logger.info(f"  Cleaned up {result['deleted_count']} old snapshots")
 
         return {
             "success": True,
@@ -783,7 +783,7 @@ async def get_product_trends(
                 "product_id": product_id
             }
 
-        logger.info(f"📈 Trend analysis for {product_id}: {trends['stock_analysis']['trend']} stock, {trends['risk_analysis']['trend']} risk")
+        logger.info(f"[TREND] Trend analysis for {product_id}: {trends['stock_analysis']['trend']} stock, {trends['risk_analysis']['trend']} risk")
 
         return trends
 
@@ -813,7 +813,7 @@ async def get_product_history(
                 "history": []
             }
 
-        logger.info(f"📊 Retrieved {len(history)} snapshots for {product_id}")
+        logger.info(f"[STATS] Retrieved {len(history)} snapshots for {product_id}")
 
         return {
             "success": True,
@@ -883,7 +883,7 @@ async def bulk_reorder_products(request: dict):
             if forecast['reorder']['should_reorder']:
                 orders_created += 1
 
-        logger.info(f"📦 Created {orders_created} bulk restock orders")
+        logger.info(f"[PACKAGE] Created {orders_created} bulk restock orders")
 
         return {
             "success": True,
@@ -982,7 +982,7 @@ async def bulk_export_products(request: dict):
 
         output.seek(0)
 
-        logger.info(f"📊 Exported {len(forecasts)} products to CSV")
+        logger.info(f"[STATS] Exported {len(forecasts)} products to CSV")
 
         return StreamingResponse(
             iter([output.getvalue()]),
@@ -1011,7 +1011,7 @@ async def bulk_configure_alerts(request: dict):
         if not product_ids:
             raise HTTPException(status_code=400, detail="No product IDs provided")
 
-        logger.info(f"🔔 Configured alerts for {len(product_ids)} products (enabled: {enabled})")
+        logger.info(f" Configured alerts for {len(product_ids)} products (enabled: {enabled})")
 
         return {
             "success": True,

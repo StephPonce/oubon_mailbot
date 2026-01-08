@@ -69,11 +69,11 @@ def generate_product_rationale(product: dict) -> dict:
 
     if rating >= 4.5:
         factors.append({"label": "Excellent reviews", "value": 10, "icon": "success"})
-        rationale_parts.append(f"{rating:.1f}★ customer satisfaction")
+        rationale_parts.append(f"{rating:.1f} customer satisfaction")
         confidence_boost += 10
     elif rating >= 4.0:
         factors.append({"label": "Good reviews", "value": 5, "icon": "success"})
-        rationale_parts.append(f"{rating:.1f}★ rating")
+        rationale_parts.append(f"{rating:.1f} rating")
         confidence_boost += 5
     elif rating < 3.5 and rating > 0:
         factors.append({"label": "Low reviews", "value": -15, "icon": "warning"})

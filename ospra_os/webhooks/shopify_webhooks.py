@@ -56,7 +56,7 @@ async def order_created(
         logger.error(f"Failed to parse webhook: {e}")
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
-    logger.info(f"📦 New order received: {order_data.get('order_number', 'unknown')}")
+    logger.info(f"[PACKAGE] New order received: {order_data.get('order_number', 'unknown')}")
 
     # Process order
     await process_new_order(order_data)
@@ -162,7 +162,7 @@ async def process_new_order(order_data: dict):
                     )
                     learning_db.add(event)
                     learning_db.commit()
-                    logger.info(f"📊 Learning event recorded for product {product_id}")
+                    logger.info(f"[STATS] Learning event recorded for product {product_id}")
                 finally:
                     learning_db.close()
             except Exception as e:
@@ -183,7 +183,7 @@ async def process_new_order(order_data: dict):
                 }
             )
 
-        logger.info(f"✅ Order {order_number} processed successfully")
+        logger.info(f"[SUCCESS] Order {order_number} processed successfully")
 
         # Send confirmation email to customer
         await send_order_confirmation_email(order_record)
@@ -200,7 +200,7 @@ async def send_order_confirmation_email(order: dict):
     # For now, just log the attempt
 
     try:
-        logger.info(f"📧 Order confirmation email queued for {order['customer_email']}")
+        logger.info(f"[EMAIL] Order confirmation email queued for {order['customer_email']}")
 
         # Future implementation:
         # from ospra_os.gmail_automation.email_sender import send_email

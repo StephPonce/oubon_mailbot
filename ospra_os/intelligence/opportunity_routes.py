@@ -245,37 +245,37 @@ async def get_opportunity_tiers():
         "tiers": {
             "golden": {
                 "min_score": 85,
-                "emoji": "✨",
+                "emoji": "[NEW]",
                 "description": "Rare gems - act immediately",
                 "recommendation": "Deploy now before competition increases"
             },
             "excellent": {
                 "min_score": 70,
-                "emoji": "🎯",
+                "emoji": "[TARGET]",
                 "description": "Strong opportunity with favorable conditions",
                 "recommendation": "Proceed with deployment"
             },
             "good": {
                 "min_score": 55,
-                "emoji": "👍",
+                "emoji": "[GOOD]",
                 "description": "Worth considering with monitoring",
                 "recommendation": "Test with limited inventory"
             },
             "fair": {
                 "min_score": 40,
-                "emoji": "⚠️",
+                "emoji": "[WARNING]",
                 "description": "Marginal opportunity",
                 "recommendation": "Only with strong differentiation"
             },
             "poor": {
                 "min_score": 25,
-                "emoji": "🚫",
+                "emoji": "[BLOCKED]",
                 "description": "Risk outweighs reward",
                 "recommendation": "Skip and find alternatives"
             },
             "avoid": {
                 "min_score": 0,
-                "emoji": "❌",
+                "emoji": "[ERROR]",
                 "description": "Does not meet criteria",
                 "recommendation": "Do not pursue"
             }

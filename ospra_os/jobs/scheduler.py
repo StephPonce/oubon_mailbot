@@ -28,14 +28,14 @@ class CustomerAnalyticsScheduler:
         Runs: Every 6 hours
         """
         try:
-            logger.info("🔄 Starting customer sync job...")
+            logger.info("[REFRESH] Starting customer sync job...")
             # TODO: Import and call actual sync function
             # from ospra_os.analytics.customer_sync import CustomerSync
             # sync = CustomerSync()
             # result = await sync.sync_all_customers()
-            logger.info("✅ Customer sync completed successfully")
+            logger.info("[SUCCESS] Customer sync completed successfully")
         except Exception as e:
-            logger.error(f"❌ Customer sync failed: {e}")
+            logger.error(f"[ERROR] Customer sync failed: {e}")
 
     async def update_customer_metrics_job(self):
         """
@@ -43,15 +43,15 @@ class CustomerAnalyticsScheduler:
         Runs: Daily at 2 AM
         """
         try:
-            logger.info("📊 Starting customer metrics update...")
+            logger.info("[STATS] Starting customer metrics update...")
             # TODO: Import and call metrics update functions
             # - Recalculate LTV for all customers
             # - Update RFM scores
             # - Recalculate churn probabilities
             # - Update segments
-            logger.info("✅ Customer metrics updated successfully")
+            logger.info("[SUCCESS] Customer metrics updated successfully")
         except Exception as e:
-            logger.error(f"❌ Metrics update failed: {e}")
+            logger.error(f"[ERROR] Metrics update failed: {e}")
 
     async def update_cohort_analysis_job(self):
         """
@@ -59,14 +59,14 @@ class CustomerAnalyticsScheduler:
         Runs: Daily at 3 AM
         """
         try:
-            logger.info("👥 Starting cohort analysis update...")
+            logger.info(" Starting cohort analysis update...")
             # TODO: Import and call cohort analyzer
             # from ospra_os.analytics.cohort_analyzer import CohortAnalyzer
             # analyzer = CohortAnalyzer()
             # cohorts = await analyzer.analyze_cohorts_by_month()
-            logger.info("✅ Cohort analysis updated successfully")
+            logger.info("[SUCCESS] Cohort analysis updated successfully")
         except Exception as e:
-            logger.error(f"❌ Cohort analysis failed: {e}")
+            logger.error(f"[ERROR] Cohort analysis failed: {e}")
 
     async def check_at_risk_customers_job(self):
         """
@@ -74,7 +74,7 @@ class CustomerAnalyticsScheduler:
         Runs: Every 12 hours
         """
         try:
-            logger.info("⚠️  Checking for at-risk customers...")
+            logger.info("[WARNING]  Checking for at-risk customers...")
             # TODO: Import churn predictor and notification system
             # from ospra_os.analytics.churn_predictor import ChurnPredictor
             # from ospra_os.services.notifications import send_at_risk_alert
@@ -82,9 +82,9 @@ class CustomerAnalyticsScheduler:
             # at_risk = await predictor.get_at_risk_customers(threshold=0.7)
             # for customer in at_risk:
             #     await send_at_risk_alert(customer)
-            logger.info("✅ At-risk customer check completed")
+            logger.info("[SUCCESS] At-risk customer check completed")
         except Exception as e:
-            logger.error(f"❌ At-risk check failed: {e}")
+            logger.error(f"[ERROR] At-risk check failed: {e}")
 
     async def generate_daily_report_job(self):
         """
@@ -92,15 +92,15 @@ class CustomerAnalyticsScheduler:
         Runs: Daily at 8 AM
         """
         try:
-            logger.info("📈 Generating daily analytics report...")
+            logger.info("[TREND] Generating daily analytics report...")
             # TODO: Generate and send daily report
             # - Top performing customers
             # - Newly at-risk customers
             # - Segment changes
             # - Key metrics summary
-            logger.info("✅ Daily report generated successfully")
+            logger.info("[SUCCESS] Daily report generated successfully")
         except Exception as e:
-            logger.error(f"❌ Daily report generation failed: {e}")
+            logger.error(f"[ERROR] Daily report generation failed: {e}")
 
     async def cleanup_old_snapshots_job(self):
         """
@@ -108,12 +108,12 @@ class CustomerAnalyticsScheduler:
         Runs: Weekly on Sunday at 1 AM
         """
         try:
-            logger.info("🧹 Cleaning up old customer snapshots...")
+            logger.info(" Cleaning up old customer snapshots...")
             # TODO: Delete snapshots older than 90 days
             # Keep monthly snapshots for historical analysis
-            logger.info("✅ Cleanup completed successfully")
+            logger.info("[SUCCESS] Cleanup completed successfully")
         except Exception as e:
-            logger.error(f"❌ Cleanup failed: {e}")
+            logger.error(f"[ERROR] Cleanup failed: {e}")
 
     def setup_jobs(self):
         """
@@ -175,7 +175,7 @@ class CustomerAnalyticsScheduler:
             replace_existing=True
         )
 
-        logger.info(f"✅ Configured {len(self.scheduler.get_jobs())} background jobs")
+        logger.info(f"[SUCCESS] Configured {len(self.scheduler.get_jobs())} background jobs")
 
     def start(self):
         """
@@ -185,11 +185,11 @@ class CustomerAnalyticsScheduler:
             self.setup_jobs()
             self.scheduler.start()
             self.is_running = True
-            logger.info("🚀 Customer analytics scheduler started")
+            logger.info("[START] Customer analytics scheduler started")
 
             # Log scheduled jobs
             for job in self.scheduler.get_jobs():
-                logger.info(f"  📅 {job.name}: {job.next_run_time}")
+                logger.info(f"   {job.name}: {job.next_run_time}")
         else:
             logger.warning("Scheduler is already running")
 
@@ -200,7 +200,7 @@ class CustomerAnalyticsScheduler:
         if self.is_running:
             self.scheduler.shutdown(wait=False)
             self.is_running = False
-            logger.info("🛑 Customer analytics scheduler stopped")
+            logger.info(" Customer analytics scheduler stopped")
         else:
             logger.warning("Scheduler is not running")
 

@@ -125,7 +125,7 @@ async def seed_test_data(db: SessionLocal):
 
     db.commit()
 
-    print(f"✅ Seeded {len(test_events)} test learning events")
+    print(f"[SUCCESS] Seeded {len(test_events)} test learning events")
     print()
     print("Event breakdown:")
     print(f"  - Sales: 3")
@@ -150,12 +150,12 @@ async def run_analysis():
                 timeout=30.0
             )
             if response.status_code == 200:
-                print("✅ Global analysis completed")
+                print("[SUCCESS] Global analysis completed")
             else:
-                print(f"❌ Global analysis failed: {response.status_code}")
+                print(f"[ERROR] Global analysis failed: {response.status_code}")
                 print(response.text)
         except Exception as e:
-            print(f"❌ Failed to trigger analysis: {e}")
+            print(f"[ERROR] Failed to trigger analysis: {e}")
             print("   Make sure the backend is running on port 8001")
             return False
 
@@ -168,11 +168,11 @@ async def run_analysis():
                 timeout=30.0
             )
             if response.status_code == 200:
-                print("✅ Personal analysis completed")
+                print("[SUCCESS] Personal analysis completed")
             else:
-                print(f"❌ Personal analysis failed: {response.status_code}")
+                print(f"[ERROR] Personal analysis failed: {response.status_code}")
         except Exception as e:
-            print(f"❌ Failed to trigger analysis: {e}")
+            print(f"[ERROR] Failed to trigger analysis: {e}")
 
     return True
 
@@ -188,25 +188,25 @@ async def verify_database(db: SessionLocal):
     # Check global weights
     global_weights = db.query(GlobalLearningWeights).first()
     if global_weights:
-        print("✅ Global weights exist")
+        print("[SUCCESS] Global weights exist")
         print(f"   Learning cycles: {global_weights.learning_cycles}")
         print(f"   Sales analyzed: {global_weights.total_sales_analyzed}")
         print(f"   Revenue analyzed: ${global_weights.total_revenue_analyzed:.2f}")
         print(f"   Niche confidence: {global_weights.niche_confidence}")
     else:
-        print("❌ No global weights found")
+        print("[ERROR] No global weights found")
         return False
 
     # Check personal weights
     personal_weights = db.query(PersonalLearningWeights).filter_by(user_id=1).first()
     if personal_weights:
-        print("✅ Personal weights exist for user 1")
+        print("[SUCCESS] Personal weights exist for user 1")
         print(f"   Learning cycles: {personal_weights.learning_cycles}")
         print(f"   Sales analyzed: {personal_weights.sales_analyzed}")
         print(f"   Best niches: {personal_weights.best_performing_niches}")
         print(f"   Optimal price range: {personal_weights.optimal_price_range}")
     else:
-        print("❌ No personal weights found for user 1")
+        print("[ERROR] No personal weights found for user 1")
         return False
 
     return True
@@ -253,18 +253,18 @@ async def test_claude_chat():
                 references_count = 0
                 for found, description in indicators:
                     if found:
-                        print(f"  ✅ References {description}")
+                        print(f"  [SUCCESS] References {description}")
                         references_count += 1
                     else:
-                        print(f"  ⚠️  Does not reference {description}")
+                        print(f"  [WARNING]  Does not reference {description}")
 
                 print()
                 if references_count >= 2:
-                    print("✅ Claude appears to be using REAL data!")
+                    print("[SUCCESS] Claude appears to be using REAL data!")
                     print(f"   Found {references_count}/{len(indicators)} expected data points")
                     return True
                 else:
-                    print("⚠️  Claude may not be using real data")
+                    print("[WARNING]  Claude may not be using real data")
                     print(f"   Only found {references_count}/{len(indicators)} expected data points")
                     print("   This could mean:")
                     print("   1. Learning context is not being passed correctly")
@@ -273,12 +273,12 @@ async def test_claude_chat():
                     return False
 
             else:
-                print(f"❌ Chat request failed: {response.status_code}")
+                print(f"[ERROR] Chat request failed: {response.status_code}")
                 print(response.text)
                 return False
 
         except Exception as e:
-            print(f"❌ Failed to test Claude chat: {e}")
+            print(f"[ERROR] Failed to test Claude chat: {e}")
             return False
 
 
@@ -301,25 +301,25 @@ async def get_learning_insights():
                 print(json.dumps(insights, indent=2))
                 return True
             else:
-                print(f"❌ Failed to get insights: {response.status_code}")
+                print(f"[ERROR] Failed to get insights: {response.status_code}")
                 return False
 
         except Exception as e:
-            print(f"❌ Failed to get insights: {e}")
+            print(f"[ERROR] Failed to get insights: {e}")
             return False
 
 
 async def main():
     """Main verification function"""
     print()
-    print("╔" + "═" * 78 + "╗")
-    print("║" + " " * 20 + "LEARNING PIPELINE VERIFICATION" + " " * 28 + "║")
-    print("╚" + "═" * 78 + "╝")
+    print("" + "" * 78 + "")
+    print("" + " " * 20 + "LEARNING PIPELINE VERIFICATION" + " " * 28 + "")
+    print("" + "" * 78 + "")
 
     # Create tables
     print_section("SETUP: CREATING DATABASE TABLES")
     Base.metadata.create_all(bind=db_engine)
-    print("✅ Database tables created")
+    print("[SUCCESS] Database tables created")
 
     # Create DB session
     db = SessionLocal()
@@ -332,7 +332,7 @@ async def main():
         analysis_ok = await run_analysis()
         if not analysis_ok:
             print()
-            print("❌ Analysis failed - cannot continue verification")
+            print("[ERROR] Analysis failed - cannot continue verification")
             return
 
         # Give analysis a moment to complete
@@ -342,7 +342,7 @@ async def main():
         db_ok = await verify_database(db)
         if not db_ok:
             print()
-            print("❌ Database verification failed")
+            print("[ERROR] Database verification failed")
             return
 
         # Step 4: Test Claude chat
@@ -363,29 +363,29 @@ async def main():
         ]
 
         for test_name, passed in results:
-            status = "✅ PASS" if passed else "❌ FAIL"
+            status = "[SUCCESS] PASS" if passed else "[ERROR] FAIL"
             print(f"  {status}  {test_name}")
 
         print()
         all_passed = all(r[1] for r in results)
 
         if all_passed:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 22 + "✅ ALL TESTS PASSED! ✅" + " " * 29 + "║")
-            print("║" + " " * 78 + "║")
-            print("║" + "  The learning pipeline is working correctly!              " + " " * 18 + "║")
-            print("║" + "  Claude is now using REAL historical data for recommendations." + " " * 13 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 22 + "[SUCCESS] ALL TESTS PASSED! [SUCCESS]" + " " * 29 + "")
+            print("" + " " * 78 + "")
+            print("" + "  The learning pipeline is working correctly!              " + " " * 18 + "")
+            print("" + "  Claude is now using REAL historical data for recommendations." + " " * 13 + "")
+            print("" + "" * 78 + "")
         else:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 22 + "⚠️  SOME TESTS FAILED" + " " * 31 + "║")
-            print("║" + " " * 78 + "║")
-            print("║" + "  Check the output above for details on what failed." + " " * 24 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 22 + "[WARNING]  SOME TESTS FAILED" + " " * 31 + "")
+            print("" + " " * 78 + "")
+            print("" + "  Check the output above for details on what failed." + " " * 24 + "")
+            print("" + "" * 78 + "")
 
     except Exception as e:
         print()
-        print(f"❌ Verification failed with error: {e}")
+        print(f"[ERROR] Verification failed with error: {e}")
         import traceback
         traceback.print_exc()
     finally:

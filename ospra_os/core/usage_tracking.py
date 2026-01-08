@@ -705,7 +705,7 @@ class TierUsageEnforcer:
 def init_usage_tracking():
     """Create usage tracking tables"""
     Base.metadata.create_all(bind=engine)
-    logger.info("✅ Usage tracking tables created")
+    logger.info("[SUCCESS] Usage tracking tables created")
 
 
 # ============================================================================
@@ -729,4 +729,4 @@ def get_enforcer(session: Session = None) -> TierUsageEnforcer:
 # Initialize tables on import
 if __name__ == "__main__":
     init_usage_tracking()
-    print("✅ Usage tracking system initialized")
+    print("[SUCCESS] Usage tracking system initialized")

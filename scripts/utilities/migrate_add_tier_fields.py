@@ -42,15 +42,15 @@ def migrate():
 
     for column_name, alter_statement in tier_columns.items():
         if column_name in columns:
-            print(f"  ✓ {column_name} already exists, skipping")
+            print(f"  [OK] {column_name} already exists, skipping")
             skipped_count += 1
         else:
             try:
                 cursor.execute(alter_statement)
-                print(f"  ✓ Added column: {column_name}")
+                print(f"  [OK] Added column: {column_name}")
                 added_count += 1
             except sqlite3.OperationalError as e:
-                print(f"  ✗ Failed to add {column_name}: {e}")
+                print(f"   Failed to add {column_name}: {e}")
 
     conn.commit()
 
@@ -68,18 +68,18 @@ def migrate():
     missing = [f for f in tier_field_names if f not in new_columns]
 
     if missing:
-        print(f"\n✗ Still missing fields: {missing}")
+        print(f"\n Still missing fields: {missing}")
         conn.close()
         return False
     else:
-        print("\n✓ All tier fields present:")
+        print("\n[OK] All tier fields present:")
         for field in tier_field_names:
             print(f"  - {field}")
 
     # Create index on subscription_tier for faster queries
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_settings_subscription_tier ON user_settings(subscription_tier)")
-        print("\n✓ Created index on subscription_tier")
+        print("\n[OK] Created index on subscription_tier")
     except sqlite3.OperationalError as e:
         print(f"\n  Index already exists or failed: {e}")
 
@@ -98,8 +98,8 @@ def migrate():
 if __name__ == "__main__":
     success = migrate()
     if success:
-        print("\n🎉 Database migration successful!")
+        print("\n[LAUNCH] Database migration successful!")
         print("\nYou can now run: python test_tier_system.py")
     else:
-        print("\n❌ Migration failed - please check errors above")
+        print("\n[ERROR] Migration failed - please check errors above")
         exit(1)

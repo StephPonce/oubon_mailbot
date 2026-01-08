@@ -36,7 +36,7 @@ NICHES = [
 
 def discover_products_for_niche(niche_id: str, search_query: str) -> list:
     """Discover products using the product research API."""
-    print(f"\n🔍 Discovering products for: {niche_id}")
+    print(f"\n[SEARCH] Discovering products for: {niche_id}")
 
     url = "http://localhost:8001/research/discover"
     payload = {
@@ -54,10 +54,10 @@ def discover_products_for_niche(niche_id: str, search_query: str) -> list:
         data = response.json()
 
         products = data.get("products", [])
-        print(f"✅ Found {len(products)} products for {niche_id}")
+        print(f"[SUCCESS] Found {len(products)} products for {niche_id}")
         return products
     except Exception as e:
-        print(f"❌ Error discovering products for {niche_id}: {e}")
+        print(f"[ERROR] Error discovering products for {niche_id}: {e}")
         return []
 
 def import_products_to_database(niche_id: str, discovered_products: list):
@@ -128,18 +128,18 @@ def import_products_to_database(niche_id: str, discovered_products: list):
                 )
 
         session.commit()
-        print(f"✅ Imported {imported_count} new products for {niche_id}")
+        print(f"[SUCCESS] Imported {imported_count} new products for {niche_id}")
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Error importing products for {niche_id}: {e}")
+        print(f"[ERROR] Error importing products for {niche_id}: {e}")
     finally:
         session.close()
 
 def main():
     """Main execution function."""
-    print("🚀 Starting product discovery and database population...")
-    print(f"📊 Target niches: {len(NICHES)}")
+    print("[START] Starting product discovery and database population...")
+    print(f"[STATS] Target niches: {len(NICHES)}")
 
     total_products = 0
 
@@ -156,12 +156,12 @@ def main():
         import time
         time.sleep(2)
 
-    print(f"\n✅ COMPLETE! Total products discovered: {total_products}")
-    print(f"📊 Database populated with real data from:")
+    print(f"\n[SUCCESS] COMPLETE! Total products discovered: {total_products}")
+    print(f"[STATS] Database populated with real data from:")
     print(f"   • Google Trends")
     print(f"   • Reddit (live discussions)")
     print(f"   • AliExpress (product marketplace)")
-    print(f"\n🎯 You can now run niche analysis with real data!")
+    print(f"\n[TARGET] You can now run niche analysis with real data!")
 
 if __name__ == "__main__":
     main()

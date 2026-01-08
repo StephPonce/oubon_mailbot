@@ -86,9 +86,9 @@ async def startup_advertising():
     try:
         ad_scheduler = AdScheduler()
         await ad_scheduler.start()
-        print("✅ Ad Automation Scheduler started")
+        print("[SUCCESS] Ad Automation Scheduler started")
     except Exception as e:
-        print(f"⚠️  Ad Scheduler failed to start: {e}")
+        print(f"[WARNING]  Ad Scheduler failed to start: {e}")
         ad_scheduler = None
 
 
@@ -98,7 +98,7 @@ async def shutdown_advertising():
 
     if ad_scheduler:
         await ad_scheduler.stop()
-        print("⏹️  Ad Automation Scheduler stopped")
+        print("[STOP]  Ad Automation Scheduler stopped")
 
 
 # ============================================================================
@@ -504,9 +504,9 @@ async def generate_ad_copy(request: GenerateAdCopyRequest):
             if "API key not found" in str(ai_error):
                 # Generate demo creative based on product info
                 platform_emojis = {
-                    'meta': '📱',
-                    'tiktok': '🎵',
-                    'google': '🔍'
+                    'meta': '[MOBILE]',
+                    'tiktok': '',
+                    'google': '[SEARCH]'
                 }
 
                 creative = {
@@ -515,7 +515,7 @@ async def generate_ad_copy(request: GenerateAdCopyRequest):
 
                 for i in range(request.variations):
                     variation = {
-                        'headline': f"{platform_emojis.get(request.platform, '✨')} {request.product_name[:35]}",
+                        'headline': f"{platform_emojis.get(request.platform, '[NEW]')} {request.product_name[:35]}",
                         'primary_text': request.product_description[:120] + "..." if len(request.product_description) > 120 else request.product_description,
                         'description': f"Discover amazing deals on {request.product_name}. Limited time offer!",
                         'cta': "Shop Now",
@@ -540,9 +540,9 @@ async def generate_ad_copy(request: GenerateAdCopyRequest):
         if "API key not found" in str(e):
             # Generate demo creative
             platform_emojis = {
-                'meta': '📱',
-                'tiktok': '🎵',
-                'google': '🔍'
+                'meta': '[MOBILE]',
+                'tiktok': '',
+                'google': '[SEARCH]'
             }
 
             creative = {
@@ -553,7 +553,7 @@ async def generate_ad_copy(request: GenerateAdCopyRequest):
 
             for i in range(request.variations):
                 variation = {
-                    'headline': f"{platform_emojis.get(request.platform, '✨')} {request.product_name[:35]}",
+                    'headline': f"{platform_emojis.get(request.platform, '[NEW]')} {request.product_name[:35]}",
                     'primary_text': request.product_description[:120] + "..." if len(request.product_description) > 120 else request.product_description,
                     'description': f"Discover amazing deals on {request.product_name}. Limited time offer!",
                     'cta': "Shop Now",

@@ -14,7 +14,7 @@ Endpoints:
 - GET  /api/feedback/performance         - Get all product performance
 - POST /api/feedback/evaluate            - Evaluate pending outcomes
 - GET  /api/feedback/outcomes            - Get recommendation outcomes
-- GET  /api/feedback/learning-stats      - Get AI learning statistics ⭐ KEY
+- GET  /api/feedback/learning-stats      - Get AI learning statistics [STAR] KEY
 - POST /api/feedback/process-learning    - Process learning events
 """
 
@@ -377,7 +377,7 @@ def get_learning_stats(
     """
     Get AI learning statistics for the user.
 
-    ⭐ THIS IS THE KILLER ENDPOINT ⭐
+    [STAR] THIS IS THE KILLER ENDPOINT [STAR]
 
     Returns:
     - Success rate: "AI has 78% success rate for you"

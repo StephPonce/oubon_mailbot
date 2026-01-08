@@ -117,7 +117,7 @@ def get_shopify_client():
         try:
             from ospra_os.integrations.shopify.client import ShopifyClient
             _shopify_client = ShopifyClient()
-            logger.info("✅ Shopify client initialized")
+            logger.info("[SUCCESS] Shopify client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Shopify client: {e}")
             raise HTTPException(status_code=500, detail=f"Shopify not configured: {e}")
@@ -131,7 +131,7 @@ def get_deployment_service():
         try:
             from ospra_os.integrations.shopify.deployment import ProductDeploymentService
             _deployment_service = ProductDeploymentService(get_shopify_client())
-            logger.info("✅ Legacy deployment service initialized")
+            logger.info("[SUCCESS] Legacy deployment service initialized")
         except Exception as e:
             logger.error(f"Failed to initialize deployment service: {e}")
             raise HTTPException(status_code=500, detail=f"Deployment service error: {e}")
@@ -145,7 +145,7 @@ def get_unified_deployer():
         try:
             from ospra_os.services.product_deployer import ProductDeployer
             _unified_deployer = ProductDeployer()
-            logger.info("✅ Unified AI deployer initialized (Claude + DALL-E + rembg)")
+            logger.info("[SUCCESS] Unified AI deployer initialized (Claude + DALL-E + rembg)")
         except Exception as e:
             logger.error(f"Failed to initialize unified deployer: {e}")
             raise HTTPException(status_code=500, detail=f"Unified deployer error: {e}")
@@ -255,7 +255,7 @@ async def list_shopify_products(limit: int = 50):
 @router.post("/deploy", response_model=DeploymentResult)
 async def deploy_product(request: ProductDeployRequest, background_tasks: BackgroundTasks):
     """
-    🚀 ONE-CLICK DEPLOY with Full AI Pipeline
+    [START] ONE-CLICK DEPLOY with Full AI Pipeline
 
     Deploy a single product to Shopify with AI-powered enhancements:
     - Content generation (Claude Sonnet 4.5)
@@ -274,7 +274,7 @@ async def deploy_product(request: ProductDeployRequest, background_tasks: Backgr
     Time: ~20-30 seconds
     """
     try:
-        logger.info(f"🚀 Deploying product: {request.name}")
+        logger.info(f"[START] Deploying product: {request.name}")
         logger.info(f"   AI Flags: content={request.ai_content}, images={request.ai_images}, pricing={request.ai_pricing}, seo={request.ai_seo}")
 
         deployer = get_unified_deployer()
@@ -349,7 +349,7 @@ async def deploy_product(request: ProductDeployRequest, background_tasks: Backgr
 @router.post("/deploy/preview", response_model=PreviewResult)
 async def preview_deployment(request: ProductDeployRequest):
     """
-    👁️ PREVIEW DEPLOYMENT
+     PREVIEW DEPLOYMENT
 
     Generate AI content and enhanced images WITHOUT deploying to Shopify.
     Use this to preview what the product will look like before going live.
@@ -365,7 +365,7 @@ async def preview_deployment(request: ProductDeployRequest):
     Time: ~15-20 seconds
     """
     try:
-        logger.info(f"👁️ Previewing product: {request.name}")
+        logger.info(f" Previewing product: {request.name}")
 
         deployer = get_unified_deployer()
 
@@ -408,7 +408,7 @@ async def preview_deployment(request: ProductDeployRequest):
 @router.post("/deploy/bulk", response_model=List[DeploymentResult])
 async def bulk_deploy_products(request: BulkDeployRequest):
     """
-    🚀 BULK DEPLOY
+    [START] BULK DEPLOY
     
     Deploy multiple products to Shopify.
     """

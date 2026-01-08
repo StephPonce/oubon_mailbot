@@ -106,7 +106,7 @@ class MultiNicheDiscovery:
             }
         """
         print(f"\n{'='*70}")
-        print(f"🔥 MULTI-NICHE DISCOVERY STARTING")
+        print(f"[HOT] MULTI-NICHE DISCOVERY STARTING")
         print(f"{'='*70}")
         print(f"Niches: {len(self.NICHES)}")
         print(f"Min Score: {min_score}/10")
@@ -128,7 +128,7 @@ class MultiNicheDiscovery:
             )
             tasks.append(task)
 
-        print(f"⚡ Running {len(tasks)} parallel discoveries...")
+        print(f"[FAST] Running {len(tasks)} parallel discoveries...")
 
         # Wait for all discoveries to complete
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -140,7 +140,7 @@ class MultiNicheDiscovery:
 
         for niche_name, products in zip(self.NICHES.keys(), results):
             if isinstance(products, Exception):
-                print(f"   ❌ {niche_name}: Failed - {products}")
+                print(f"   [ERROR] {niche_name}: Failed - {products}")
                 niche_products[niche_name] = []
             else:
                 niche_products[niche_name] = products
@@ -150,16 +150,16 @@ class MultiNicheDiscovery:
 
                 # Color-coded output based on results
                 if len(products) >= 3:
-                    print(f"   🔥 {niche_name}: {len(products)} HIGH PRIORITY products")
+                    print(f"   [HOT] {niche_name}: {len(products)} HIGH PRIORITY products")
                 elif len(products) > 0:
-                    print(f"   ✅ {niche_name}: {len(products)} products")
+                    print(f"   [SUCCESS] {niche_name}: {len(products)} products")
                 else:
-                    print(f"   ⚠️  {niche_name}: No products above threshold")
+                    print(f"   [WARNING]  {niche_name}: No products above threshold")
 
         elapsed = (datetime.now() - start_time).total_seconds()
 
         print(f"\n{'='*70}")
-        print(f"✅ MULTI-NICHE DISCOVERY COMPLETE")
+        print(f"[SUCCESS] MULTI-NICHE DISCOVERY COMPLETE")
         print(f"{'='*70}")
         print(f"Total Products: {total_products}")
         print(f"Successful Niches: {successful_niches}/{len(self.NICHES)}")
@@ -197,7 +197,7 @@ class MultiNicheDiscovery:
             return filtered
 
         except Exception as e:
-            print(f"   ❌ Error discovering {niche_name}: {e}")
+            print(f"   [ERROR] Error discovering {niche_name}: {e}")
             return []
 
     def get_top_products_overall(

@@ -32,7 +32,7 @@ class InstagramAPI:
         Returns:
             List of post dicts
         """
-        logger.info(f"🔍 Searching Instagram #{hashtag}")
+        logger.info(f"[SEARCH] Searching Instagram #{hashtag}")
 
         if not self.access_token:
             logger.warning("Instagram API not configured, returning mock data")

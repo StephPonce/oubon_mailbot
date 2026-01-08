@@ -25,9 +25,9 @@ def test_woocommerce_adapter():
             AuthenticationError,
             RateLimitError
         )
-        print("✅ All imports successful")
+        print("[SUCCESS] All imports successful")
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return
 
     # Test 2: Initialize with mock credentials
@@ -49,14 +49,14 @@ def test_woocommerce_adapter():
         assert adapter.store_url == "https://example.com"
         assert "wp-json/wc/v3" in adapter.base_url
 
-        print(f"✅ Adapter initialized")
+        print(f"[SUCCESS] Adapter initialized")
         print(f"   Platform: {adapter.platform_name}")
         print(f"   API Version: {adapter.api_version}")
         print(f"   Store URL: {adapter.store_url}")
         print(f"   Base URL: {adapter.base_url}")
 
     except Exception as e:
-        print(f"❌ Initialization failed: {e}")
+        print(f"[ERROR] Initialization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -66,13 +66,13 @@ def test_woocommerce_adapter():
     try:
         try:
             bad_adapter = WooCommerceAdapter({})
-            print("❌ Should have raised AuthenticationError")
+            print("[ERROR] Should have raised AuthenticationError")
         except AuthenticationError as e:
-            print("✅ Correctly rejects missing credentials")
+            print("[SUCCESS] Correctly rejects missing credentials")
             print(f"   Error: {str(e)[:80]}...")
 
     except Exception as e:
-        print(f"❌ Credential validation failed: {e}")
+        print(f"[ERROR] Credential validation failed: {e}")
         return
 
     # Test 4: Test HTTPS warning
@@ -84,10 +84,10 @@ def test_woocommerce_adapter():
             "consumer_key": "ck_test",
             "consumer_secret": "cs_test"
         })
-        print("✅ Accepts HTTP but logs warning")
+        print("[SUCCESS] Accepts HTTP but logs warning")
 
     except Exception as e:
-        print(f"❌ HTTPS validation failed: {e}")
+        print(f"[ERROR] HTTPS validation failed: {e}")
         return
 
     # Test 5: Test helper methods
@@ -97,13 +97,13 @@ def test_woocommerce_adapter():
         info = adapter.get_platform_info()
         assert info["platform"] == "woocommerce"
         assert info["api_version"] == "wc/v3"
-        print("✅ get_platform_info() working")
+        print("[SUCCESS] get_platform_info() working")
 
         # track_request
         adapter.track_request()
         stats = adapter.get_request_stats()
         assert stats["total_requests"] == 1
-        print("✅ track_request() working")
+        print("[SUCCESS] track_request() working")
 
         # validate_product_data
         valid_product = {
@@ -112,10 +112,10 @@ def test_woocommerce_adapter():
             "sku": "SW-001"
         }
         adapter.validate_product_data(valid_product)
-        print("✅ validate_product_data() accepts valid data")
+        print("[SUCCESS] validate_product_data() accepts valid data")
 
     except Exception as e:
-        print(f"❌ Helper methods failed: {e}")
+        print(f"[ERROR] Helper methods failed: {e}")
         return
 
     # Test 6: Test data normalization
@@ -160,7 +160,7 @@ def test_woocommerce_adapter():
         assert len(normalized["images"]) == 2
         assert len(normalized["tags"]) == 2
         assert len(normalized["categories"]) == 2
-        print("✅ normalize_product() working correctly")
+        print("[SUCCESS] normalize_product() working correctly")
 
         # Test order normalization
         wc_order = {
@@ -218,10 +218,10 @@ def test_woocommerce_adapter():
         assert normalized_order["customer_name"] == "John Doe"
         assert len(normalized_order["line_items"]) == 1
         assert normalized_order["status"] == "completed"
-        print("✅ normalize_order() working correctly")
+        print("[SUCCESS] normalize_order() working correctly")
 
     except Exception as e:
-        print(f"❌ Normalization failed: {e}")
+        print(f"[ERROR] Normalization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -231,10 +231,10 @@ def test_woocommerce_adapter():
     try:
         # Check rate limit constant
         assert adapter.RATE_LIMIT_DELAY == 0.25
-        print(f"✅ Rate limit configured: {adapter.RATE_LIMIT_DELAY}s (4 req/sec)")
+        print(f"[SUCCESS] Rate limit configured: {adapter.RATE_LIMIT_DELAY}s (4 req/sec)")
 
     except Exception as e:
-        print(f"❌ Rate limiting test failed: {e}")
+        print(f"[ERROR] Rate limiting test failed: {e}")
         return
 
     # Test 8: Test async method signatures
@@ -258,10 +258,10 @@ def test_woocommerce_adapter():
             method = getattr(adapter, method_name)
             assert asyncio.iscoroutinefunction(method), f"{method_name} should be async"
 
-        print(f"✅ All {len(methods_to_check)} abstract methods are async")
+        print(f"[SUCCESS] All {len(methods_to_check)} abstract methods are async")
 
     except Exception as e:
-        print(f"❌ Async signature test failed: {e}")
+        print(f"[ERROR] Async signature test failed: {e}")
         return
 
     # Test 9: Test HTTP headers
@@ -271,27 +271,27 @@ def test_woocommerce_adapter():
         assert headers["Content-Type"] == "application/json"
         assert headers["Accept"] == "application/json"
         assert "OspraOS" in headers["User-Agent"]
-        print("✅ HTTP headers correctly formatted")
+        print("[SUCCESS] HTTP headers correctly formatted")
 
     except Exception as e:
-        print(f"❌ HTTP headers test failed: {e}")
+        print(f"[ERROR] HTTP headers test failed: {e}")
         return
 
     print("\n" + "=" * 70)
-    print("✅ ALL WOOCOMMERCE ADAPTER TESTS PASSED!")
+    print("[SUCCESS] ALL WOOCOMMERCE ADAPTER TESTS PASSED!")
     print("=" * 70)
     print()
-    print("📋 Summary:")
-    print("   ✓ WooCommerce adapter properly inherits from PlatformAdapter")
-    print("   ✓ All 9 abstract methods implemented")
-    print("   ✓ Credential validation working (3 required fields)")
-    print("   ✓ Data normalization working (products & orders)")
-    print("   ✓ Rate limiting configured (4 req/sec)")
-    print("   ✓ HTTP Basic Auth setup")
-    print("   ✓ Helper methods functional")
-    print("   ✓ HTTPS validation with warnings")
+    print("[LIST] Summary:")
+    print("   [OK] WooCommerce adapter properly inherits from PlatformAdapter")
+    print("   [OK] All 9 abstract methods implemented")
+    print("   [OK] Credential validation working (3 required fields)")
+    print("   [OK] Data normalization working (products & orders)")
+    print("   [OK] Rate limiting configured (4 req/sec)")
+    print("   [OK] HTTP Basic Auth setup")
+    print("   [OK] Helper methods functional")
+    print("   [OK] HTTPS validation with warnings")
     print()
-    print("🎯 WooCommerce Adapter Features:")
+    print("[TARGET] WooCommerce Adapter Features:")
     print("   • WooCommerce REST API wc/v3")
     print("   • WordPress /wp-json/ structure")
     print("   • HTTP Basic Auth (consumer key/secret)")
@@ -302,7 +302,7 @@ def test_woocommerce_adapter():
     print("   • Categories and tags support")
     print("   • Comprehensive error handling")
     print()
-    print("📚 To test with real WooCommerce store:")
+    print(" To test with real WooCommerce store:")
     print("   1. Set WOOCOMMERCE_STORE_URL in environment")
     print("   2. Set WOOCOMMERCE_CONSUMER_KEY in environment")
     print("   3. Set WOOCOMMERCE_CONSUMER_SECRET in environment")
@@ -326,7 +326,7 @@ def test_with_real_credentials():
     consumer_secret = os.getenv("WOOCOMMERCE_CONSUMER_SECRET")
 
     if not store_url or not consumer_key or not consumer_secret:
-        print("⚠️  No real credentials found in environment")
+        print("[WARNING]  No real credentials found in environment")
         print("   Set WOOCOMMERCE_STORE_URL, WOOCOMMERCE_CONSUMER_KEY,")
         print("   and WOOCOMMERCE_CONSUMER_SECRET to test")
         return
@@ -349,12 +349,12 @@ def test_with_real_credentials():
         result = await adapter.test_connection()
 
         if result.get("success"):
-            print(f"✅ Connected to: {result['store_name']}")
+            print(f"[SUCCESS] Connected to: {result['store_name']}")
             print(f"   WooCommerce: {result['platform_version']}")
             print(f"   WordPress: {result['wordpress_version']}")
             print(f"   Currency: {result['currency']}")
         else:
-            print(f"❌ Connection failed: {result.get('error')}")
+            print(f"[ERROR] Connection failed: {result.get('error')}")
             return
 
         # Get store info
@@ -362,12 +362,12 @@ def test_with_real_credentials():
         info = await adapter.get_store_info()
 
         if info.get("success"):
-            print(f"✅ Store info retrieved")
+            print(f"[SUCCESS] Store info retrieved")
             print(f"   Plan: {info.get('plan')}")
             print(f"   Country: {info.get('country')}")
             print(f"   Email: {info.get('email')}")
         else:
-            print(f"❌ Get store info failed: {info.get('error')}")
+            print(f"[ERROR] Get store info failed: {info.get('error')}")
 
         # Get products (first 5)
         print("\nFetching products...")
@@ -375,11 +375,11 @@ def test_with_real_credentials():
 
         if products.get("success"):
             count = products.get("total_count", 0)
-            print(f"✅ Retrieved {count} products")
+            print(f"[SUCCESS] Retrieved {count} products")
             for product in products.get("products", [])[:3]:
                 print(f"   - {product['title']}: ${product['price']}")
         else:
-            print(f"❌ Get products failed: {products.get('error')}")
+            print(f"[ERROR] Get products failed: {products.get('error')}")
 
         # Get orders (first 5)
         print("\nFetching orders...")
@@ -387,35 +387,35 @@ def test_with_real_credentials():
 
         if orders.get("success"):
             count = orders.get("total_count", 0)
-            print(f"✅ Retrieved {count} orders")
+            print(f"[SUCCESS] Retrieved {count} orders")
             for order in orders.get("orders", [])[:3]:
                 print(f"   - Order #{order['order_number']}: ${order['total_price']} ({order['status']})")
         else:
-            print(f"❌ Get orders failed: {orders.get('error')}")
+            print(f"[ERROR] Get orders failed: {orders.get('error')}")
 
         # Sync orders
         print("\nSyncing orders...")
         sync_result = await adapter.sync_orders()
 
         if sync_result.get("success"):
-            print(f"✅ Orders synced: {sync_result['orders_synced']}")
+            print(f"[SUCCESS] Orders synced: {sync_result['orders_synced']}")
             metrics = sync_result.get("metrics", {})
             print(f"   Total Revenue: ${metrics.get('total_revenue', 0):.2f}")
             print(f"   Avg Order Value: ${metrics.get('avg_order_value', 0):.2f}")
         else:
-            print(f"❌ Sync failed: {sync_result.get('error')}")
+            print(f"[ERROR] Sync failed: {sync_result.get('error')}")
 
         # Show stats
         print("\nAPI Statistics:")
         stats = adapter.get_request_stats()
         print(f"   Total requests: {stats['total_requests']}")
 
-        print("\n✅ Live tests complete!")
+        print("\n[SUCCESS] Live tests complete!")
 
     try:
         asyncio.run(run_live_tests())
     except Exception as e:
-        print(f"❌ Live tests failed: {e}")
+        print(f"[ERROR] Live tests failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -432,6 +432,6 @@ if __name__ == "__main__":
     ]):
         test_with_real_credentials()
     else:
-        print("💡 Tip: Set WooCommerce credentials to test with real API:")
+        print("[TIP] Tip: Set WooCommerce credentials to test with real API:")
         print("   WOOCOMMERCE_STORE_URL, WOOCOMMERCE_CONSUMER_KEY,")
         print("   WOOCOMMERCE_CONSUMER_SECRET")

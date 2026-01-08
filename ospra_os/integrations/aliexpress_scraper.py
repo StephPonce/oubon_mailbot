@@ -50,7 +50,7 @@ class AliExpressScraper:
         Returns:
             List of product dicts with real URLs that work
         """
-        logger.info(f"🔍 Scraping AliExpress for: {query}")
+        logger.info(f"[SEARCH] Scraping AliExpress for: {query}")
 
         try:
             # Format query for URL
@@ -60,7 +60,7 @@ class AliExpressScraper:
             # Use API-style endpoint for more reliable data
             api_url = f"https://www.aliexpress.com/af/{search_query}.html?SearchText={query.replace(' ', '+')}&SortType=total_tranpro_desc"
 
-            logger.info(f"📡 Fetching from: {api_url[:80]}...")
+            logger.info(f" Fetching from: {api_url[:80]}...")
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(api_url, headers=self.headers, timeout=15) as response:
@@ -80,7 +80,7 @@ class AliExpressScraper:
                 logger.warning("No products extracted from page, using fallback")
                 return self._fallback_products(query, limit)
 
-            logger.info(f"✅ Found {len(products)} real products")
+            logger.info(f"[SUCCESS] Found {len(products)} real products")
             return products[:limit]
 
         except asyncio.TimeoutError:

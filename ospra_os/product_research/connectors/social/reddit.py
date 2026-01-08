@@ -71,13 +71,13 @@ class RedditConnector(BaseConnector):
             Product candidates with Reddit engagement data
         """
         if not self.is_available():
-            print("⚠️  Reddit API credentials not configured")
+            print("[WARNING]  Reddit API credentials not configured")
             return []
 
         try:
             import praw
         except ImportError:
-            print("⚠️  praw not installed. Run: pip install praw")
+            print("[WARNING]  praw not installed. Run: pip install praw")
             return []
 
         subreddits = kwargs.get("subreddits", ["smarthome", "homeautomation", "HomeKit", "amazonecho"])
@@ -130,14 +130,14 @@ class RedditConnector(BaseConnector):
                         products.append(product)
 
                 except Exception as e:
-                    print(f"⚠️  Error searching r/{subreddit_name}: {e}")
+                    print(f"[WARNING]  Error searching r/{subreddit_name}: {e}")
                     continue
 
-            print(f"✅ Reddit search: Found {len(products)} products for '{query}'")
+            print(f"[SUCCESS] Reddit search: Found {len(products)} products for '{query}'")
             return products
 
         except Exception as e:
-            print(f"❌ Reddit search error: {e}")
+            print(f"[ERROR] Reddit search error: {e}")
             return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
@@ -152,13 +152,13 @@ class RedditConnector(BaseConnector):
             Trending products from Reddit communities
         """
         if not self.is_available():
-            print("⚠️  Reddit API credentials not configured")
+            print("[WARNING]  Reddit API credentials not configured")
             return []
 
         try:
             import praw
         except ImportError:
-            print("⚠️  praw not installed. Run: pip install praw")
+            print("[WARNING]  praw not installed. Run: pip install praw")
             return []
 
         # Initialize Reddit client in read-only mode (no user auth needed for public subs)
@@ -211,14 +211,14 @@ class RedditConnector(BaseConnector):
                         products.append(product)
 
                 except Exception as e:
-                    print(f"⚠️  Error fetching hot posts from r/{subreddit_name}: {e}")
+                    print(f"[WARNING]  Error fetching hot posts from r/{subreddit_name}: {e}")
                     continue
 
-            print(f"✅ Reddit trending: Found {len(products)} hot products")
+            print(f"[SUCCESS] Reddit trending: Found {len(products)} hot products")
             return products
 
         except Exception as e:
-            print(f"❌ Reddit trending error: {e}")
+            print(f"[ERROR] Reddit trending error: {e}")
             return []
 
     async def get_subreddit_products(self, subreddit: str, time_filter: str = "week", limit: int = 25) -> List[ProductCandidate]:
@@ -248,19 +248,19 @@ class RedditConnector(BaseConnector):
         products = []
 
         try:
-            print(f"🔍 Fetching r/{subreddit} - URL: {url}, params: {params}")
+            print(f"[SEARCH] Fetching r/{subreddit} - URL: {url}, params: {params}")
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, params=params, headers=headers) as response:
-                    print(f"📡 Response status: {response.status}")
+                    print(f" Response status: {response.status}")
                     if response.status != 200:
                         resp_text = await response.text()
-                        print(f"❌ Reddit API error for r/{subreddit}: HTTP {response.status}")
+                        print(f"[ERROR] Reddit API error for r/{subreddit}: HTTP {response.status}")
                         print(f"Response: {resp_text[:200]}")
                         return []
 
                     data = await response.json()
                     posts = data.get("data", {}).get("children", [])
-                    print(f"📊 Received {len(posts)} posts from r/{subreddit}")
+                    print(f"[STATS] Received {len(posts)} posts from r/{subreddit}")
 
                     filtered_stickied = 0
                     filtered_removed = 0
@@ -301,11 +301,11 @@ class RedditConnector(BaseConnector):
                         )
                         products.append(product)
 
-                    print(f"🔧 Filtered: {filtered_stickied} stickied, {filtered_removed} removed")
+                    print(f"[FIX] Filtered: {filtered_stickied} stickied, {filtered_removed} removed")
 
-            print(f"✅ r/{subreddit}: Found {len(products)} top products")
+            print(f"[SUCCESS] r/{subreddit}: Found {len(products)} top products")
             return products
 
         except Exception as e:
-            print(f"❌ Error fetching from r/{subreddit}: {e}")
+            print(f"[ERROR] Error fetching from r/{subreddit}: {e}")
             return []

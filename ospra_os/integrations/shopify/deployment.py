@@ -23,11 +23,11 @@ class ProductDeploymentService:
         if anthropic_key:
             try:
                 self.ai_client = Anthropic(api_key=anthropic_key)
-                print("✅ AI-powered deployment enabled (Claude)")
+                print("[SUCCESS] AI-powered deployment enabled (Claude)")
             except Exception as e:
-                print(f"⚠️  AI initialization failed: {e}")
+                print(f"[WARNING]  AI initialization failed: {e}")
         else:
-            print("⚠️  ANTHROPIC_API_KEY not set - using template descriptions")
+            print("[WARNING]  ANTHROPIC_API_KEY not set - using template descriptions")
 
         # Initialize image enhancement services
         self.image_processor = None
@@ -36,9 +36,9 @@ class ProductDeploymentService:
             try:
                 self.image_processor = ProductImageProcessor()
                 self.image_storage = ImageStorage()
-                print("✅ AI-powered image enhancement enabled (DALL-E 3 + rembg)")
+                print("[SUCCESS] AI-powered image enhancement enabled (DALL-E 3 + rembg)")
             except Exception as e:
-                print(f"⚠️  Image enhancement initialization failed: {e}")
+                print(f"[WARNING]  Image enhancement initialization failed: {e}")
 
     async def deploy_product(
         self,
@@ -57,7 +57,7 @@ class ProductDeploymentService:
         """
         try:
             print(f"\n{'='*70}")
-            print(f"🚀 DEPLOYING TO SHOPIFY")
+            print(f"[START] DEPLOYING TO SHOPIFY")
             print(f"{'='*70}")
             print(f"Product: {product_data.get('name', 'Unknown')[:50]}")
             print()
@@ -95,7 +95,7 @@ class ProductDeploymentService:
             )
 
             if not shopify_product:
-                print("❌ Deployment failed")
+                print("[ERROR] Deployment failed")
                 return {
                     'success': False,
                     'error': 'Shopify API error'
@@ -112,7 +112,7 @@ class ProductDeploymentService:
             }
 
             print(f"\n{'='*70}")
-            print(f"✅ DEPLOYMENT SUCCESSFUL")
+            print(f"[SUCCESS] DEPLOYMENT SUCCESSFUL")
             print(f"{'='*70}")
             print(f"Shopify ID: {result['shopify_product_id']}")
             print(f"Store URL: {result['shopify_url']}")
@@ -123,7 +123,7 @@ class ProductDeploymentService:
             return result
 
         except Exception as e:
-            print(f"❌ Deployment error: {e}")
+            print(f"[ERROR] Deployment error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -156,7 +156,7 @@ class ProductDeploymentService:
         """Generate AI-powered product description using Claude"""
         if use_ai and self.ai_client:
             try:
-                print("🤖 Generating AI description with Claude...")
+                print("[AI] Generating AI description with Claude...")
 
                 # Get multi-source data for context
                 source_count = product_data.get('source_count', 0)
@@ -208,11 +208,11 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
                     lines = description.split("\n")
                     description = "\n".join(lines[1:-1])
 
-                print(f"✅ AI description generated ({len(description)} chars)")
+                print(f"[SUCCESS] AI description generated ({len(description)} chars)")
                 return description
 
             except Exception as e:
-                print(f"⚠️  AI description failed, using template: {e}")
+                print(f"[WARNING]  AI description failed, using template: {e}")
                 # Fall through to template
 
         # Use existing description or create basic one
@@ -246,7 +246,7 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
         # Try AI-powered pricing first
         if self.ai_client:
             try:
-                print("🤖 Calculating competitive pricing with AI...")
+                print("[AI] Calculating competitive pricing with AI...")
                 pricing_data = generate_product_pricing(
                     product_name=product_data.get('name', ''),
                     niche=product_data.get('niche', 'general')
@@ -255,11 +255,11 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
                 # Use AI-generated price
                 ai_price = pricing_data.get('price', 0)
                 if ai_price > 0:
-                    print(f"✅ AI pricing: ${ai_price:.2f} (margin: {pricing_data.get('profit_margin')}%)")
+                    print(f"[SUCCESS] AI pricing: ${ai_price:.2f} (margin: {pricing_data.get('profit_margin')}%)")
                     return ai_price
 
             except Exception as e:
-                print(f"⚠️  AI pricing failed, using rule-based: {e}")
+                print(f"[WARNING]  AI pricing failed, using rule-based: {e}")
 
         # Fallback: Rule-based pricing
         cost = product_data.get('cost', 0) or product_data.get('price', 0)
@@ -328,11 +328,11 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
             List of enhanced image URLs (HTTP accessible)
         """
         if not self.image_processor or not self.image_storage:
-            print("⚠️  Image enhancement disabled, using original images")
+            print("[WARNING]  Image enhancement disabled, using original images")
             return original_images
 
         if not original_images:
-            print("⚠️  No images to enhance")
+            print("[WARNING]  No images to enhance")
             return []
 
         enhanced_urls = []
@@ -340,7 +340,7 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
         product_name = product_data.get('name', 'Product')
         niche = product_data.get('niche', 'smart_home')
 
-        print(f"\n🎨 ENHANCING IMAGES WITH AI")
+        print(f"\n ENHANCING IMAGES WITH AI")
         print(f"   Product: {product_name[:40]}")
         print(f"   Niche: {niche}")
         print(f"   Images to process: {len(original_images)}")
@@ -393,26 +393,26 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
                     enhanced_urls.append(full_url)
 
                     cost = result.get("cost_estimate", 0.04)
-                    print(f"   ✅ Image enhanced successfully (cost: ${cost:.2f})")
-                    print(f"   📸 Saved to: {storage_result.get('filename')}")
+                    print(f"   [SUCCESS] Image enhanced successfully (cost: ${cost:.2f})")
+                    print(f"    Saved to: {storage_result.get('filename')}")
                 else:
-                    print(f"   ⚠️  Storage failed, using original")
+                    print(f"   [WARNING]  Storage failed, using original")
                     enhanced_urls.append(image_url)
             else:
                 error = result.get("error", "Unknown error")
-                print(f"   ⚠️  Enhancement failed: {error}")
+                print(f"   [WARNING]  Enhancement failed: {error}")
                 enhanced_urls.append(image_url)
 
         except Exception as e:
-            print(f"   ❌ Enhancement error: {e}")
+            print(f"   [ERROR] Enhancement error: {e}")
             enhanced_urls.append(image_url)
 
         # Add remaining original images (unprocessed)
         if len(original_images) > 1:
             enhanced_urls.extend(original_images[1:])
-            print(f"   ℹ️  Added {len(original_images) - 1} original images (unprocessed)")
+            print(f"   [INFO]  Added {len(original_images) - 1} original images (unprocessed)")
 
-        print(f"\n   ✅ Final image count: {len(enhanced_urls)}\n")
+        print(f"\n   [SUCCESS] Final image count: {len(enhanced_urls)}\n")
 
         return enhanced_urls
 
@@ -466,7 +466,7 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
         """Deploy multiple products"""
         import asyncio
 
-        print(f"\n🚀 Bulk deploying {len(products)} products...")
+        print(f"\n[START] Bulk deploying {len(products)} products...")
 
         results = []
 
@@ -488,6 +488,6 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
                 await asyncio.sleep(2)
 
         successful = sum(1 for r in results if r.get('success'))
-        print(f"\n✅ Deployed {successful}/{len(products)} products successfully")
+        print(f"\n[SUCCESS] Deployed {successful}/{len(products)} products successfully")
 
         return results

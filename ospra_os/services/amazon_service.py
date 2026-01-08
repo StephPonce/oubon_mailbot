@@ -167,16 +167,16 @@ class AmazonService:
             if client.test_connection():
                 account.status = "active"
                 account.last_sync_at = datetime.utcnow()
-                logger.info("✅ Amazon account connected successfully")
+                logger.info("[SUCCESS] Amazon account connected successfully")
             else:
                 account.status = "error"
                 account.sync_error = "Connection test failed"
-                logger.error("❌ Amazon connection test failed")
+                logger.error("[ERROR] Amazon connection test failed")
 
         except Exception as e:
             account.status = "error"
             account.sync_error = str(e)
-            logger.error(f"❌ Amazon connection error: {e}")
+            logger.error(f"[ERROR] Amazon connection error: {e}")
 
         # Save to database
         self.db.add(account)
@@ -423,7 +423,7 @@ class AmazonService:
                 "margin_percent": margin,
                 "sales_rank": product.get("salesRanks", [{}])[0].get("rank"),
                 "category": product.get("salesRanks", [{}])[0].get("displayGroupTitle"),
-                "recommendation": "✅ Profitable" if profit > 5 and margin > 20 else "⚠️ Low margin" if profit > 0 else "❌ Unprofitable"
+                "recommendation": "[SUCCESS] Profitable" if profit > 5 and margin > 20 else "[WARNING] Low margin" if profit > 0 else "[ERROR] Unprofitable"
             }
 
             logger.info(f"Analysis complete: {analysis['recommendation']}")
@@ -562,13 +562,13 @@ class AmazonService:
             listing.status = "active"
             self.db.commit()
 
-            logger.info(f"✅ Listing {listing.sku} published")
+            logger.info(f"[SUCCESS] Listing {listing.sku} published")
             return True
 
         except Exception as e:
             listing.status = "error"
             self.db.commit()
-            logger.error(f"❌ Failed to publish listing: {e}")
+            logger.error(f"[ERROR] Failed to publish listing: {e}")
             return False
 
     def sync_listings(self, account_id: int) -> int:
@@ -680,11 +680,11 @@ class AmazonService:
             account.last_sync_at = datetime.utcnow()
             self.db.commit()
 
-            logger.info(f"✅ Synced {synced_count} orders")
+            logger.info(f"[SUCCESS] Synced {synced_count} orders")
             return synced_count
 
         except Exception as e:
-            logger.error(f"❌ Order sync error: {e}")
+            logger.error(f"[ERROR] Order sync error: {e}")
             return 0
 
     # ========================================================================
@@ -741,11 +741,11 @@ class AmazonService:
 
             self.db.commit()
 
-            logger.info(f"✅ Synced inventory for {synced_count} SKUs")
+            logger.info(f"[SUCCESS] Synced inventory for {synced_count} SKUs")
             return synced_count
 
         except Exception as e:
-            logger.error(f"❌ Inventory sync error: {e}")
+            logger.error(f"[ERROR] Inventory sync error: {e}")
             return 0
 
     # ========================================================================

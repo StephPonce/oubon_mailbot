@@ -63,7 +63,7 @@ class SalesSyncService:
                 "errors": []
             }
         """
-        print(f"📊 Syncing sales for store: {store.store_name} ({store.platform.value})")
+        print(f"[STATS] Syncing sales for store: {store.store_name} ({store.platform.value})")
 
         if store.platform == Platform.SHOPIFY:
             return await self._sync_shopify_store(store, days_back)
@@ -103,7 +103,7 @@ class SalesSyncService:
                 result = await self.sync_store(store, days_back)
                 results.append(result)
             except Exception as e:
-                print(f"❌ Error syncing store {store.id}: {e}")
+                print(f"[ERROR] Error syncing store {store.id}: {e}")
                 results.append({
                     "success": False,
                     "store_id": store.id,
@@ -174,7 +174,7 @@ class SalesSyncService:
                         response = await client.get(url, headers=headers)
 
                     if response.status_code != 200:
-                        print(f"❌ Shopify API error: {response.status_code}")
+                        print(f"[ERROR] Shopify API error: {response.status_code}")
                         print(response.text)
                         break
 
@@ -194,7 +194,7 @@ class SalesSyncService:
                     else:
                         break
 
-            print(f"✅ Fetched {len(all_orders)} orders from Shopify")
+            print(f"[SUCCESS] Fetched {len(all_orders)} orders from Shopify")
 
             # Process orders into daily performance snapshots
             products_updated = await self._process_shopify_orders(
@@ -220,7 +220,7 @@ class SalesSyncService:
             }
 
         except Exception as e:
-            print(f"❌ Shopify sync error: {e}")
+            print(f"[ERROR] Shopify sync error: {e}")
             store.sync_error = str(e)
             self.db.commit()
             return {
@@ -362,7 +362,7 @@ class SalesSyncService:
             products_updated += 1
 
         self.db.commit()
-        print(f"✅ Updated {products_updated} product performance records")
+        print(f"[SUCCESS] Updated {products_updated} product performance records")
 
         return products_updated
 

@@ -50,6 +50,7 @@ dependencies = [
     "pillow>=12.0.0",
     "onnxruntime>=1.23.2",
     "sentry-sdk[fastapi,httpx,sqlalchemy]>=2.47.0",
+    "resend>=2.19.0",
 ]
 
 [project.optional-dependencies]

@@ -62,7 +62,7 @@ class AliExpressTokenRefresher:
             with open(tokens_file, 'r') as f:
                 return json.load(f)
         except Exception as e:
-            print(f"❌ Error loading tokens from {tokens_file}: {e}")
+            print(f"[ERROR] Error loading tokens from {tokens_file}: {e}")
             return None
 
     def save_tokens(self, tokens: dict, tokens_file: Path) -> bool:
@@ -77,10 +77,10 @@ class AliExpressTokenRefresher:
             with open(tokens_file, 'w') as f:
                 json.dump(tokens, f, indent=2)
 
-            print(f"✅ Tokens saved to {tokens_file}")
+            print(f"[SUCCESS] Tokens saved to {tokens_file}")
             return True
         except Exception as e:
-            print(f"❌ Error saving tokens to {tokens_file}: {e}")
+            print(f"[ERROR] Error saving tokens to {tokens_file}: {e}")
             return False
 
     def is_token_expiring_soon(self, tokens: dict) -> bool:
@@ -119,10 +119,10 @@ class AliExpressTokenRefresher:
 
         if should_refresh:
             days_until_expiry = time_until_expiry / 86400
-            print(f"⚠️  Token expires in {days_until_expiry:.1f} days - refresh needed")
+            print(f"[WARNING]  Token expires in {days_until_expiry:.1f} days - refresh needed")
         else:
             days_until_expiry = time_until_expiry / 86400
-            print(f"✅ Token valid for {days_until_expiry:.1f} more days")
+            print(f"[SUCCESS] Token valid for {days_until_expiry:.1f} more days")
 
         return should_refresh
 
@@ -158,7 +158,7 @@ class AliExpressTokenRefresher:
                 signature = self.generate_signature_sha256(params, app_secret)
                 params["sign"] = signature
 
-                print(f"🔄 Refreshing token for app {app_key}...")
+                print(f"[REFRESH] Refreshing token for app {app_key}...")
 
                 # Make refresh request
                 response = await client.post(
@@ -167,26 +167,26 @@ class AliExpressTokenRefresher:
                     headers={"Content-Type": "application/x-www-form-urlencoded"}
                 )
 
-                print(f"📡 Refresh Response Status: {response.status_code}")
+                print(f" Refresh Response Status: {response.status_code}")
 
                 if response.status_code == 200:
                     token_response = response.json()
 
                     # Check if successful
                     if "access_token" in token_response:
-                        print(f"✅ Token refreshed successfully!")
+                        print(f"[SUCCESS] Token refreshed successfully!")
                         print(f"   New Access Token: {token_response['access_token'][:20]}...")
                         print(f"   Expires In: {token_response.get('expires_in', 'N/A')} seconds")
                         return token_response
                     else:
-                        print(f"❌ Token refresh failed: {token_response}")
+                        print(f"[ERROR] Token refresh failed: {token_response}")
                         return None
                 else:
-                    print(f"❌ Token refresh request failed: {response.status_code} - {response.text}")
+                    print(f"[ERROR] Token refresh request failed: {response.status_code} - {response.text}")
                     return None
 
         except Exception as e:
-            print(f"❌ Exception during token refresh: {e}")
+            print(f"[ERROR] Exception during token refresh: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -199,24 +199,24 @@ class AliExpressTokenRefresher:
             True if token is valid (either already valid or successfully refreshed)
         """
         print("\n" + "=" * 80)
-        print("🔍 CHECKING DROPSHIPPING API TOKEN (App Key: 520918)")
+        print("[SEARCH] CHECKING DROPSHIPPING API TOKEN (App Key: 520918)")
         print("=" * 80)
 
         # Load current tokens
         tokens = self.load_tokens(self.dropship_tokens_file)
         if not tokens:
-            print("❌ No tokens found - need to authorize first")
+            print("[ERROR] No tokens found - need to authorize first")
             return False
 
         # Check if refresh is needed
         if not self.is_token_expiring_soon(tokens):
-            print("✅ Token is still valid - no refresh needed")
+            print("[SUCCESS] Token is still valid - no refresh needed")
             return True
 
         # Get refresh token
         refresh_token = tokens.get("refresh_token")
         if not refresh_token:
-            print("❌ No refresh token available - need to re-authorize")
+            print("[ERROR] No refresh token available - need to re-authorize")
             return False
 
         # Refresh the token
@@ -230,7 +230,7 @@ class AliExpressTokenRefresher:
             # Save new tokens
             return self.save_tokens(new_tokens, self.dropship_tokens_file)
         else:
-            print("❌ Token refresh failed")
+            print("[ERROR] Token refresh failed")
             return False
 
     async def refresh_affiliate_token_if_needed(self) -> bool:
@@ -241,24 +241,24 @@ class AliExpressTokenRefresher:
             True if token is valid (either already valid or successfully refreshed)
         """
         print("\n" + "=" * 80)
-        print("🔍 CHECKING AFFILIATE API TOKEN (App Key: 522382)")
+        print("[SEARCH] CHECKING AFFILIATE API TOKEN (App Key: 522382)")
         print("=" * 80)
 
         # Load current tokens
         tokens = self.load_tokens(self.affiliate_tokens_file)
         if not tokens:
-            print("❌ No tokens found - need to authorize first")
+            print("[ERROR] No tokens found - need to authorize first")
             return False
 
         # Check if refresh is needed
         if not self.is_token_expiring_soon(tokens):
-            print("✅ Token is still valid - no refresh needed")
+            print("[SUCCESS] Token is still valid - no refresh needed")
             return True
 
         # Get refresh token
         refresh_token = tokens.get("refresh_token")
         if not refresh_token:
-            print("❌ No refresh token available - need to re-authorize")
+            print("[ERROR] No refresh token available - need to re-authorize")
             return False
 
         # Refresh the token
@@ -272,7 +272,7 @@ class AliExpressTokenRefresher:
             # Save new tokens
             return self.save_tokens(new_tokens, self.affiliate_tokens_file)
         else:
-            print("❌ Token refresh failed")
+            print("[ERROR] Token refresh failed")
             return False
 
     async def refresh_all_tokens(self) -> Dict[str, bool]:
@@ -283,7 +283,7 @@ class AliExpressTokenRefresher:
             Dict with status for each API
         """
         print("\n" + "=" * 80)
-        print("🔄 ALIEXPRESS TOKEN REFRESH SERVICE")
+        print("[REFRESH] ALIEXPRESS TOKEN REFRESH SERVICE")
         print("=" * 80)
         print(f"Started at: {datetime.now().isoformat()}")
         print(f"Refresh window: {self.refresh_window / 86400:.1f} days before expiry")
@@ -294,10 +294,10 @@ class AliExpressTokenRefresher:
         }
 
         print("\n" + "=" * 80)
-        print("📊 REFRESH SUMMARY")
+        print("[STATS] REFRESH SUMMARY")
         print("=" * 80)
-        print(f"Dropshipping API: {'✅ Valid' if results['dropship'] else '❌ Failed'}")
-        print(f"Affiliate API: {'✅ Valid' if results['affiliate'] else '❌ Failed'}")
+        print(f"Dropshipping API: {'[SUCCESS] Valid' if results['dropship'] else '[ERROR] Failed'}")
+        print(f"Affiliate API: {'[SUCCESS] Valid' if results['affiliate'] else '[ERROR] Failed'}")
         print("=" * 80)
 
         return results

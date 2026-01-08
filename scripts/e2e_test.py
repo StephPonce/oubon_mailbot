@@ -46,22 +46,22 @@ def print_header(text: str):
 
 def print_success(text: str):
     """Print success message"""
-    print(f"{Colors.GREEN}✅ {text}{Colors.ENDC}")
+    print(f"{Colors.GREEN}[SUCCESS] {text}{Colors.ENDC}")
 
 
 def print_error(text: str):
     """Print error message"""
-    print(f"{Colors.RED}❌ {text}{Colors.ENDC}")
+    print(f"{Colors.RED}[ERROR] {text}{Colors.ENDC}")
 
 
 def print_info(text: str):
     """Print info message"""
-    print(f"{Colors.CYAN}ℹ️  {text}{Colors.ENDC}")
+    print(f"{Colors.CYAN}[INFO]  {text}{Colors.ENDC}")
 
 
 def print_warning(text: str):
     """Print warning message"""
-    print(f"{Colors.YELLOW}⚠️  {text}{Colors.ENDC}")
+    print(f"{Colors.YELLOW}[WARNING]  {text}{Colors.ENDC}")
 
 
 async def test_product_discovery(niche: str, count: int = 5) -> List[Dict]:
@@ -85,14 +85,14 @@ async def test_product_discovery(niche: str, count: int = 5) -> List[Dict]:
         print_success(f"Discovered {len(products)} products")
 
         # Display products
-        print("\n" + "─" * 80)
+        print("\n" + "" * 80)
         for i, product in enumerate(products, 1):
             print(f"\n{Colors.BOLD}Product {i}:{Colors.ENDC}")
             print(f"  Name: {product.get('title', 'N/A')}")
             print(f"  Price: ${product.get('price', 0):.2f}")
             print(f"  Source: {product.get('source', 'N/A')}")
             print(f"  Trend Score: {product.get('trend_score', 0)}/100")
-        print("─" * 80)
+        print("" * 80)
 
         return products
 
@@ -151,22 +151,22 @@ async def test_opportunity_scoring(products: List[Dict]) -> List[Dict]:
         print_success(f"Scored {len(scored_products)} products")
 
         # Display scores
-        print("\n" + "─" * 80)
+        print("\n" + "" * 80)
         print(f"{Colors.BOLD}{'Rank':<6}{'Product':<40}{'Score':<10}{'Tier':<12}{'Demand':<10}{'Comp.':<10}{Colors.ENDC}")
-        print("─" * 80)
+        print("" * 80)
 
         for i, product in enumerate(scored_products, 1):
             tier_emoji = {
-                'golden': '✨',
-                'excellent': '🎯',
-                'good': '👍',
-                'fair': '⚠️',
-                'poor': '🚫',
-                'avoid': '❌'
+                'golden': '[NEW]',
+                'excellent': '[TARGET]',
+                'good': '[GOOD]',
+                'fair': '[WARNING]',
+                'poor': '[BLOCKED]',
+                'avoid': '[ERROR]'
             }
 
             tier = product.get('opportunity_tier', 'unknown')
-            emoji = tier_emoji.get(tier, '❓')
+            emoji = tier_emoji.get(tier, '[QUESTION]')
 
             print(f"{i:<6}{product.get('title', 'N/A')[:38]:<40}"
                   f"{product.get('opportunity_score', 0):<10.1f}"
@@ -174,7 +174,7 @@ async def test_opportunity_scoring(products: List[Dict]) -> List[Dict]:
                   f"{product.get('demand_score', 0):<10.1f}"
                   f"{product.get('competition_score', 0):<10.1f}")
 
-        print("─" * 80)
+        print("" * 80)
 
         return scored_products
 
@@ -223,12 +223,12 @@ async def test_ai_enrichment(products: List[Dict]) -> List[Dict]:
         # Display sample enrichment
         if enriched_products:
             sample = enriched_products[0]
-            print("\n" + "─" * 80)
+            print("\n" + "" * 80)
             print(f"{Colors.BOLD}Sample Enrichment:{Colors.ENDC}")
             print(f"\nOriginal: {sample.get('title', 'N/A')}")
             print(f"Enriched: {sample.get('enriched_title', sample.get('title', 'N/A'))}")
             print(f"\nDescription: {sample.get('description', 'N/A')[:200]}...")
-            print("─" * 80)
+            print("" * 80)
 
         return enriched_products
 
@@ -289,7 +289,7 @@ async def test_shopify_deployment(products: List[Dict], test_only: bool = False)
         )
 
         if result.get('id'):
-            print_success(f"✨ Product deployed successfully!")
+            print_success(f"[NEW] Product deployed successfully!")
             print_info(f"Shopify Product ID: {result['id']}")
             print_info(f"Admin URL: https://{shop_info.get('domain', '')}/admin/products/{result['id']}")
 
@@ -330,38 +330,38 @@ def print_test_summary(
 
     if all_passed:
         print(f"{Colors.GREEN}{Colors.BOLD}")
-        print("┌" + "─" * 78 + "┐")
-        print("│" + "✅ E2E TEST PASSED - ALL SYSTEMS OPERATIONAL ✅".center(78) + "│")
-        print("└" + "─" * 78 + "┘")
+        print("" + "" * 78 + "")
+        print("" + "[SUCCESS] E2E TEST PASSED - ALL SYSTEMS OPERATIONAL [SUCCESS]".center(78) + "")
+        print("" + "" * 78 + "")
         print(Colors.ENDC)
     else:
         print(f"{Colors.RED}{Colors.BOLD}")
-        print("┌" + "─" * 78 + "┐")
-        print("│" + "❌ E2E TEST FAILED - CHECK ERRORS ABOVE ❌".center(78) + "│")
-        print("└" + "─" * 78 + "┘")
+        print("" + "" * 78 + "")
+        print("" + "[ERROR] E2E TEST FAILED - CHECK ERRORS ABOVE [ERROR]".center(78) + "")
+        print("" + "" * 78 + "")
         print(Colors.ENDC)
 
     # Detailed results
     print(f"\n{Colors.BOLD}Results:{Colors.ENDC}")
-    print(f"  1️⃣  Product Discovery:  {products_found} products found")
-    print(f"  2️⃣  Opportunity Scoring: {products_scored} products scored")
-    print(f"  3️⃣  AI Enrichment:       {products_enriched} products enriched")
-    print(f"  4️⃣  Shopify Deployment:  {deployment_result.get('deployed', 0)} deployed, "
+    print(f"  1⃣  Product Discovery:  {products_found} products found")
+    print(f"  2⃣  Opportunity Scoring: {products_scored} products scored")
+    print(f"  3⃣  AI Enrichment:       {products_enriched} products enriched")
+    print(f"  4⃣  Shopify Deployment:  {deployment_result.get('deployed', 0)} deployed, "
           f"{deployment_result.get('failed', 0)} failed, "
           f"{deployment_result.get('skipped', 0)} skipped")
 
     # Next steps
     print(f"\n{Colors.BOLD}Next Steps:{Colors.ENDC}")
     if all_passed:
-        print(f"  {Colors.GREEN}✓{Colors.ENDC} Your OspraOS pipeline is working end-to-end")
-        print(f"  {Colors.GREEN}✓{Colors.ENDC} Ready to discover and deploy products at scale")
-        print(f"  {Colors.GREEN}✓{Colors.ENDC} Open http://localhost:5173 to use the dashboard")
+        print(f"  {Colors.GREEN}[OK]{Colors.ENDC} Your OspraOS pipeline is working end-to-end")
+        print(f"  {Colors.GREEN}[OK]{Colors.ENDC} Ready to discover and deploy products at scale")
+        print(f"  {Colors.GREEN}[OK]{Colors.ENDC} Open http://localhost:5173 to use the dashboard")
     else:
         print(f"  {Colors.YELLOW}•{Colors.ENDC} Fix the errors shown above")
         print(f"  {Colors.YELLOW}•{Colors.ENDC} Ensure all API keys are configured in .env")
         print(f"  {Colors.YELLOW}•{Colors.ENDC} Run the test again to verify fixes")
 
-    print("\n" + "─" * 80 + "\n")
+    print("\n" + "" * 80 + "\n")
 
     return 0 if all_passed else 1
 
@@ -379,10 +379,10 @@ async def main():
     args = parser.parse_args()
 
     print(f"\n{Colors.CYAN}{Colors.BOLD}")
-    print("╔" + "═" * 78 + "╗")
-    print("║" + "OSPRAOS END-TO-END TEST".center(78) + "║")
-    print("║" + f"Niche: {args.niche.upper()} | Products: {args.products}".center(78) + "║")
-    print("╚" + "═" * 78 + "╝")
+    print("" + "" * 78 + "")
+    print("" + "OSPRAOS END-TO-END TEST".center(78) + "")
+    print("" + f"Niche: {args.niche.upper()} | Products: {args.products}".center(78) + "")
+    print("" + "" * 78 + "")
     print(Colors.ENDC)
 
     # Run tests

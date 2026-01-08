@@ -136,22 +136,22 @@ class TrendVelocityDetector:
         """
         # EARLY SPIKE: Fast rise, not yet saturated
         if velocity > 3.0 and current_score < 60:
-            return 'early_spike'  # 🎯 PRIME TIME TO SELL
+            return 'early_spike'  # [TARGET] PRIME TIME TO SELL
 
         # SUSTAINED GROWTH: Steady rise
         if velocity > 1.0 and acceleration >= 0:
-            return 'sustained_growth'  # ✅ Still good
+            return 'sustained_growth'  # [SUCCESS] Still good
 
         # PEAK: High score but slowing
         if current_score > 80 and velocity < 1.0:
-            return 'peak'  # ⚠️ Might be too late
+            return 'peak'  # [WARNING] Might be too late
 
         # DECLINING: Negative velocity
         if velocity < -1.0:
-            return 'declining'  # ❌ Trend is dying
+            return 'declining'  # [ERROR] Trend is dying
 
         # STABLE: Not much change
-        return 'stable'  # 🤷 Watch and wait
+        return 'stable'  #  Watch and wait
 
     async def get_early_opportunities(self, min_velocity: float = 3.0, max_score: float = 60) -> List[Dict]:
         """
@@ -196,7 +196,7 @@ class TrendVelocityDetector:
         # Sort by opportunity score
         opportunities.sort(key=lambda x: x['opportunity_score'], reverse=True)
 
-        logger.info(f"🎯 Found {len(opportunities)} early spike opportunities")
+        logger.info(f"[TARGET] Found {len(opportunities)} early spike opportunities")
 
         return opportunities
 
@@ -229,7 +229,7 @@ class TrendVelocityDetector:
         # Sort by velocity (most negative first)
         declining.sort(key=lambda x: x['velocity'])
 
-        logger.warning(f"⚠️ Found {len(declining)} declining products")
+        logger.warning(f"[WARNING] Found {len(declining)} declining products")
 
         return declining
 
@@ -293,7 +293,7 @@ async def demo_velocity_tracking():
     # Simulate product rising over 7 days
     product_id = "smart-led-strip"
 
-    logger.info("📊 Simulating 7-day trend growth...")
+    logger.info("[STATS] Simulating 7-day trend growth...")
 
     # Day 1-3: Slow start
     await detector.track_product(product_id, 20, datetime.now() - timedelta(days=7))
@@ -311,7 +311,7 @@ async def demo_velocity_tracking():
     # Calculate velocity
     velocity = await detector.calculate_velocity(product_id)
 
-    logger.info(f"✅ Velocity Analysis:")
+    logger.info(f"[SUCCESS] Velocity Analysis:")
     logger.info(f"   Current Score: {velocity['current_score']}")
     logger.info(f"   Velocity: {velocity['velocity']}/day")
     logger.info(f"   Status: {velocity['status']}")
@@ -321,7 +321,7 @@ async def demo_velocity_tracking():
     opportunities = await detector.get_early_opportunities()
 
     if opportunities:
-        logger.info(f"\n🎯 Early Opportunity Detected!")
+        logger.info(f"\n[TARGET] Early Opportunity Detected!")
         logger.info(f"   Opportunity Score: {opportunities[0]['opportunity_score']}")
 
     return velocity

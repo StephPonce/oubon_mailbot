@@ -40,6 +40,9 @@ app.add_middleware(
         "https://www.ospra.io",
         "https://app.oubonshop.com",
         "https://policies.oubonshop.com",
+        # Render deployment
+        "https://ospra-intelligence-api.onrender.com",
+        "https://*.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
@@ -79,21 +82,44 @@ async def startup_event():
     try:
         from ospra_os.database.multi_store_models import init_db as init_ospra_db
         init_ospra_db()
-        print("✅ Ospra OS database tables initialized")
+        print("[SUCCESS] Ospra OS database tables initialized")
     except Exception as e:
-        print(f"⚠️  Ospra DB init failed: {e}")
+        print(f"[WARNING]  Ospra DB init failed: {e}")
 
     # Initialize Hybrid Learning tables
     try:
         from ospra_os.learning.hybrid_learning_engine import init_hybrid_learning
         init_hybrid_learning()
-        print("✅ Hybrid Learning tables initialized")
+        print("[SUCCESS] Hybrid Learning tables initialized")
     except Exception as e:
-        print(f"⚠️  Learning tables init failed: {e}")
+        print(f"[WARNING]  Learning tables init failed: {e}")
 
     # Start background email checker
     from app.scheduler import start_scheduler
     start_scheduler()
+
+    # 
+    #  OSPRA INTELLIGENCE SCHEDULERS
+    # 
+    
+    # Start Intelligence Core scheduler (morning briefings, product grading)
+    try:
+        from ospra_os.background_jobs.intelligence_scheduler import start_intelligence_scheduler
+        start_intelligence_scheduler()
+        print("[SUCCESS] Intelligence Core scheduler started")
+        print("    Morning briefings: Daily at 6:00 AM")
+        print("    Product grading: Every 6 hours")
+        print("    Progress updates: Daily at midnight")
+    except Exception as e:
+        print(f"[WARNING]  Intelligence scheduler failed: {e}")
+
+    # Start Auto-Discovery scheduler (background product discovery)
+    try:
+        from ospra_os.background_jobs.scheduler_integration import setup_background_jobs
+        await setup_background_jobs(app)
+        print("[SUCCESS] Auto-Discovery scheduler started")
+    except Exception as e:
+        print(f"[WARNING]  Auto-Discovery scheduler failed: {e}")
 
 @app.get("/health")
 async def health():
@@ -699,7 +725,7 @@ async def gmail_pubsub_webhook(
         message = body.get("message", {})
         message_id = message.get("messageId", "unknown")
 
-        print(f"📧 Gmail push notification received: {message_id}")
+        print(f"[EMAIL] Gmail push notification received: {message_id}")
 
         # Process emails in background (don't block the webhook response)
         background_tasks.add_task(process_emails_background, settings)
@@ -708,7 +734,7 @@ async def gmail_pubsub_webhook(
         return {"status": "received", "message_id": message_id}
 
     except Exception as e:
-        print(f"❌ Error processing Pub/Sub webhook: {e}")
+        print(f"[ERROR] Error processing Pub/Sub webhook: {e}")
         # Still return 200 to avoid Pub/Sub retries
         return {"status": "error", "error": str(e)}
 
@@ -729,10 +755,10 @@ def process_emails_background(settings: Settings):
             templates=templates,
         )
 
-        print(f"✅ Processed {result['processed']} emails, replied to {result['replied']}")
+        print(f"[SUCCESS] Processed {result['processed']} emails, replied to {result['replied']}")
 
     except Exception as e:
-        print(f"❌ Error in background email processing: {e}")
+        print(f"[ERROR] Error in background email processing: {e}")
 
 
 @app.post("/gmail/watch/start")
@@ -1070,304 +1096,414 @@ async def get_all_niches(products_per_niche: int = 5):
 # Mount static files (must be last)
 # ---------------------------------------------------------------
 
-# Include Authentication routes
+# Include Authentication routes (JWT-based)
 try:
-    from ospra_os.api.auth_routes import router as auth_router
+    from ospra_os.auth.routes import router as auth_router
     app.include_router(auth_router)
-    print("✅ Auth routes loaded (/api/auth/*)")
+    print("[SUCCESS] JWT Auth routes loaded (/api/auth/*)")
 except Exception as e:
-    print(f"⚠️  Auth routes not loaded: {e}")
+    print(f"[WARNING]  JWT Auth routes not loaded: {e}")
+    # Fallback to old auth routes if they exist
+    try:
+        from ospra_os.api.auth_routes import router as auth_router_old
+        app.include_router(auth_router_old)
+        print("[SUCCESS] Legacy Auth routes loaded (/api/auth/*)")
+    except:
+        pass
+
+# Include User Profile & Settings routes
+try:
+    from ospra_os.api.user_routes import router as user_router
+    app.include_router(user_router)
+    print("[SUCCESS] User Profile routes loaded (/api/user/*)")
+except Exception as e:
+    print(f"[WARNING]  User Profile routes not loaded: {e}")
+
+# Include Subscription routes
+try:
+    from ospra_os.api.subscription_routes import router as subscription_router
+    app.include_router(subscription_router)
+    print("[SUCCESS] Subscription routes loaded (/api/subscription/*)")
+except Exception as e:
+    print(f"[WARNING]  Subscription routes not loaded: {e}")
 
 # Include Tier System routes (Unified Subscription Tiers)
 try:
     from ospra_os.core.routes import router as tier_router
     app.include_router(tier_router)
-    print("✅ Tier System routes loaded (/api/tiers/*)")
+    print("[SUCCESS] Tier System routes loaded (/api/tiers/*)")
 except Exception as e:
-    print(f"⚠️  Tier routes not loaded: {e}")
+    print(f"[WARNING]  Tier routes not loaded: {e}")
 
 # Include Shopify routes
 try:
     from ospra_os.integrations.shopify.routes import router as shopify_router
     app.include_router(shopify_router)
-    print("✅ Shopify routes loaded")
+    print("[SUCCESS] Shopify routes loaded")
 except Exception as e:
-    print(f"⚠️  Shopify routes not loaded: {e}")
+    print(f"[WARNING]  Shopify routes not loaded: {e}")
 
 # Include Opportunity Scoring routes (Anti-AutoDS Algorithm)
 try:
     from ospra_os.intelligence.opportunity_routes import router as opportunity_router
     app.include_router(opportunity_router)
-    print("✅ Opportunity Scoring routes loaded")
+    print("[SUCCESS] Opportunity Scoring routes loaded")
 except Exception as e:
-    print(f"⚠️  Opportunity routes not loaded: {e}")
+    print(f"[WARNING]  Opportunity routes not loaded: {e}")
 
 # Include Usage Tracking routes
 try:
     from ospra_os.core.usage_routes import router as usage_router
     app.include_router(usage_router)
-    print("✅ Usage Tracking routes loaded (/api/usage/*)")
+    print("[SUCCESS] Usage Tracking routes loaded (/api/usage/*)")
 except Exception as e:
-    print(f"⚠️  Usage Tracking routes not loaded: {e}")
+    print(f"[WARNING]  Usage Tracking routes not loaded: {e}")
 
 # Include Hybrid Learning routes
 try:
     from ospra_os.learning.learning_routes import router as learning_router
     app.include_router(learning_router)
-    print("✅ Hybrid Learning routes loaded (/api/learning/*)")
+    print("[SUCCESS] Hybrid Learning routes loaded (/api/learning/*)")
 except Exception as e:
-    print(f"⚠️  Learning routes not loaded: {e}")
+    print(f"[WARNING]  Learning routes not loaded: {e}")
 
 # Include Payment/LemonSqueezy routes
 try:
     from ospra_os.payments.routes import router as payments_router
     app.include_router(payments_router)
-    print("✅ Payment routes loaded (/api/payments/*)")
+    print("[SUCCESS] Payment routes loaded (/api/payments/*)")
 except Exception as e:
-    print(f"⚠️  Payment routes not loaded: {e}")
+    print(f"[WARNING]  Payment routes not loaded: {e}")
 
 # ============================================================================
-# 🚀 ALL OSPRA OS ROUTES - FULL PLATFORM WIRING
+# [START] ALL OSPRA OS ROUTES - FULL PLATFORM WIRING
 # ============================================================================
 
 # --- ALIEXPRESS ROUTES ---
 try:
     from ospra_os.aliexpress.routes import router as aliexpress_core_router
     app.include_router(aliexpress_core_router)
-    print("✅ AliExpress Core routes loaded (/api/aliexpress/*)")
+    print("[SUCCESS] AliExpress Core routes loaded (/api/aliexpress/*)")
 except Exception as e:
-    print(f"⚠️  AliExpress Core routes not loaded: {e}")
+    print(f"[WARNING]  AliExpress Core routes not loaded: {e}")
 
 try:
     from ospra_os.api.aliexpress_product_routes import router as aliexpress_product_router
     app.include_router(aliexpress_product_router)
-    print("✅ AliExpress Product routes loaded (/api/aliexpress/products/*)")
+    print("[SUCCESS] AliExpress Product routes loaded (/api/aliexpress/products/*)")
 except Exception as e:
-    print(f"⚠️  AliExpress Product routes not loaded: {e}")
+    print(f"[WARNING]  AliExpress Product routes not loaded: {e}")
 
 try:
     from ospra_os.api.aliexpress_token_routes import router as aliexpress_token_router
     app.include_router(aliexpress_token_router)
-    print("✅ AliExpress Token routes loaded (/api/aliexpress/tokens/*)")
+    print("[SUCCESS] AliExpress Token routes loaded (/api/aliexpress/tokens/*)")
 except Exception as e:
-    print(f"⚠️  AliExpress Token routes not loaded: {e}")
+    print(f"[WARNING]  AliExpress Token routes not loaded: {e}")
 
 # --- ADMIN ROUTES ---
 try:
     from ospra_os.admin.routes import router as admin_router
     app.include_router(admin_router)
-    print("✅ Admin routes loaded (/api/admin/*)")
+    print("[SUCCESS] Admin routes loaded (/api/admin/*)")
 except Exception as e:
-    print(f"⚠️  Admin routes not loaded: {e}")
+    print(f"[WARNING]  Admin routes not loaded: {e}")
 
 # --- ADVERTISING ROUTES ---
 try:
     from ospra_os.advertising.routes import router as advertising_router
     app.include_router(advertising_router)
-    print("✅ Advertising routes loaded (/api/ads/*)")
+    print("[SUCCESS] Advertising routes loaded (/api/ads/*)")
 except Exception as e:
-    print(f"⚠️  Advertising routes not loaded: {e}")
+    print(f"[WARNING]  Advertising routes not loaded: {e}")
 
 # --- ANALYTICS ROUTES ---
 try:
     from ospra_os.analytics.routes import router as analytics_router
     app.include_router(analytics_router)
-    print("✅ Analytics routes loaded (/api/analytics/*)")
+    print("[SUCCESS] Analytics routes loaded (/api/analytics/*)")
 except Exception as e:
-    print(f"⚠️  Analytics routes not loaded: {e}")
+    print(f"[WARNING]  Analytics routes not loaded: {e}")
 
 try:
     from ospra_os.analytics.customer_routes import router as customer_analytics_router
     app.include_router(customer_analytics_router)
-    print("✅ Customer Analytics routes loaded (/api/customers/*)")
+    print("[SUCCESS] Customer Analytics routes loaded (/api/customers/*)")
 except Exception as e:
-    print(f"⚠️  Customer Analytics routes not loaded: {e}")
+    print(f"[WARNING]  Customer Analytics routes not loaded: {e}")
 
 # --- DASHBOARD ROUTES ---
 try:
     from ospra_os.dashboard.routes import router as dashboard_router
     app.include_router(dashboard_router)
-    print("✅ Dashboard routes loaded (/api/dashboard/*)")
+    print("[SUCCESS] Dashboard routes loaded (/api/dashboard/*)")
 except Exception as e:
-    print(f"⚠️  Dashboard routes not loaded: {e}")
+    print(f"[WARNING]  Dashboard routes not loaded: {e}")
 
 try:
     from ospra_os.dashboard.routes_multi_store import router as multi_store_router
     app.include_router(multi_store_router)
-    print("✅ Multi-Store routes loaded (/api/stores/*)")
+    print("[SUCCESS] Multi-Store routes loaded (/api/stores/*)")
 except Exception as e:
-    print(f"⚠️  Multi-Store routes not loaded: {e}")
+    print(f"[WARNING]  Multi-Store routes not loaded: {e}")
 
 # --- EMAIL AUTOMATION ROUTES ---
 try:
     from ospra_os.email_automation.automation_routes import router as email_automation_router
     app.include_router(email_automation_router)
-    print("✅ Email Automation routes loaded (/api/email/automation/*)")
+    print("[SUCCESS] Email Automation routes loaded (/api/email/automation/*)")
 except Exception as e:
-    print(f"⚠️  Email Automation routes not loaded: {e}")
+    print(f"[WARNING]  Email Automation routes not loaded: {e}")
 
 try:
     from ospra_os.email_automation.analytics_routes import router as email_analytics_router
     app.include_router(email_analytics_router)
-    print("✅ Email Analytics routes loaded (/api/email/analytics/*)")
+    print("[SUCCESS] Email Analytics routes loaded (/api/email/analytics/*)")
 except Exception as e:
-    print(f"⚠️  Email Analytics routes not loaded: {e}")
+    print(f"[WARNING]  Email Analytics routes not loaded: {e}")
 
 try:
     from ospra_os.email_automation.settings_routes import router as email_settings_router
     app.include_router(email_settings_router)
-    print("✅ Email Settings routes loaded (/api/email/settings/*)")
+    print("[SUCCESS] Email Settings routes loaded (/api/email/settings/*)")
 except Exception as e:
-    print(f"⚠️  Email Settings routes not loaded: {e}")
+    print(f"[WARNING]  Email Settings routes not loaded: {e}")
 
 try:
     from ospra_os.email_automation.sync_routes import router as email_sync_router
     app.include_router(email_sync_router)
-    print("✅ Email Sync routes loaded (/api/email/sync/*)")
+    print("[SUCCESS] Email Sync routes loaded (/api/email/sync/*)")
 except Exception as e:
-    print(f"⚠️  Email Sync routes not loaded: {e}")
+    print(f"[WARNING]  Email Sync routes not loaded: {e}")
 
 try:
     from ospra_os.email_automation.oauth.routes import router as email_oauth_router
     app.include_router(email_oauth_router)
-    print("✅ Email OAuth routes loaded (/api/email/oauth/*)")
+    print("[SUCCESS] Email OAuth routes loaded (/api/email/oauth/*)")
 except Exception as e:
-    print(f"⚠️  Email OAuth routes not loaded: {e}")
+    print(f"[WARNING]  Email OAuth routes not loaded: {e}")
 
 # --- GMAIL ROUTES ---
 try:
     from ospra_os.gmail.routes import router as gmail_router
     app.include_router(gmail_router)
-    print("✅ Gmail routes loaded (/api/gmail/*)")
+    print("[SUCCESS] Gmail routes loaded (/api/gmail/*)")
 except Exception as e:
-    print(f"⚠️  Gmail routes not loaded: {e}")
+    print(f"[WARNING]  Gmail routes not loaded: {e}")
 
 # --- INTELLIGENCE ROUTES (THE BRAIN) ---
 try:
     from ospra_os.intelligence.routes import router as intelligence_router
     app.include_router(intelligence_router)
-    print("✅ Intelligence routes loaded (/api/intelligence/*)")
+    print("[SUCCESS] Intelligence routes loaded (/api/intelligence/*)")
 except Exception as e:
-    print(f"⚠️  Intelligence routes not loaded: {e}")
+    print(f"[WARNING]  Intelligence routes not loaded: {e}")
 
 try:
     from ospra_os.intelligence.intelligence_core_routes import router as intelligence_core_router
     app.include_router(intelligence_core_router)
-    print("✅ Intelligence Core routes loaded (/api/intelligence/core/*)")
+    print("[SUCCESS] Intelligence Core routes loaded (/api/intelligence/core/*)")
 except Exception as e:
-    print(f"⚠️  Intelligence Core routes not loaded: {e}")
+    print(f"[WARNING]  Intelligence Core routes not loaded: {e}")
+
+# Trend Discovery routes (NEW)
+try:
+    from ospra_os.api.intelligence_routes import router as trend_discovery_router
+    app.include_router(trend_discovery_router)
+    print("[SUCCESS] Trend Discovery routes loaded (/api/intelligence/*)")
+except Exception as e:
+    print(f"[WARNING]  Trend Discovery routes not loaded: {e}")
 
 try:
     from ospra_os.intelligence.niche_routes import router as niche_router
     app.include_router(niche_router)
-    print("✅ Niche Analysis routes loaded (/api/niches/*)")
+    print("[SUCCESS] Niche Analysis routes loaded (/api/niches/*)")
 except Exception as e:
-    print(f"⚠️  Niche routes not loaded: {e}")
+    print(f"[WARNING]  Niche routes not loaded: {e}")
 
 try:
     from ospra_os.intelligence.unified_discovery_routes import router as unified_discovery_router
     app.include_router(unified_discovery_router)
-    print("✅ Unified Discovery routes loaded (/api/discover/*)")
+    print("[SUCCESS] Unified Discovery routes loaded (/api/discover/*)")
 except Exception as e:
-    print(f"⚠️  Unified Discovery routes not loaded: {e}")
+    print(f"[WARNING]  Unified Discovery routes not loaded: {e}")
 
 try:
     from ospra_os.intelligence.ai_actions_routes import router as ai_actions_router
     app.include_router(ai_actions_router)
-    print("✅ AI Actions routes loaded (/api/ai/actions/*)")
+    print("[SUCCESS] AI Actions routes loaded (/api/ai/actions/*)")
 except Exception as e:
-    print(f"⚠️  AI Actions routes not loaded: {e}")
+    print(f"[WARNING]  AI Actions routes not loaded: {e}")
+
+try:
+    from ospra_os.api.nl_routes import router as nl_router
+    app.include_router(nl_router)
+    print("[SUCCESS] Natural Language routes loaded (/api/nl/*)")
+except Exception as e:
+    print(f"[WARNING]  Natural Language routes not loaded: {e}")
 
 # --- INVENTORY ROUTES ---
 try:
     from ospra_os.inventory.routes import router as inventory_router
     app.include_router(inventory_router)
-    print("✅ Inventory routes loaded (/api/inventory/*)")
+    print("[SUCCESS] Inventory routes loaded (/api/inventory/*)")
 except Exception as e:
-    print(f"⚠️  Inventory routes not loaded: {e}")
+    print(f"[WARNING]  Inventory routes not loaded: {e}")
 
 # --- JOBS/SCHEDULER ROUTES ---
 try:
     from ospra_os.jobs.routes import router as jobs_router
     app.include_router(jobs_router)
-    print("✅ Jobs/Scheduler routes loaded (/api/jobs/*)")
+    print("[SUCCESS] Jobs/Scheduler routes loaded (/api/jobs/*)")
 except Exception as e:
-    print(f"⚠️  Jobs routes not loaded: {e}")
+    print(f"[WARNING]  Jobs routes not loaded: {e}")
 
 # --- MONITORING ROUTES ---
 try:
     from ospra_os.monitoring.routes import router as monitoring_router
     app.include_router(monitoring_router)
-    print("✅ Monitoring routes loaded (/api/monitoring/*)")
+    print("[SUCCESS] Monitoring routes loaded (/api/monitoring/*)")
 except Exception as e:
-    print(f"⚠️  Monitoring routes not loaded: {e}")
+    print(f"[WARNING]  Monitoring routes not loaded: {e}")
 
 # --- ONBOARDING ROUTES ---
 try:
     from ospra_os.onboarding.routes import router as onboarding_router
     app.include_router(onboarding_router)
-    print("✅ Onboarding routes loaded (/api/onboarding/*)")
+    print("[SUCCESS] Onboarding routes loaded (/api/onboarding/*)")
 except Exception as e:
-    print(f"⚠️  Onboarding routes not loaded: {e}")
+    print(f"[WARNING]  Onboarding routes not loaded: {e}")
 
 # --- PLATFORM DEPLOYMENT ROUTES ---
 try:
     from ospra_os.platforms.deployment_routes import router as deployment_router
     app.include_router(deployment_router)
-    print("✅ Platform Deployment routes loaded (/api/deploy/*)")
+    print("[SUCCESS] Platform Deployment routes loaded (/api/deploy/*)")
 except Exception as e:
-    print(f"⚠️  Deployment routes not loaded: {e}")
+    print(f"[WARNING]  Deployment routes not loaded: {e}")
 
 # --- PRODUCT RESEARCH ROUTES ---
 try:
     from ospra_os.product_research.routes import router as product_research_router
     app.include_router(product_research_router)
-    print("✅ Product Research routes loaded (/api/research/*)")
+    print("[SUCCESS] Product Research routes loaded (/api/research/*)")
 except Exception as e:
-    print(f"⚠️  Product Research routes not loaded: {e}")
+    print(f"[WARNING]  Product Research routes not loaded: {e}")
 
 # --- REPORTS ROUTES ---
 try:
     from ospra_os.reports.routes import router as reports_router
     app.include_router(reports_router)
-    print("✅ Reports routes loaded (/api/reports/*)")
+    print("[SUCCESS] Reports routes loaded (/api/reports/*)")
 except Exception as e:
-    print(f"⚠️  Reports routes not loaded: {e}")
+    print(f"[WARNING]  Reports routes not loaded: {e}")
 
 # --- NOTIFICATIONS ROUTES ---
 try:
-    from ospra_os.services.notification_routes import router as notification_router
+    from ospra_os.api.notification_routes import router as notification_router
     app.include_router(notification_router)
-    print("✅ Notification routes loaded (/api/notifications/*)")
+    print("[SUCCESS] Notification routes loaded (/api/notifications/*)")
 except Exception as e:
-    print(f"⚠️  Notification routes not loaded: {e}")
+    print(f"[WARNING]  Notification routes not loaded: {e}")
 
 # --- A/B TESTING ROUTES ---
 try:
     from ospra_os.testing.routes import router as testing_router
     app.include_router(testing_router)
-    print("✅ A/B Testing routes loaded (/api/testing/*)")
+    print("[SUCCESS] A/B Testing routes loaded (/api/testing/*)")
 except Exception as e:
-    print(f"⚠️  Testing routes not loaded: {e}")
+    print(f"[WARNING]  Testing routes not loaded: {e}")
 
 # --- TIKTOK ROUTES ---
 try:
     from ospra_os.tiktok.routes import router as tiktok_router
     app.include_router(tiktok_router)
-    print("✅ TikTok routes loaded (/api/tiktok/*)")
+    print("[SUCCESS] TikTok routes loaded (/api/tiktok/*)")
 except Exception as e:
-    print(f"⚠️  TikTok routes not loaded: {e}")
+    print(f"[WARNING]  TikTok routes not loaded: {e}")
 
 # --- WAITLIST ROUTES ---
 try:
     from ospra_os.waitlist.routes import router as waitlist_router
     app.include_router(waitlist_router)
-    print("✅ Waitlist routes loaded (/api/waitlist/*)")
+    print("[SUCCESS] Waitlist routes loaded (/api/waitlist/*)")
 except Exception as e:
-    print(f"⚠️  Waitlist routes not loaded: {e}")
+    print(f"[WARNING]  Waitlist routes not loaded: {e}")
+
+# --- RATE LIMITER ROUTES ---
+try:
+    from ospra_os.api.rate_limit_routes import router as rate_limit_router
+    app.include_router(rate_limit_router)
+    print("[SUCCESS] Rate Limiter routes loaded (/api/rate-limit/*)")
+except Exception as e:
+    print(f"[WARNING]  Rate Limiter routes not loaded: {e}")
+
+# --- SMART CACHE ROUTES ---
+try:
+    from ospra_os.api.cache_routes import router as cache_router
+    app.include_router(cache_router)
+    print("[SUCCESS] Smart Cache routes loaded (/api/cache/*)")
+except Exception as e:
+    print(f"[WARNING]  Cache routes not loaded: {e}")
+
+# --- SEARCH RELEVANCE ROUTES ---
+try:
+    from ospra_os.api.search_relevance_routes import router as search_relevance_router
+    app.include_router(search_relevance_router)
+    print("[SUCCESS] Search Relevance routes loaded (/api/search-relevance/*)")
+except Exception as e:
+    print(f"[WARNING]  Search Relevance routes not loaded: {e}")
+
+# --- NATURAL LANGUAGE COMMAND ROUTES ---
+try:
+    from ospra_os.api.nl_routes import router as nl_router
+    app.include_router(nl_router)
+    print("[SUCCESS] Natural Language routes loaded (/api/nl/*)")
+except Exception as e:
+    print(f"[WARNING]  Natural Language routes not loaded: {e}")
+
+# --- AUTO-PILOT ROUTES ---
+try:
+    from ospra_os.api.autopilot_routes import router as autopilot_router
+    app.include_router(autopilot_router)
+    print("[SUCCESS] Auto-Pilot routes loaded (/api/autopilot/*)")
+except Exception as e:
+    print(f"[WARNING]  Auto-Pilot routes not loaded: {e}")
+
+# --- OI ASSISTANT ROUTES ---
+try:
+    from ospra_os.api.oi_routes import router as oi_router
+    app.include_router(oi_router)
+    print("[SUCCESS] OI Assistant routes loaded (/api/oi/*)")
+except Exception as e:
+    print(f"[WARNING]  OI routes not loaded: {e}")
+
+# --- WEBHOOK ROUTES (SECURE) ---
+try:
+    from ospra_os.api.webhook_routes import router as webhook_router
+    app.include_router(webhook_router)
+    print("[SUCCESS] Webhook routes loaded (/api/webhooks/*)")
+except Exception as e:
+    print(f"[WARNING]  Webhook routes not loaded: {e}")
+
+# --- AI IMAGE GENERATION ROUTES ---
+try:
+    from ospra_os.api.image_generation_routes import router as image_gen_router
+    app.include_router(image_gen_router)
+    print("[SUCCESS] AI Image Generation routes loaded (/api/images/*)")
+except Exception as e:
+    print(f"[WARNING]  Image Generation routes not loaded: {e}")
+
+# --- PRODUCT ANALYSIS ROUTES ---
+try:
+    from ospra_os.api.product_analysis_routes import router as product_analysis_router
+    app.include_router(product_analysis_router)
+    print("[SUCCESS] Product Analysis routes loaded (/api/products/analysis/*)")
+except Exception as e:
+    print(f"[WARNING]  Product Analysis routes not loaded: {e}")
 
 print("\n" + "="*60)
-print("🦅 OSPRA INTELLIGENCE - ALL SYSTEMS ONLINE")
+print(" OSPRA INTELLIGENCE - ALL SYSTEMS ONLINE")
 print("="*60 + "\n")
 
 # ============================================================================
@@ -1441,5 +1577,14 @@ async def sync_emails(settings: Settings = Depends(get_settings)):
             'synced': 0,
             'error': str(e)
         }
+
+# Serve generated AI images
+try:
+    generated_images_dir = Path(__file__).parent / "generated_images"
+    generated_images_dir.mkdir(exist_ok=True)
+    app.mount("/generated_images", StaticFiles(directory=str(generated_images_dir)), name="generated_images")
+    print("[SUCCESS] Generated images directory mounted (/generated_images)")
+except Exception as e:
+    print(f"[WARNING] Generated images mount failed: {e}")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

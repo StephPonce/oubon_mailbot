@@ -48,9 +48,9 @@ class AutoPilotLog(Base):
         return f"<AutoPilotLog(action_id={self.action_id}, executed={self.executed})>"
 
 
-print("✅ Intelligence models added")
-print("✅ A/B Testing models added")
-print("✅ Auto-Pilot models added")
+print("[SUCCESS] Intelligence models added")
+print("[SUCCESS] A/B Testing models added")
+print("[SUCCESS] Auto-Pilot models added")
 
 
 # ============================================================================

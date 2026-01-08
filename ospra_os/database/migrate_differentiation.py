@@ -20,7 +20,7 @@ def migrate():
     existing_tables = inspector.get_table_names()
 
     print("=" * 70)
-    print("🔄 DIFFERENTIATION SYSTEM MIGRATION")
+    print("[REFRESH] DIFFERENTIATION SYSTEM MIGRATION")
     print("=" * 70)
 
     # Create all new tables
@@ -37,9 +37,9 @@ def migrate():
     print("\nTable Status:")
     for table in new_tables:
         if table in existing_tables:
-            print(f"  ✅ {table} - Already exists")
+            print(f"  [SUCCESS] {table} - Already exists")
         else:
-            print(f"  ✅ {table} - Created successfully")
+            print(f"  [SUCCESS] {table} - Created successfully")
 
     # Verify all tables exist now
     inspector = inspect(engine)
@@ -49,9 +49,9 @@ def migrate():
 
     print("\n" + "=" * 70)
     if all_created:
-        print("✅ MIGRATION COMPLETE - All tables ready!")
+        print("[SUCCESS] MIGRATION COMPLETE - All tables ready!")
     else:
-        print("⚠️  MIGRATION INCOMPLETE - Some tables missing")
+        print("[WARNING]  MIGRATION INCOMPLETE - Some tables missing")
         missing = [t for t in new_tables if t not in current_tables]
         print(f"Missing: {', '.join(missing)}")
     print("=" * 70)

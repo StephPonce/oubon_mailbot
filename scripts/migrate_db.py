@@ -31,15 +31,15 @@ def check_connection():
     """Check database connectivity."""
     from ospra_os.database import check_database_connection
     
-    print("🔍 Checking database connection...")
+    print("[SEARCH] Checking database connection...")
     status = check_database_connection()
     
     if status["status"] == "healthy":
-        print(f"✅ Database connected!")
+        print(f"[SUCCESS] Database connected!")
         print(f"   Type: {status['database_type']}")
         print(f"   URL: {status['url_masked']}")
     else:
-        print(f"❌ Database error: {status.get('error')}")
+        print(f"[ERROR] Database error: {status.get('error')}")
         sys.exit(1)
 
 
@@ -47,9 +47,9 @@ def init_database():
     """Initialize database tables."""
     from ospra_os.database import init_database
     
-    print("🔧 Initializing database...")
+    print("[FIX] Initializing database...")
     init_database()
-    print("✅ Database initialized!")
+    print("[SUCCESS] Database initialized!")
 
 
 def export_sqlite():
@@ -64,10 +64,10 @@ def export_sqlite():
         sqlite_path = sqlite_path.replace("sqlite:///", "")
     
     if not os.path.exists(sqlite_path):
-        print(f"❌ SQLite database not found: {sqlite_path}")
+        print(f"[ERROR] SQLite database not found: {sqlite_path}")
         sys.exit(1)
     
-    print(f"📦 Exporting from: {sqlite_path}")
+    print(f"[PACKAGE] Exporting from: {sqlite_path}")
     
     conn = sqlite3.connect(sqlite_path)
     
@@ -84,8 +84,8 @@ def export_sqlite():
     
     conn.close()
     
-    print(f"✅ Exported to: {export_path}")
-    print("\n📝 To import into PostgreSQL:")
+    print(f"[SUCCESS] Exported to: {export_path}")
+    print("\n[NOTE] To import into PostgreSQL:")
     print(f"   psql -h <host> -U <user> -d <database> -f {export_path}")
 
 
@@ -103,7 +103,7 @@ def main():
     elif command == "export":
         export_sqlite()
     else:
-        print(f"❌ Unknown command: {command}")
+        print(f"[ERROR] Unknown command: {command}")
         print("   Available: check, init, export")
         sys.exit(1)
 

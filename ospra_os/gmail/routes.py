@@ -67,7 +67,7 @@ async def callback(request: Request):
             token_dir.mkdir(parents=True, exist_ok=True)
         except Exception as mkdir_err:
             return HTMLResponse(
-                f"<h2>❌ Directory Error</h2>"
+                f"<h2>[ERROR] Directory Error</h2>"
                 f"<p>Cannot create directory: {token_dir}</p>"
                 f"<p>Error: {str(mkdir_err)}</p>",
                 status_code=500
@@ -86,7 +86,7 @@ async def callback(request: Request):
                 }, f)
         except Exception as write_err:
             return HTMLResponse(
-                f"<h2>❌ Write Error</h2>"
+                f"<h2>[ERROR] Write Error</h2>"
                 f"<p>Cannot write to: {token_path}</p>"
                 f"<p>Error: {str(write_err)}</p>",
                 status_code=500
@@ -180,11 +180,11 @@ async def callback(request: Request):
             print(f"Warning: Failed to save Gmail to database: {str(db_err)}")
             print(traceback.format_exc())
 
-        return HTMLResponse(f"<h2>Gmail connected ✅</h2><p>Saved tokens to <code>{token_path}</code> and database.</p>")
+        return HTMLResponse(f"<h2>Gmail connected [SUCCESS]</h2><p>Saved tokens to <code>{token_path}</code> and database.</p>")
     except Exception as e:
         import traceback
         return HTMLResponse(
-            f"<h2>❌ OAuth Error</h2>"
+            f"<h2>[ERROR] OAuth Error</h2>"
             f"<p>Error: {str(e)}</p>"
             f"<pre>{traceback.format_exc()}</pre>",
             status_code=500

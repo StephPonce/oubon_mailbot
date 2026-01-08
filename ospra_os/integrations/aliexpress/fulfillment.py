@@ -29,7 +29,7 @@ class OrderFulfillmentService:
         """
         try:
             print(f"\n{'='*70}")
-            print(f"📦 FULFILLING ORDER")
+            print(f"[PACKAGE] FULFILLING ORDER")
             print(f"{'='*70}")
             print(f"Shopify Order: {shopify_order.get('id')}")
             print(f"AliExpress Product: {aliexpress_product_id}")
@@ -47,7 +47,7 @@ class OrderFulfillmentService:
             )
 
             if not availability['available']:
-                print("❌ Product not available on AliExpress")
+                print("[ERROR] Product not available on AliExpress")
                 return {
                     'success': False,
                     'error': 'Product out of stock'
@@ -61,7 +61,7 @@ class OrderFulfillmentService:
             )
 
             if not order_result['success']:
-                print(f"❌ Order placement failed: {order_result.get('error')}")
+                print(f"[ERROR] Order placement failed: {order_result.get('error')}")
                 return order_result
 
             result = {
@@ -73,7 +73,7 @@ class OrderFulfillmentService:
             }
 
             print(f"\n{'='*70}")
-            print(f"✅ ORDER FULFILLED")
+            print(f"[SUCCESS] ORDER FULFILLED")
             print(f"{'='*70}")
             print(f"AliExpress Order ID: {result['aliexpress_order_id']}")
             print(f"Cost: ${result['total_cost']:.2f}")
@@ -82,7 +82,7 @@ class OrderFulfillmentService:
             return result
 
         except Exception as e:
-            print(f"❌ Fulfillment error: {e}")
+            print(f"[ERROR] Fulfillment error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -130,7 +130,7 @@ class OrderFulfillmentService:
         Returns tracking info
         """
         try:
-            print(f"📍 Updating tracking for order {shopify_order_id}")
+            print(f"[LOCATION] Updating tracking for order {shopify_order_id}")
 
             # Get tracking from AliExpress
             tracking = await self.dropship.get_order_status(aliexpress_order_id)
@@ -152,7 +152,7 @@ class OrderFulfillmentService:
             }
 
         except Exception as e:
-            print(f"❌ Tracking update error: {e}")
+            print(f"[ERROR] Tracking update error: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -165,7 +165,7 @@ class OrderFulfillmentService:
         """Fulfill multiple orders"""
         import asyncio
 
-        print(f"\n📦 Bulk fulfilling {len(orders)} orders...")
+        print(f"\n[PACKAGE] Bulk fulfilling {len(orders)} orders...")
 
         results = []
 
@@ -180,6 +180,6 @@ class OrderFulfillmentService:
             await asyncio.sleep(2)
 
         successful = sum(1 for r in results if r.get('success'))
-        print(f"\n✅ Fulfilled {successful}/{len(orders)} orders")
+        print(f"\n[SUCCESS] Fulfilled {successful}/{len(orders)} orders")
 
         return results

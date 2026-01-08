@@ -43,7 +43,7 @@ class LTVCalculator:
             return 0.0
 
         total = sum(order.get('total', 0) for order in orders)
-        logger.info(f"💰 Historical LTV for {customer_id}: ${total:.2f}")
+        logger.info(f"[PRICE] Historical LTV for {customer_id}: ${total:.2f}")
 
         return round(total, 2)
 
@@ -69,7 +69,7 @@ class LTVCalculator:
             Calculated LTV
         """
         ltv = average_order_value * purchase_frequency * customer_lifespan_months
-        logger.info(f"📊 Average LTV: ${ltv:.2f} (AOV: ${average_order_value}, Freq: {purchase_frequency}/mo, Lifespan: {customer_lifespan_months}mo)")
+        logger.info(f"[STATS] Average LTV: ${ltv:.2f} (AOV: ${average_order_value}, Freq: {purchase_frequency}/mo, Lifespan: {customer_lifespan_months}mo)")
 
         return round(ltv, 2)
 
@@ -94,7 +94,7 @@ class LTVCalculator:
         Returns:
             Predictive LTV breakdown
         """
-        logger.info(f"🔮 Predicting LTV for: {customer_id}")
+        logger.info(f" Predicting LTV for: {customer_id}")
 
         # Extract customer metrics
         historical_ltv = customer_data.get('ltv', 0)
@@ -164,7 +164,7 @@ class LTVCalculator:
             "calculated_at": datetime.utcnow().isoformat()
         }
 
-        logger.info(f"✅ Predicted LTV: ${predicted_total_ltv:.2f} (confidence: {confidence:.0%})")
+        logger.info(f"[SUCCESS] Predicted LTV: ${predicted_total_ltv:.2f} (confidence: {confidence:.0%})")
 
         return result
 
@@ -180,7 +180,7 @@ class LTVCalculator:
         Returns:
             Segment breakdown with average LTV
         """
-        logger.info("📊 Calculating LTV by segment...")
+        logger.info("[STATS] Calculating LTV by segment...")
 
         segment_data = {}
 
@@ -217,7 +217,7 @@ class LTVCalculator:
         Returns:
             Source breakdown with average LTV
         """
-        logger.info("📊 Calculating LTV by acquisition source...")
+        logger.info("[STATS] Calculating LTV by acquisition source...")
 
         source_data = {}
 
@@ -400,4 +400,4 @@ def get_ltv_calculator(db_session=None):
     return _ltv_calculator
 
 
-logger.info("✅ LTV Calculator module loaded")
+logger.info("[SUCCESS] LTV Calculator module loaded")

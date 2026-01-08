@@ -63,7 +63,7 @@ class CustomerSync:
         Returns:
             List of customer dictionaries from Shopify
         """
-        logger.info(f"📥 Fetching customers from Shopify (limit: {limit})...")
+        logger.info(f" Fetching customers from Shopify (limit: {limit})...")
 
         url = f"{self.base_url}/customers.json"
         headers = {
@@ -82,11 +82,11 @@ class CustomerSync:
                 data = response.json()
                 customers = data.get("customers", [])
 
-                logger.info(f"✅ Fetched {len(customers)} customers from Shopify")
+                logger.info(f"[SUCCESS] Fetched {len(customers)} customers from Shopify")
                 return customers
 
             except httpx.HTTPError as e:
-                logger.error(f"❌ Error fetching Shopify customers: {e}")
+                logger.error(f"[ERROR] Error fetching Shopify customers: {e}")
                 return []
 
     async def fetch_customer_orders(self, shopify_customer_id: str) -> List[Dict]:
@@ -99,7 +99,7 @@ class CustomerSync:
         Returns:
             List of order dictionaries
         """
-        logger.info(f"📦 Fetching orders for customer: {shopify_customer_id}")
+        logger.info(f"[PACKAGE] Fetching orders for customer: {shopify_customer_id}")
 
         url = f"{self.base_url}/customers/{shopify_customer_id}/orders.json"
         headers = {
@@ -114,11 +114,11 @@ class CustomerSync:
                 data = response.json()
                 orders = data.get("orders", [])
 
-                logger.info(f"✅ Fetched {len(orders)} orders")
+                logger.info(f"[SUCCESS] Fetched {len(orders)} orders")
                 return orders
 
             except httpx.HTTPError as e:
-                logger.error(f"❌ Error fetching orders: {e}")
+                logger.error(f"[ERROR] Error fetching orders: {e}")
                 return []
 
     async def fetch_all_customers(self) -> List[Dict]:
@@ -128,7 +128,7 @@ class CustomerSync:
         Returns:
             Complete list of all customers
         """
-        logger.info("📥 Fetching ALL customers from Shopify (with pagination)...")
+        logger.info(" Fetching ALL customers from Shopify (with pagination)...")
 
         all_customers = []
         since_id = None
@@ -149,10 +149,10 @@ class CustomerSync:
 
             # Safety limit to prevent infinite loops
             if page > 100:
-                logger.warning("⚠️  Reached page limit (100), stopping pagination")
+                logger.warning("[WARNING]  Reached page limit (100), stopping pagination")
                 break
 
-        logger.info(f"✅ Fetched total of {len(all_customers)} customers")
+        logger.info(f"[SUCCESS] Fetched total of {len(all_customers)} customers")
         return all_customers
 
     # ==================== Data Transformation ====================
@@ -251,7 +251,7 @@ class CustomerSync:
             Customer data with calculated metrics
         """
         customer_id = customer_data['customer_id']
-        logger.info(f"🧮 Calculating metrics for: {customer_id}")
+        logger.info(f" Calculating metrics for: {customer_id}")
 
         # Get complete profile (includes RFM, segment)
         profile = await self.analytics.get_customer_profile(customer_id, customer_data)
@@ -291,7 +291,7 @@ class CustomerSync:
             "risk_level": risk_level
         })
 
-        logger.info(f"✅ Metrics calculated - LTV: ${historical_ltv:.2f}, Segment: {profile['segment']}, Risk: {risk_level}")
+        logger.info(f"[SUCCESS] Metrics calculated - LTV: ${historical_ltv:.2f}, Segment: {profile['segment']}, Risk: {risk_level}")
 
         return profile
 
@@ -308,11 +308,11 @@ class CustomerSync:
             Customer database record
         """
         if not self.db:
-            logger.warning("⚠️  No database session, skipping save")
+            logger.warning("[WARNING]  No database session, skipping save")
             return None
 
         customer_id = customer_profile['customer_id']
-        logger.info(f"💾 Saving customer to database: {customer_id}")
+        logger.info(f" Saving customer to database: {customer_id}")
 
         # Check if customer exists
         stmt = select(Customer).where(Customer.customer_id == customer_id)
@@ -356,14 +356,14 @@ class CustomerSync:
                     setattr(existing_customer, key, value)
 
             existing_customer.updated_at = datetime.utcnow()
-            logger.info(f"✅ Updated existing customer: {customer_id}")
+            logger.info(f"[SUCCESS] Updated existing customer: {customer_id}")
             return existing_customer
 
         else:
             # Create new customer
             new_customer = Customer(**customer_dict)
             self.db.add(new_customer)
-            logger.info(f"✅ Created new customer: {customer_id}")
+            logger.info(f"[SUCCESS] Created new customer: {customer_id}")
             return new_customer
 
     async def create_customer_snapshot(self, customer_profile: Dict):
@@ -388,7 +388,7 @@ class CustomerSync:
         )
 
         self.db.add(snapshot)
-        logger.info(f"📸 Created snapshot for: {customer_profile['customer_id']}")
+        logger.info(f" Created snapshot for: {customer_profile['customer_id']}")
 
     # ==================== Full Sync ====================
 
@@ -409,13 +409,13 @@ class CustomerSync:
         Returns:
             List of customer profiles
         """
-        logger.info("🔄 Starting full customer sync from Shopify...")
+        logger.info("[REFRESH] Starting full customer sync from Shopify...")
 
         # Fetch all customers
         shopify_customers = await self.fetch_all_customers()
 
         if not shopify_customers:
-            logger.warning("⚠️  No customers found in Shopify")
+            logger.warning("[WARNING]  No customers found in Shopify")
             return []
 
         customer_profiles = []
@@ -446,15 +446,15 @@ class CustomerSync:
                 customer_profiles.append(customer_profile)
 
             except Exception as e:
-                logger.error(f"❌ Error processing customer {shopify_customer.get('id')}: {e}")
+                logger.error(f"[ERROR] Error processing customer {shopify_customer.get('id')}: {e}")
                 continue
 
         # Commit database changes
         if save_to_db and self.db:
             await self.db.commit()
-            logger.info("✅ Database changes committed")
+            logger.info("[SUCCESS] Database changes committed")
 
-        logger.info(f"✅ Full sync complete: {len(customer_profiles)} customers processed")
+        logger.info(f"[SUCCESS] Full sync complete: {len(customer_profiles)} customers processed")
 
         return customer_profiles
 
@@ -473,7 +473,7 @@ class CustomerSync:
         Returns:
             Customer profile or None
         """
-        logger.info(f"🔄 Syncing single customer: {shopify_customer_id}")
+        logger.info(f"[REFRESH] Syncing single customer: {shopify_customer_id}")
 
         # Fetch customer
         url = f"{self.base_url}/customers/{shopify_customer_id}.json"
@@ -490,7 +490,7 @@ class CustomerSync:
                 shopify_customer = data.get("customer")
 
                 if not shopify_customer:
-                    logger.error(f"❌ Customer not found: {shopify_customer_id}")
+                    logger.error(f"[ERROR] Customer not found: {shopify_customer_id}")
                     return None
 
                 # Fetch orders
@@ -506,12 +506,12 @@ class CustomerSync:
                     await self.create_customer_snapshot(customer_profile)
                     await self.db.commit()
 
-                logger.info(f"✅ Customer synced: {customer_profile['customer_id']}")
+                logger.info(f"[SUCCESS] Customer synced: {customer_profile['customer_id']}")
 
                 return customer_profile
 
             except httpx.HTTPError as e:
-                logger.error(f"❌ Error syncing customer: {e}")
+                logger.error(f"[ERROR] Error syncing customer: {e}")
                 return None
 
     # ==================== Incremental Sync ====================
@@ -531,7 +531,7 @@ class CustomerSync:
         Returns:
             List of updated customer profiles
         """
-        logger.info(f"🔄 Syncing customers updated since: {since_datetime.isoformat()}")
+        logger.info(f"[REFRESH] Syncing customers updated since: {since_datetime.isoformat()}")
 
         # Shopify API uses 'updated_at_min' parameter
         url = f"{self.base_url}/customers.json"
@@ -554,7 +554,7 @@ class CustomerSync:
                 data = response.json()
                 shopify_customers = data.get("customers", [])
 
-                logger.info(f"📥 Found {len(shopify_customers)} updated customers")
+                logger.info(f" Found {len(shopify_customers)} updated customers")
 
                 for shopify_customer in shopify_customers:
                     # Fetch orders
@@ -575,12 +575,12 @@ class CustomerSync:
                 if save_to_db and self.db:
                     await self.db.commit()
 
-                logger.info(f"✅ Incremental sync complete: {len(customer_profiles)} customers")
+                logger.info(f"[SUCCESS] Incremental sync complete: {len(customer_profiles)} customers")
 
                 return customer_profiles
 
             except httpx.HTTPError as e:
-                logger.error(f"❌ Error syncing updated customers: {e}")
+                logger.error(f"[ERROR] Error syncing updated customers: {e}")
                 return []
 
 
@@ -594,4 +594,4 @@ def create_customer_sync(
     return CustomerSync(shopify_store, shopify_api_token, db_session)
 
 
-logger.info("✅ Customer Sync module loaded")
+logger.info("[SUCCESS] Customer Sync module loaded")

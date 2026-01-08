@@ -71,7 +71,7 @@ class ProxyManager:
 
             if response.status_code == 200:
                 self.requests_made += 1
-                logger.info(f"✅ ScraperAPI: {url[:50]}...")
+                logger.info(f"[SUCCESS] ScraperAPI: {url[:50]}...")
                 return response.content
             else:
                 logger.warning(f"ScraperAPI returned {response.status_code}")
@@ -99,7 +99,7 @@ class ProxyManager:
 
             if response.status_code == 200:
                 self.requests_made += 1
-                logger.info(f"✅ Direct: {url[:50]}...")
+                logger.info(f"[SUCCESS] Direct: {url[:50]}...")
                 return response.content
         except Exception as e:
             logger.warning(f"Direct connection failed: {e}")
@@ -128,7 +128,7 @@ class ProxyManager:
 
                 if response.status_code == 200:
                     self.requests_made += 1
-                    logger.info(f"✅ Proxy: {url[:50]}...")
+                    logger.info(f"[SUCCESS] Proxy: {url[:50]}...")
                     return response.content
 
             except Exception as e:
@@ -155,7 +155,7 @@ class ProxyManager:
                 response = requests.get(source, timeout=5)
                 proxies = response.text.strip().split('\n')
                 self.free_proxies.extend(proxies)
-                logger.info(f"✅ Fetched {len(proxies)} proxies from {source[:30]}...")
+                logger.info(f"[SUCCESS] Fetched {len(proxies)} proxies from {source[:30]}...")
             except Exception as e:
                 logger.warning(f"Failed to fetch proxies from {source}: {e}")
                 continue

@@ -1,5 +1,5 @@
 """
-🔍 PRODUCT CHANGE ANALYZER
+[SEARCH] PRODUCT CHANGE ANALYZER
 Uses Claude AI to analyze product changes and recommend actions
 """
 
@@ -16,7 +16,7 @@ class ProductChangeAnalyzer:
 
     def __init__(self):
         self.claude = RealTimeClaudeAnalyzer()
-        logger.info("✅ Product change analyzer initialized")
+        logger.info("[SUCCESS] Product change analyzer initialized")
 
     def analyze_change(
         self,
@@ -219,7 +219,7 @@ EXPLANATION: [2-3 sentences on business impact]
         urgency_order = {"High": 0, "Medium": 1, "Low": 2}
         analyses.sort(key=lambda x: urgency_order.get(x.get('urgency', 'Low'), 3))
 
-        logger.info(f"✅ Analyzed {len(analyses)} changes")
+        logger.info(f"[SUCCESS] Analyzed {len(analyses)} changes")
 
         return analyses
 
@@ -230,9 +230,9 @@ EXPLANATION: [2-3 sentences on business impact]
             return "No changes to analyze."
 
         report = f"""
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🔍 PRODUCT CHANGE ANALYSIS REPORT
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+[SEARCH] PRODUCT CHANGE ANALYSIS REPORT
+
 
 Total Changes Analyzed: {len(analyses)}
 Report Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -245,29 +245,29 @@ Report Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         low = [a for a in analyses if a.get('urgency') == 'Low']
 
         if high:
-            report += f"\n🔴 HIGH URGENCY ({len(high)}):\n"
+            report += f"\n HIGH URGENCY ({len(high)}):\n"
             for analysis in high:
-                report += f"\n  📦 {analysis['product_name']}\n"
+                report += f"\n  [PACKAGE] {analysis['product_name']}\n"
                 report += f"     Change: {analysis['change_type']} ({analysis['old_value']} → {analysis['new_value']})\n"
                 report += f"     Impact: {analysis['impact']}\n"
                 report += f"     Action: {analysis['action']}\n"
                 report += f"     Cause: {analysis['cause']}\n"
 
         if medium:
-            report += f"\n🟡 MEDIUM URGENCY ({len(medium)}):\n"
+            report += f"\n MEDIUM URGENCY ({len(medium)}):\n"
             for analysis in medium:
-                report += f"\n  📦 {analysis['product_name']}\n"
+                report += f"\n  [PACKAGE] {analysis['product_name']}\n"
                 report += f"     Change: {analysis['change_type']} ({analysis['old_value']} → {analysis['new_value']})\n"
                 report += f"     Action: {analysis['action']}\n"
 
         if low:
-            report += f"\n🟢 LOW URGENCY ({len(low)}):\n"
+            report += f"\n LOW URGENCY ({len(low)}):\n"
             for analysis in low[:3]:  # Limit to 3
                 report += f"  • {analysis['product_name']}: {analysis['action']}\n"
             if len(low) > 3:
                 report += f"  ... and {len(low) - 3} more low priority items\n"
 
-        report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        report += "\n"
 
         return report
 

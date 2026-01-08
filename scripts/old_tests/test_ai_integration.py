@@ -27,9 +27,9 @@ print("-" * 80)
 
 claude_key = os.getenv("CLAUDE_API_KEY")
 if claude_key:
-    print(f"✅ CLAUDE_API_KEY found: {claude_key[:15]}...{claude_key[-4:]}")
+    print(f"[SUCCESS] CLAUDE_API_KEY found: {claude_key[:15]}...{claude_key[-4:]}")
 else:
-    print("❌ CLAUDE_API_KEY not found in environment")
+    print("[ERROR] CLAUDE_API_KEY not found in environment")
     exit(1)
 
 print()
@@ -40,9 +40,9 @@ print("-" * 80)
 
 try:
     from ospra_os.ai.providers.claude import ClaudeProvider
-    print("✅ ClaudeProvider imported successfully")
+    print("[SUCCESS] ClaudeProvider imported successfully")
 except Exception as e:
-    print(f"❌ Failed to import ClaudeProvider: {e}")
+    print(f"[ERROR] Failed to import ClaudeProvider: {e}")
     exit(1)
 
 print()
@@ -53,13 +53,13 @@ print("-" * 80)
 
 try:
     provider = ClaudeProvider(api_key=claude_key)
-    print(f"✅ Provider initialized")
+    print(f"[SUCCESS] Provider initialized")
     print(f"   Model: {provider.model_name}")
     print(f"   Cost per 1K tokens: ${provider.cost_per_1k}")
     print(f"   Total tokens used: {provider._total_tokens_used}")
     print(f"   Total cost: ${provider._total_cost:.4f}")
 except Exception as e:
-    print(f"❌ Failed to initialize provider: {e}")
+    print(f"[ERROR] Failed to initialize provider: {e}")
     exit(1)
 
 print()
@@ -72,13 +72,13 @@ async def test_connection():
     try:
         result = await provider.test_connection()
         if result:
-            print("✅ API connection successful")
+            print("[SUCCESS] API connection successful")
             return True
         else:
-            print("❌ API connection failed")
+            print("[ERROR] API connection failed")
             return False
     except Exception as e:
-        print(f"❌ Connection test error: {e}")
+        print(f"[ERROR] Connection test error: {e}")
         return False
 
 connection_ok = asyncio.run(test_connection())
@@ -99,7 +99,7 @@ async def test_chat():
             context=None
         )
 
-        print(f"\n📝 RAW RESPONSE ({len(response)} chars):")
+        print(f"\n[NOTE] RAW RESPONSE ({len(response)} chars):")
         print("-" * 40)
         print(response)
         print("-" * 40)
@@ -112,20 +112,20 @@ async def test_chat():
                 found_symbols.append(symbol)
 
         if found_symbols:
-            print(f"\n⚠️  WARNING: Found markdown symbols: {found_symbols}")
+            print(f"\n[WARNING]  WARNING: Found markdown symbols: {found_symbols}")
             print("   AI is still using markdown formatting despite instructions")
         else:
-            print(f"\n✅ No markdown symbols found")
+            print(f"\n[SUCCESS] No markdown symbols found")
 
         # Token usage
-        print(f"\n📊 TOKEN USAGE:")
+        print(f"\n[STATS] TOKEN USAGE:")
         print(f"   Tokens used this call: ~{len(response.split()) * 1.3:.0f} (estimated)")
         print(f"   Total tokens: {provider._total_tokens_used}")
         print(f"   Total cost: ${provider._total_cost:.4f}")
 
         return response
     except Exception as e:
-        print(f"❌ Chat test failed: {e}")
+        print(f"[ERROR] Chat test failed: {e}")
         return None
 
 chat_response = asyncio.run(test_chat())
@@ -153,8 +153,8 @@ async def test_product_analysis():
 
         analysis = await provider.analyze_product(test_product)
 
-        print(f"\n✅ Analysis completed")
-        print(f"\n📊 RESULTS:")
+        print(f"\n[SUCCESS] Analysis completed")
+        print(f"\n[STATS] RESULTS:")
         print(f"   Score: {analysis.get('score', 'N/A')}/10")
         print(f"   Confidence: {analysis.get('confidence', 'N/A'):.1%}")
         print(f"   Suggested Price: ${analysis.get('pricing_suggestion', 'N/A'):.2f}")
@@ -162,13 +162,13 @@ async def test_product_analysis():
         print(f"   Risks: {len(analysis.get('risks', []))}")
 
         # Token usage
-        print(f"\n📊 TOKEN USAGE:")
+        print(f"\n[STATS] TOKEN USAGE:")
         print(f"   Total tokens: {provider._total_tokens_used}")
         print(f"   Total cost: ${provider._total_cost:.4f}")
 
         return analysis
     except Exception as e:
-        print(f"❌ Product analysis failed: {e}")
+        print(f"[ERROR] Product analysis failed: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -188,7 +188,7 @@ try:
     db = SessionLocal()
     context_builder = get_unified_context_builder(db)
 
-    print("✅ Unified context builder loaded")
+    print("[SUCCESS] Unified context builder loaded")
     print("   Self-learning data sources:")
     print("   - Product performance history")
     print("   - Ad campaign results")
@@ -203,7 +203,7 @@ try:
     db.close()
 
 except Exception as e:
-    print(f"⚠️  Self-learning system: {e}")
+    print(f"[WARNING]  Self-learning system: {e}")
 
 print()
 
@@ -211,15 +211,15 @@ print()
 print("8. VERIFYING TOKEN TRACKING")
 print("-" * 80)
 
-print(f"✅ Token usage tracked in provider instance:")
+print(f"[SUCCESS] Token usage tracked in provider instance:")
 print(f"   Total tokens used: {provider._total_tokens_used}")
 print(f"   Total cost: ${provider._total_cost:.4f}")
 print(f"   Cost per 1K tokens: ${provider.cost_per_1k}")
 
 if provider._total_tokens_used > 0:
-    print(f"\n✅ VERIFIED: AI is making real API calls and tracking token usage")
+    print(f"\n[SUCCESS] VERIFIED: AI is making real API calls and tracking token usage")
 else:
-    print(f"\n⚠️  WARNING: No tokens tracked - possible mock/fallback mode")
+    print(f"\n[WARNING]  WARNING: No tokens tracked - possible mock/fallback mode")
 
 print()
 
@@ -229,20 +229,20 @@ print("SUMMARY")
 print("=" * 80)
 
 print("\nAI Integration Status:")
-print(f"  API Connection: {'✅ Working' if connection_ok else '❌ Failed'}")
-print(f"  Chat Functionality: {'✅ Working' if chat_response else '❌ Failed'}")
-print(f"  Product Analysis: {'✅ Working' if analysis_result else '❌ Failed'}")
-print(f"  Token Tracking: {'✅ Active' if provider._total_tokens_used > 0 else '⚠️  Not tracked'}")
+print(f"  API Connection: {'[SUCCESS] Working' if connection_ok else '[ERROR] Failed'}")
+print(f"  Chat Functionality: {'[SUCCESS] Working' if chat_response else '[ERROR] Failed'}")
+print(f"  Product Analysis: {'[SUCCESS] Working' if analysis_result else '[ERROR] Failed'}")
+print(f"  Token Tracking: {'[SUCCESS] Active' if provider._total_tokens_used > 0 else '[WARNING]  Not tracked'}")
 print(f"  Total API Cost: ${provider._total_cost:.4f}")
 
 print("\nFormatting Check:")
 if chat_response:
     markdown_check = not any(sym in chat_response for sym in ['##', '**', '***'])
-    print(f"  No Markdown Symbols: {'✅ Clean' if markdown_check else '⚠️  Found symbols'}")
+    print(f"  No Markdown Symbols: {'[SUCCESS] Clean' if markdown_check else '[WARNING]  Found symbols'}")
 
 print("\nSelf-Learning System:")
-print(f"  Unified Context: ✅ Available")
-print(f"  Data Compilation: ✅ Active")
+print(f"  Unified Context: [SUCCESS] Available")
+print(f"  Data Compilation: [SUCCESS] Active")
 
 print("\n" + "=" * 80)
 print("TEST COMPLETE")

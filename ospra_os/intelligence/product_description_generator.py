@@ -143,7 +143,7 @@ CRITICAL:
 
             result = json.loads(content.strip())
 
-            logger.info(f"✅ Generated premium SEO description")
+            logger.info(f"[SUCCESS] Generated premium SEO description")
             return result
 
         except Exception as e:

@@ -41,11 +41,11 @@ class ImageHandler:
 
             # Check if already downloaded
             if filepath.exists():
-                logger.info(f"✅ Image cached: {filename}")
+                logger.info(f"[SUCCESS] Image cached: {filename}")
                 return str(filepath)
 
             # Download image
-            logger.info(f"📥 Downloading image from: {image_url[:60]}...")
+            logger.info(f" Downloading image from: {image_url[:60]}...")
 
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
@@ -66,7 +66,7 @@ class ImageHandler:
                     filepath.unlink()
                     return None
 
-                logger.info(f"✅ Downloaded: {filename} ({file_size:,} bytes)")
+                logger.info(f"[SUCCESS] Downloaded: {filename} ({file_size:,} bytes)")
                 return str(filepath)
             else:
                 logger.error(f"Download failed: HTTP {response.status_code}")
@@ -97,7 +97,7 @@ class ImageHandler:
 
             # Upload to Shopify (via product image)
             # Note: Shopify automatically hosts images on their CDN
-            logger.info(f"📤 Uploading to Shopify: {filename}")
+            logger.info(f" Uploading to Shopify: {filename}")
 
             # Create image attachment
             import base64
@@ -145,7 +145,7 @@ class ImageHandler:
             shopify_image = self.upload_to_shopify(local_path, product_id, shopify_client)
             if shopify_image:
                 product['shopify_image'] = shopify_image
-                logger.info(f"✅ Image ready for Shopify: {product_id}")
+                logger.info(f"[SUCCESS] Image ready for Shopify: {product_id}")
 
         # Store local path (temporary)
         product['local_image_path'] = local_path
@@ -168,7 +168,7 @@ class ImageHandler:
                         count += 1
 
             if count > 0:
-                logger.info(f"🧹 Cleaned up {count} old cached images")
+                logger.info(f" Cleaned up {count} old cached images")
 
         except Exception as e:
             logger.error(f"Cache cleanup failed: {e}")

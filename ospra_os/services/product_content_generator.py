@@ -126,11 +126,11 @@ class ProductContentGenerator:
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
 
         if not self.api_key:
-            logger.warning("⚠️  ANTHROPIC_API_KEY not set - content generation disabled")
+            logger.warning("[WARNING]  ANTHROPIC_API_KEY not set - content generation disabled")
             self.client = None
         else:
             self.client = AsyncAnthropic(api_key=self.api_key)
-            logger.info("✅ ProductContentGenerator initialized with Claude Sonnet 4.5")
+            logger.info("[SUCCESS] ProductContentGenerator initialized with Claude Sonnet 4.5")
 
         self.model = "claude-sonnet-4-20250514"  # Latest cost-efficient model
         self.rate_limiter = RateLimiter(calls_per_minute=rate_limit)
@@ -630,7 +630,7 @@ RATIONALE:
         Returns:
             Complete Shopify product data ready for deployment
         """
-        logger.info(f"🤖 Generating complete listing for: {aliexpress_data.get('title', 'Unknown')[:50]}")
+        logger.info(f"[AI] Generating complete listing for: {aliexpress_data.get('title', 'Unknown')[:50]}")
 
         # Extract data
         original_title = aliexpress_data.get("title", "Product")
@@ -645,7 +645,7 @@ RATIONALE:
             brand_voice="modern, minimal, premium"
         )
 
-        logger.info(f"   ✅ Title generated: {title}")
+        logger.info(f"   [SUCCESS] Title generated: {title}")
 
         # Generate description
         description_data = await self.generate_product_description(
@@ -656,7 +656,7 @@ RATIONALE:
             tone="professional yet approachable"
         )
 
-        logger.info(f"   ✅ Description generated ({len(description_data['long_description'])} chars)")
+        logger.info(f"   [SUCCESS] Description generated ({len(description_data['long_description'])} chars)")
 
         # Generate SEO
         seo_data = await self.generate_seo_content(
@@ -665,7 +665,7 @@ RATIONALE:
             description=description_data["short_description"]
         )
 
-        logger.info(f"   ✅ SEO data generated (primary keyword: {seo_data['keywords']['primary']})")
+        logger.info(f"   [SUCCESS] SEO data generated (primary keyword: {seo_data['keywords']['primary']})")
 
         # Generate pricing
         pricing_data = await self.suggest_competitive_price(
@@ -674,7 +674,7 @@ RATIONALE:
             target_margin=0.4
         )
 
-        logger.info(f"   ✅ Pricing generated: ${pricing_data['suggested_price']}")
+        logger.info(f"   [SUCCESS] Pricing generated: ${pricing_data['suggested_price']}")
 
         # Compile complete listing
         listing = {
@@ -698,7 +698,7 @@ RATIONALE:
             }
         }
 
-        logger.info(f"   ✅ Complete listing generated successfully")
+        logger.info(f"   [SUCCESS] Complete listing generated successfully")
 
         return listing
 

@@ -76,7 +76,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     tables_to_create = [t for t in g4_tables if t not in existing_tables]
 
     if not tables_to_create:
-        logger.info("✅ All G4 feedback loop tables already exist")
+        logger.info("[SUCCESS] All G4 feedback loop tables already exist")
         logger.info("")
         logger.info("Existing G4 feedback loop tables:")
         for table in g4_tables:
@@ -103,12 +103,12 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     created_tables = [t for t in g4_tables if t in new_tables]
 
     logger.info("")
-    logger.info("✅ G4 Feedback Loop Tables Created:")
+    logger.info("[SUCCESS] G4 Feedback Loop Tables Created:")
     logger.info("")
 
     for table in created_tables:
         columns = inspector.get_columns(table)
-        logger.info(f"  ✓ {table}")
+        logger.info(f"  [OK] {table}")
         logger.info(f"    Columns: {len(columns)}")
         for col in columns[:5]:  # Show first 5 columns
             logger.info(f"      - {col['name']}: {col['type']}")
@@ -117,7 +117,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
         logger.info("")
 
     logger.info("=" * 70)
-    logger.info("🎉 G4: COMPLETE FEEDBACK LOOP - MIGRATION COMPLETE")
+    logger.info("[LAUNCH] G4: COMPLETE FEEDBACK LOOP - MIGRATION COMPLETE")
     logger.info("=" * 70)
     logger.info("")
     logger.info("What this enables:")

@@ -3,17 +3,17 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { AuthProvider } from './contexts/AuthContext';
-import { QueryProvider } from './providers/QueryProvider';
+import { OiProvider } from './contexts/OiContext';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryProvider>
-      <BrowserRouter>
-        <AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <OiProvider>
           <App />
-        </AuthProvider>
-      </BrowserRouter>
-    </QueryProvider>
+        </OiProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );

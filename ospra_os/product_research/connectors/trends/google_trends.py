@@ -1,19 +1,32 @@
-"""Google Trends connector for product trend analysis."""
+"""
+Google Trends connector with PROXY SUPPORT
+==========================================
+
+Uses ScraperAPI/proxy rotation to bypass rate limits.
+"""
 
 from typing import List, Optional
 from datetime import datetime, timedelta
 from ..base import BaseConnector, ProductCandidate
 import asyncio
+import logging
+import os
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleTrendsConnector(BaseConnector):
     """
-    Google Trends integration.
+    Google Trends integration with proxy support.
 
-    Uses pytrends library to fetch trending searches and interest over time.
-    No API key required.
+    Uses pytrends library with rotating proxies to avoid rate limits.
     """
 
+    def __init__(self):
+        super().__init__()
+        self._cache = {}
+        self._cache_ttl = 3600  # 1 hour cache
+        
     @property
     def name(self) -> str:
         return "Google Trends"
@@ -21,6 +34,50 @@ class GoogleTrendsConnector(BaseConnector):
     @property
     def source_id(self) -> str:
         return "google_trends"
+
+    def _get_proxy_config(self) -> dict:
+        """Get proxy configuration for pytrends."""
+        scraper_api_key = os.getenv('SCRAPERAPI_KEY')
+        
+        if scraper_api_key:
+            # ScraperAPI proxy format
+            return {
+                'https': f'http://scraperapi:{scraper_api_key}@proxy-server.scraperapi.com:8001'
+            }
+        
+        # Fallback: Try free proxy
+        try:
+            from ospra_os.scraping.proxy_manager import proxy_manager
+            if proxy_manager.free_proxies:
+                proxy = proxy_manager._get_next_proxy()
+                if proxy:
+                    return {'https': proxy, 'http': proxy}
+        except Exception as e:
+            logger.warning(f"Could not get proxy: {e}")
+        
+        return {}
+
+    def _get_cache_key(self, query: str, timeframe: str, geo: str) -> str:
+        """Generate cache key."""
+        return f"{query}:{timeframe}:{geo}"
+
+    def _is_cached(self, key: str) -> bool:
+        """Check if data is cached and not expired."""
+        if key not in self._cache:
+            return False
+        cached_time, _ = self._cache[key]
+        return (datetime.utcnow() - cached_time).seconds < self._cache_ttl
+
+    def _get_cached(self, key: str):
+        """Get cached data."""
+        if self._is_cached(key):
+            _, data = self._cache[key]
+            return data
+        return None
+
+    def _set_cache(self, key: str, data):
+        """Cache data."""
+        self._cache[key] = (datetime.utcnow(), data)
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -36,55 +93,144 @@ class GoogleTrendsConnector(BaseConnector):
         """
         timeframe = kwargs.get("timeframe", "today 3-m")
         geo = kwargs.get("geo", "US")
+        
+        # Check cache first
+        cache_key = self._get_cache_key(query, timeframe, geo)
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            logger.info(f"[PACKAGE] Google Trends cache hit: {query}")
+            return cached
 
         try:
             from pytrends.request import TrendReq
 
-            # Run pytrends in thread pool (it's blocking)
             loop = asyncio.get_event_loop()
-            pytrend = await loop.run_in_executor(None, TrendReq)
+            
+            # Get proxy configuration
+            proxies = self._get_proxy_config()
+            
+            # Create TrendReq with proxy and timeout
+            def create_pytrend():
+                return TrendReq(
+                    hl='en-US',
+                    tz=360,
+                    timeout=(10, 25),
+                    proxies=proxies if proxies else None,
+                    retries=3,
+                    backoff_factor=0.5
+                )
+            
+            pytrend = await loop.run_in_executor(None, create_pytrend)
+            logger.info(f"[SEARCH] Google Trends search: {query} (proxy: {'yes' if proxies else 'no'})")
 
-            # Build payload
-            await loop.run_in_executor(
-                None,
-                lambda: pytrend.build_payload([query], timeframe=timeframe, geo=geo)
-            )
+            # Build payload with retry logic
+            async def build_with_retry(retries=3):
+                for attempt in range(retries):
+                    try:
+                        await loop.run_in_executor(
+                            None,
+                            lambda: pytrend.build_payload([query], timeframe=timeframe, geo=geo)
+                        )
+                        return True
+                    except Exception as e:
+                        if attempt < retries - 1:
+                            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                            logger.warning(f"Retry {attempt + 1} for {query}: {e}")
+                        else:
+                            raise
+                return False
+
+            await build_with_retry()
 
             # Get interest over time
             interest_df = await loop.run_in_executor(None, lambda: pytrend.interest_over_time())
 
             if interest_df.empty or query not in interest_df.columns:
-                return []
+                result = []
+                self._set_cache(cache_key, result)
+                return result
 
             # Calculate trend score (0-100)
             interest_values = interest_df[query].dropna()
             if len(interest_values) == 0:
-                return []
+                result = []
+                self._set_cache(cache_key, result)
+                return result
 
             current_value = int(interest_values.iloc[-1])
             max_value = int(interest_values.max())
             avg_value = int(interest_values.mean())
 
+            # Calculate trend direction
+            recent = interest_values.tail(7).mean() if len(interest_values) >= 7 else current_value
+            older = interest_values.head(7).mean() if len(interest_values) >= 7 else avg_value
+            
+            if older > 0:
+                velocity = ((recent - older) / older) * 100
+            else:
+                velocity = 0
+
             # Trend score: higher if currently trending up
             trend_score = min(100, (current_value / max(avg_value, 1)) * 50)
+            
+            # Boost score if velocity is positive
+            if velocity > 20:
+                trend_score = min(100, trend_score * 1.3)
 
-            return [
+            result = [
                 ProductCandidate(
                     name=query,
                     source=self.source_id,
                     trend_score=trend_score,
-                    search_volume=current_value,  # Relative search volume
+                    search_volume=current_value,
                     category=kwargs.get("category"),
-                    tags=["trending" if current_value > avg_value else "declining"],
+                    tags=self._get_trend_tags(velocity, current_value, avg_value),
+                    metadata={
+                        "velocity": velocity,
+                        "current_interest": current_value,
+                        "max_interest": max_value,
+                        "avg_interest": avg_value,
+                        "timeframe": timeframe,
+                        "geo": geo,
+                        "fetched_at": datetime.utcnow().isoformat()
+                    }
                 )
             ]
+            
+            self._set_cache(cache_key, result)
+            logger.info(f"[SUCCESS] Google Trends: {query} = {trend_score:.1f} score, {velocity:+.1f}% velocity")
+            
+            return result
 
         except ImportError:
-            print("⚠️  pytrends not installed. Run: pip install pytrends")
+            logger.error("[WARNING]  pytrends not installed. Run: pip install pytrends")
             return []
         except Exception as e:
-            print(f"⚠️  Google Trends error: {e}")
+            logger.error(f"[WARNING]  Google Trends error for '{query}': {e}")
+            # Return empty but don't cache errors
             return []
+
+    def _get_trend_tags(self, velocity: float, current: int, avg: int) -> List[str]:
+        """Generate tags based on trend data."""
+        tags = []
+        
+        if velocity > 50:
+            tags.append("exploding")
+        elif velocity > 20:
+            tags.append("trending_up")
+        elif velocity > 0:
+            tags.append("growing")
+        elif velocity > -20:
+            tags.append("stable")
+        else:
+            tags.append("declining")
+        
+        if current > avg * 1.5:
+            tags.append("high_interest")
+        elif current < avg * 0.5:
+            tags.append("low_interest")
+        
+        return tags
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
         """
@@ -97,11 +243,29 @@ class GoogleTrendsConnector(BaseConnector):
         Returns:
             List of trending product candidates
         """
+        cache_key = f"trending:{category or 'all'}:{limit}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            logger.info(f"[PACKAGE] Google Trends trending cache hit")
+            return cached
+        
         try:
             from pytrends.request import TrendReq
 
             loop = asyncio.get_event_loop()
-            pytrend = await loop.run_in_executor(None, TrendReq)
+            proxies = self._get_proxy_config()
+            
+            def create_pytrend():
+                return TrendReq(
+                    hl='en-US',
+                    tz=360,
+                    timeout=(10, 25),
+                    proxies=proxies if proxies else None,
+                    retries=3,
+                    backoff_factor=0.5
+                )
+            
+            pytrend = await loop.run_in_executor(None, create_pytrend)
 
             # Get trending searches (US by default)
             trending_df = await loop.run_in_executor(
@@ -133,14 +297,18 @@ class GoogleTrendsConnector(BaseConnector):
                             tags=["trending_now"],
                         )
                     )
+                
+                # Rate limit between requests
+                await asyncio.sleep(0.5)
 
+            self._set_cache(cache_key, candidates)
             return candidates[:limit]
 
         except ImportError:
-            print("⚠️  pytrends not installed. Run: pip install pytrends")
+            logger.error("[WARNING]  pytrends not installed. Run: pip install pytrends")
             return []
         except Exception as e:
-            print(f"⚠️  Google Trends error: {e}")
+            logger.error(f"[WARNING]  Google Trends trending error: {e}")
             return []
 
     async def get_related_queries(self, query: str, limit: int = 10) -> List[str]:
@@ -154,11 +322,28 @@ class GoogleTrendsConnector(BaseConnector):
         Returns:
             List of related search terms
         """
+        cache_key = f"related:{query}:{limit}"
+        cached = self._get_cached(cache_key)
+        if cached is not None:
+            return cached
+        
         try:
             from pytrends.request import TrendReq
 
             loop = asyncio.get_event_loop()
-            pytrend = await loop.run_in_executor(None, TrendReq)
+            proxies = self._get_proxy_config()
+            
+            def create_pytrend():
+                return TrendReq(
+                    hl='en-US',
+                    tz=360,
+                    timeout=(10, 25),
+                    proxies=proxies if proxies else None,
+                    retries=3,
+                    backoff_factor=0.5
+                )
+            
+            pytrend = await loop.run_in_executor(None, create_pytrend)
 
             await loop.run_in_executor(
                 None,
@@ -177,8 +362,16 @@ class GoogleTrendsConnector(BaseConnector):
                 return []
 
             # Return top N queries
-            return rising_df["query"].head(limit).tolist()
+            result = rising_df["query"].head(limit).tolist()
+            self._set_cache(cache_key, result)
+            
+            return result
 
         except Exception as e:
-            print(f"⚠️  Error getting related queries: {e}")
+            logger.error(f"[WARNING]  Error getting related queries: {e}")
             return []
+    
+    def clear_cache(self):
+        """Clear the cache."""
+        self._cache = {}
+        logger.info(" Google Trends cache cleared")

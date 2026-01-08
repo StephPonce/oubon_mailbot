@@ -28,9 +28,9 @@ def test_platform_adapter_base():
             get_available_platforms,
             validate_platform_name
         )
-        print("✅ All imports successful")
+        print("[SUCCESS] All imports successful")
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return
 
     # Test 2: Exception hierarchy
@@ -39,29 +39,29 @@ def test_platform_adapter_base():
         # Test base exception
         base_error = PlatformAPIError("Test error", platform="test")
         assert str(base_error) == "[test] Test error"
-        print("✅ PlatformAPIError working")
+        print("[SUCCESS] PlatformAPIError working")
 
         # Test RateLimitError
         rate_error = RateLimitError(platform="test", retry_after=60)
         assert rate_error.retry_after == 60
-        print("✅ RateLimitError working")
+        print("[SUCCESS] RateLimitError working")
 
         # Test AuthenticationError
         auth_error = AuthenticationError(platform="test")
-        print("✅ AuthenticationError working")
+        print("[SUCCESS] AuthenticationError working")
 
         # Test ProductNotFoundError
         not_found = ProductNotFoundError("prod_123", platform="test")
         assert not_found.product_id == "prod_123"
-        print("✅ ProductNotFoundError working")
+        print("[SUCCESS] ProductNotFoundError working")
 
         # Test InvalidRequestError
         invalid = InvalidRequestError("Invalid field", platform="test", field="price")
         assert invalid.field == "price"
-        print("✅ InvalidRequestError working")
+        print("[SUCCESS] InvalidRequestError working")
 
     except Exception as e:
-        print(f"❌ Exception hierarchy test failed: {e}")
+        print(f"[ERROR] Exception hierarchy test failed: {e}")
         return
 
     # Test 3: Create mock adapter
@@ -144,10 +144,10 @@ def test_platform_adapter_base():
 
         # Create instance
         adapter = MockAdapter({"api_key": "test_key"})
-        print(f"✅ Mock adapter created: {adapter.platform_name}")
+        print(f"[SUCCESS] Mock adapter created: {adapter.platform_name}")
 
     except Exception as e:
-        print(f"❌ Mock adapter creation failed: {e}")
+        print(f"[ERROR] Mock adapter creation failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -160,37 +160,37 @@ def test_platform_adapter_base():
         assert info["platform"] == "mock"
         assert info["api_version"] == "1.0"
         assert info["adapter_version"] == "1.0.0"
-        print("✅ get_platform_info() working")
+        print("[SUCCESS] get_platform_info() working")
 
         # track_request
         adapter.track_request()
         adapter.track_request()
         stats = adapter.get_request_stats()
         assert stats["total_requests"] == 2
-        print("✅ track_request() and get_request_stats() working")
+        print("[SUCCESS] track_request() and get_request_stats() working")
 
         # validate_product_data
         valid_product = {"title": "Test Product", "price": 99.99}
         adapter.validate_product_data(valid_product)
-        print("✅ validate_product_data() accepts valid data")
+        print("[SUCCESS] validate_product_data() accepts valid data")
 
         # Test invalid data
         try:
             invalid_product = {"title": "Test"}  # Missing price
             adapter.validate_product_data(invalid_product)
-            print("❌ Should have raised InvalidRequestError")
+            print("[ERROR] Should have raised InvalidRequestError")
         except InvalidRequestError:
-            print("✅ validate_product_data() rejects invalid data")
+            print("[SUCCESS] validate_product_data() rejects invalid data")
 
         # build_error_response
         test_error = PlatformAPIError("Test error", platform="mock")
         error_response = adapter.build_error_response(test_error, context="test")
         assert error_response["success"] is False
         assert "error" in error_response
-        print("✅ build_error_response() working")
+        print("[SUCCESS] build_error_response() working")
 
     except Exception as e:
-        print(f"❌ Helper methods test failed: {e}")
+        print(f"[ERROR] Helper methods test failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -202,7 +202,7 @@ def test_platform_adapter_base():
         result = await adapter.test_connection()
         assert result["success"] is True
         assert result["store_name"] == "Mock Store"
-        print("✅ test_connection() working")
+        print("[SUCCESS] test_connection() working")
 
         # deploy_product
         product = {
@@ -214,51 +214,51 @@ def test_platform_adapter_base():
         result = await adapter.deploy_product(product)
         assert result["success"] is True
         assert "platform_product_id" in result
-        print("✅ deploy_product() working")
+        print("[SUCCESS] deploy_product() working")
 
         # update_product
         result = await adapter.update_product("mock_123", {"price": 89.99})
         assert result["success"] is True
-        print("✅ update_product() working")
+        print("[SUCCESS] update_product() working")
 
         # delete_product
         result = await adapter.delete_product("mock_123")
         assert result["success"] is True
-        print("✅ delete_product() working")
+        print("[SUCCESS] delete_product() working")
 
         # get_orders
         result = await adapter.get_orders(limit=10)
         assert result["success"] is True
         assert "orders" in result
-        print("✅ get_orders() working")
+        print("[SUCCESS] get_orders() working")
 
         # get_products
         result = await adapter.get_products(limit=10)
         assert result["success"] is True
         assert "products" in result
-        print("✅ get_products() working")
+        print("[SUCCESS] get_products() working")
 
         # update_inventory
         result = await adapter.update_inventory("mock_123", 75)
         assert result["success"] is True
         assert result["new_quantity"] == 75
-        print("✅ update_inventory() working")
+        print("[SUCCESS] update_inventory() working")
 
         # sync_orders
         result = await adapter.sync_orders()
         assert result["success"] is True
-        print("✅ sync_orders() working")
+        print("[SUCCESS] sync_orders() working")
 
         # get_store_info
         result = await adapter.get_store_info()
         assert result["success"] is True
         assert result["currency"] == "USD"
-        print("✅ get_store_info() working")
+        print("[SUCCESS] get_store_info() working")
 
     try:
         asyncio.run(test_async())
     except Exception as e:
-        print(f"❌ Async methods test failed: {e}")
+        print(f"[ERROR] Async methods test failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -270,31 +270,31 @@ def test_platform_adapter_base():
         platforms = get_available_platforms()
         assert isinstance(platforms, list)
         assert len(platforms) > 0
-        print(f"✅ get_available_platforms() returns: {platforms}")
+        print(f"[SUCCESS] get_available_platforms() returns: {platforms}")
 
         # validate_platform_name
         assert validate_platform_name("shopify") is True
         assert validate_platform_name("amazon") is True
         assert validate_platform_name("unknown") is False
-        print("✅ validate_platform_name() working")
+        print("[SUCCESS] validate_platform_name() working")
 
     except Exception as e:
-        print(f"❌ Utility functions test failed: {e}")
+        print(f"[ERROR] Utility functions test failed: {e}")
         return
 
     print("\n" + "=" * 70)
-    print("✅ ALL PLATFORM ADAPTER BASE TESTS PASSED!")
+    print("[SUCCESS] ALL PLATFORM ADAPTER BASE TESTS PASSED!")
     print("=" * 70)
     print()
-    print("📋 Summary:")
-    print("   ✓ Exception hierarchy working correctly")
-    print("   ✓ Abstract base class structure valid")
-    print("   ✓ All 9 abstract methods defined")
-    print("   ✓ Helper methods functional")
-    print("   ✓ Async operations working")
-    print("   ✓ Utility functions working")
+    print("[LIST] Summary:")
+    print("   [OK] Exception hierarchy working correctly")
+    print("   [OK] Abstract base class structure valid")
+    print("   [OK] All 9 abstract methods defined")
+    print("   [OK] Helper methods functional")
+    print("   [OK] Async operations working")
+    print("   [OK] Utility functions working")
     print()
-    print("🎯 Ready for platform adapter implementations:")
+    print("[TARGET] Ready for platform adapter implementations:")
     print("   - ShopifyAdapter")
     print("   - AmazonAdapter")
     print("   - WooCommerceAdapter")

@@ -53,7 +53,7 @@ def sync_all_stores_task(self, days_back: int = 1) -> Dict[str, Any]:
     Returns:
         Sync summary with stores synced and products updated
     """
-    logger.info(f"🔄 Starting sales sync for all stores ({days_back} days)")
+    logger.info(f"[REFRESH] Starting sales sync for all stores ({days_back} days)")
 
     try:
         service = SalesSyncService(self.db)
@@ -69,12 +69,12 @@ def sync_all_stores_task(self, days_back: int = 1) -> Dict[str, Any]:
         total_orders = sum(r.get("orders_fetched", 0) for r in successful)
 
         logger.info(
-            f"✅ Sales sync complete: {len(successful)}/{len(results)} stores synced, "
+            f"[SUCCESS] Sales sync complete: {len(successful)}/{len(results)} stores synced, "
             f"{total_products} products updated, {total_orders} orders fetched"
         )
 
         if failed:
-            logger.warning(f"⚠️  {len(failed)} stores failed to sync")
+            logger.warning(f"[WARNING]  {len(failed)} stores failed to sync")
 
         return {
             "status": "success",
@@ -86,7 +86,7 @@ def sync_all_stores_task(self, days_back: int = 1) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"❌ Sales sync failed: {e}")
+        logger.error(f"[ERROR] Sales sync failed: {e}")
         raise
 
 
@@ -111,7 +111,7 @@ def evaluate_outcomes_task(self) -> Dict[str, Any]:
     Returns:
         Evaluation summary with outcomes evaluated and learning events created
     """
-    logger.info("📊 Starting outcome evaluation")
+    logger.info("[STATS] Starting outcome evaluation")
 
     try:
         service = OutcomeService(self.db)
@@ -123,7 +123,7 @@ def evaluate_outcomes_task(self) -> Dict[str, Any]:
         learning_events = sum(r.get("learning_events_created", 0) for r in results)
 
         logger.info(
-            f"✅ Outcome evaluation complete: {len(results)} outcomes evaluated, "
+            f"[SUCCESS] Outcome evaluation complete: {len(results)} outcomes evaluated, "
             f"{learning_events} learning events created"
         )
 
@@ -142,7 +142,7 @@ def evaluate_outcomes_task(self) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"❌ Outcome evaluation failed: {e}")
+        logger.error(f"[ERROR] Outcome evaluation failed: {e}")
         raise
 
 
@@ -167,14 +167,14 @@ def process_learning_task(self) -> Dict[str, Any]:
     Returns:
         Processing summary with events processed and users updated
     """
-    logger.info("🧠 Starting learning event processing")
+    logger.info("[BRAIN] Starting learning event processing")
 
     try:
         processor = LearningProcessor(self.db)
         result = processor.process_pending_events()
 
         logger.info(
-            f"✅ Learning processing complete: {result['events_processed']} events processed, "
+            f"[SUCCESS] Learning processing complete: {result['events_processed']} events processed, "
             f"{result['users_updated']} users updated"
         )
 
@@ -186,7 +186,7 @@ def process_learning_task(self) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"❌ Learning processing failed: {e}")
+        logger.error(f"[ERROR] Learning processing failed: {e}")
         raise
 
 
@@ -209,13 +209,13 @@ def update_global_weights_task(self) -> Dict[str, Any]:
     Returns:
         Updated global weights
     """
-    logger.info("🌍 Starting global weights update")
+    logger.info(" Starting global weights update")
 
     try:
         processor = LearningProcessor(self.db)
         global_weights = processor.update_global_weights(category="confidence")
 
-        logger.info(f"✅ Global weights updated: {global_weights}")
+        logger.info(f"[SUCCESS] Global weights updated: {global_weights}")
 
         return {
             "status": "success",
@@ -223,7 +223,7 @@ def update_global_weights_task(self) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        logger.error(f"❌ Global weights update failed: {e}")
+        logger.error(f"[ERROR] Global weights update failed: {e}")
         raise
 
 
@@ -251,7 +251,7 @@ def daily_feedback_loop(self) -> Dict[str, Any]:
     Returns:
         Complete feedback loop summary
     """
-    logger.info("🔁 Starting daily feedback loop")
+    logger.info(" Starting daily feedback loop")
 
     results = {
         "status": "success",
@@ -282,7 +282,7 @@ def daily_feedback_loop(self) -> Dict[str, Any]:
         ).total_seconds()
 
         logger.info(
-            f"✅ Daily feedback loop complete in {results['duration_seconds']:.1f}s: "
+            f"[SUCCESS] Daily feedback loop complete in {results['duration_seconds']:.1f}s: "
             f"{sync_result['products_updated']} products synced, "
             f"{evaluate_result['outcomes_evaluated']} outcomes evaluated, "
             f"{learning_result['events_processed']} learning events processed"
@@ -291,7 +291,7 @@ def daily_feedback_loop(self) -> Dict[str, Any]:
         return results
 
     except Exception as e:
-        logger.error(f"❌ Daily feedback loop failed: {e}")
+        logger.error(f"[ERROR] Daily feedback loop failed: {e}")
         results["status"] = "failed"
         results["error"] = str(e)
         raise

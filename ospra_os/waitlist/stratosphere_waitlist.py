@@ -102,7 +102,7 @@ class StratosphereWaitlist:
         # Check for duplicate
         if email_lower in self._emails_set:
             existing = next((e for e in self._entries if e.email.lower() == email_lower), None)
-            logger.info(f"📋 Already on waitlist: {email}")
+            logger.info(f"[LIST] Already on waitlist: {email}")
             return existing, False
         
         # Determine position and founding member status
@@ -124,7 +124,7 @@ class StratosphereWaitlist:
         self._entries.append(entry)
         self._emails_set.add(email_lower)
         
-        logger.info(f"🌌 Waitlist signup #{position}: {email} {'(Founding Member! 🎉)' if is_founding else ''}")
+        logger.info(f" Waitlist signup #{position}: {email} {'(Founding Member! [LAUNCH])' if is_founding else ''}")
         
         # TODO: Store in Supabase
         # await self._save_to_database(entry)
@@ -172,7 +172,7 @@ def get_waitlist_confirmation_email(entry: WaitlistEntry) -> Dict:
     first_name = entry.name.split()[0] if entry.name else "there"
     
     if entry.is_founding_member:
-        subject = f"You're in! Founding Member #{entry.position} 🌌"
+        subject = f"You're in! Founding Member #{entry.position} "
         founding_section = f"""
         <div style="background: linear-gradient(135deg, #7C3AED 0%, #1E1B4B 100%); border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="color: #FFD700; font-size: 14px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">Founding Member</p>
@@ -187,7 +187,7 @@ def get_waitlist_confirmation_email(entry: WaitlistEntry) -> Dict:
         </p>
         """
     else:
-        subject = f"You're on the list! Position #{entry.position} 🌌"
+        subject = f"You're on the list! Position #{entry.position} "
         founding_section = f"""
         <div style="background: #f3f4f6; border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center;">
             <p style="color: #666; font-size: 14px; margin: 0 0 8px 0;">Your position</p>
@@ -206,7 +206,7 @@ def get_waitlist_confirmation_email(entry: WaitlistEntry) -> Dict:
         <p style="font-size: 18px; color: #1a1a1a;">Hey {first_name},</p>
         
         <p style="font-size: 16px; color: #333; line-height: 1.6;">
-            You're officially on the Stratosphere waitlist. 🎉
+            You're officially on the Stratosphere waitlist. [LAUNCH]
         </p>
         
         {founding_section}
@@ -216,12 +216,12 @@ def get_waitlist_confirmation_email(entry: WaitlistEntry) -> Dict:
         </p>
         
         <ul style="font-size: 15px; color: #444; line-height: 1.8;">
-            <li>🚀 Day-zero product access (before anyone else sees them)</li>
-            <li>🤖 Custom AI trained on YOUR specific niches</li>
-            <li>🏪 Unlimited e-commerce stores</li>
-            <li>📊 Predictive saturation alerts</li>
-            <li>👤 Dedicated success manager</li>
-            <li>👥 Up to 3 team members</li>
+            <li>[START] Day-zero product access (before anyone else sees them)</li>
+            <li>[AI] Custom AI trained on YOUR specific niches</li>
+            <li> Unlimited e-commerce stores</li>
+            <li>[STATS] Predictive saturation alerts</li>
+            <li> Dedicated success manager</li>
+            <li> Up to 3 team members</li>
         </ul>
         
         <p style="font-size: 16px; color: #333; line-height: 1.6;">
@@ -260,11 +260,11 @@ def get_waitlist_launch_email(entry: WaitlistEntry) -> Dict:
     first_name = entry.name.split()[0] if entry.name else "there"
     
     if entry.is_founding_member:
-        subject = "🌌 Stratosphere is LIVE — Claim your founding member spot"
+        subject = " Stratosphere is LIVE — Claim your founding member spot"
         pricing_note = "Your founding member pricing ($149/mo instead of $199/mo) is locked and waiting."
         cta_text = "Claim Founding Member Spot"
     else:
-        subject = "🌌 Stratosphere is LIVE — You're off the waitlist"
+        subject = " Stratosphere is LIVE — You're off the waitlist"
         pricing_note = ""
         cta_text = "Get Stratosphere Access"
     
@@ -274,7 +274,7 @@ def get_waitlist_launch_email(entry: WaitlistEntry) -> Dict:
         <p style="font-size: 18px; color: #1a1a1a;">Hey {first_name},</p>
         
         <p style="font-size: 16px; color: #333; line-height: 1.6;">
-            The wait is over. <strong>Stratosphere is live.</strong> 🌌
+            The wait is over. <strong>Stratosphere is live.</strong> 
         </p>
         
         <p style="font-size: 16px; color: #333; line-height: 1.6;">
@@ -346,7 +346,7 @@ async def join_waitlist(
         "is_founding_member": entry.is_founding_member,
         "founding_spots_remaining": stats.founding_spots_remaining,
         "message": (
-            f"🎉 You're Founding Member #{entry.position}!" 
+            f"[LAUNCH] You're Founding Member #{entry.position}!" 
             if entry.is_founding_member 
             else f"You're #{entry.position} on the waitlist!"
         )

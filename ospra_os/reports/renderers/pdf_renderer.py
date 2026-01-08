@@ -50,7 +50,7 @@ class PDFRenderer:
         Returns:
             PDF file as bytes
         """
-        logger.info(f"📄 Rendering PDF: {report_data['metadata']['report_name']}")
+        logger.info(f"[FILE] Rendering PDF: {report_data['metadata']['report_name']}")
 
         # Create PDF in memory
         buffer = io.BytesIO()
@@ -107,7 +107,7 @@ class PDFRenderer:
         pdf_bytes = buffer.getvalue()
         buffer.close()
 
-        logger.info(f"✅ PDF rendered: {len(pdf_bytes) / 1024:.1f} KB")
+        logger.info(f"[SUCCESS] PDF rendered: {len(pdf_bytes) / 1024:.1f} KB")
         return pdf_bytes
 
     # ==================== Page Decorations ====================
@@ -271,7 +271,7 @@ class PDFRenderer:
             elements.append(Spacer(1, 0.1*inch))
 
             for concern in data['concerns']:
-                bullet = Paragraph(f"⚠ {concern}", self.styles['CustomBullet'])
+                bullet = Paragraph(f"[WARNING] {concern}", self.styles['CustomBullet'])
                 elements.append(bullet)
                 elements.append(Spacer(1, 0.05*inch))
 

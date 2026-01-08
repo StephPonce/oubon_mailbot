@@ -25,10 +25,10 @@ class SubscriptionTier(str, enum.Enum):
     """
     User subscription levels - Sky/Flight themed
 
-    🪺 Nest → Free tier (grounded, learning)
-    ✈️ Flight → $29/mo (first flight, momentum)
-    🦅 Soar → $79/mo (high altitude, seeing far)
-    🌌 Stratosphere → $199/mo (edge of space, first to see)
+     Nest → Free tier (grounded, learning)
+     Flight → $29/mo (first flight, momentum)
+     Soar → $79/mo (high altitude, seeing far)
+     Stratosphere → $199/mo (edge of space, first to see)
     """
     NEST = "nest"
     FLIGHT = "flight"
@@ -118,11 +118,11 @@ class ActionType(str, enum.Enum):
 
 class LifecycleStage(str, enum.Enum):
     """Niche lifecycle stages"""
-    EMERGING = "emerging"      # 🌱 New niche, low competition, growing interest
-    GROWTH = "growth"          # 🚀 Accelerating demand, increasing competition
-    PEAK = "peak"              # 📈 Maximum demand, high competition
-    DECLINE = "decline"        # 📉 Decreasing demand, oversaturated
-    DEAD = "dead"              # 💀 Minimal demand, avoid
+    EMERGING = "emerging"      #  New niche, low competition, growing interest
+    GROWTH = "growth"          # [START] Accelerating demand, increasing competition
+    PEAK = "peak"              # [TREND] Maximum demand, high competition
+    DECLINE = "decline"        # [DECLINE] Decreasing demand, oversaturated
+    DEAD = "dead"              #  Minimal demand, avoid
 
 
 class EntryTiming(str, enum.Enum):

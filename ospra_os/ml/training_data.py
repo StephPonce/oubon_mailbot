@@ -466,7 +466,7 @@ Recommendation: Maintain current pricing. Monitor conversion rate and adjust if 
                 limit=examples_per_task
             )
             all_examples[task_type] = examples
-            logger.info(f"  ✓ {len(examples)} examples collected")
+            logger.info(f"  [OK] {len(examples)} examples collected")
 
         # Summary
         total = sum(len(ex) for ex in all_examples.values())

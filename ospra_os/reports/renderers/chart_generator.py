@@ -68,7 +68,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info("📈 Generating revenue trend chart")
+        logger.info("[TREND] Generating revenue trend chart")
 
         fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=100)
 
@@ -131,7 +131,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info(f"📊 Generating {metric_name} comparison chart")
+        logger.info(f"[STATS] Generating {metric_name} comparison chart")
 
         fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=100)
 
@@ -199,7 +199,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info("📦 Generating product performance chart")
+        logger.info("[PACKAGE] Generating product performance chart")
 
         # Sort and take top N
         sorted_data = sorted(
@@ -272,7 +272,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info(f"📊 Generating grouped bar chart: {title}")
+        logger.info(f"[STATS] Generating grouped bar chart: {title}")
 
         fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=100)
 
@@ -331,7 +331,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info("💰 Generating cost breakdown pie chart")
+        logger.info("[PRICE] Generating cost breakdown pie chart")
 
         fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=100)
 
@@ -396,7 +396,7 @@ class ChartGenerator:
         Returns:
             Chart as BytesIO buffer
         """
-        logger.info("📊 Generating revenue by category pie chart")
+        logger.info("[STATS] Generating revenue by category pie chart")
 
         fig, ax = plt.subplots(figsize=(width/100, height/100), dpi=100)
 
@@ -465,7 +465,7 @@ class ChartGenerator:
         Returns:
             Combined chart as BytesIO buffer
         """
-        logger.info("📊 Generating dashboard overview")
+        logger.info("[STATS] Generating dashboard overview")
 
         fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(
             2, 2,

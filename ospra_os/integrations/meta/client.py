@@ -69,7 +69,7 @@ class MetaAdsClient:
                     raise ValueError(f"Unsupported method: {method}")
 
                 if response.status_code not in [200, 201]:
-                    print(f"❌ Meta API error: {response.status_code}")
+                    print(f"[ERROR] Meta API error: {response.status_code}")
                     print(response.text)
                     return None
 
@@ -78,13 +78,13 @@ class MetaAdsClient:
                 # Check for API errors
                 if 'error' in result:
                     error = result['error']
-                    print(f"❌ Meta error: {error.get('message')}")
+                    print(f"[ERROR] Meta error: {error.get('message')}")
                     return None
 
                 return result
 
         except Exception as e:
-            print(f"❌ Request error: {e}")
+            print(f"[ERROR] Request error: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -101,7 +101,7 @@ class MetaAdsClient:
             return result
 
         except Exception as e:
-            print(f"❌ Error getting ad account: {e}")
+            print(f"[ERROR] Error getting ad account: {e}")
             return None
 
     async def create_campaign(
@@ -124,7 +124,7 @@ class MetaAdsClient:
             Campaign data with campaign_id
         """
         try:
-            print(f"📢 Creating Meta campaign: {name}")
+            print(f" Creating Meta campaign: {name}")
 
             data = {
                 'name': name,
@@ -140,12 +140,12 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Campaign created! ID: {result.get('id')}")
+                print(f"[SUCCESS] Campaign created! ID: {result.get('id')}")
 
             return result
 
         except Exception as e:
-            print(f"❌ Campaign creation error: {e}")
+            print(f"[ERROR] Campaign creation error: {e}")
             return None
 
     async def create_ad_set(
@@ -173,7 +173,7 @@ class MetaAdsClient:
             status: ACTIVE or PAUSED
         """
         try:
-            print(f"🎯 Creating ad set: {name}")
+            print(f"[TARGET] Creating ad set: {name}")
 
             data = {
                 'name': name,
@@ -193,12 +193,12 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Ad set created! ID: {result.get('id')}")
+                print(f"[SUCCESS] Ad set created! ID: {result.get('id')}")
 
             return result
 
         except Exception as e:
-            print(f"❌ Ad set creation error: {e}")
+            print(f"[ERROR] Ad set creation error: {e}")
             return None
 
     async def create_ad_creative(
@@ -224,7 +224,7 @@ class MetaAdsClient:
             call_to_action: CTA button type
         """
         try:
-            print(f"🎨 Creating ad creative: {name}")
+            print(f" Creating ad creative: {name}")
 
             # Build object story spec
             object_story_spec = {
@@ -267,12 +267,12 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Ad creative created! ID: {result.get('id')}")
+                print(f"[SUCCESS] Ad creative created! ID: {result.get('id')}")
 
             return result
 
         except Exception as e:
-            print(f"❌ Ad creative creation error: {e}")
+            print(f"[ERROR] Ad creative creation error: {e}")
             return None
 
     async def create_ad(
@@ -292,7 +292,7 @@ class MetaAdsClient:
             status: ACTIVE or PAUSED
         """
         try:
-            print(f"📱 Creating ad: {name}")
+            print(f"[MOBILE] Creating ad: {name}")
 
             data = {
                 'name': name,
@@ -308,12 +308,12 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Ad created! ID: {result.get('id')}")
+                print(f"[SUCCESS] Ad created! ID: {result.get('id')}")
 
             return result
 
         except Exception as e:
-            print(f"❌ Ad creation error: {e}")
+            print(f"[ERROR] Ad creation error: {e}")
             return None
 
     async def get_campaign_insights(
@@ -353,7 +353,7 @@ class MetaAdsClient:
             return result
 
         except Exception as e:
-            print(f"❌ Insights error: {e}")
+            print(f"[ERROR] Insights error: {e}")
             return None
 
     async def update_campaign_status(
@@ -376,13 +376,13 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Campaign status updated to {status}")
+                print(f"[SUCCESS] Campaign status updated to {status}")
                 return True
 
             return False
 
         except Exception as e:
-            print(f"❌ Status update error: {e}")
+            print(f"[ERROR] Status update error: {e}")
             return False
 
     async def update_ad_set_budget(
@@ -405,13 +405,13 @@ class MetaAdsClient:
             )
 
             if result:
-                print(f"✅ Budget updated to ${daily_budget/100:.2f}/day")
+                print(f"[SUCCESS] Budget updated to ${daily_budget/100:.2f}/day")
                 return True
 
             return False
 
         except Exception as e:
-            print(f"❌ Budget update error: {e}")
+            print(f"[ERROR] Budget update error: {e}")
             return False
 
     async def delete_campaign(self, campaign_id: str) -> bool:
@@ -420,11 +420,11 @@ class MetaAdsClient:
             result = await self._make_request('DELETE', campaign_id)
 
             if result:
-                print(f"✅ Campaign deleted")
+                print(f"[SUCCESS] Campaign deleted")
                 return True
 
             return False
 
         except Exception as e:
-            print(f"❌ Delete error: {e}")
+            print(f"[ERROR] Delete error: {e}")
             return False

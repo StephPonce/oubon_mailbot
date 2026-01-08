@@ -116,10 +116,10 @@ async def process_emails_background(settings: Settings):
             max_messages=10,  # Process recent emails
         )
 
-        print(f"✅ Processed {result['processed']} emails, replied to {result['replied']}")
+        print(f"[SUCCESS] Processed {result['processed']} emails, replied to {result['replied']}")
 
     except Exception as e:
-        print(f"❌ Error in background email processing: {e}")
+        print(f"[ERROR] Error in background email processing: {e}")
 
 
 # ============================================================================

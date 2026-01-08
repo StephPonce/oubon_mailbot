@@ -213,7 +213,7 @@ def init_analytics_db(database_url: str):
     sync_url = database_url.replace("+aiosqlite", "")
     engine = create_engine(sync_url, echo=False)
     Base.metadata.create_all(engine)
-    print("✅ Analytics database initialized")
+    print("[SUCCESS] Analytics database initialized")
 
 
 def get_analytics_summary(database_url: str) -> Dict[str, Any]:

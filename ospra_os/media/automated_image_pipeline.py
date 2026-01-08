@@ -64,7 +64,7 @@ class AutomatedImagePipeline:
         Returns:
             Dict with processed image URLs and metadata
         """
-        logger.info(f"🎨 Processing images for: {product.get('name', 'Unknown')[:50]}")
+        logger.info(f" Processing images for: {product.get('name', 'Unknown')[:50]}")
 
         options = options or {}
         enhance_quality = options.get('enhance_quality', True)
@@ -132,7 +132,7 @@ class AutomatedImagePipeline:
                 results['lifestyle_images'] = lifestyle_images
 
             results['success'] = len(enhanced_images) > 0
-            logger.info(f"✅ Processed {len(enhanced_images)} images successfully")
+            logger.info(f"[SUCCESS] Processed {len(enhanced_images)} images successfully")
 
         except Exception as e:
             logger.error(f"Image pipeline error: {e}")
@@ -271,7 +271,7 @@ class AutomatedImagePipeline:
         Returns:
             List of results for each product
         """
-        logger.info(f"📦 Batch processing {len(products)} products")
+        logger.info(f"[PACKAGE] Batch processing {len(products)} products")
 
         # Process in parallel (limit concurrency to avoid overwhelming servers)
         max_concurrent = 3
@@ -295,7 +295,7 @@ class AutomatedImagePipeline:
                 await asyncio.sleep(1)
 
         successful = sum(1 for r in results if r.get('success'))
-        logger.info(f"✅ Batch complete: {successful}/{len(products)} successful")
+        logger.info(f"[SUCCESS] Batch complete: {successful}/{len(products)} successful")
 
         return results
 

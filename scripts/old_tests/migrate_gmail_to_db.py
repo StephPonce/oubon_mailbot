@@ -23,19 +23,19 @@ def migrate_gmail_token():
     token_path = os.getenv("OUBONSHOP_GMAIL_TOKEN_PATH", "/data/gmail/token.json")
 
     if not os.path.exists(token_path):
-        print(f"❌ No Gmail token found at {token_path}")
+        print(f"[ERROR] No Gmail token found at {token_path}")
         print("   Gmail is not connected, or token is in a different location.")
         return False
 
-    print(f"✅ Found Gmail token at {token_path}")
+    print(f"[SUCCESS] Found Gmail token at {token_path}")
 
     # Load token
     try:
         with open(token_path, 'r') as f:
             token_data = json.load(f)
-        print(f"✅ Loaded token data")
+        print(f"[SUCCESS] Loaded token data")
     except Exception as e:
-        print(f"❌ Failed to load token: {e}")
+        print(f"[ERROR] Failed to load token: {e}")
         return False
 
     # Get Gmail email address
@@ -52,9 +52,9 @@ def migrate_gmail_token():
         service = build('gmail', 'v1', credentials=creds)
         profile = service.users().getProfile(userId='me').execute()
         email_address = profile['emailAddress']
-        print(f"✅ Gmail email: {email_address}")
+        print(f"[SUCCESS] Gmail email: {email_address}")
     except Exception as e:
-        print(f"❌ Failed to get Gmail email address: {e}")
+        print(f"[ERROR] Failed to get Gmail email address: {e}")
         return False
 
     # Save to database
@@ -66,9 +66,9 @@ def migrate_gmail_token():
             user = User(id=1, email=email_address, name="Default User", created_at=datetime.utcnow())
             session.add(user)
             session.commit()
-            print(f"✅ Created user: {email_address}")
+            print(f"[SUCCESS] Created user: {email_address}")
         else:
-            print(f"✅ Using existing user: {user.email}")
+            print(f"[SUCCESS] Using existing user: {user.email}")
 
         # Check if Gmail account already exists
         existing = session.query(UserEmailAccount).filter(
@@ -81,7 +81,7 @@ def migrate_gmail_token():
         encryption_key = os.getenv('EMAIL_OAUTH_ENCRYPTION_KEY')
         if not encryption_key:
             encryption_key = Fernet.generate_key().decode()
-            print(f"⚠️  Generated new encryption key. Set EMAIL_OAUTH_ENCRYPTION_KEY={encryption_key}")
+            print(f"[WARNING]  Generated new encryption key. Set EMAIL_OAUTH_ENCRYPTION_KEY={encryption_key}")
 
         fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
 
@@ -97,14 +97,14 @@ def migrate_gmail_token():
         encrypted_creds = fernet.encrypt(json.dumps(creds_dict).encode()).decode()
 
         if existing:
-            print(f"⚠️  Gmail account already exists in database (ID: {existing.id})")
+            print(f"[WARNING]  Gmail account already exists in database (ID: {existing.id})")
             print(f"   Updating credentials...")
 
             existing.encrypted_credentials = encrypted_creds
             existing.is_active = True
             existing.sync_status = 'active'
             session.commit()
-            print(f"✅ Updated Gmail account in database")
+            print(f"[SUCCESS] Updated Gmail account in database")
         else:
             # Create new account record
             new_account = UserEmailAccount(
@@ -119,13 +119,13 @@ def migrate_gmail_token():
             )
             session.add(new_account)
             session.commit()
-            print(f"✅ Added Gmail account to database (ID: {new_account.id})")
+            print(f"[SUCCESS] Added Gmail account to database (ID: {new_account.id})")
 
         return True
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Database error: {e}")
+        print(f"[ERROR] Database error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -142,10 +142,10 @@ if __name__ == '__main__':
 
     print()
     if success:
-        print("✅ Migration complete!")
+        print("[SUCCESS] Migration complete!")
         print("   Gmail account should now appear in the EmailSyncButton modal.")
         print("   Refresh your browser to see the changes.")
     else:
-        print("❌ Migration failed.")
+        print("[ERROR] Migration failed.")
         print("   You may need to reconnect Gmail via OAuth.")
     print()

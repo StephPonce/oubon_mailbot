@@ -227,7 +227,7 @@ class ModelRouter:
             try:
                 import anthropic
                 self.providers["anthropic"] = anthropic.Anthropic(api_key=claude_key)
-                logger.info("✅ Anthropic provider initialized")
+                logger.info("[SUCCESS] Anthropic provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init Anthropic: {e}")
         
@@ -238,7 +238,7 @@ class ModelRouter:
                 import google.generativeai as genai
                 genai.configure(api_key=google_key)
                 self.providers["google"] = genai
-                logger.info("✅ Google provider initialized")
+                logger.info("[SUCCESS] Google provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init Google: {e}")
         
@@ -248,7 +248,7 @@ class ModelRouter:
             try:
                 from groq import Groq
                 self.providers["groq"] = Groq(api_key=groq_key)
-                logger.info("✅ Groq provider initialized")
+                logger.info("[SUCCESS] Groq provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init Groq: {e}")
         
@@ -258,7 +258,7 @@ class ModelRouter:
             try:
                 import openai
                 self.providers["openai"] = openai.OpenAI(api_key=openai_key)
-                logger.info("✅ OpenAI provider initialized")
+                logger.info("[SUCCESS] OpenAI provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init OpenAI: {e}")
         
@@ -271,7 +271,7 @@ class ModelRouter:
                     api_key=xai_key,
                     base_url="https://api.x.ai/v1"
                 )
-                logger.info("✅ xAI provider initialized")
+                logger.info("[SUCCESS] xAI provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init xAI: {e}")
     

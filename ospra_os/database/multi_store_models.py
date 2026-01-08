@@ -31,10 +31,10 @@ class SubscriptionTier(str, enum.Enum):
     """
     User subscription levels - Sky/Flight themed
     
-    🪺 Nest → Free tier (grounded, learning)
-    ✈️ Flight → $29/mo (first flight, momentum)
-    🦅 Soar → $79/mo (high altitude, seeing far)
-    🌌 Stratosphere → $199/mo (edge of space, first to see)
+     Nest → Free tier (grounded, learning)
+     Flight → $29/mo (first flight, momentum)
+     Soar → $79/mo (high altitude, seeing far)
+     Stratosphere → $199/mo (edge of space, first to see)
     """
     NEST = "nest"
     FLIGHT = "flight"
@@ -124,11 +124,11 @@ class ActionType(str, enum.Enum):
 
 class LifecycleStage(str, enum.Enum):
     """Niche lifecycle stages"""
-    EMERGING = "emerging"      # 🌱 New niche, low competition, growing interest
-    GROWTH = "growth"          # 🚀 Accelerating demand, increasing competition
-    PEAK = "peak"              # 📈 Maximum demand, high competition
-    DECLINE = "decline"        # 📉 Decreasing demand, oversaturated
-    DEAD = "dead"              # 💀 Minimal demand, avoid
+    EMERGING = "emerging"      #  New niche, low competition, growing interest
+    GROWTH = "growth"          # [START] Accelerating demand, increasing competition
+    PEAK = "peak"              # [TREND] Maximum demand, high competition
+    DECLINE = "decline"        # [DECLINE] Decreasing demand, oversaturated
+    DEAD = "dead"              #  Minimal demand, avoid
 
 
 class EntryTiming(str, enum.Enum):
@@ -220,6 +220,40 @@ class User(Base):
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier='{self.subscription_tier}')>"
+
+
+# ============================================================================
+# PASSWORD RESET TOKEN MODEL
+# ============================================================================
+
+class PasswordResetToken(Base):
+    """
+    Password reset tokens for secure password recovery.
+
+    Stores tokens in database instead of memory to persist across server restarts.
+    Tokens expire after 1 hour for security.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)  # Track if token was used
+
+    def __repr__(self):
+        return f"<PasswordResetToken(email='{self.email}', expires={self.expires_at}, used={self.used})>"
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if token has expired"""
+        return datetime.utcnow() > self.expires_at
+
+    @property
+    def is_valid(self) -> bool:
+        """Check if token is valid (not expired and not used)"""
+        return not self.is_expired and not self.used
 
 
 # ============================================================================
@@ -1120,7 +1154,7 @@ def init_multi_store_db(database_url: str = "sqlite:///./multi_store.db"):
     # Create all tables
     Base.metadata.create_all(bind=engine)
 
-    print(f"✅ Multi-store database initialized at: {database_url}")
+    print(f"[SUCCESS] Multi-store database initialized at: {database_url}")
     print(f"   Tables created: {len(Base.metadata.tables)}")
 
     return engine
@@ -1205,7 +1239,7 @@ def migrate_existing_store(
 
         session.commit()
 
-        print(f"✅ Migration complete!")
+        print(f"[SUCCESS] Migration complete!")
         print(f"   User: {user.email} (ID: {user.id})")
         print(f"   Store: {store.store_name} (ID: {store.id})")
 
@@ -1213,7 +1247,7 @@ def migrate_existing_store(
 
     except Exception as e:
         session.rollback()
-        print(f"❌ Migration failed: {e}")
+        print(f"[ERROR] Migration failed: {e}")
         raise
     finally:
         session.close()
@@ -1269,18 +1303,18 @@ def get_store_performance(session: Session, store_id: int) -> dict:
 
 if __name__ == "__main__":
     # Demo usage
-    print("🔧 Initializing Multi-Store Database...")
+    print("[FIX] Initializing Multi-Store Database...")
     engine = init_multi_store_db()
 
-    print("\n📊 Database Schema:")
+    print("\n[STATS] Database Schema:")
     for table_name in Base.metadata.tables.keys():
         print(f"   • {table_name}")
 
-    print("\n✅ Ready for multi-store, multi-platform e-commerce!")
+    print("\n[SUCCESS] Ready for multi-store, multi-platform e-commerce!")
 
-# ═══════════════════════════════════════════════════════
+# 
 # INTELLIGENCE LAYER - YOUR COMPETITIVE MOAT
-# ═══════════════════════════════════════════════════════
+# 
 
 class ProductSnapshot(Base):
     """Track product metrics over time for velocity analysis"""
@@ -1618,8 +1652,8 @@ class ABTestAssignment(Base):
         return f"<ABTestAssignment(test_id={self.test_id}, variant_id={self.variant_id}, visitor='{self.visitor_id}')>"
 
 
-print("✅ Intelligence models added")
-print("✅ A/B Testing models added")
+print("[SUCCESS] Intelligence models added")
+print("[SUCCESS] A/B Testing models added")
 
 
 # ============================================================================
@@ -1663,7 +1697,7 @@ def get_followup_session(database_url: str):
     return Session()
 
 
-print("✅ Email Automation models added")
+print("[SUCCESS] Email Automation models added")
 
 
 # ============================================================================

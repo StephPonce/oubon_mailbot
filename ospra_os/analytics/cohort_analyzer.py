@@ -50,7 +50,7 @@ class CohortAnalyzer:
         Returns:
             Cohort retention table with percentages
         """
-        logger.info(f"📊 Generating {cohort_type} cohort table for {periods} periods...")
+        logger.info(f"[STATS] Generating {cohort_type} cohort table for {periods} periods...")
 
         if cohort_type == 'monthly':
             cohorts = await self._build_monthly_cohorts(customers, periods)
@@ -76,7 +76,7 @@ class CohortAnalyzer:
             "generated_at": datetime.utcnow().isoformat()
         }
 
-        logger.info(f"✅ Generated {len(cohorts)} cohorts")
+        logger.info(f"[SUCCESS] Generated {len(cohorts)} cohorts")
 
         return result
 
@@ -348,7 +348,7 @@ class CohortAnalyzer:
         Returns:
             LTV metrics per cohort
         """
-        logger.info(f"💰 Calculating LTV by {cohort_type} cohort...")
+        logger.info(f"[PRICE] Calculating LTV by {cohort_type} cohort...")
 
         # Group customers by cohort
         cohort_groups = defaultdict(list)
@@ -405,7 +405,7 @@ class CohortAnalyzer:
         Returns:
             Comparison metrics
         """
-        logger.info(f"📊 Comparing cohorts: {cohort_a} vs {cohort_b}")
+        logger.info(f"[STATS] Comparing cohorts: {cohort_a} vs {cohort_b}")
 
         # Filter customers for each cohort
         customers_a = [c for c in customers if self._get_customer_cohort(c) == cohort_a]
@@ -478,7 +478,7 @@ class CohortAnalyzer:
         Returns:
             Retention metrics by source
         """
-        logger.info("📊 Analyzing retention by acquisition source...")
+        logger.info("[STATS] Analyzing retention by acquisition source...")
 
         # Group by source
         source_groups = defaultdict(list)
@@ -521,7 +521,7 @@ class CohortAnalyzer:
         Returns:
             Top performing cohorts
         """
-        logger.info("🏆 Identifying best performing cohorts...")
+        logger.info("[TOP] Identifying best performing cohorts...")
 
         # Get cohort data
         cohort_table = await self.get_cohort_table(customers, 'monthly', 12)
@@ -573,4 +573,4 @@ def get_cohort_analyzer(db_session=None):
     return _cohort_analyzer
 
 
-logger.info("✅ Cohort Analyzer module loaded")
+logger.info("[SUCCESS] Cohort Analyzer module loaded")

@@ -90,7 +90,7 @@ class OutcomeService:
         Returns:
             RecommendationOutcome record
         """
-        print(f"📝 Creating outcome record for product {product.id}")
+        print(f"[NOTE] Creating outcome record for product {product.id}")
 
         outcome = RecommendationOutcome(
             user_id=product.user_id,
@@ -114,7 +114,7 @@ class OutcomeService:
         self.db.commit()
         self.db.refresh(outcome)
 
-        print(f"✅ Outcome record created: ID {outcome.id}")
+        print(f"[SUCCESS] Outcome record created: ID {outcome.id}")
         return outcome
 
     def record_rejection(
@@ -169,7 +169,7 @@ class OutcomeService:
         Returns:
             List of evaluation results
         """
-        print("🔍 Evaluating pending outcomes...")
+        print("[SEARCH] Evaluating pending outcomes...")
 
         # Find outcomes ready to evaluate
         cutoff_date = datetime.now() - timedelta(days=self.MIN_TRACKING_DAYS)
@@ -187,7 +187,7 @@ class OutcomeService:
 
         pending_outcomes = query.all()
 
-        print(f"📊 Found {len(pending_outcomes)} outcomes ready to evaluate")
+        print(f"[STATS] Found {len(pending_outcomes)} outcomes ready to evaluate")
 
         results = []
         for outcome in pending_outcomes:
@@ -195,7 +195,7 @@ class OutcomeService:
                 result = await self._evaluate_single_outcome(outcome)
                 results.append(result)
             except Exception as e:
-                print(f"❌ Error evaluating outcome {outcome.id}: {e}")
+                print(f"[ERROR] Error evaluating outcome {outcome.id}: {e}")
                 results.append({
                     "success": False,
                     "outcome_id": outcome.id,
@@ -223,7 +223,7 @@ class OutcomeService:
                 "performance_ratio": 1.44
             }
         """
-        print(f"⚖️  Evaluating outcome {outcome.id} for product {outcome.product_id}")
+        print(f"  Evaluating outcome {outcome.id} for product {outcome.product_id}")
 
         # Calculate tracking period
         days_tracked = (datetime.now() - outcome.tracking_started_at).days
@@ -291,7 +291,7 @@ class OutcomeService:
 
         self.db.commit()
 
-        print(f"✅ Outcome classified as: {classification} (score: {outcome_score})")
+        print(f"[SUCCESS] Outcome classified as: {classification} (score: {outcome_score})")
 
         return {
             "success": True,
@@ -435,7 +435,7 @@ class OutcomeService:
         )
 
         self.db.add(event)
-        print(f"📚 Learning event created: {lesson_type} (strength {lesson_strength})")
+        print(f" Learning event created: {lesson_type} (strength {lesson_strength})")
 
         return event
 
@@ -518,7 +518,7 @@ class OutcomeService:
         niche_learning.last_product_at = datetime.now()
         niche_learning.updated_at = datetime.now()
 
-        print(f"📈 Niche '{niche}' updated: {niche_learning.success_rate:.1f}% success rate")
+        print(f"[TREND] Niche '{niche}' updated: {niche_learning.success_rate:.1f}% success rate")
 
     def _update_confidence_calibration(
         self,
@@ -573,4 +573,4 @@ class OutcomeService:
 
         calibration.updated_at = datetime.now()
 
-        print(f"🎯 Calibration updated: {bucket_min}-{bucket_max}% bucket → {calibration.actual_success_rate:.1f}% actual")
+        print(f"[TARGET] Calibration updated: {bucket_min}-{bucket_max}% bucket → {calibration.actual_success_rate:.1f}% actual")

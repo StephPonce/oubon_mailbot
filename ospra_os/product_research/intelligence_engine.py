@@ -98,16 +98,16 @@ class IntelligenceEngine:
         Returns:
             List of ProductIntelligence objects, sorted by score
         """
-        logger.info("🚀 Starting AI product discovery...")
+        logger.info("[START] Starting AI product discovery...")
 
         # Step 1: Discover niches if not provided
         if not niches:
-            logger.info("📊 Discovering trending niches...")
+            logger.info("[STATS] Discovering trending niches...")
             niches = await self._discover_niches()
             logger.info(f"Found {len(niches)} trending niches: {niches}")
 
         # Step 2: Find products in each niche
-        logger.info(f"🔍 Searching for products in {len(niches)} niches...")
+        logger.info(f"[SEARCH] Searching for products in {len(niches)} niches...")
         all_products = []
 
         for niche in niches:
@@ -117,11 +117,11 @@ class IntelligenceEngine:
                     max_products_per_niche
                 )
                 all_products.extend(products)
-                logger.info(f"  ✓ {niche}: Found {len(products)} products")
+                logger.info(f"  [OK] {niche}: Found {len(products)} products")
             except Exception as e:
-                logger.error(f"  ✗ {niche}: Error - {str(e)}")
+                logger.error(f"   {niche}: Error - {str(e)}")
 
-        logger.info(f"✅ Total products found: {len(all_products)}")
+        logger.info(f"[SUCCESS] Total products found: {len(all_products)}")
 
         # Sort by score
         all_products.sort(key=lambda p: p.score, reverse=True)
@@ -358,7 +358,7 @@ class IntelligenceEngine:
         supplier_rating = grading['data_sources'].get('aliexpress_seller_rating', 0)
         explanation_parts.append(
             f" The exact supplier match has {supplier_orders:,}+ orders and "
-            f"{supplier_rating}★ rating, indicating reliability."
+            f"{supplier_rating} rating, indicating reliability."
         )
 
         # Recommendation
@@ -376,36 +376,36 @@ class IntelligenceEngine:
 
         if social_data.get('tiktok', {}).get('views', 0) > 1000000:
             why_chosen.append(
-                f"✅ Viral on TikTok ({social_data['tiktok']['views']} views)"
+                f"[SUCCESS] Viral on TikTok ({social_data['tiktok']['views']} views)"
             )
 
         if grading['data_sources'].get('amazon_bsr', float('inf')) < 5000:
             why_chosen.append(
-                f"✅ High Amazon BSR (#{grading['data_sources']['amazon_bsr']})"
+                f"[SUCCESS] High Amazon BSR (#{grading['data_sources']['amazon_bsr']})"
             )
 
         if grading['data_sources'].get('amazon_rating', 0) >= 4.5:
             why_chosen.append(
-                f"✅ Excellent reviews ({grading['data_sources']['amazon_rating']}★ "
+                f"[SUCCESS] Excellent reviews ({grading['data_sources']['amazon_rating']} "
                 f"from {grading['data_sources'].get('amazon_reviews', 0):,} customers)"
             )
 
         if grading['data_sources'].get('profit_margin', 0) >= 60:
             why_chosen.append(
-                f"✅ Strong profit margin ({grading['data_sources']['profit_margin']}%)"
+                f"[SUCCESS] Strong profit margin ({grading['data_sources']['profit_margin']}%)"
             )
 
         if grading['data_sources'].get('trend_direction') == 'growing':
             why_chosen.append(
-                f"✅ Growing trend (+{grading['data_sources'].get('trend_growth', 0)}% search volume)"
+                f"[SUCCESS] Growing trend (+{grading['data_sources'].get('trend_growth', 0)}% search volume)"
             )
 
         why_chosen.append(
-            f"✅ Reliable supplier ({supplier_orders:,} orders, {supplier_rating}★)"
+            f"[SUCCESS] Reliable supplier ({supplier_orders:,} orders, {supplier_rating})"
         )
 
         why_chosen.append(
-            f"✅ Positive customer sentiment ({int(sentiment['score'] * 100)}% positive)"
+            f"[SUCCESS] Positive customer sentiment ({int(sentiment['score'] * 100)}% positive)"
         )
 
         # Risk factors
@@ -413,14 +413,14 @@ class IntelligenceEngine:
 
         if sentiment['negative_themes']:
             risk_factors.append(
-                f"⚠️ {sentiment['negative_themes'][0]} mentioned in reviews"
+                f"[WARNING] {sentiment['negative_themes'][0]} mentioned in reviews"
             )
 
         if grading['data_sources'].get('competition_level') == 'high':
-            risk_factors.append("⚠️ High competition in this category")
+            risk_factors.append("[WARNING] High competition in this category")
 
         if grading['data_sources'].get('seasonality') == 'high':
-            risk_factors.append("⚠️ Seasonal demand pattern detected")
+            risk_factors.append("[WARNING] Seasonal demand pattern detected")
 
         return {
             'explanation': ''.join(explanation_parts),
@@ -927,7 +927,7 @@ class LearningEngine:
 
     async def _retrain_model(self):
         """Adjust scoring weights based on what actually sells"""
-        logger.info("🧠 Retraining AI model based on sales data...")
+        logger.info("[BRAIN] Retraining AI model based on sales data...")
 
         # Analyze what works
         # This would compare predicted scores vs actual performance

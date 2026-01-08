@@ -1,6 +1,6 @@
 """
-Authentication API Routes
-=========================
+Authentication API Routes - FIXED
+=================================
 
 Endpoints:
 - POST /api/auth/register - Create new account
@@ -8,11 +8,14 @@ Endpoints:
 - POST /api/auth/refresh - Refresh access token
 - GET /api/auth/me - Get current user info
 - POST /api/auth/logout - Logout (client-side token removal)
+- POST /api/auth/change-password - Change password (FIXED to accept JSON body)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import datetime
+from pydantic import BaseModel
+from typing import Optional
 
 from ospra_os.auth.jwt_auth import (
     UserCreate,
@@ -28,11 +31,34 @@ from ospra_os.auth.jwt_auth import (
     create_access_token,
     user_to_dict,
     get_user_by_id,
+    verify_password,
+    hash_password,
 )
 from ospra_os.database.multi_store_models import User
 
+# Try to import email service, but don't fail if it doesn't exist
+try:
+    from ospra_os.services.email_service import send_welcome_email
+except ImportError:
+    send_welcome_email = None
+
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+# ============================================================================
+# REQUEST MODELS
+# ============================================================================
+
+class ChangePasswordRequest(BaseModel):
+    """Request body for password change"""
+    current_password: str
+    new_password: str
+
+
+class RefreshTokenRequest(BaseModel):
+    """Request body for token refresh"""
+    refresh_token: str
 
 
 # ============================================================================
@@ -40,12 +66,17 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 # ============================================================================
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate, db: Session = Depends(get_db)):
+async def register(
+    user_data: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Register a new user account.
-    
+
     Returns access and refresh tokens upon successful registration.
     New users start at the Nest (free) tier.
+    Sends a welcome email in the background.
     """
     # Check if email already exists
     existing_user = get_user_by_email(db, user_data.email)
@@ -54,10 +85,18 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
+
     # Create user
     user = create_user(db, user_data)
-    
+
+    # Send welcome email in background (if available)
+    if send_welcome_email:
+        background_tasks.add_task(
+            send_welcome_email,
+            to_email=user.email,
+            user_name=user.name
+        )
+
     # Generate tokens
     return generate_tokens(user)
 
@@ -95,7 +134,7 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
 # ============================================================================
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
+async def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_db)):
     """
     Refresh an expired access token using a valid refresh token.
     
@@ -106,7 +145,7 @@ async def refresh_token(refresh_token: str, db: Session = Depends(get_db)):
     """
     # Decode refresh token
     try:
-        payload = decode_token(refresh_token)
+        payload = decode_token(request.refresh_token)
     except HTTPException:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -186,13 +225,12 @@ async def logout(user: User = Depends(get_current_user)):
 
 
 # ============================================================================
-# PASSWORD CHANGE
+# PASSWORD CHANGE - FIXED TO ACCEPT JSON BODY
 # ============================================================================
 
 @router.post("/change-password")
 async def change_password(
-    current_password: str,
-    new_password: str,
+    request: ChangePasswordRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -200,25 +238,32 @@ async def change_password(
     Change user's password.
     
     Requires current password for verification.
+    Accepts JSON body with current_password and new_password.
     """
-    from ospra_os.auth.jwt_auth import verify_password, hash_password
-    
     # Verify current password
-    if not verify_password(current_password, user.password_hash):
+    if not verify_password(request.current_password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
     
     # Validate new password
-    if len(new_password) < 8:
+    if len(request.new_password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be at least 8 characters"
         )
-    
+
+    # Check if new password is the same as current password
+    if verify_password(request.new_password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password cannot be the same as your current password"
+        )
+
     # Update password
-    user.password_hash = hash_password(new_password)
+    user.password_hash = hash_password(request.new_password)
+    user.updated_at = datetime.utcnow()
     db.commit()
     
     return {

@@ -46,12 +46,12 @@ def print_test(name: str):
 
 def print_success(text: str):
     """Print success message"""
-    print(f"{GREEN}✅ {text}{RESET}")
+    print(f"{GREEN}[SUCCESS] {text}{RESET}")
 
 
 def print_error(text: str):
     """Print error message"""
-    print(f"{RED}❌ {text}{RESET}")
+    print(f"{RED}[ERROR] {text}{RESET}")
 
 
 def print_json(data: Any):
@@ -362,17 +362,17 @@ def run_all_tests():
     total = len(results)
 
     for test_name, result in results:
-        status = f"{GREEN}✅ PASS{RESET}" if result else f"{RED}❌ FAIL{RESET}"
+        status = f"{GREEN}[SUCCESS] PASS{RESET}" if result else f"{RED}[ERROR] FAIL{RESET}"
         print(f"{status}  {test_name}")
 
     print(f"\n{'-'*70}")
     print(f"Results: {passed}/{total} tests passed")
 
     if passed == total:
-        print(f"{GREEN}🎉 ALL TESTS PASSED!{RESET}")
+        print(f"{GREEN}[LAUNCH] ALL TESTS PASSED!{RESET}")
         return 0
     else:
-        print(f"{RED}⚠️  Some tests failed{RESET}")
+        print(f"{RED}[WARNING]  Some tests failed{RESET}")
         return 1
 
 

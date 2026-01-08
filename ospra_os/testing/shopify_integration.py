@@ -401,4 +401,4 @@ class ShopifyABTestIntegration:
             }
 
 
-print("✅ Shopify A/B Testing integration loaded successfully")
+print("[SUCCESS] Shopify A/B Testing integration loaded successfully")

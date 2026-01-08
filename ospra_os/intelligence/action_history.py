@@ -59,7 +59,7 @@ class ActionHistory:
         self.engine = create_engine(f"sqlite:///{db_path}")
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(bind=self.engine)
-        logger.info(f"✅ Action history initialized: {db_path}")
+        logger.info(f"[SUCCESS] Action history initialized: {db_path}")
 
     def log_action(
         self,
@@ -107,12 +107,12 @@ class ActionHistory:
             db.commit()
             db.refresh(action_log)
 
-            logger.info(f"✅ Action logged: {action_id} ({action_type}) by user {user_id}")
+            logger.info(f"[SUCCESS] Action logged: {action_id} ({action_type}) by user {user_id}")
             return action_log
 
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Failed to log action: {e}")
+            logger.error(f"[ERROR] Failed to log action: {e}")
             raise
 
         finally:
@@ -153,27 +153,27 @@ class ActionHistory:
             action_log = db.query(ActionLog).filter(ActionLog.action_id == action_id).first()
 
             if not action_log:
-                logger.error(f"❌ Action not found: {action_id}")
+                logger.error(f"[ERROR] Action not found: {action_id}")
                 return False
 
             if not action_log.undo_available:
-                logger.error(f"❌ Action cannot be undone: {action_id}")
+                logger.error(f"[ERROR] Action cannot be undone: {action_id}")
                 return False
 
             if action_log.status == "undone":
-                logger.warning(f"⚠️  Action already undone: {action_id}")
+                logger.warning(f"[WARNING]  Action already undone: {action_id}")
                 return True
 
             action_log.status = "undone"
             action_log.undone_at = datetime.utcnow()
 
             db.commit()
-            logger.info(f"✅ Action marked as undone: {action_id}")
+            logger.info(f"[SUCCESS] Action marked as undone: {action_id}")
             return True
 
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Failed to mark action as undone: {e}")
+            logger.error(f"[ERROR] Failed to mark action as undone: {e}")
             return False
 
         finally:
@@ -237,12 +237,12 @@ class ActionHistory:
             deleted = db.query(ActionLog).filter(ActionLog.created_at < cutoff_date).delete()
             db.commit()
 
-            logger.info(f"✅ Cleaned up {deleted} old actions (older than {days} days)")
+            logger.info(f"[SUCCESS] Cleaned up {deleted} old actions (older than {days} days)")
             return deleted
 
         except Exception as e:
             db.rollback()
-            logger.error(f"❌ Failed to cleanup old actions: {e}")
+            logger.error(f"[ERROR] Failed to cleanup old actions: {e}")
             return 0
 
         finally:

@@ -103,7 +103,7 @@ async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
 </head>
 <body>
     <div class="card">
-        <h1>🔗 Connect AliExpress</h1>
+        <h1>[LINK] Connect AliExpress</h1>
         <p>Click the button below to authorize Ospra to access your AliExpress seller account.</p>
 
         <div class="steps">
@@ -247,7 +247,7 @@ async def oauth_callback(
 </head>
 <body>
     <div class="card">
-        <div class="success">✅</div>
+        <div class="success">[SUCCESS]</div>
         <h1>Successfully Connected!</h1>
         <p>Your AliExpress account is now connected to Ospra.</p>
 

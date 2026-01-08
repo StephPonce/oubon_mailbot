@@ -1,31 +1,28 @@
-/**
- * Protected Route Component
- * =========================
- * 
- * Wraps routes that require authentication.
- * Redirects to login if not authenticated.
- */
+// 
+// PROTECTED ROUTE
+// Redirects to login if not authenticated
+// 
 
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requireTier?: 'nest' | 'flight' | 'soar' | 'stratosphere';
 }
 
-export function ProtectedRoute({ children, requireTier }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, user } = useAuth();
+export default function ProtectedRoute({ children }: ProtectedRouteProps) {
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  // Show loading spinner while checking auth
+  // Show loading while checking auth
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="app-background" />
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-slate-400">Loading...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
+          <p className="text-secondary text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -33,25 +30,10 @@ export function ProtectedRoute({ children, requireTier }: ProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    // Save the attempted URL for redirecting after login
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check tier requirement
-  if (requireTier && user) {
-    const tierOrder = ['nest', 'flight', 'soar', 'stratosphere'];
-    const userTier = user.subscription_tier?.toLowerCase() || 'nest';
-    const userTierIndex = tierOrder.indexOf(userTier);
-    const requiredTierIndex = tierOrder.indexOf(requireTier.toLowerCase());
-
-    if (userTierIndex < requiredTierIndex) {
-      return <Navigate to="/subscription" state={{
-        requiredTier: requireTier,
-        message: `This feature requires ${requireTier.charAt(0).toUpperCase() + requireTier.slice(1)} tier or higher`
-      }} replace />;
-    }
-  }
-
+  // Render protected content
   return <>{children}</>;
 }
-
-export default ProtectedRoute;

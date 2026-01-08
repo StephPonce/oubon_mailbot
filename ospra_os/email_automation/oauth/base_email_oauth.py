@@ -37,7 +37,7 @@ class EmailOAuthHandler(ABC):
         if not key:
             # Generate new key if not set (for development)
             key = Fernet.generate_key().decode()
-            print(f"⚠️  Generated new encryption key. Set EMAIL_OAUTH_ENCRYPTION_KEY={key}")
+            print(f"[WARNING]  Generated new encryption key. Set EMAIL_OAUTH_ENCRYPTION_KEY={key}")
 
         if isinstance(key, str):
             key = key.encode()

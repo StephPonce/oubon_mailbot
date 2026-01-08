@@ -67,7 +67,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     tables_to_create = [t for t in federated_tables if t not in existing_tables]
 
     if not tables_to_create:
-        logger.info("✅ All federated learning tables already exist")
+        logger.info("[SUCCESS] All federated learning tables already exist")
         logger.info("")
         logger.info("Existing federated tables:")
         for table in federated_tables:
@@ -91,7 +91,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     created_tables = [t for t in federated_tables if t in new_tables]
 
     logger.info("")
-    logger.info(f"✅ Created {len(created_tables)} federated learning tables:")
+    logger.info(f"[SUCCESS] Created {len(created_tables)} federated learning tables:")
     for table in created_tables:
         # Get columns
         columns = inspector.get_columns(table)
@@ -99,7 +99,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
         logger.info(f"   - {table} ({len(column_names)} columns)")
 
     logger.info("")
-    logger.info("🎉 Federated Learning migration complete!")
+    logger.info("[LAUNCH] Federated Learning migration complete!")
     logger.info("")
     logger.info("Tables created:")
     logger.info("  aggregate_insights    - Statistical patterns from all users")
@@ -108,11 +108,11 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     logger.info("  privacy_consents      - GDPR/CCPA compliant consent management")
     logger.info("")
     logger.info("Privacy Guarantees:")
-    logger.info("  ✓ Only bucketed data stored (no exact values)")
-    logger.info("  ✓ Minimum 10 users required for aggregation")
-    logger.info("  ✓ Minimum 50 samples required for insights")
-    logger.info("  ✓ Explicit opt-in consent required")
-    logger.info("  ✓ Granular control over data types")
+    logger.info("  [OK] Only bucketed data stored (no exact values)")
+    logger.info("  [OK] Minimum 10 users required for aggregation")
+    logger.info("  [OK] Minimum 50 samples required for insights")
+    logger.info("  [OK] Explicit opt-in consent required")
+    logger.info("  [OK] Granular control over data types")
     logger.info("")
     logger.info("Next steps:")
     logger.info("  1. Register federated router in ospra_os/main.py:")
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     try:
         run_migration(database_url)
     except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
+        logger.error(f"[ERROR] Migration failed: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

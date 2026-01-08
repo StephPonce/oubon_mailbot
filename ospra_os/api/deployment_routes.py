@@ -175,7 +175,7 @@ async def prepare_product(request: PrepareProductRequest):
     ```
     """
     try:
-        logger.info(f"📦 Preparing product: {request.product.title[:50]}")
+        logger.info(f"[PACKAGE] Preparing product: {request.product.title[:50]}")
 
         result = await deployer.prepare_product(
             aliexpress_product=request.product.dict(),
@@ -234,7 +234,7 @@ async def deploy_product(request: DeployProductRequest):
     ```
     """
     try:
-        logger.info(f"🚀 Deploying product: {request.product.title[:50]}")
+        logger.info(f"[START] Deploying product: {request.product.title[:50]}")
 
         result = await deployer.deploy_product(
             aliexpress_product=request.product.dict(),
@@ -316,7 +316,7 @@ async def bulk_deploy(request: BulkDeployRequest, background_tasks: BackgroundTa
     ```
     """
     try:
-        logger.info(f"📦 Bulk deploy: {len(request.products)} products")
+        logger.info(f"[PACKAGE] Bulk deploy: {len(request.products)} products")
 
         if request.async_mode:
             # Run in background
@@ -412,7 +412,7 @@ async def preview_deployment(request: PreviewRequest):
     ```
     """
     try:
-        logger.info(f"👁️  Preview: {request.product.title[:50]}")
+        logger.info(f"  Preview: {request.product.title[:50]}")
 
         result = await deployer.preview_deployment(
             aliexpress_product=request.product.dict(),

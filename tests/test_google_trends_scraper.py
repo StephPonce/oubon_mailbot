@@ -8,7 +8,7 @@ async def test_google_trends():
     """Direct test of Google Trends scraper"""
 
     print("=" * 80)
-    print("📈 GOOGLE TRENDS SCRAPER TEST")
+    print("[TREND] GOOGLE TRENDS SCRAPER TEST")
     print("=" * 80)
     print()
     print("Testing: scrape_google_trends() method")
@@ -23,7 +23,7 @@ async def test_google_trends():
         result = await scraper.scrape_google_trends("smart watch", timeframe="today 3-m")
 
         print("\n" + "=" * 80)
-        print("📊 RESULTS")
+        print("[STATS] RESULTS")
         print("=" * 80)
         print()
 
@@ -38,18 +38,18 @@ async def test_google_trends():
             print()
 
         if result.get('success'):
-            print("🎉" * 30)
-            print("✅ ✅ ✅ GOOGLE TRENDS SCRAPER WORKING! ✅ ✅ ✅")
-            print("🎉" * 30)
+            print("[LAUNCH]" * 30)
+            print("[SUCCESS] [SUCCESS] [SUCCESS] GOOGLE TRENDS SCRAPER WORKING! [SUCCESS] [SUCCESS] [SUCCESS]")
+            print("[LAUNCH]" * 30)
             print()
             print("This proves:")
-            print("  ✅ Playwright browser launches successfully")
-            print("  ✅ Can navigate to Google Trends")
-            print("  ✅ Stealth mode bypasses detection")
-            print("  ✅ Can extract trend data")
-            print("  ✅ Velocity calculation works")
+            print("  [SUCCESS] Playwright browser launches successfully")
+            print("  [SUCCESS] Can navigate to Google Trends")
+            print("  [SUCCESS] Stealth mode bypasses detection")
+            print("  [SUCCESS] Can extract trend data")
+            print("  [SUCCESS] Velocity calculation works")
         else:
-            print("⚠️  Scraping failed - check details above")
+            print("[WARNING]  Scraping failed - check details above")
             print()
             print("Common reasons:")
             print("  • Google Trends changed layout")
@@ -60,7 +60,7 @@ async def test_google_trends():
         print("=" * 80)
 
         # Test multiple keywords
-        print("\n🧪 Testing Multiple Keywords...")
+        print("\n[TEST] Testing Multiple Keywords...")
         print()
 
         keywords = ["wireless earbuds", "robot vacuum", "air fryer"]
@@ -82,7 +82,7 @@ async def test_google_trends():
 
         if successful > 0:
             print()
-            print("✅ Google Trends scraper is WORKING!")
+            print("[SUCCESS] Google Trends scraper is WORKING!")
             print("   • Can be used for real-time velocity scoring")
             print("   • Bypasses rate limits with browser automation")
             print("   • Ready for production use")

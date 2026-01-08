@@ -247,7 +247,7 @@ async def seed_multi_user_data(db: SessionLocal):
 
     db.commit()
 
-    print(f"✅ Seeded {len(events)} learning events across 3 users")
+    print(f"[SUCCESS] Seeded {len(events)} learning events across 3 users")
     print()
     print("User breakdown:")
     print(f"  User 1 (Smart Home): 2 sales ($2,224.60 revenue) + 1 deployment + 1 ad")
@@ -271,13 +271,13 @@ async def run_analysis():
                 timeout=30.0
             )
             if response.status_code == 200:
-                print("✅ Global analysis completed")
+                print("[SUCCESS] Global analysis completed")
             else:
-                print(f"❌ Failed: {response.status_code}")
+                print(f"[ERROR] Failed: {response.status_code}")
                 print(response.text)
                 return False
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] Error: {e}")
             return False
 
     print()
@@ -289,11 +289,11 @@ async def run_analysis():
                 timeout=30.0
             )
             if response.status_code == 200:
-                print("✅ Personal analysis completed for all users")
+                print("[SUCCESS] Personal analysis completed for all users")
             else:
-                print(f"❌ Failed: {response.status_code}")
+                print(f"[ERROR] Failed: {response.status_code}")
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f"[ERROR] Error: {e}")
 
     return True
 
@@ -305,10 +305,10 @@ async def verify_global_brain(db: SessionLocal):
     global_weights = db.query(GlobalLearningWeights).first()
 
     if not global_weights:
-        print("❌ No global weights found")
+        print("[ERROR] No global weights found")
         return False
 
-    print("✅ Global Brain data:")
+    print("[SUCCESS] Global Brain data:")
     print(f"   Learning cycles: {global_weights.learning_cycles}")
     print(f"   Total users contributing: {global_weights.total_users_contributing}")
     print(f"   Total sales analyzed: {global_weights.total_sales_analyzed}")
@@ -321,10 +321,10 @@ async def verify_global_brain(db: SessionLocal):
     # Verify multi-user aggregation
     if global_weights.total_users_contributing >= 3:
         print()
-        print("✅ Global Brain is aggregating across multiple users")
+        print("[SUCCESS] Global Brain is aggregating across multiple users")
     else:
         print()
-        print(f"⚠️  Only {global_weights.total_users_contributing} users contributing")
+        print(f"[WARNING]  Only {global_weights.total_users_contributing} users contributing")
 
     return True
 
@@ -340,12 +340,12 @@ async def verify_personal_layers(db: SessionLocal):
         personal = db.query(PersonalLearningWeights).filter_by(user_id=user_id).first()
 
         if not personal:
-            print(f"❌ No personal weights for user {user_id}")
+            print(f"[ERROR] No personal weights for user {user_id}")
             continue
 
         personal_data[user_id] = personal
 
-        print(f"\n👤 User {user_id}:")
+        print(f"\n User {user_id}:")
         print(f"   Learning cycles: {personal.learning_cycles}")
         print(f"   Sales analyzed: {personal.sales_analyzed}")
         print(f"   Revenue analyzed: ${personal.revenue_analyzed:,.2f}")
@@ -369,9 +369,9 @@ async def verify_personal_layers(db: SessionLocal):
 
         # Check if users have different primary niches
         if user1_niches != user2_niches or user2_niches != user3_niches:
-            print("\n✅ Users have UNIQUE niche preferences (Personal Layer working!)")
+            print("\n[SUCCESS] Users have UNIQUE niche preferences (Personal Layer working!)")
         else:
-            print("\n⚠️  All users have same niches")
+            print("\n[WARNING]  All users have same niches")
 
         # Compare revenue
         print(f"\nRevenue comparison:")
@@ -404,25 +404,25 @@ async def test_event_types(db: SessionLocal):
     found_types = set(event_counts.keys())
 
     if expected_types.issubset(found_types):
-        print("\n✅ All event types present!")
+        print("\n[SUCCESS] All event types present!")
         return True
     else:
         missing = expected_types - found_types
-        print(f"\n⚠️  Missing event types: {missing}")
+        print(f"\n[WARNING]  Missing event types: {missing}")
         return False
 
 
 async def main():
     """Main test function"""
     print()
-    print("╔" + "═" * 78 + "╗")
-    print("║" + " " * 18 + "MULTI-USER LEARNING SYSTEM TEST" + " " * 27 + "║")
-    print("╚" + "═" * 78 + "╝")
+    print("" + "" * 78 + "")
+    print("" + " " * 18 + "MULTI-USER LEARNING SYSTEM TEST" + " " * 27 + "")
+    print("" + "" * 78 + "")
 
     # Create tables
     print_section("SETUP: CREATING DATABASE TABLES")
     Base.metadata.create_all(bind=db_engine)
-    print("✅ Database tables created")
+    print("[SUCCESS] Database tables created")
 
     # Create DB session
     db = SessionLocal()
@@ -434,7 +434,7 @@ async def main():
         # Step 2: Run analysis
         analysis_ok = await run_analysis()
         if not analysis_ok:
-            print("\n❌ Analysis failed - cannot continue")
+            print("\n[ERROR] Analysis failed - cannot continue")
             return
 
         # Wait for analysis to complete
@@ -461,29 +461,29 @@ async def main():
         ]
 
         for test_name, passed in results:
-            status = "✅ PASS" if passed else "❌ FAIL"
+            status = "[SUCCESS] PASS" if passed else "[ERROR] FAIL"
             print(f"  {status}  {test_name}")
 
         print()
         all_passed = all(r[1] for r in results)
 
         if all_passed:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 20 + "✅ ALL TESTS PASSED! ✅" + " " * 31 + "║")
-            print("║" + " " * 78 + "║")
-            print("║" + "  The hybrid learning system is working correctly:" + " " * 24 + "║")
-            print("║" + "  • Global Brain aggregates across all users" + " " * 31 + "║")
-            print("║" + "  • Personal Layers show unique user preferences" + " " * 26 + "║")
-            print("║" + "  • All event types (sales, deployments, ads) are tracked" + " " * 17 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 20 + "[SUCCESS] ALL TESTS PASSED! [SUCCESS]" + " " * 31 + "")
+            print("" + " " * 78 + "")
+            print("" + "  The hybrid learning system is working correctly:" + " " * 24 + "")
+            print("" + "  • Global Brain aggregates across all users" + " " * 31 + "")
+            print("" + "  • Personal Layers show unique user preferences" + " " * 26 + "")
+            print("" + "  • All event types (sales, deployments, ads) are tracked" + " " * 17 + "")
+            print("" + "" * 78 + "")
         else:
-            print("╔" + "═" * 78 + "╗")
-            print("║" + " " * 24 + "⚠️  SOME TESTS FAILED" + " " * 29 + "║")
-            print("╚" + "═" * 78 + "╝")
+            print("" + "" * 78 + "")
+            print("" + " " * 24 + "[WARNING]  SOME TESTS FAILED" + " " * 29 + "")
+            print("" + "" * 78 + "")
 
     except Exception as e:
         print()
-        print(f"❌ Test failed with error: {e}")
+        print(f"[ERROR] Test failed with error: {e}")
         import traceback
         traceback.print_exc()
     finally:

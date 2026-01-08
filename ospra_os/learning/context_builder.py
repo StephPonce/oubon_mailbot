@@ -108,14 +108,14 @@ def get_latest_summary(user_id: int, db: Session) -> str:
     # Format as markdown
     context = f"""**Your Business Overview** (as of {summary.summary_date.strftime('%Y-%m-%d')})
 
-📊 **Overall Performance:**
+[STATS] **Overall Performance:**
 - Total Revenue: ${overall.get('total_revenue', 0):,.2f}
 - Products Deployed: {overall.get('total_products_deployed', 0)}
 - Total Sales: {overall.get('total_sales', 0)}
 - Avg Revenue per Product: ${overall.get('avg_revenue_per_product', 0):.2f}
 - Best Month: {overall.get('best_month', 'N/A')}
 
-🎯 **Niche Performance:**
+[TARGET] **Niche Performance:**
 """
 
     # Add top 3 niches
@@ -126,18 +126,18 @@ def get_latest_summary(user_id: int, db: Session) -> str:
     # Add price insights
     price_data = summary.price_insights
     if price_data and price_data.get('optimal_range'):
-        context += f"\n💰 **Optimal Price Range:** {price_data['optimal_range']}\n"
+        context += f"\n[PRICE] **Optimal Price Range:** {price_data['optimal_range']}\n"
 
     # Add ad insights if available
     ad_data = summary.ad_insights
     if ad_data and ad_data.get('best_platform'):
-        context += f"\n📱 **Ad Performance:**\n"
+        context += f"\n[MOBILE] **Ad Performance:**\n"
         context += f"- Best Platform: {ad_data['best_platform']}\n"
         context += f"- Average ROAS: {ad_data.get('avg_roas', 0):.2f}x\n"
 
     # Add AI recommendations
     if summary.recommendations:
-        context += f"\n✨ **AI Recommendations:**\n{summary.recommendations}\n"
+        context += f"\n[NEW] **AI Recommendations:**\n{summary.recommendations}\n"
 
     return context
 

@@ -28,7 +28,7 @@ class DHgateConnector(BaseConnector):
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """Search DHgate products."""
         if not self.api_key:
-            print("⚠️  DHGATE_API_KEY not configured")
+            print("[WARNING]  DHGATE_API_KEY not configured")
             return []
 
         # TODO: Implement DHgate API integration
@@ -36,14 +36,14 @@ class DHgateConnector(BaseConnector):
         # - MOQ (Minimum Order Quantity) info
         # - Bulk discount tiers
 
-        print(f"📦 DHgate API call: search('{query}')")
+        print(f"[PACKAGE] DHgate API call: search('{query}')")
         return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
         """Get trending DHgate products."""
         if not self.api_key:
-            print("⚠️  DHGATE_API_KEY not configured")
+            print("[WARNING]  DHGATE_API_KEY not configured")
             return []
 
-        print(f"📦 DHgate API call: get_trending(category={category})")
+        print(f"[PACKAGE] DHgate API call: get_trending(category={category})")
         return []

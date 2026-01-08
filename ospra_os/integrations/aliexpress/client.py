@@ -39,7 +39,7 @@ class AliExpressClient:
         self.base_url = "https://api-sg.aliexpress.com/sync"
         self.tracking_id = os.getenv('ALIEXPRESS_TRACKING_ID', 'ospra_tracking')
 
-        print(f"✅ AliExpress Client initialized (App Key: {self.app_key[:6]}...)")
+        print(f"[SUCCESS] AliExpress Client initialized (App Key: {self.app_key[:6]}...)")
 
     def _sign_request(self, params: Dict) -> str:
         """Generate API signature"""
@@ -81,7 +81,7 @@ class AliExpressClient:
                 )
 
                 if response.status_code != 200:
-                    print(f"❌ AliExpress API error: {response.status_code}")
+                    print(f"[ERROR] AliExpress API error: {response.status_code}")
                     print(response.text)
                     return None
 
@@ -90,13 +90,13 @@ class AliExpressClient:
                 # Check for API errors
                 if 'error_response' in result:
                     error = result['error_response']
-                    print(f"❌ AliExpress error: {error.get('msg')}")
+                    print(f"[ERROR] AliExpress error: {error.get('msg')}")
                     return None
 
                 return result
 
         except Exception as e:
-            print(f"❌ Request error: {e}")
+            print(f"[ERROR] Request error: {e}")
             return None
 
     async def search_products(
@@ -113,7 +113,7 @@ class AliExpressClient:
         Returns list of products with affiliate links
         """
         try:
-            print(f"🔍 Searching AliExpress: {keywords}")
+            print(f"[SEARCH] Searching AliExpress: {keywords}")
 
             params = {
                 'keywords': keywords,
@@ -138,12 +138,12 @@ class AliExpressClient:
 
             products = result.get('aliexpress_affiliate_product_query_response', {}).get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
 
-            print(f"✅ Found {len(products)} AliExpress products")
+            print(f"[SUCCESS] Found {len(products)} AliExpress products")
 
             return products
 
         except Exception as e:
-            print(f"❌ Search error: {e}")
+            print(f"[ERROR] Search error: {e}")
             return []
 
     async def get_affiliate_links(
@@ -162,7 +162,7 @@ class AliExpressClient:
             Dict of product_id -> affiliate_url
         """
         try:
-            print(f"🔗 Generating affiliate links for {len(product_ids)} products")
+            print(f"[LINK] Generating affiliate links for {len(product_ids)} products")
 
             params = {
                 'product_ids': ','.join(product_ids),
@@ -187,12 +187,12 @@ class AliExpressClient:
                 url = link.get('promotion_link')
                 affiliate_links[product_id] = url
 
-            print(f"✅ Generated {len(affiliate_links)} affiliate links")
+            print(f"[SUCCESS] Generated {len(affiliate_links)} affiliate links")
 
             return affiliate_links
 
         except Exception as e:
-            print(f"❌ Affiliate link error: {e}")
+            print(f"[ERROR] Affiliate link error: {e}")
             return {}
 
     async def get_product_details(
@@ -201,7 +201,7 @@ class AliExpressClient:
     ) -> List[Dict]:
         """Get detailed product information"""
         try:
-            print(f"📦 Getting details for {len(product_ids)} products")
+            print(f"[PACKAGE] Getting details for {len(product_ids)} products")
 
             params = {
                 'product_ids': ','.join(product_ids),
@@ -220,12 +220,12 @@ class AliExpressClient:
 
             products = result.get('aliexpress_affiliate_productdetail_get_response', {}).get('resp_result', {}).get('result', {}).get('products', {}).get('product', [])
 
-            print(f"✅ Got details for {len(products)} products")
+            print(f"[SUCCESS] Got details for {len(products)} products")
 
             return products
 
         except Exception as e:
-            print(f"❌ Product details error: {e}")
+            print(f"[ERROR] Product details error: {e}")
             return []
 
     async def get_order_tracking(
@@ -238,7 +238,7 @@ class AliExpressClient:
         Returns tracking number and shipping status
         """
         try:
-            print(f"📍 Getting tracking for order {order_id}")
+            print(f"[LOCATION] Getting tracking for order {order_id}")
 
             params = {
                 'order_id': order_id
@@ -257,7 +257,7 @@ class AliExpressClient:
             return tracking_info
 
         except Exception as e:
-            print(f"❌ Tracking error: {e}")
+            print(f"[ERROR] Tracking error: {e}")
             return None
 
     async def check_product_availability(
@@ -293,7 +293,7 @@ class AliExpressClient:
             }
 
         except Exception as e:
-            print(f"❌ Availability check error: {e}")
+            print(f"[ERROR] Availability check error: {e}")
             return {
                 'available': False,
                 'stock_quantity': 0,
@@ -327,7 +327,7 @@ class AliExpressDropshipping:
             Order details with tracking
         """
         try:
-            print(f"🛒 Placing order for product {product_id}")
+            print(f"[CART] Placing order for product {product_id}")
 
             # Build order params
             params = {
@@ -367,12 +367,12 @@ class AliExpressDropshipping:
                 'payment_url': order_data.get('payment_url')
             }
 
-            print(f"✅ Order placed! ID: {order_info['order_id']}")
+            print(f"[SUCCESS] Order placed! ID: {order_info['order_id']}")
 
             return order_info
 
         except Exception as e:
-            print(f"❌ Order placement error: {e}")
+            print(f"[ERROR] Order placement error: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -404,5 +404,5 @@ class AliExpressDropshipping:
             }
 
         except Exception as e:
-            print(f"❌ Order status error: {e}")
+            print(f"[ERROR] Order status error: {e}")
             return None

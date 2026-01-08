@@ -1,5 +1,5 @@
 """
-💬 SLACK NOTIFIER
+[CHAT] SLACK NOTIFIER
 Send product change alerts to Slack via webhooks
 """
 
@@ -23,9 +23,9 @@ class SlackNotifier:
         self.is_configured = bool(self.webhook_url)
 
         if not self.is_configured:
-            logger.warning("⚠️  Slack notifications not configured. Set SLACK_WEBHOOK_URL in .env")
+            logger.warning("[WARNING]  Slack notifications not configured. Set SLACK_WEBHOOK_URL in .env")
         else:
-            logger.info("✅ Slack notifier initialized")
+            logger.info("[SUCCESS] Slack notifier initialized")
 
     def send_change_alert(self, changes: List[Dict]) -> bool:
         """
@@ -56,7 +56,7 @@ class SlackNotifier:
             )
 
             if response.status_code == 200:
-                logger.info("✅ Slack message sent")
+                logger.info("[SUCCESS] Slack message sent")
                 return True
             else:
                 logger.error(f"Slack webhook failed: {response.status_code} - {response.text}")
@@ -81,7 +81,7 @@ class SlackNotifier:
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🚨 Product Change Alert",
+                "text": f" Product Change Alert",
                 "emoji": True
             }
         })
@@ -103,7 +103,7 @@ class SlackNotifier:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🔴 HIGH PRIORITY ({len(high)})*"
+                    "text": f"* HIGH PRIORITY ({len(high)})*"
                 }
             })
 
@@ -133,7 +133,7 @@ class SlackNotifier:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🟡 MEDIUM PRIORITY ({len(medium)})*\n{changes_text}"
+                    "text": f"* MEDIUM PRIORITY ({len(medium)})*\n{changes_text}"
                 }
             })
 
@@ -153,7 +153,7 @@ class SlackNotifier:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🟢 LOW PRIORITY ({len(low)})*\n{changes_text}"
+                    "text": f"* LOW PRIORITY ({len(low)})*\n{changes_text}"
                 }
             })
 
@@ -171,11 +171,11 @@ class SlackNotifier:
     def _get_emoji(self, change_type: str) -> str:
         """Get emoji for change type"""
         emoji_map = {
-            'velocity': '⚡',
-            'price': '💰',
-            'score': '⭐'
+            'velocity': '[FAST]',
+            'price': '[PRICE]',
+            'score': '[STAR]'
         }
-        return emoji_map.get(change_type, '📊')
+        return emoji_map.get(change_type, '[STATS]')
 
     def send_test_message(self) -> bool:
         """Send a test message to verify configuration"""
@@ -186,7 +186,7 @@ class SlackNotifier:
         test_changes = [{
             'product_name': 'Test Product',
             'type': 'velocity',
-            'message': '📈 Test notification',
+            'message': '[TREND] Test notification',
             'severity': 'high'
         }]
 

@@ -96,7 +96,7 @@ class StratosphereCustomer(BaseModel):
 class OnboardingChecklist(BaseModel):
     """Dashboard checklist items"""
     items: List[Dict] = [
-        {"id": "welcome", "label": "Welcome to Stratosphere! 🌌", "completed": True},
+        {"id": "welcome", "label": "Welcome to Stratosphere! ", "completed": True},
         {"id": "form", "label": "Complete onboarding questionnaire", "completed": False},
         {"id": "call", "label": "Schedule onboarding call", "completed": False},
         {"id": "store", "label": "Connect your first store", "completed": False},
@@ -112,7 +112,7 @@ class OnboardingChecklist(BaseModel):
 
 async def send_slack_alert(customer: StratosphereCustomer) -> bool:
     """
-    🚨 Instant Slack alert when someone goes Stratosphere
+     Instant Slack alert when someone goes Stratosphere
     
     This is the "drop everything" notification
     """
@@ -126,7 +126,7 @@ async def send_slack_alert(customer: StratosphereCustomer) -> bool:
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": "🌌 NEW STRATOSPHERE CUSTOMER!",
+                    "text": " NEW STRATOSPHERE CUSTOMER!",
                     "emoji": True
                 }
             },
@@ -135,7 +135,7 @@ async def send_slack_alert(customer: StratosphereCustomer) -> bool:
                 "fields": [
                     {"type": "mrkdwn", "text": f"*Customer:*\n{customer.name}"},
                     {"type": "mrkdwn", "text": f"*Email:*\n{customer.email}"},
-                    {"type": "mrkdwn", "text": f"*Revenue:*\n+$199/mo 🎉"},
+                    {"type": "mrkdwn", "text": f"*Revenue:*\n+$199/mo [LAUNCH]"},
                     {"type": "mrkdwn", "text": f"*Time:*\n{datetime.now().strftime('%I:%M %p')}"}
                 ]
             },
@@ -143,7 +143,7 @@ async def send_slack_alert(customer: StratosphereCustomer) -> bool:
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "⏰ *Action Required:* Send personal welcome within 24 hours!"
+                    "text": "[ALARM] *Action Required:* Send personal welcome within 24 hours!"
                 }
             },
             {
@@ -163,24 +163,24 @@ async def send_slack_alert(customer: StratosphereCustomer) -> bool:
         async with httpx.AsyncClient() as client:
             response = await client.post(SLACK_WEBHOOK_URL, json=message)
             if response.status_code == 200:
-                logger.info(f"✅ Slack alert sent for {customer.email}")
+                logger.info(f"[SUCCESS] Slack alert sent for {customer.email}")
                 return True
             else:
-                logger.error(f"❌ Slack alert failed: {response.text}")
+                logger.error(f"[ERROR] Slack alert failed: {response.text}")
                 return False
     except Exception as e:
-        logger.error(f"❌ Slack alert error: {e}")
+        logger.error(f"[ERROR] Slack alert error: {e}")
         return False
 
 
 async def send_admin_email_alert(customer: StratosphereCustomer) -> bool:
     """
-    📧 Email alert to admin (backup if Slack fails or not configured)
+    [EMAIL] Email alert to admin (backup if Slack fails or not configured)
     """
-    subject = f"🌌 NEW STRATOSPHERE: {customer.name} just subscribed!"
+    subject = f" NEW STRATOSPHERE: {customer.name} just subscribed!"
     
     body = f"""
-    🎉 STRATOSPHERE SIGNUP!
+    [LAUNCH] STRATOSPHERE SIGNUP!
     
     Customer: {customer.name}
     Email: {customer.email}
@@ -189,9 +189,9 @@ async def send_admin_email_alert(customer: StratosphereCustomer) -> bool:
     
     Monthly Revenue: +$199
     
-    ⏰ ACTION REQUIRED:
-    - Welcome email auto-sent ✓
-    - Onboarding form auto-sent ✓
+    [ALARM] ACTION REQUIRED:
+    - Welcome email auto-sent [OK]
+    - Onboarding form auto-sent [OK]
     - YOU need to: Review their form responses and show up to the call!
     
     View customer: https://app.ospra.io/admin/customers/{customer.user_id}
@@ -200,7 +200,7 @@ async def send_admin_email_alert(customer: StratosphereCustomer) -> bool:
     # TODO: Integrate with your email sending system
     # await send_email(to=ADMIN_EMAIL, subject=subject, body=body)
     
-    logger.info(f"📧 Admin alert queued for {customer.email}")
+    logger.info(f"[EMAIL] Admin alert queued for {customer.email}")
     return True
 
 
@@ -214,7 +214,7 @@ def get_welcome_email(customer: StratosphereCustomer) -> Dict:
     """
     first_name = customer.name.split()[0] if customer.name else "there"
     
-    subject = f"Welcome to the Stratosphere, {first_name} 🌌"
+    subject = f"Welcome to the Stratosphere, {first_name} "
     
     html_body = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -368,7 +368,7 @@ def get_day_7_checkin_email(customer: StratosphereCustomer) -> Dict:
     """Day 7 check-in - first week wrap-up"""
     first_name = customer.name.split()[0] if customer.name else "there"
     
-    subject = f"Your first week in the Stratosphere 🌌"
+    subject = f"Your first week in the Stratosphere "
     
     html_body = f"""
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -406,7 +406,7 @@ async def handle_stratosphere_signup(
     company: Optional[str] = None
 ) -> StratosphereCustomer:
     """
-    🌌 Main handler when someone subscribes to Stratosphere
+     Main handler when someone subscribes to Stratosphere
     
     This is called by the LemonSqueezy webhook handler
     """
@@ -422,7 +422,7 @@ async def handle_stratosphere_signup(
         onboarding_started=datetime.now()
     )
     
-    logger.info(f"🌌 New Stratosphere customer: {email}")
+    logger.info(f" New Stratosphere customer: {email}")
     
     # 1. Send instant alerts to admin
     await send_slack_alert(customer)
@@ -443,7 +443,7 @@ async def handle_stratosphere_signup(
     # 5. Save customer record to database
     # TODO: await save_stratosphere_customer(customer)
     
-    logger.info(f"✅ Stratosphere onboarding initiated for {email}")
+    logger.info(f"[SUCCESS] Stratosphere onboarding initiated for {email}")
     
     return customer
 
@@ -470,7 +470,7 @@ async def process_onboarding_form(
     # Send Calendly booking link
     # await send_calendly_booking_email(customer)
     
-    logger.info(f"✅ Onboarding form completed for {user_id}")
+    logger.info(f"[SUCCESS] Onboarding form completed for {user_id}")
     return True
 
 
@@ -497,7 +497,7 @@ async def run_scheduled_checkins():
     #     
     #     # Continue for day 14, 30, etc.
     
-    logger.info("✅ Scheduled check-ins processed")
+    logger.info("[SUCCESS] Scheduled check-ins processed")
 
 
 # ==================== ONBOARDING FORM QUESTIONS ====================
@@ -641,7 +641,7 @@ ONBOARDING_FORM_SCHEMA = {
 
 
 if __name__ == "__main__":
-    print("🌌 Stratosphere Onboarding System")
+    print(" Stratosphere Onboarding System")
     print("=" * 50)
     print("\nOnboarding Form Fields:")
     for field in ONBOARDING_FORM_SCHEMA["fields"]:

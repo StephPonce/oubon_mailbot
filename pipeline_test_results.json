@@ -1,0 +1,47 @@
+{
+  "data_sources": {
+    "google_trends": false,
+    "cj_dropshipping": false,
+    "aliexpress": true,
+    "apify": true,
+    "tiktok": true,
+    "reddit": true,
+    "openai": false,
+    "claude": false,
+    "google_trends_data": true,
+    "cj_products": true,
+    "dalle": true,
+    "claude_analysis": true
+  },
+  "products_found": [
+    {
+      "name": "Air Purifier, H13 HEPA Layer, 1200 Ft\u00b2/h Smart Air",
+      "price": "65.31",
+      "source": "CJ Dropshipping"
+    },
+    {
+      "name": "Motorcycle Helmet, Full Face, Smart Street ABS & H",
+      "price": "40.39",
+      "source": "CJ Dropshipping"
+    },
+    {
+      "name": "Motorcycle Helmet, 3/4-Face, Smart Street ABS & Hi",
+      "price": "32.11",
+      "source": "CJ Dropshipping"
+    }
+  ],
+  "scoring": [
+    {
+      "product": "Smart WiFi Plug with Energy Monitoring",
+      "generated_title": "Smart WiFi Plug with Energy Monitoring",
+      "suggested_price": 14.98
+    }
+  ],
+  "images_generated": [
+    {
+      "prompt": "smart wifi plug",
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-WZc0vbU1XrCuDyncWboP9J5y/user-ElR6OZwoYmGwzQeji8lHWt5f/img-QHqOXoEUoknrCKHtk30c8kMJ.png?st=2025-12-17T07%3A44%3A49Z&se=2025-12-17T09%3A44%3A49Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=77e5a8ec-6bd1-4477-8afc-16703a64f029&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-12-17T05%3A01%3A28Z&ske=2025-12-18T05%3A01%3A28Z&sks=b&skv=2024-08-04&sig=bggYVvw6fR8XZBkF4bDVgDtef08ywJLEtBvqUXf02iM%3D"
+    }
+  ],
+  "errors": []
+}

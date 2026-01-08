@@ -145,12 +145,12 @@ class AdCreativeGenerator:
             # Parse and validate response
             creative = self._parse_ai_response(response, platform, variations)
 
-            print(f"✅ Generated {variations} ad creative(s) for {platform} using {self.provider_name}")
+            print(f"[SUCCESS] Generated {variations} ad creative(s) for {platform} using {self.provider_name}")
 
             return creative
 
         except Exception as e:
-            print(f"❌ AI generation failed: {e}")
+            print(f"[ERROR] AI generation failed: {e}")
             # Fallback to template-based generation
             return self._generate_fallback_copy(platform, product_name, product_description, variations)
 
@@ -321,7 +321,7 @@ IMPORTANT:
         variations: int
     ) -> Dict:
         """Generate fallback creative using templates when AI fails."""
-        print(f"🔄 Using fallback template for {platform}")
+        print(f"[REFRESH] Using fallback template for {platform}")
 
         limits = self.PLATFORM_LIMITS[platform]
         variations_list = []
@@ -340,7 +340,7 @@ IMPORTANT:
 
         elif platform == 'tiktok':
             for i in range(variations):
-                headline = f"🔥 {product_name} is trending!"[:limits['headline_max']]
+                headline = f"[HOT] {product_name} is trending!"[:limits['headline_max']]
                 body = f"Get yours now! {product_description[:40]}..."[:limits['body_max']]
                 cta = "Tap to buy"[:limits['cta_max']]
                 variations_list.append({
@@ -456,12 +456,12 @@ Return ONLY valid JSON, no markdown.
 
             script = json.loads(response)
 
-            print(f"✅ Generated {duration_seconds}s video script for {platform}")
+            print(f"[SUCCESS] Generated {duration_seconds}s video script for {platform}")
 
             return script
 
         except Exception as e:
-            print(f"❌ Video script generation failed: {e}")
+            print(f"[ERROR] Video script generation failed: {e}")
 
             # Fallback script
             return {

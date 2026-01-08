@@ -29,46 +29,71 @@ logger = logging.getLogger(__name__)
 
 class GeminiProvider(AIProvider):
     """
-    Google Gemini AI Provider implementation using Gemini 1.5 Flash.
+    Google Gemini AI Provider implementation using Gemini 2.0 Flash.
 
-    Uses gemini-1.5-flash model for ultra-cost-effective, high-speed product
+    Uses gemini-2.0-flash model for cost-effective, high-speed product
     analysis, description generation, pricing optimization, and conversational AI.
 
     Attributes:
         model (GenerativeModel): Gemini model instance
         provider_name (str): "gemini"
-        model_name (str): "gemini-1.5-flash"
+        model_name (str): "gemini-2.0-flash"
         cost_per_1k (float): 0.00025 (USD per 1K tokens)
     """
+    
+    # Model fallback order (Gemini 1.5 is RETIRED as of late 2024)
+    MODEL_FALLBACK_ORDER = [
+        "gemini-2.0-flash",           # Latest stable
+        "gemini-2.0-flash-lite",      # Cheaper alternative
+        "gemini-1.5-flash-latest",    # Legacy fallback (may not work)
+    ]
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None):
         """
         Initialize Gemini provider with API key.
 
         Args:
-            api_key: Google AI API key
+            api_key: Google AI API key.
+                     If not provided, uses GOOGLE_API_KEY env var.
 
         Raises:
             APIKeyError: If API key is invalid or missing
         """
+        import os
+        api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise APIKeyError("GOOGLE_API_KEY not configured")
+            
         super().__init__(api_key)
 
         # Set provider details
         self.provider_name = "gemini"
-        self.model_name = "gemini-1.5-flash"
-        self.cost_per_1k = 0.00025  # Extremely cheap!
+        self.model_name = "gemini-2.0-flash"  # Updated from retired 1.5
+        self.cost_per_1k = 0.00025  # Still very cheap!
 
-        # Initialize Gemini
+        # Initialize Gemini with model fallback
         try:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(
-                self.model_name,
-                generation_config={
-                    "temperature": 0.7,
-                    "max_output_tokens": 2048
-                }
-            )
-            logger.info(f"Initialized Gemini provider with model {self.model_name}")
+            
+            # Try models in fallback order
+            for model_name in self.MODEL_FALLBACK_ORDER:
+                try:
+                    self.model = genai.GenerativeModel(
+                        model_name,
+                        generation_config={
+                            "temperature": 0.7,
+                            "max_output_tokens": 2048
+                        }
+                    )
+                    self.model_name = model_name
+                    logger.info(f"Initialized Gemini provider with model {self.model_name}")
+                    break
+                except Exception as model_error:
+                    logger.warning(f"Gemini model {model_name} not available: {model_error}")
+                    continue
+            else:
+                raise APIKeyError("No Gemini models available")
+                
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
             raise APIKeyError(f"Failed to initialize Gemini client: {e}")

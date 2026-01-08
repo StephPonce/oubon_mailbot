@@ -408,7 +408,7 @@ class AdTestManager:
         # 2. Social proof approach
         variants.append({
             "headline": f"Why Everyone Loves {product_name}",
-            "description": f"⭐⭐⭐⭐⭐ Rated 5 stars by thousands. Experience {key_benefit} like never before!",
+            "description": f"[STAR][STAR][STAR][STAR][STAR] Rated 5 stars by thousands. Experience {key_benefit} like never before!",
             "cta": "See Why",
             "strategy": "social_proof",
             "expected_impact": "Builds trust through popularity"

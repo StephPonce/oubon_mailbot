@@ -43,7 +43,7 @@ class CJDropshippingConnector(BaseConnector):
             Product candidates with shipping from multiple warehouses
         """
         if not self.api_key:
-            print("⚠️  CJDROPSHIPPING_TOKEN not configured")
+            print("[WARNING]  CJDROPSHIPPING_TOKEN not configured")
             return []
 
         warehouse = kwargs.get("warehouse", "US")  # Prefer US warehouse
@@ -55,20 +55,20 @@ class CJDropshippingConnector(BaseConnector):
         # - Get variants, pricing, inventory
         # - Calculate shipping costs
 
-        print(f"📦 CJ Dropshipping API call: search('{query}', warehouse={warehouse})")
+        print(f"[PACKAGE] CJ Dropshipping API call: search('{query}', warehouse={warehouse})")
         return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
         """Get trending CJ products."""
         if not self.api_key:
-            print("⚠️  CJDROPSHIPPING_TOKEN not configured")
+            print("[WARNING]  CJDROPSHIPPING_TOKEN not configured")
             return []
 
         # TODO: Implement hot products query
         # CJ has curated "winning products" lists
         # POST /product/getHotProduct
 
-        print(f"📦 CJ Dropshipping API call: get_trending(category={category})")
+        print(f"[PACKAGE] CJ Dropshipping API call: get_trending(category={category})")
         return []
 
     async def get_shipping_cost(self, product_id: str, country_code: str = "US") -> dict:

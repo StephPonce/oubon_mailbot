@@ -21,66 +21,66 @@ test_product = {
 
 def test_ai_generator():
     """Test the AI description generator"""
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("🤖 TESTING AI DESCRIPTION GENERATOR")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[AI] TESTING AI DESCRIPTION GENERATOR")
+    print("")
     print()
 
     # Check if ANTHROPIC_API_KEY is set
     api_key = os.getenv("ANTHROPIC_API_KEY")
     if not api_key:
-        print("❌ ANTHROPIC_API_KEY not found in environment")
+        print("[ERROR] ANTHROPIC_API_KEY not found in environment")
         print("   Set it with: export ANTHROPIC_API_KEY='your-key-here'")
         return False
 
-    print(f"✅ ANTHROPIC_API_KEY found: {api_key[:20]}...")
+    print(f"[SUCCESS] ANTHROPIC_API_KEY found: {api_key[:20]}...")
     print()
 
     try:
         from ospra_os.intelligence.product_description_generator import ProductDescriptionGenerator
-        print("✅ ProductDescriptionGenerator imported successfully")
+        print("[SUCCESS] ProductDescriptionGenerator imported successfully")
         print()
 
         # Initialize generator
         generator = ProductDescriptionGenerator()
-        print("✅ Generator initialized")
+        print("[SUCCESS] Generator initialized")
         print()
 
         # Generate description
-        print(f"📝 Generating AI description for: {test_product['name']}")
+        print(f"[NOTE] Generating AI description for: {test_product['name']}")
         print()
 
         result = generator.generate_shopify_description(test_product)
 
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        print("✅ AI DESCRIPTION GENERATED SUCCESSFULLY!")
-        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("")
+        print("[SUCCESS] AI DESCRIPTION GENERATED SUCCESSFULLY!")
+        print("")
         print()
 
-        print("📌 SEO-OPTIMIZED TITLE:")
+        print(" SEO-OPTIMIZED TITLE:")
         print(f"   {result['title']}")
         print()
 
-        print("📝 HTML DESCRIPTION:")
+        print("[NOTE] HTML DESCRIPTION:")
         print(result['description'])
         print()
 
-        print("✨ KEY FEATURES:")
+        print("[NEW] KEY FEATURES:")
         for i, feature in enumerate(result['bullet_points'], 1):
             print(f"   {i}. {feature}")
         print()
 
-        print("🔑 SEO KEYWORDS:")
+        print(" SEO KEYWORDS:")
         print(f"   {', '.join(result['seo_keywords'])}")
         print()
 
         return True
 
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return False
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -88,9 +88,9 @@ def test_ai_generator():
 def test_shopify_integration():
     """Test Shopify client with AI descriptions"""
     print()
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("🛒 TESTING SHOPIFY CLIENT INTEGRATION")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[CART] TESTING SHOPIFY CLIENT INTEGRATION")
+    print("")
     print()
 
     try:
@@ -99,15 +99,15 @@ def test_shopify_integration():
         client = ShopifyClient()
 
         if hasattr(client, 'description_generator') and client.description_generator:
-            print("✅ ShopifyClient has AI description generator")
+            print("[SUCCESS] ShopifyClient has AI description generator")
             print(f"   Type: {type(client.description_generator)}")
             print()
 
             # Test description generation through Shopify client
-            print("📝 Generating description via Shopify client...")
+            print("[NOTE] Generating description via Shopify client...")
             description = client._generate_description(test_product)
 
-            print("✅ Description generated successfully!")
+            print("[SUCCESS] Description generated successfully!")
             print()
             print("PREVIEW:")
             print(description[:500] + "..." if len(description) > 500 else description)
@@ -115,12 +115,12 @@ def test_shopify_integration():
 
             return True
         else:
-            print("❌ ShopifyClient does NOT have AI description generator")
+            print("[ERROR] ShopifyClient does NOT have AI description generator")
             print("   This means the integration failed")
             return False
 
     except Exception as e:
-        print(f"❌ Shopify integration test failed: {e}")
+        print(f"[ERROR] Shopify integration test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -131,16 +131,16 @@ if __name__ == "__main__":
     success2 = test_shopify_integration()
 
     print()
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("📊 TEST SUMMARY")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print(f"   AI Generator Test: {'✅ PASSED' if success1 else '❌ FAILED'}")
-    print(f"   Shopify Integration: {'✅ PASSED' if success2 else '❌ FAILED'}")
+    print("")
+    print("[STATS] TEST SUMMARY")
+    print("")
+    print(f"   AI Generator Test: {'[SUCCESS] PASSED' if success1 else '[ERROR] FAILED'}")
+    print(f"   Shopify Integration: {'[SUCCESS] PASSED' if success2 else '[ERROR] FAILED'}")
     print()
 
     if success1 and success2:
-        print("🎉 ALL TESTS PASSED! AI descriptions are ready to use.")
+        print("[LAUNCH] ALL TESTS PASSED! AI descriptions are ready to use.")
         sys.exit(0)
     else:
-        print("⚠️  Some tests failed. Check the errors above.")
+        print("[WARNING]  Some tests failed. Check the errors above.")
         sys.exit(1)

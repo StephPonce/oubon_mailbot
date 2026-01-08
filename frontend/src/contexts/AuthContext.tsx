@@ -1,118 +1,117 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authAPI } from '../services/api';
+// 
+// AUTH CONTEXT
+// Manages authentication state across the application
+// 
 
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  subscription_tier: string;
-  created_at?: string;
-  last_login?: string;
-}
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import type { User, LoginCredentials, AuthContextType } from '../types';
+import { authApi, getStoredToken, getStoredUser, storeAuth, clearAuth } from '../api/auth';
 
-interface AuthContextType {
-  user: User | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  logout: () => void;
-  tier: string;
-}
+// Create context with default values
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
+  login: async () => ({ success: false }),
+  logout: () => {},
+  checkAuth: async () => {},
+});
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check for stored auth token on mount
-    const token = localStorage.getItem('ospra_token');
-    if (token) {
-      fetchUser();
-    } else {
-      setIsLoading(false);
-    }
-  }, []);
-
-  const fetchUser = async () => {
-    try {
-      const response = await authAPI.getProfile();
-      setUser(response.user);
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
-      // Clear invalid token
-      localStorage.removeItem('ospra_token');
-      localStorage.removeItem('ospra_user');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    const response = await authAPI.login(email, password);
-
-    // Store tokens
-    localStorage.setItem('ospra_token', response.access_token);
-    if (response.refresh_token) {
-      localStorage.setItem('ospra_refresh_token', response.refresh_token);
-    }
-
-    // Set user from response
-    setUser(response.user);
-  };
-
-  const register = async (email: string, password: string, name: string) => {
-    const response = await authAPI.register(email, password, name);
-
-    // Store tokens
-    localStorage.setItem('ospra_token', response.access_token);
-    if (response.refresh_token) {
-      localStorage.setItem('ospra_refresh_token', response.refresh_token);
-    }
-
-    // Set user from response
-    setUser(response.user);
-  };
-
-  const logout = () => {
-    // Call logout endpoint (fire and forget)
-    authAPI.logout().catch(() => {});
-
-    // Clear local storage
-    localStorage.removeItem('ospra_token');
-    localStorage.removeItem('ospra_refresh_token');
-    localStorage.removeItem('ospra_user');
-
-    // Clear user state
-    setUser(null);
-
-    // Redirect to auth page
-    window.location.href = '/auth';
-  };
-
-  return (
-    <AuthContext.Provider value={{
-      user,
-      isAuthenticated: !!user,
-      isLoading,
-      login,
-      register,
-      logout,
-      tier: user?.subscription_tier || 'nest',
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
+// Hook to use auth context
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+// Auth Provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check if user is authenticated on mount
+  const checkAuth = useCallback(async () => {
+    setIsLoading(true);
+    
+    const token = getStoredToken();
+    if (!token) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // Try to get user from storage first (faster)
+    const storedUser = getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
+    }
+
+    // Verify token is still valid with backend
+    try {
+      const response = await authApi.me();
+      if (response.success && response.user) {
+        setUser(response.user);
+      } else {
+        // Token invalid, clear storage
+        clearAuth();
+        setUser(null);
+      }
+    } catch {
+      // Network error - keep user logged in with stored data
+      // They can still use cached data
+      if (!storedUser) {
+        clearAuth();
+        setUser(null);
+      }
+    }
+    
+    setIsLoading(false);
+  }, []);
+
+  // Check auth on mount
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Login function
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    setIsLoading(true);
+    
+    const response = await authApi.login(credentials);
+    
+    if (response.success && response.access_token && response.user) {
+      storeAuth(response.access_token, response.user, credentials.remember_me || false);
+      setUser(response.user);
+      setIsLoading(false);
+      return { success: true };
+    }
+    
+    setIsLoading(false);
+    return { success: false, error: response.error || 'Login failed' };
+  }, []);
+
+  // Logout function
+  const logout = useCallback(() => {
+    authApi.logout();
+    setUser(null);
+  }, []);
+
+  const value: AuthContextType = {
+    user,
+    isAuthenticated: !!user,
+    isLoading,
+    login,
+    logout,
+    checkAuth,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export default AuthContext;

@@ -1,5 +1,5 @@
 """
-📊 PRODUCT HISTORY DATABASE
+[STATS] PRODUCT HISTORY DATABASE
 SQLite-based storage for product snapshots and change tracking
 """
 
@@ -23,7 +23,7 @@ class ProductHistoryDB:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
         self._init_db()
-        logger.info(f"✅ Product history database initialized: {db_path}")
+        logger.info(f"[SUCCESS] Product history database initialized: {db_path}")
 
     def _init_db(self):
         """Initialize database tables"""
@@ -630,7 +630,7 @@ class ProductHistoryDB:
                 shopify_data.get('shopify_url', '')
             ))
             conn.commit()
-            logger.info(f"✅ Recorded deployment for {product_id}")
+            logger.info(f"[SUCCESS] Recorded deployment for {product_id}")
             return True
         except Exception as e:
             logger.error(f"Failed to save deployment: {e}")
@@ -765,7 +765,7 @@ class ProductHistoryDB:
             """, (notification_type, title, message, severity, product_id, metadata_json))
 
             conn.commit()
-            logger.info(f"✅ Notification created: {title}")
+            logger.info(f"[SUCCESS] Notification created: {title}")
             return True
         except Exception as e:
             logger.error(f"Failed to create notification: {e}")
@@ -882,7 +882,7 @@ class ProductHistoryDB:
                 'unfulfilled'
             ))
             conn.commit()
-            logger.info(f"✅ Order saved: {order_data.get('shopify_order_number')}")
+            logger.info(f"[SUCCESS] Order saved: {order_data.get('shopify_order_number')}")
             return True
         except Exception as e:
             logger.error(f"Failed to save order: {e}")

@@ -1,4 +1,13 @@
-"""AliExpress connector for product sourcing."""
+"""
+AliExpress connector for product sourcing.
+
+FIXED: Uses correct API endpoints for keyword search.
+- Affiliate API (aliexpress.affiliate.product.query) for keyword search
+- Dropshipping API (aliexpress.ds.recommend.feed.get) for hot products feed
+
+Author: OspraOS
+Updated: December 2024
+"""
 
 from typing import List, Optional
 import hashlib
@@ -6,6 +15,7 @@ import hmac
 import time
 import requests
 import asyncio
+import os
 from ..base import BaseConnector, ProductCandidate
 
 
@@ -13,25 +23,36 @@ class AliExpressConnector(BaseConnector):
     """
     AliExpress integration for dropshipping product sourcing.
 
-    Use AliExpress Open Platform API to:
-    - Search products by keyword/category
-    - Get product details (price, rating, shipping)
-    - Find trending/hot products
-    - Track supplier performance
+    APIs Used:
+    - Affiliate API: For keyword product search (better for discovery)
+    - Dropshipping API: For hot products feeds and order management
 
     Setup:
     1. Register at https://portals.aliexpress.com/
-    2. Get API key and App Secret
-    3. Set ALIEXPRESS_API_KEY, ALIEXPRESS_APP_SECRET in .env
-
-    Note: Can also use unofficial scraping as fallback (slower, less reliable)
+    2. Get API credentials for both Affiliate and Dropshipping APIs
+    3. Set environment variables in .env
     """
 
-    def __init__(self, api_key: Optional[str] = None, app_secret: Optional[str] = None, access_token: Optional[str] = None):
-        super().__init__(api_key)
-        self.app_secret = app_secret
-        self.access_token = access_token  # OAuth access token for Dropshipping API
+    def __init__(
+        self, 
+        api_key: Optional[str] = None, 
+        app_secret: Optional[str] = None, 
+        access_token: Optional[str] = None,
+        affiliate_app_key: Optional[str] = None,
+        affiliate_app_secret: Optional[str] = None
+    ):
+        # Primary: Dropshipping API credentials
+        self.api_key = api_key or os.getenv('ALIEXPRESS_APP_KEY')
+        self.app_secret = app_secret or os.getenv('ALIEXPRESS_APP_SECRET')
+        self.access_token = access_token or os.getenv('ALIEXPRESS_ACCESS_TOKEN')
+        
+        # Secondary: Affiliate API credentials (better for search)
+        self.affiliate_app_key = affiliate_app_key or os.getenv('ALIEXPRESS_AFFILIATE_APP_KEY') or self.api_key
+        self.affiliate_app_secret = affiliate_app_secret or os.getenv('ALIEXPRESS_AFFILIATE_APP_SECRET') or self.app_secret
+        
         self.api_url = "https://api-sg.aliexpress.com/sync"
+        
+        super().__init__(self.api_key)
 
     @property
     def name(self) -> str:
@@ -42,11 +63,13 @@ class AliExpressConnector(BaseConnector):
         return "aliexpress"
 
     def is_available(self) -> bool:
-        """Check if both API key and secret are configured."""
+        """Check if API credentials are configured."""
         return bool(self.api_key and self.app_secret)
 
-    def _generate_signature(self, params: dict) -> str:
+    def _generate_signature(self, params: dict, secret: str = None) -> str:
         """Generate HMAC-SHA256 signature for API request."""
+        secret = secret or self.app_secret
+        
         # Sort parameters alphabetically
         sorted_params = sorted(params.items())
 
@@ -55,7 +78,7 @@ class AliExpressConnector(BaseConnector):
 
         # Generate HMAC-SHA256 signature
         signature = hmac.new(
-            self.app_secret.encode('utf-8'),
+            secret.encode('utf-8'),
             sign_string.encode('utf-8'),
             hashlib.sha256
         ).hexdigest().upper()
@@ -64,109 +87,248 @@ class AliExpressConnector(BaseConnector):
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
-        Search AliExpress products.
+        Search AliExpress products by keyword.
+
+        Uses Affiliate API for keyword search (most reliable for discovery).
+        Falls back to Dropshipping feed if Affiliate fails.
 
         Args:
             query: Product keyword or category
             min_price: Min price filter (USD)
             max_price: Max price filter (USD)
             min_rating: Min seller rating (0-5)
-            ship_from: Shipping location (default: 'CN')
             sort: 'price_asc', 'price_desc', 'orders', 'rating'
 
         Returns:
             Product candidates with pricing and supplier info
         """
         if not self.is_available():
-            print("⚠️  AliExpress API credentials not configured")
+            print("[WARNING]  AliExpress API credentials not configured")
             return []
 
-        min_price = kwargs.get("min_price", 0)
-        max_price = kwargs.get("max_price", 1000)
-        min_rating = kwargs.get("min_rating", 4.0)
-        sort = kwargs.get("sort", "orders")
+        # Try Affiliate API first (supports keyword search)
+        products = await self._search_affiliate(query, **kwargs)
+        
+        if products:
+            return products
+        
+        # Fallback to Dropshipping feed (doesn't support keyword, but gets products)
+        print("[WARNING]  Affiliate search returned 0, trying Dropshipping feed...")
+        return await self._get_feed_products(**kwargs)
 
-        # Build API parameters for DROPSHIPPING API
+    async def _search_affiliate(self, query: str, **kwargs) -> List[ProductCandidate]:
+        """
+        Search using Affiliate API - supports keyword queries.
+        
+        API Method: aliexpress.affiliate.product.query
+        """
+        min_price = kwargs.get("min_price")
+        max_price = kwargs.get("max_price")
+        sort = kwargs.get("sort", "SALE_PRICE_ASC")
+        page_size = kwargs.get("page_size", 20)
+        
+        # Map sort options
+        sort_map = {
+            "orders": "LAST_VOLUME_DESC",
+            "price_asc": "SALE_PRICE_ASC", 
+            "price_desc": "SALE_PRICE_DESC",
+            "rating": "EVALUATE_RATE_DESC",
+            "commission": "COMMISSION_RATE_DESC",
+        }
+        sort_param = sort_map.get(sort, sort)
+
+        # Build API parameters for AFFILIATE PRODUCT QUERY
         params = {
-            "app_key": self.api_key,
-            "method": "aliexpress.ds.recommend.feed.get",  # Dropshipping API endpoint
+            "app_key": self.affiliate_app_key,
+            "method": "aliexpress.affiliate.product.query",
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
-            "session": self.access_token,  # OAuth access token (REQUIRED for Dropshipping API!)
-            "feed_name": "DS hot product",  # Dropshipping feed
-            "country": "US",
+            # Search parameters
+            "keywords": query,
             "target_currency": "USD",
             "target_language": "EN",
-            "page_size": "20",
+            "ship_to_country": "US",
+            "sort": sort_param,
+            "page_size": str(page_size),
             "page_no": "1",
         }
 
         # Add optional filters
-        if min_price > 0:
-            params["min_price"] = str(min_price)
-        if max_price < 1000:
-            params["max_price"] = str(max_price)
+        if min_price is not None:
+            params["min_sale_price"] = str(min_price)
+        if max_price is not None:
+            params["max_sale_price"] = str(max_price)
+
+        # Generate signature with affiliate secret
+        params["sign"] = self._generate_signature(params, self.affiliate_app_secret)
+
+        try:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(self.api_url, params=params, timeout=15)
+            )
+
+            if response.status_code != 200:
+                print(f"[ERROR] AliExpress Affiliate API error: {response.status_code}")
+                return []
+
+            data = response.json()
+
+            # Check for API errors
+            if "error_response" in data:
+                error = data["error_response"]
+                error_code = error.get('code', 'unknown')
+                error_msg = error.get('msg', 'Unknown error')
+                print(f"[ERROR] AliExpress Affiliate API error {error_code}: {error_msg}")
+                
+                # Log sub-errors if present
+                if 'sub_code' in error:
+                    print(f"   Sub-code: {error.get('sub_code')} - {error.get('sub_msg', '')}")
+                return []
+
+            # Parse Affiliate API response
+            products = []
+            resp = data.get("aliexpress_affiliate_product_query_response", {})
+            resp_result = resp.get("resp_result", {})
+            result = resp_result.get("result", {})
+            
+            # Get products list
+            product_list = result.get("products", {}).get("product", [])
+            
+            # Handle single product (API returns dict instead of list)
+            if isinstance(product_list, dict):
+                product_list = [product_list]
+            
+            print(f"[SEARCH] AliExpress Affiliate: Found {len(product_list)} products for '{query}'")
+
+            for item in product_list:
+                try:
+                    # Extract price (handle both string and number)
+                    price_str = item.get("target_sale_price", "0")
+                    price = float(str(price_str).replace(",", ""))
+                    
+                    # Extract original price
+                    orig_price_str = item.get("target_original_price", price_str)
+                    orig_price = float(str(orig_price_str).replace(",", ""))
+                    
+                    product = ProductCandidate(
+                        name=item.get("product_title", "Unknown"),
+                        source=self.source_id,
+                        price=price,
+                        url=item.get("promotion_link", item.get("product_detail_url", "")),
+                        image_url=item.get("product_main_image_url", ""),
+                        supplier_rating=float(item.get("evaluate_rate", "0").replace("%", "")) / 100 * 5 if item.get("evaluate_rate") else 4.0,
+                        search_volume=int(item.get("lastest_volume", 0)),  # Recent sales
+                        category=item.get("second_level_category_name", item.get("first_level_category_name", "")),
+                    )
+                    
+                    # Add extra metadata
+                    product.original_price = orig_price
+                    product.commission_rate = item.get("commission_rate", "0%")
+                    product.product_id = item.get("product_id", "")
+                    
+                    products.append(product)
+                except Exception as e:
+                    print(f"   [WARNING] Error parsing product: {e}")
+                    continue
+
+            print(f"[SUCCESS] AliExpress Affiliate search: Parsed {len(products)} products")
+            return products
+
+        except Exception as e:
+            print(f"[ERROR] AliExpress Affiliate search error: {e}")
+            return []
+
+    async def _get_feed_products(self, **kwargs) -> List[ProductCandidate]:
+        """
+        Get products from Dropshipping feed.
+        
+        API Method: aliexpress.ds.recommend.feed.get
+        Note: This doesn't support keyword search, just returns feed products.
+        """
+        page_size = kwargs.get("page_size", 20)
+        feed_name = kwargs.get("feed_name", "DS hot product")
+
+        # Build API parameters for DROPSHIPPING FEED
+        params = {
+            "app_key": self.api_key,
+            "method": "aliexpress.ds.recommend.feed.get",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "session": self.access_token,
+            "feed_name": feed_name,
+            "country": "US",
+            "target_currency": "USD",
+            "target_language": "EN",
+            "page_size": str(page_size),
+            "page_no": "1",
+        }
 
         # Generate signature
         params["sign"] = self._generate_signature(params)
 
         try:
-            # Make async request
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: requests.get(self.api_url, params=params, timeout=10)
+                lambda: requests.get(self.api_url, params=params, timeout=15)
             )
 
             if response.status_code != 200:
-                print(f"❌ AliExpress API error: {response.status_code} - {response.text}")
+                print(f"[ERROR] AliExpress DS Feed API error: {response.status_code}")
                 return []
 
             data = response.json()
 
-            # Debug: Print response structure
-            print(f"🔍 AliExpress API response keys: {list(data.keys())}")
-            import json
-            print(f"📋 Full API response:")
-            print(json.dumps(data, indent=2)[:2000])  # First 2000 chars
-
             # Check for API errors
             if "error_response" in data:
                 error = data["error_response"]
-                print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
+                print(f"[ERROR] AliExpress DS Feed error: {error.get('code')} - {error.get('msg')}")
                 return []
 
-            # Parse DROPSHIPPING API response
+            # Parse Dropshipping API response
             products = []
             resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-            result = resp_result.get("resp_result", {})
+            result = resp_result.get("resp_result", {}).get("result", {})
 
-            # Handle both nested and flat product list structures
-            if isinstance(result.get("products"), dict):
-                product_list = result.get("products", {}).get("product", [])
-            else:
-                product_list = result.get("products", [])
+            # Handle nested product list
+            product_list = result.get("products", {})
+            if isinstance(product_list, dict):
+                product_list = product_list.get("product", [])
+            if isinstance(product_list, dict):
+                product_list = [product_list]
+
+            print(f"[SEARCH] AliExpress DS Feed: Found {len(product_list)} products")
 
             for item in product_list:
-                product = ProductCandidate(
-                    name=item.get("product_title", "Unknown"),
-                    source=self.source_id,
-                    price=float(item.get("target_sale_price", 0)),
-                    url=item.get("promotion_link", item.get("product_detail_url", "")),
-                    image_url=item.get("product_main_image_url", ""),
-                    supplier_rating=float(item.get("evaluate_rate", 0)) / 20.0,  # Convert 0-100 to 0-5
-                    search_volume=int(item.get("volume", 0)),  # Use orders as search volume proxy
-                    category=item.get("second_level_category_name", item.get("first_level_category_name")),
-                )
-                products.append(product)
+                try:
+                    price = float(item.get("target_sale_price", 0))
+                    
+                    product = ProductCandidate(
+                        name=item.get("product_title", "Unknown"),
+                        source=self.source_id,
+                        price=price,
+                        url=item.get("promotion_link", item.get("product_detail_url", "")),
+                        image_url=item.get("product_main_image_url", ""),
+                        supplier_rating=float(item.get("evaluate_rate", 0)) / 20.0,
+                        search_volume=int(item.get("volume", 0)),
+                        category=item.get("second_level_category_name", item.get("first_level_category_name", "")),
+                    )
+                    products.append(product)
+                except Exception as e:
+                    print(f"   [WARNING] Error parsing product: {e}")
+                    continue
 
-            print(f"✅ AliExpress search: Found {len(products)} products for '{query}'")
+            print(f"[SUCCESS] AliExpress DS Feed: Parsed {len(products)} products")
             return products
 
         except Exception as e:
-            print(f"❌ AliExpress search error: {e}")
+            print(f"[ERROR] AliExpress DS Feed error: {e}")
             return []
 
     async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
@@ -180,86 +342,93 @@ class AliExpressConnector(BaseConnector):
         Returns:
             Trending products with high order volume
         """
-        if not self.is_available():
-            print("⚠️  AliExpress API credentials not configured")
-            return []
+        # Try bestseller feed
+        products = await self._get_feed_products(
+            page_size=limit,
+            feed_name="DS bestseller"
+        )
+        
+        if not products:
+            # Fallback to hot products
+            products = await self._get_feed_products(
+                page_size=limit,
+                feed_name="DS hot product"
+            )
+        
+        return products
 
-        # Build API parameters for hot products (DROPSHIPPING API)
+    async def search_by_category(self, category_id: str, **kwargs) -> List[ProductCandidate]:
+        """
+        Search products by category ID.
+        
+        Uses Affiliate API with category filter.
+        """
+        page_size = kwargs.get("page_size", 20)
+        
         params = {
-            "app_key": self.api_key,
-            "method": "aliexpress.ds.recommend.feed.get",  # Dropshipping API
+            "app_key": self.affiliate_app_key,
+            "method": "aliexpress.affiliate.product.query",
             "timestamp": str(int(time.time() * 1000)),
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
-            "session": self.access_token,  # OAuth access token (REQUIRED!)
-            "feed_name": "DS bestseller",  # Bestseller feed
-            "country": "US",
+            "category_ids": category_id,
             "target_currency": "USD",
             "target_language": "EN",
-            "page_size": str(limit),
+            "ship_to_country": "US",
+            "sort": "LAST_VOLUME_DESC",
+            "page_size": str(page_size),
             "page_no": "1",
         }
-
-        # Add category filter if provided
-        if category:
-            params["category_ids"] = category
-
-        # Generate signature
-        params["sign"] = self._generate_signature(params)
-
+        
+        params["sign"] = self._generate_signature(params, self.affiliate_app_secret)
+        
         try:
-            # Make async request
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
                 None,
-                lambda: requests.get(self.api_url, params=params, timeout=10)
+                lambda: requests.get(self.api_url, params=params, timeout=15)
             )
-
+            
             if response.status_code != 200:
-                print(f"❌ AliExpress API error: {response.status_code} - {response.text}")
                 return []
-
+            
             data = response.json()
-
-            # Debug: Print response structure
-            print(f"🔍 AliExpress Hot Products API response keys: {list(data.keys())}")
-
-            # Check for API errors
+            
             if "error_response" in data:
-                error = data["error_response"]
-                print(f"❌ AliExpress API error: {error.get('code')} - {error.get('msg')}")
                 return []
-
-            # Parse DROPSHIPPING API response
+            
+            # Parse response
             products = []
-            resp_result = data.get("aliexpress_ds_recommend_feed_get_response", {})
-            result = resp_result.get("resp_result", {})
-
-            # Handle both nested and flat product list structures
-            if isinstance(result.get("products"), dict):
-                product_list = result.get("products", {}).get("product", [])
-            else:
-                product_list = result.get("products", [])
-
+            resp = data.get("aliexpress_affiliate_product_query_response", {})
+            resp_result = resp.get("resp_result", {})
+            result = resp_result.get("result", {})
+            product_list = result.get("products", {}).get("product", [])
+            
+            if isinstance(product_list, dict):
+                product_list = [product_list]
+            
             for item in product_list:
-                product = ProductCandidate(
-                    name=item.get("product_title", "Unknown"),
-                    source=self.source_id,
-                    price=float(item.get("target_sale_price", 0)),
-                    url=item.get("promotion_link", item.get("product_detail_url", "")),
-                    image_url=item.get("product_main_image_url", ""),
-                    supplier_rating=float(item.get("evaluate_rate", 0)) / 20.0,  # Convert 0-100 to 0-5
-                    search_volume=int(item.get("volume", 0)),  # Use orders as search volume proxy
-                    category=item.get("second_level_category_name", item.get("first_level_category_name")),
-                )
-                products.append(product)
-
-            print(f"✅ AliExpress trending: Found {len(products)} hot products")
+                try:
+                    price = float(str(item.get("target_sale_price", "0")).replace(",", ""))
+                    product = ProductCandidate(
+                        name=item.get("product_title", "Unknown"),
+                        source=self.source_id,
+                        price=price,
+                        url=item.get("promotion_link", ""),
+                        image_url=item.get("product_main_image_url", ""),
+                        supplier_rating=4.0,
+                        search_volume=int(item.get("lastest_volume", 0)),
+                        category=item.get("second_level_category_name", ""),
+                    )
+                    products.append(product)
+                except:
+                    continue
+            
             return products
-
+            
         except Exception as e:
-            print(f"❌ AliExpress trending error: {e}")
+            print(f"[ERROR] Category search error: {e}")
             return []
 
     async def get_product_details(self, product_id: str) -> dict:
@@ -270,42 +439,61 @@ class AliExpressConnector(BaseConnector):
             product_id: AliExpress product ID
 
         Returns:
-            {
-                "title": str,
-                "price": float,
-                "original_price": float,
-                "discount": float,
-                "rating": float,
-                "orders": int,
-                "shipping_cost": float,
-                "shipping_time": str,
-                "supplier_rating": float,
-                "images": List[str],
-                "variants": List[dict]
-            }
+            Product details dict
         """
         if not self.api_key:
             return {}
 
-        # TODO: Implement product details fetch
-        # API endpoint: aliexpress.affiliate.productdetail.get
-        # - Get complete product info
-        # - Calculate potential margins
-        # - Check shipping options
-
-        return {}
+        params = {
+            "app_key": self.affiliate_app_key,
+            "method": "aliexpress.affiliate.productdetail.get",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "product_ids": product_id,
+            "target_currency": "USD",
+            "target_language": "EN",
+            "ship_to_country": "US",
+        }
+        
+        params["sign"] = self._generate_signature(params, self.affiliate_app_secret)
+        
+        try:
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.get(self.api_url, params=params, timeout=15)
+            )
+            
+            if response.status_code != 200:
+                return {}
+            
+            data = response.json()
+            
+            if "error_response" in data:
+                return {}
+            
+            resp = data.get("aliexpress_affiliate_productdetail_get_response", {})
+            resp_result = resp.get("resp_result", {})
+            result = resp_result.get("result", {})
+            products = result.get("products", {}).get("product", [])
+            
+            if products:
+                return products[0] if isinstance(products, list) else products
+            
+            return {}
+            
+        except Exception as e:
+            print(f"[ERROR] Product details error: {e}")
+            return {}
 
     async def calculate_margin(self, product_price: float, sale_price: float, shipping_cost: float = 0) -> dict:
         """
         Calculate profit margin for a product.
 
         Returns:
-            {
-                "cost": float,
-                "revenue": float,
-                "profit": float,
-                "margin_percent": float
-            }
+            Margin calculation dict
         """
         cost = product_price + shipping_cost
         revenue = sale_price
@@ -318,3 +506,44 @@ class AliExpressConnector(BaseConnector):
             "profit": round(profit, 2),
             "margin_percent": round(margin_percent, 2),
         }
+
+
+# Quick test function
+async def test_aliexpress():
+    """Test AliExpress connector."""
+    print("\n" + "="*60)
+    print("[TEST] TESTING ALIEXPRESS CONNECTOR")
+    print("="*60)
+    
+    connector = AliExpressConnector()
+    
+    if not connector.is_available():
+        print("[ERROR] AliExpress not configured")
+        return
+    
+    print(f"[SUCCESS] API Key: {connector.api_key[:8]}...")
+    print(f"[SUCCESS] Affiliate Key: {connector.affiliate_app_key[:8]}...")
+    
+    # Test keyword search
+    print("\n Testing keyword search: 'smart plug wifi'")
+    products = await connector.search("smart plug wifi", page_size=5)
+    
+    print(f"\n[SEARCH] Results: {len(products)} products")
+    for p in products[:3]:
+        print(f"   [PACKAGE] {p.name[:50]}...")
+        print(f"      Price: ${p.price:.2f} | Orders: {p.search_volume}")
+    
+    # Test trending
+    print("\n Testing trending products...")
+    trending = await connector.get_trending(limit=5)
+    
+    print(f"\n[HOT] Trending: {len(trending)} products")
+    for p in trending[:3]:
+        print(f"   [HOT] {p.name[:50]}...")
+        print(f"      Price: ${p.price:.2f}")
+    
+    print("\n[SUCCESS] Test complete!")
+
+
+if __name__ == "__main__":
+    asyncio.run(test_aliexpress())

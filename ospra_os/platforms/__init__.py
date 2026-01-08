@@ -5,9 +5,9 @@ This package provides adapters for integrating with various e-commerce platforms
 All adapters implement the PlatformAdapter abstract base class.
 
 Available Platforms:
-    - Shopify ✅ (Admin API 2024-01+)
-    - Amazon ✅ (SP-API 2021-06-30, MVP: Orders & Sync)
-    - WooCommerce ✅ (REST API wc/v3)
+    - Shopify [SUCCESS] (Admin API 2024-01+)
+    - Amazon [SUCCESS] (SP-API 2021-06-30, MVP: Orders & Sync)
+    - WooCommerce [SUCCESS] (REST API wc/v3)
 
 Author: OspraOS
 Date: November 2025

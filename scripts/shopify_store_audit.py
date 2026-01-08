@@ -56,16 +56,16 @@ class ShopifyAuditor:
             if response.status_code == 200:
                 return response.json()
             else:
-                print(f"⚠️  API Error ({endpoint}): {response.status_code} - {response.text[:200]}")
+                print(f"[WARNING]  API Error ({endpoint}): {response.status_code} - {response.text[:200]}")
                 return None
 
         except Exception as e:
-            print(f"❌ Request failed ({endpoint}): {e}")
+            print(f"[ERROR] Request failed ({endpoint}): {e}")
             return None
 
     def audit_products(self):
         """Audit all products for common issues"""
-        print("\n📦 Auditing Products...")
+        print("\n[PACKAGE] Auditing Products...")
 
         products = self._make_request("products", {"limit": 250})
 
@@ -150,11 +150,11 @@ class ShopifyAuditor:
                 "products": issues["poor_description"][:5]
             })
 
-        print(f"   ✅ Product audit complete")
+        print(f"   [SUCCESS] Product audit complete")
 
     def audit_pages(self):
         """Audit store pages"""
-        print("\n📄 Auditing Pages...")
+        print("\n[FILE] Auditing Pages...")
 
         pages = self._make_request("pages", {"limit": 250})
 
@@ -211,7 +211,7 @@ class ShopifyAuditor:
 
     def audit_policies(self):
         """Audit legal policies"""
-        print("\n📜 Auditing Policies...")
+        print("\n Auditing Policies...")
 
         shop_info = self._make_request("shop")
 
@@ -252,7 +252,7 @@ class ShopifyAuditor:
 
     def audit_navigation(self):
         """Audit navigation menus"""
-        print("\n🧭 Auditing Navigation...")
+        print("\n Auditing Navigation...")
 
         # Note: Shopify API doesn't provide direct menu access
         # This is a placeholder for manual checking
@@ -273,7 +273,7 @@ class ShopifyAuditor:
 
     def audit_seo(self):
         """Audit SEO settings"""
-        print("\n🔍 Auditing SEO...")
+        print("\n[SEARCH] Auditing SEO...")
 
         shop_info = self._make_request("shop")
 
@@ -309,7 +309,7 @@ class ShopifyAuditor:
 
     def audit_theme(self):
         """Audit theme configuration"""
-        print("\n🎨 Auditing Theme...")
+        print("\n Auditing Theme...")
 
         themes = self._make_request("themes")
 
@@ -365,7 +365,7 @@ class ShopifyAuditor:
     def run_full_audit(self):
         """Run complete store audit"""
         print("=" * 60)
-        print("🔍 OUBON SHOP - COMPREHENSIVE STORE AUDIT")
+        print("[SEARCH] OUBON SHOP - COMPREHENSIVE STORE AUDIT")
         print("=" * 60)
         print(f"Store: {self.store_url}")
         print(f"API Version: {self.api_version}")
@@ -381,7 +381,7 @@ class ShopifyAuditor:
         self.calculate_overall_score()
 
         print("\n" + "=" * 60)
-        print(f"✅ AUDIT COMPLETE")
+        print(f"[SUCCESS] AUDIT COMPLETE")
         print(f"Overall Store Health: {self.audit_results['overall_score']}/100")
         print(f"Critical Issues: {len(self.audit_results['critical_issues'])}")
         print(f"Warnings: {len(self.audit_results['warnings'])}")
@@ -394,44 +394,44 @@ class ShopifyAuditor:
         with open(filename, 'w') as f:
             json.dump(self.audit_results, f, indent=2)
 
-        print(f"\n📄 Report saved to: {filename}")
+        print(f"\n[FILE] Report saved to: {filename}")
 
     def print_summary(self):
         """Print executive summary"""
         print("\n" + "=" * 60)
-        print("📊 EXECUTIVE SUMMARY")
+        print("[STATS] EXECUTIVE SUMMARY")
         print("=" * 60)
 
-        print(f"\n🏪 Overall Store Health: {self.audit_results['overall_score']}/100")
+        print(f"\n Overall Store Health: {self.audit_results['overall_score']}/100")
 
         if self.audit_results['overall_score'] >= 80:
-            print("   ✅ EXCELLENT - Store is well-optimized")
+            print("   [SUCCESS] EXCELLENT - Store is well-optimized")
         elif self.audit_results['overall_score'] >= 60:
-            print("   ⚠️  GOOD - Some improvements needed")
+            print("   [WARNING]  GOOD - Some improvements needed")
         elif self.audit_results['overall_score'] >= 40:
-            print("   ⚠️  FAIR - Significant improvements needed")
+            print("   [WARNING]  FAIR - Significant improvements needed")
         else:
-            print("   ❌ POOR - Critical issues need immediate attention")
+            print("   [ERROR] POOR - Critical issues need immediate attention")
 
-        print(f"\n🔴 Critical Issues: {len(self.audit_results['critical_issues'])}")
+        print(f"\n Critical Issues: {len(self.audit_results['critical_issues'])}")
         for issue in self.audit_results['critical_issues'][:3]:
             print(f"   • {issue['area']}: {issue['issue']}")
 
-        print(f"\n⚠️  Warnings: {len(self.audit_results['warnings'])}")
+        print(f"\n[WARNING]  Warnings: {len(self.audit_results['warnings'])}")
         for warning in self.audit_results['warnings'][:3]:
             print(f"   • {warning['area']}: {warning['issue']}")
 
-        print("\n📦 Products:")
+        print("\n[PACKAGE] Products:")
         print(f"   Total: {self.audit_results['products'].get('total_count', 0)}")
         print(f"   Score: {self.audit_results['products'].get('score', 0)}/100")
 
-        print("\n📄 Pages:")
+        print("\n[FILE] Pages:")
         print(f"   Existing: {self.audit_results['pages'].get('total_count', 0)}")
         missing = self.audit_results['pages'].get('missing_pages', [])
         if missing:
             print(f"   Missing: {', '.join(missing)}")
 
-        print("\n📜 Policies:")
+        print("\n Policies:")
         existing_policies = self.audit_results['policies'].get('existing', [])
         missing_policies = self.audit_results['policies'].get('missing', [])
         print(f"   Configured: {', '.join(existing_policies) if existing_policies else 'None'}")
@@ -439,7 +439,7 @@ class ShopifyAuditor:
             print(f"   Missing: {', '.join(missing_policies)}")
 
         print("\n" + "=" * 60)
-        print("📝 NEXT STEPS:")
+        print("[NOTE] NEXT STEPS:")
         print("=" * 60)
         print("1. Review full report: shopify_audit_report.json")
         print("2. Check manual editing checklist: docs/SHOPIFY_SEO_CHECKLIST.md")
@@ -457,7 +457,7 @@ def main():
         auditor.print_summary()
 
     except Exception as e:
-        print(f"\n❌ Audit failed: {e}")
+        print(f"\n[ERROR] Audit failed: {e}")
         import traceback
         traceback.print_exc()
         return 1

@@ -37,7 +37,7 @@ class ShopifyInventorySync:
                 "admin_api_token": access_token,
                 "api_version": "2024-01"
             })
-            logger.info("✅ Shopify inventory sync initialized")
+            logger.info("[SUCCESS] Shopify inventory sync initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Shopify adapter: {e}")
             self.adapter = None
@@ -226,7 +226,7 @@ class ShopifyInventorySync:
                     'sales_history': sales_history
                 })
 
-            logger.info(f"✅ Synced {len(synced_products)} products from Shopify")
+            logger.info(f"[SUCCESS] Synced {len(synced_products)} products from Shopify")
             return synced_products
 
         except Exception as e:

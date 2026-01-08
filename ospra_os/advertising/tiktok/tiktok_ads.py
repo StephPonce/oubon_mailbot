@@ -49,7 +49,7 @@ class TikTokAdsManager:
             Campaign info dict
         """
         try:
-            print(f"🎵 Creating TikTok ad campaign for: {product_name}")
+            print(f" Creating TikTok ad campaign for: {product_name}")
 
             # Step 1: Create Campaign
             campaign = self._create_campaign(
@@ -75,7 +75,7 @@ class TikTokAdsManager:
                 landing_page_url=product_url
             )
 
-            print(f"✅ TikTok campaign created: {campaign['campaign_id']}")
+            print(f"[SUCCESS] TikTok campaign created: {campaign['campaign_id']}")
 
             return {
                 'success': True,
@@ -87,7 +87,7 @@ class TikTokAdsManager:
             }
 
         except Exception as e:
-            print(f"❌ TikTok campaign creation failed: {e}")
+            print(f"[ERROR] TikTok campaign creation failed: {e}")
             return {
                 'success': False,
                 'error': str(e)
@@ -310,7 +310,7 @@ class TikTokAdsManager:
                     return None
 
                 video_id = result['data']['video_id']
-                print(f"✅ Video uploaded: {video_id}")
+                print(f"[SUCCESS] Video uploaded: {video_id}")
                 return video_id
 
         except Exception as e:

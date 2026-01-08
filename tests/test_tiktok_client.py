@@ -16,16 +16,16 @@ from ospra_os.integrations.tiktok_client import TikTokClient
 
 
 def test_tiktok_client():
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("🎵 TESTING TIKTOK PRODUCT DISCOVERY")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print(" TESTING TIKTOK PRODUCT DISCOVERY")
+    print("")
     print()
 
     # Initialize client
     client = TikTokClient()
 
     if not client.enabled:
-        print("⚠️  TikTok credentials not configured")
+        print("[WARNING]  TikTok credentials not configured")
         print()
         print("To enable TikTok integration:")
         print("1. Add TikTok credentials to .env file")
@@ -35,8 +35,8 @@ def test_tiktok_client():
         print()
 
     # Test 1: Get trending hashtags
-    print("1️⃣ TRENDING HASHTAGS")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("1⃣ TRENDING HASHTAGS")
+    print("")
     hashtags = client.get_trending_hashtags(limit=10)
     print(f"Found {len(hashtags)} trending product hashtags:")
     for i, tag in enumerate(hashtags[:10], 1):
@@ -44,19 +44,19 @@ def test_tiktok_client():
     print()
 
     # Test 2: Generate OAuth URL
-    print("2️⃣ OAUTH AUTHORIZATION")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("2⃣ OAUTH AUTHORIZATION")
+    print("")
     auth_url = client.get_authorization_url(state="test_state_123")
     if auth_url:
         print("To authorize TikTok access, visit:")
         print(f"  {auth_url}")
     else:
-        print("⚠️  OAuth not configured (credentials missing)")
+        print("[WARNING]  OAuth not configured (credentials missing)")
     print()
 
     # Test 3: Search for trending products
-    print("3️⃣ SEARCHING FOR TRENDING PRODUCTS")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("3⃣ SEARCHING FOR TRENDING PRODUCTS")
+    print("")
 
     # Search multiple categories
     keywords = ["smart home", "fitness gadget", "kitchen tool"]
@@ -65,36 +65,36 @@ def test_tiktok_client():
 
     products = client.search_trending_products(keywords=keywords, limit=10)
 
-    print(f"✅ Found {len(products)} viral products")
+    print(f"[SUCCESS] Found {len(products)} viral products")
     print()
 
     # Display top 5 products
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("📦 TOP 5 VIRAL PRODUCTS")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[PACKAGE] TOP 5 VIRAL PRODUCTS")
+    print("")
     print()
 
     for i, product in enumerate(products[:5], 1):
         print(f"{i}. {product['name']}")
-        print(f"   💰 Price: ${product['price']:.2f}")
-        print(f"   📈 Viral Score: {product['viral_score']}/100")
-        print(f"   ⚡ Velocity: {product['velocity_score']}/100")
-        print(f"   ⭐ Estimated Rating: {product['rating']}/5.0")
-        print(f"   💵 Profit: ${product['estimated_profit']:.2f} ({product['profit_margin']:.1f}% margin)")
+        print(f"   [PRICE] Price: ${product['price']:.2f}")
+        print(f"   [TREND] Viral Score: {product['viral_score']}/100")
+        print(f"   [FAST] Velocity: {product['velocity_score']}/100")
+        print(f"   [STAR] Estimated Rating: {product['rating']}/5.0")
+        print(f"   [MONEY] Profit: ${product['estimated_profit']:.2f} ({product['profit_margin']:.1f}% margin)")
 
         stats = product.get('statistics', {})
-        print(f"   📊 Engagement: {stats.get('engagement_rate', 0):.2f}%")
+        print(f"   [STATS] Engagement: {stats.get('engagement_rate', 0):.2f}%")
         print(f"      • Views: {stats.get('views', 0):,}")
         print(f"      • Likes: {stats.get('likes', 0):,}")
         print(f"      • Comments: {stats.get('comments', 0):,}")
         print(f"      • Shares: {stats.get('shares', 0):,}")
-        print(f"   🔗 Source: {product.get('source_url', 'N/A')}")
+        print(f"   [LINK] Source: {product.get('source_url', 'N/A')}")
         print()
 
     # Test 4: Show integration examples
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("💡 INTEGRATION EXAMPLES")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[TIP] INTEGRATION EXAMPLES")
+    print("")
     print()
 
     print("1. Add to Product Discovery:")
@@ -142,9 +142,9 @@ def test_tiktok_client():
     print("   ```")
     print()
 
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-    print("✨ NEXT STEPS")
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+    print("[NEW] NEXT STEPS")
+    print("")
     print()
     print("1. Get TikTok API access:")
     print("   • Visit: https://developers.tiktok.com")
@@ -161,7 +161,7 @@ def test_tiktok_client():
     print("   • Run daily discovery jobs")
     print("   • Auto-deploy top products")
     print()
-    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
 
 
 if __name__ == "__main__":

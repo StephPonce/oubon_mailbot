@@ -90,7 +90,7 @@ async def setup_background_jobs(app: FastAPI):
         # Store in app state
         app.state.daily_ranking_job = _daily_ranking_job
 
-        logger.info("✅ Background jobs setup complete")
+        logger.info("[SUCCESS] Background jobs setup complete")
 
     except Exception as e:
         logger.error(f"Failed to setup background jobs: {e}")
@@ -130,7 +130,7 @@ async def shutdown_background_jobs(app: FastAPI):
 
             _daily_ranking_job = None
 
-        logger.info("✅ Background jobs shutdown complete")
+        logger.info("[SUCCESS] Background jobs shutdown complete")
 
     except Exception as e:
         logger.error(f"Error during background jobs shutdown: {e}")

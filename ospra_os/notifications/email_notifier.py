@@ -1,5 +1,5 @@
 """
-📧 EMAIL NOTIFIER
+[EMAIL] EMAIL NOTIFIER
 Send product change alerts via email using Gmail SMTP
 """
 
@@ -35,9 +35,9 @@ class EmailNotifier:
         ])
 
         if not self.is_configured:
-            logger.warning("⚠️  Email notifications not configured. Set NOTIFICATION_EMAIL, NOTIFICATION_EMAIL_PASSWORD, and ALERT_RECIPIENT_EMAIL in .env")
+            logger.warning("[WARNING]  Email notifications not configured. Set NOTIFICATION_EMAIL, NOTIFICATION_EMAIL_PASSWORD, and ALERT_RECIPIENT_EMAIL in .env")
         else:
-            logger.info("✅ Email notifier initialized")
+            logger.info("[SUCCESS] Email notifier initialized")
 
     def send_change_alert(self, changes: List[Dict]) -> bool:
         """
@@ -59,7 +59,7 @@ class EmailNotifier:
         try:
             # Create email
             message = MIMEMultipart("alternative")
-            message["Subject"] = f"🚨 Product Alert: {len(changes)} Changes Detected"
+            message["Subject"] = f" Product Alert: {len(changes)} Changes Detected"
             message["From"] = self.sender_email
             message["To"] = self.recipient_email
 
@@ -80,7 +80,7 @@ class EmailNotifier:
                 server.login(self.sender_email, self.sender_password)
                 server.send_message(message)
 
-            logger.info(f"✅ Email sent to {self.recipient_email}")
+            logger.info(f"[SUCCESS] Email sent to {self.recipient_email}")
             return True
 
         except Exception as e:
@@ -97,33 +97,33 @@ class EmailNotifier:
 
         body = f"""
 Product Change Alert
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 """
 
         if high:
-            body += f"\n🔴 HIGH PRIORITY ({len(high)}):\n"
+            body += f"\n HIGH PRIORITY ({len(high)}):\n"
             for change in high:
                 body += f"\n• {change['product_name']}\n"
                 body += f"  {change['message']}\n"
 
         if medium:
-            body += f"\n🟡 MEDIUM PRIORITY ({len(medium)}):\n"
+            body += f"\n MEDIUM PRIORITY ({len(medium)}):\n"
             for change in medium[:5]:
                 body += f"• {change['product_name']}: {change['message']}\n"
             if len(medium) > 5:
                 body += f"  ... and {len(medium) - 5} more\n"
 
         if low:
-            body += f"\n🟢 LOW PRIORITY ({len(low)}):\n"
+            body += f"\n LOW PRIORITY ({len(low)}):\n"
             for change in low[:3]:
                 body += f"• {change['product_name']}: {change['message']}\n"
             if len(low) > 3:
                 body += f"  ... and {len(low) - 3} more\n"
 
-        body += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        body += "\n\n"
         body += "View your dashboard for full details.\n"
 
         return body
@@ -207,7 +207,7 @@ Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H
 </head>
 <body>
     <div class="header">
-        <h1>🚨 Product Change Alert</h1>
+        <h1> Product Change Alert</h1>
         <div class="timestamp">{len(changes)} changes detected at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>
     </div>
 """
@@ -215,7 +215,7 @@ Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H
         if high:
             html += f"""
     <div class="section high">
-        <h2 style="margin-top:0;">🔴 HIGH PRIORITY ({len(high)})</h2>
+        <h2 style="margin-top:0;"> HIGH PRIORITY ({len(high)})</h2>
 """
             for change in high:
                 html += f"""
@@ -229,7 +229,7 @@ Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H
         if medium:
             html += f"""
     <div class="section medium">
-        <h2 style="margin-top:0;">🟡 MEDIUM PRIORITY ({len(medium)})</h2>
+        <h2 style="margin-top:0;"> MEDIUM PRIORITY ({len(medium)})</h2>
 """
             for change in medium[:5]:
                 html += f"""
@@ -245,7 +245,7 @@ Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H
         if low:
             html += f"""
     <div class="section low">
-        <h2 style="margin-top:0;">🟢 LOW PRIORITY ({len(low)})</h2>
+        <h2 style="margin-top:0;"> LOW PRIORITY ({len(low)})</h2>
 """
             for change in low[:3]:
                 html += f"""
@@ -275,7 +275,7 @@ Detected {len(changes)} product changes at {datetime.now().strftime('%Y-%m-%d %H
 
         test_changes = [{
             'product_name': 'Test Product',
-            'message': '📈 Test notification',
+            'message': '[TREND] Test notification',
             'severity': 'high'
         }]
 

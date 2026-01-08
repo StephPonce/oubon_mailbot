@@ -29,7 +29,7 @@ async def test_smart_recommendation_engine():
         # Initialize engine
         print("\n[Test 1.1] Initializing SmartRecommendationEngine...")
         engine = SmartRecommendationEngine(database_url=settings.database_url)
-        print("✓ Engine initialized with all 4 sub-systems:")
+        print("[OK] Engine initialized with all 4 sub-systems:")
         print("  - SaturationTracker")
         print("  - VelocityDetector")
         print("  - TierManager")
@@ -45,13 +45,13 @@ async def test_smart_recommendation_engine():
         )
 
         if free_user_recs.get('success'):
-            print(f"✓ Free user recommendations:")
+            print(f"[OK] Free user recommendations:")
             print(f"  Tier: {free_user_recs['user_tier']}")
             print(f"  Phase Access: {free_user_recs['tier_info']['phase_access']}")
             print(f"  Products: {free_user_recs['count']}")
             print(f"  Advantage: {free_user_recs['tier_info']['advantage']}")
         else:
-            print(f"✗ Free user recommendations failed: {free_user_recs.get('error')}")
+            print(f" Free user recommendations failed: {free_user_recs.get('error')}")
 
         # Test Pro tier user
         print("\n[Test 1.3] Getting recommendations for Pro tier user (user_id=2)...")
@@ -63,7 +63,7 @@ async def test_smart_recommendation_engine():
         )
 
         if pro_user_recs.get('success'):
-            print(f"✓ Pro user recommendations:")
+            print(f"[OK] Pro user recommendations:")
             print(f"  Tier: {pro_user_recs['user_tier']}")
             print(f"  Phase Access: {pro_user_recs['tier_info']['phase_access']}")
             print(f"  Products: {pro_user_recs['count']}")
@@ -80,24 +80,24 @@ async def test_smart_recommendation_engine():
                     print(f"    Personalized Title: {angle.get('title')}")
                     print(f"    Target Audience: {angle.get('target_audience')}")
         else:
-            print(f"✗ Pro user recommendations failed: {pro_user_recs.get('error')}")
+            print(f" Pro user recommendations failed: {pro_user_recs.get('error')}")
 
         # Test analytics
         print("\n[Test 1.4] Getting recommendation analytics for user 1...")
         analytics = await engine.get_recommendation_analytics(user_id=1)
 
-        print(f"✓ Analytics retrieved:")
+        print(f"[OK] Analytics retrieved:")
         print(f"  Total recommendations: {analytics.get('total_recommendations', 0)}")
         print(f"  Products deployed: {analytics.get('products_deployed', 0)}")
         print(f"  Success rate: {analytics.get('success_rate', 0)}%")
 
         # Close engine
         await engine.close()
-        print("\n✓ All SmartRecommendationEngine tests passed!")
+        print("\n[OK] All SmartRecommendationEngine tests passed!")
         return True
 
     except Exception as e:
-        print(f"\n✗ SmartRecommendationEngine test failed: {e}")
+        print(f"\n SmartRecommendationEngine test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -128,7 +128,7 @@ async def test_api_endpoints():
             if response.status_code == 200:
                 data = response.json()
                 if data.get('success'):
-                    print(f"✓ API responded successfully")
+                    print(f"[OK] API responded successfully")
                     print(f"  User Tier: {data.get('user_tier')}")
                     print(f"  Products Returned: {data.get('count')}")
                     print(f"  Saturation Protected: {data.get('personalization', {}).get('saturation_protected')}")
@@ -143,10 +143,10 @@ async def test_api_endpoints():
                     print(f"    After Tier Filter: {filters.get('after_tier_filter', 0)}")
                     print(f"    Final Count: {filters.get('final_count', 0)}")
                 else:
-                    print(f"✗ API error: {data.get('error')}")
+                    print(f" API error: {data.get('error')}")
                     return False
             else:
-                print(f"✗ HTTP {response.status_code}: {response.text[:200]}")
+                print(f" HTTP {response.status_code}: {response.text[:200]}")
                 return False
 
             # Test 2: Analytics endpoint
@@ -157,7 +157,7 @@ async def test_api_endpoints():
 
             if response.status_code == 200:
                 data = response.json()
-                print(f"✓ API responded successfully")
+                print(f"[OK] API responded successfully")
                 print(f"  User ID: {data.get('user_id')}")
                 print(f"  Total Recommendations: {data.get('total_recommendations', 0)}")
                 print(f"  Products Deployed: {data.get('products_deployed', 0)}")
@@ -169,7 +169,7 @@ async def test_api_endpoints():
                 print(f"    Unique Niches: {diversity.get('unique_niches', 0)}")
                 print(f"    Unique Angles: {diversity.get('unique_marketing_angles', 0)}")
             else:
-                print(f"✗ HTTP {response.status_code}")
+                print(f" HTTP {response.status_code}")
                 return False
 
             # Test 3: Different tiers get different products
@@ -191,22 +191,22 @@ async def test_api_endpoints():
                 free_data = free_response.json()
                 pro_data = pro_response.json()
 
-                print(f"✓ Tier differentiation working:")
+                print(f"[OK] Tier differentiation working:")
                 print(f"  Free tier: {free_data.get('user_tier')} - Access to {free_data.get('tier_info', {}).get('phase_access')}")
                 print(f"  Pro tier: {pro_data.get('user_tier')} - Access to {pro_data.get('tier_info', {}).get('phase_access')}")
             else:
-                print(f"✗ Tier differentiation test failed")
+                print(f" Tier differentiation test failed")
 
-            print("\n✓ All API endpoint tests passed!")
+            print("\n[OK] All API endpoint tests passed!")
             return True
 
         except httpx.ConnectError:
-            print("✗ Failed to connect to backend")
+            print(" Failed to connect to backend")
             print("  Make sure the backend is running on port 8001")
             return False
 
         except Exception as e:
-            print(f"✗ API test failed: {e}")
+            print(f" API test failed: {e}")
             import traceback
             traceback.print_exc()
             return False
@@ -237,7 +237,7 @@ async def demonstration():
 
         # User A: Free tier
         print("\n" + "-"*70)
-        print("👤 USER A (Free Tier)")
+        print(" USER A (Free Tier)")
         print("-"*70)
 
         user_a = await engine.get_personalized_recommendations(
@@ -255,7 +255,7 @@ async def demonstration():
 
         # User B: Starter tier (would need to set up user with starter tier)
         print("\n" + "-"*70)
-        print("👤 USER B (Starter Tier)")
+        print(" USER B (Starter Tier)")
         print("-"*70)
 
         user_b = await engine.get_personalized_recommendations(
@@ -273,7 +273,7 @@ async def demonstration():
 
         # User C: Pro tier
         print("\n" + "-"*70)
-        print("👤 USER C (Pro Tier)")
+        print(" USER C (Pro Tier)")
         print("-"*70)
 
         user_c = await engine.get_personalized_recommendations(
@@ -292,27 +292,27 @@ async def demonstration():
         await engine.close()
 
         print("\n" + "="*70)
-        print("✅ RESULT: Complete Anti-AutoDS System Working!")
+        print("[SUCCESS] RESULT: Complete Anti-AutoDS System Working!")
         print("="*70)
         print("\nKey Features Demonstrated:")
-        print("  ✓ Tier-based early access (different phases per tier)")
-        print("  ✓ Saturation protection (oversaturated products filtered)")
-        print("  ✓ Velocity detection (lifecycle phase filtering)")
-        print("  ✓ Unique marketing angles (prevent direct competition)")
+        print("  [OK] Tier-based early access (different phases per tier)")
+        print("  [OK] Saturation protection (oversaturated products filtered)")
+        print("  [OK] Velocity detection (lifecycle phase filtering)")
+        print("  [OK] Unique marketing angles (prevent direct competition)")
         print("\nNo two users compete directly - each gets personalized recommendations!")
         print("="*70)
 
     except Exception as e:
-        print(f"\n✗ Demonstration failed: {e}")
+        print(f"\n Demonstration failed: {e}")
         import traceback
         traceback.print_exc()
 
 
 async def main():
     """Run all tests"""
-    print("\n" + "█"*70)
+    print("\n" + ""*70)
     print("SMART RECOMMENDATIONS SYSTEM - COMPLETE ANTI-AUTODS VERIFICATION")
-    print("█"*70)
+    print(""*70)
 
     try:
         # Test 1: Service layer
@@ -328,30 +328,30 @@ async def main():
         print("\n" + "="*70)
         print("TEST SUMMARY")
         print("="*70)
-        print(f"✓ SmartRecommendationEngine Service: {'PASSED' if test1_passed else 'FAILED'}")
-        print(f"✓ API Endpoints: {'PASSED' if test2_passed else 'FAILED'}")
+        print(f"[OK] SmartRecommendationEngine Service: {'PASSED' if test1_passed else 'FAILED'}")
+        print(f"[OK] API Endpoints: {'PASSED' if test2_passed else 'FAILED'}")
 
         if test1_passed and test2_passed:
-            print("\n" + "█"*70)
-            print("🎉 ALL TESTS PASSED - COMPLETE ANTI-AUTODS SYSTEM READY!")
-            print("█"*70)
+            print("\n" + ""*70)
+            print("[LAUNCH] ALL TESTS PASSED - COMPLETE ANTI-AUTODS SYSTEM READY!")
+            print(""*70)
             print("\nThe master recommendation system is now active:")
-            print("  ✓ 4 integrated sub-systems")
-            print("  ✓ Saturation tracking prevents oversaturation")
-            print("  ✓ Velocity detection provides tier-based early access")
-            print("  ✓ Subscription tiers differentiate access levels")
-            print("  ✓ Marketing angles ensure unique positioning")
+            print("  [OK] 4 integrated sub-systems")
+            print("  [OK] Saturation tracking prevents oversaturation")
+            print("  [OK] Velocity detection provides tier-based early access")
+            print("  [OK] Subscription tiers differentiate access levels")
+            print("  [OK] Marketing angles ensure unique positioning")
             print("\nAPI Endpoints:")
             print("  • POST /api/recommendations/smart")
             print("  • GET /api/recommendations/analytics/{user_id}")
-            print("\n🚀 Users will NEVER compete directly - everyone wins!")
+            print("\n[START] Users will NEVER compete directly - everyone wins!")
             return 0
         else:
-            print("\n❌ SOME TESTS FAILED")
+            print("\n[ERROR] SOME TESTS FAILED")
             return 1
 
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\n[ERROR] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return 1

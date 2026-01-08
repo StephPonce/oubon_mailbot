@@ -4,6 +4,20 @@ from typing import List, Dict, Optional
 import asyncio
 from pytrends.request import TrendReq
 
+# Search relevance filter for better results
+try:
+    from ospra_os.product_research.search_relevance_filter import (
+        SearchRelevanceFilter,
+        QueryOptimizer,
+        filter_search_results
+    )
+    HAS_RELEVANCE_FILTER = True
+except ImportError:
+    SearchRelevanceFilter = None
+    QueryOptimizer = None
+    filter_search_results = None
+    HAS_RELEVANCE_FILTER = False
+
 # Optional cross-reference engine import
 try:
     from ospra_os.intelligence.cross_reference import CrossReferenceEngine
@@ -55,13 +69,13 @@ class MultiSourceDiscovery:
     5. Amazon Bestsellers via Apify (proven demand + sales velocity)
 
     Why multi-source is powerful:
-    - ✅ Google Trends: Real buying intent signals
-    - ✅ Amazon PA-API: US market validation + competitive pricing
-    - ✅ AliExpress: Dropship costs + profit margins
-    - ✅ TikTok Shop: Viral potential + social proof
-    - ✅ Amazon Bestsellers: Proven demand + velocity leaders
-    - ✅ Works on Render (no blocking)
-    - ✅ Comprehensive market intelligence across 5 sources
+    - [SUCCESS] Google Trends: Real buying intent signals
+    - [SUCCESS] Amazon PA-API: US market validation + competitive pricing
+    - [SUCCESS] AliExpress: Dropship costs + profit margins
+    - [SUCCESS] TikTok Shop: Viral potential + social proof
+    - [SUCCESS] Amazon Bestsellers: Proven demand + velocity leaders
+    - [SUCCESS] Works on Render (no blocking)
+    - [SUCCESS] Comprehensive market intelligence across 5 sources
     """
 
     # Curated trending keywords for each niche (Smart Home Focus)
@@ -143,11 +157,11 @@ class MultiSourceDiscovery:
                     partner_tag=settings.AMAZON_PARTNER_TAG,
                     country=settings.AMAZON_COUNTRY
                 )
-                print("✅ Amazon PA-API connector initialized")
+                print("[SUCCESS] Amazon PA-API connector initialized")
             else:
-                print("⚠️  Amazon PA-API credentials not configured - skipping Amazon enrichment")
+                print("[WARNING]  Amazon PA-API credentials not configured - skipping Amazon enrichment")
         except Exception as e:
-            print(f"⚠️  Failed to initialize Amazon connector: {e}")
+            print(f"[WARNING]  Failed to initialize Amazon connector: {e}")
             self.amazon = None
 
         # Try to initialize AliExpress connector
@@ -161,35 +175,35 @@ class MultiSourceDiscovery:
                     api_key=settings.ALIEXPRESS_API_KEY,
                     app_secret=settings.ALIEXPRESS_APP_SECRET
                 )
-                print("✅ AliExpress API connector initialized")
+                print("[SUCCESS] AliExpress API connector initialized")
             else:
-                print("⚠️  AliExpress API credentials not configured - using estimated pricing")
+                print("[WARNING]  AliExpress API credentials not configured - using estimated pricing")
         except Exception as e:
-            print(f"⚠️  Failed to initialize AliExpress connector: {e}")
+            print(f"[WARNING]  Failed to initialize AliExpress connector: {e}")
             self.aliexpress = None
 
         # Try to initialize TikTok Shop scraper via Apify
         try:
             self.tiktok = TikTokShopScraper()
             if self.tiktok.is_available():
-                print("✅ TikTok Shop scraper initialized via Apify")
+                print("[SUCCESS] TikTok Shop scraper initialized via Apify")
             else:
-                print("⚠️  Apify not configured - skipping TikTok Shop scraping")
+                print("[WARNING]  Apify not configured - skipping TikTok Shop scraping")
                 self.tiktok = None
         except Exception as e:
-            print(f"⚠️  Failed to initialize TikTok scraper: {e}")
+            print(f"[WARNING]  Failed to initialize TikTok scraper: {e}")
             self.tiktok = None
 
         # Try to initialize Amazon Bestsellers scraper via Apify
         try:
             self.amazon_bestsellers = AmazonBestsellersScraper()
             if self.amazon_bestsellers.is_available():
-                print("✅ Amazon Bestsellers scraper initialized via Apify")
+                print("[SUCCESS] Amazon Bestsellers scraper initialized via Apify")
             else:
-                print("⚠️  Apify not configured - skipping Amazon Bestsellers scraping")
+                print("[WARNING]  Apify not configured - skipping Amazon Bestsellers scraping")
                 self.amazon_bestsellers = None
         except Exception as e:
-            print(f"⚠️  Failed to initialize Amazon Bestsellers scraper: {e}")
+            print(f"[WARNING]  Failed to initialize Amazon Bestsellers scraper: {e}")
             self.amazon_bestsellers = None
 
         # REMOVED 2025-12-07: Reddit, Shopify, AliExpress Apify scrapers
@@ -205,11 +219,11 @@ class MultiSourceDiscovery:
         try:
             self.xai_twitter = XAITwitterDiscovery()
             if self.xai_twitter.is_available():
-                print("✅ xAI Twitter Discovery initialized")
+                print("[SUCCESS] xAI Twitter Discovery initialized")
             else:
                 self.xai_twitter = None
         except Exception as e:
-            print(f"⚠️  xAI Twitter init failed: {e}")
+            print(f"[WARNING]  xAI Twitter init failed: {e}")
             self.xai_twitter = None
 
         # Initialize cross-reference engine if all required scrapers are available
@@ -222,15 +236,15 @@ class MultiSourceDiscovery:
                     self.tiktok,
                     self.xai_twitter  # Use xAI Twitter instead of Reddit
                 )
-                print("✅ Cross-reference engine initialized (with xAI Twitter)")
+                print("[SUCCESS] Cross-reference engine initialized (with xAI Twitter)")
             except Exception as e:
-                print(f"⚠️  Failed to initialize cross-reference engine: {e}")
+                print(f"[WARNING]  Failed to initialize cross-reference engine: {e}")
                 self.cross_ref = None
         else:
             if not HAS_CROSS_REF:
-                print("⚠️  Cross-reference engine unavailable (module not found)")
+                print("[WARNING]  Cross-reference engine unavailable (module not found)")
             else:
-                print("⚠️  Cross-reference engine unavailable (missing scrapers: Amazon, TikTok, or xAI Twitter)")
+                print("[WARNING]  Cross-reference engine unavailable (missing scrapers: Amazon, TikTok, or xAI Twitter)")
 
     async def discover_all_niches(
         self,
@@ -262,7 +276,7 @@ class MultiSourceDiscovery:
         """
 
         print(f"\n{'='*70}")
-        print(f"🔍 MULTI-SOURCE DISCOVERY STARTING (REDDIT-FREE)")
+        print(f"[SEARCH] MULTI-SOURCE DISCOVERY STARTING (REDDIT-FREE)")
         print(f"{'='*70}")
         print(f"Niches: {len(self.TRENDING_KEYWORDS)}")
         print(f"Min Trend Score: {min_score}/100")
@@ -275,7 +289,7 @@ class MultiSourceDiscovery:
         total_found = 0
 
         for niche, keywords in self.TRENDING_KEYWORDS.items():
-            print(f"📊 Discovering {niche}...")
+            print(f"[STATS] Discovering {niche}...")
 
             niche_products = []
 
@@ -317,15 +331,15 @@ class MultiSourceDiscovery:
                         }
                         niche_products.append(product)
                         total_found += 1
-                        print(f"   ✅ {keyword}: {enhanced_score}/10 (trend: {trend_score}/100) → {product['priority']} priority")
+                        print(f"   [SUCCESS] {keyword}: {enhanced_score}/10 (trend: {trend_score}/100) → {product['priority']} priority")
                     else:
-                        print(f"   ⚠️  {keyword}: {enhanced_score}/10 (below threshold)")
+                        print(f"   [WARNING]  {keyword}: {enhanced_score}/10 (below threshold)")
 
                     # Rate limit to avoid Google Trends throttling
                     await asyncio.sleep(2.0)  # Slower but more accurate - reduces 429 rate limit errors
 
                 except Exception as e:
-                    print(f"   ❌ {keyword} failed: {e}")
+                    print(f"   [ERROR] {keyword} failed: {e}")
                     continue
 
             # Sort by score (highest first)
@@ -335,12 +349,12 @@ class MultiSourceDiscovery:
             all_products[niche] = niche_products[:max_per_niche]
 
             if len(niche_products) > 0:
-                print(f"   🔥 Found {len(niche_products)} products in {niche}")
+                print(f"   [HOT] Found {len(niche_products)} products in {niche}")
             else:
-                print(f"   📭 No products above threshold in {niche}")
+                print(f"    No products above threshold in {niche}")
 
         print(f"\n{'='*70}")
-        print(f"✅ MULTI-SOURCE DISCOVERY COMPLETE")
+        print(f"[SUCCESS] MULTI-SOURCE DISCOVERY COMPLETE")
         print(f"{'='*70}")
         print(f"Keywords Checked: {total_checked}")
         print(f"Products Found: {total_found}")
@@ -350,14 +364,14 @@ class MultiSourceDiscovery:
         # Enrich with Amazon data if available
         if self.amazon and self.amazon.is_available():
             print(f"\n{'='*70}")
-            print(f"🛍️  ENRICHING WITH AMAZON DATA (US Market Intelligence)")
+            print(f"[SHOP]  ENRICHING WITH AMAZON DATA (US Market Intelligence)")
             print(f"{'='*70}\n")
             await self._enrich_with_amazon(all_products)
 
         # Enrich with AliExpress data if available
         if self.aliexpress and self.aliexpress.is_available():
             print(f"\n{'='*70}")
-            print(f"🛒 ENRICHING WITH ALIEXPRESS DATA (Dropship Pricing)")
+            print(f"[CART] ENRICHING WITH ALIEXPRESS DATA (Dropship Pricing)")
             print(f"{'='*70}\n")
             await self._enrich_with_aliexpress(all_products)
 
@@ -533,18 +547,18 @@ class MultiSourceDiscovery:
                         enriched_count += 1
                         price_str = f"${amazon_product.price:.2f}" if amazon_product.price else "N/A"
                         rating_str = f"{amazon_product.supplier_rating:.1f}/5" if amazon_product.supplier_rating else "N/A"
-                        print(f"   ✅ {product['name']}: {price_str} (rating: {rating_str})")
+                        print(f"   [SUCCESS] {product['name']}: {price_str} (rating: {rating_str})")
                     else:
-                        print(f"   ⚠️  {product['name']}: No Amazon matches found")
+                        print(f"   [WARNING]  {product['name']}: No Amazon matches found")
 
                 except Exception as e:
-                    print(f"   ❌ {product['name']}: Amazon error - {e}")
+                    print(f"   [ERROR] {product['name']}: Amazon error - {e}")
                     continue
 
                 # Small delay to avoid rate limiting
                 await asyncio.sleep(0.5)
 
-        print(f"\n✅ Amazon enrichment complete:")
+        print(f"\n[SUCCESS] Amazon enrichment complete:")
         print(f"   Enriched: {enriched_count}/{total_count} products")
         print(f"   Coverage: {(enriched_count/total_count*100):.1f}%")
         print(f"{'='*70}\n")
@@ -558,45 +572,119 @@ class MultiSourceDiscovery:
         - aliexpress_url: Direct product link
         - aliexpress_image: Product image URL
         - supplier_rating: Supplier rating (0-5)
+        
+        Now includes RELEVANCE FILTERING to prevent off-topic results!
         """
         enriched_count = 0
+        filtered_count = 0
         total_count = sum(len(products) for products in niche_products.values())
+        
+        # Initialize relevance filter
+        relevance_filter = None
+        if HAS_RELEVANCE_FILTER:
+            relevance_filter = SearchRelevanceFilter(
+                min_relevance_score=30.0,  # Accept moderately relevant results
+                min_keyword_match=0.2      # At least 20% keyword overlap
+            )
+            print("   [SEARCH] Relevance filtering ENABLED")
 
         for niche_name, products in niche_products.items():
             for product in products:
                 try:
+                    # Optimize the search query
+                    search_query = product["name"]
+                    if HAS_RELEVANCE_FILTER and QueryOptimizer:
+                        optimized_query = QueryOptimizer.optimize_query(search_query)
+                        if optimized_query and len(optimized_query) > 3:
+                            search_query = optimized_query
+                    
                     # Search AliExpress for this product
                     results = await self.aliexpress.search(
-                        query=product["name"],
+                        query=search_query,
                         min_rating=4.0,
                         max_price=50,  # Reasonable upper limit for dropshipping
                         sort="orders"  # Sort by popularity
                     )
 
                     if results and len(results) > 0:
-                        # Use the first (most popular) result
-                        ali_product = results[0]
+                        # Apply relevance filtering
+                        if relevance_filter and HAS_RELEVANCE_FILTER:
+                            # Convert ProductCandidate objects to dicts for filtering
+                            result_dicts = []
+                            for r in results:
+                                if hasattr(r, 'to_dict'):
+                                    result_dicts.append(r.to_dict())
+                                elif hasattr(r, 'name'):
+                                    result_dicts.append({
+                                        'name': r.name,
+                                        'price': r.price,
+                                        'url': r.url,
+                                        'image_url': r.image_url,
+                                        'supplier_rating': r.supplier_rating
+                                    })
+                                else:
+                                    result_dicts.append(r)
+                            
+                            # Filter for relevance
+                            filtered_results = relevance_filter.filter_with_fallback(
+                                result_dicts,
+                                product["name"],
+                                title_key="name",
+                                min_results=1
+                            )
+                            
+                            if len(filtered_results) < len(result_dicts):
+                                filtered_count += (len(result_dicts) - len(filtered_results))
+                            
+                            if filtered_results:
+                                ali_product = filtered_results[0]
+                            else:
+                                print(f"   [WARNING]  {product['name']}: All results filtered as irrelevant")
+                                continue
+                        else:
+                            # No filtering - use first result
+                            ali_product = results[0]
+                            if hasattr(ali_product, 'to_dict'):
+                                ali_product = ali_product.to_dict()
+                            elif hasattr(ali_product, 'name'):
+                                ali_product = {
+                                    'name': ali_product.name,
+                                    'price': ali_product.price,
+                                    'url': ali_product.url,
+                                    'image_url': ali_product.image_url,
+                                    'supplier_rating': ali_product.supplier_rating
+                                }
 
                         # Update product with AliExpress data
-                        product["aliexpress_price"] = ali_product.price
-                        product["aliexpress_url"] = ali_product.url
-                        product["aliexpress_image"] = ali_product.image_url
-                        product["supplier_rating"] = ali_product.supplier_rating
+                        product["aliexpress_price"] = ali_product.get('price', 0)
+                        product["aliexpress_url"] = ali_product.get('url', '')
+                        product["aliexpress_image"] = ali_product.get('image_url', '')
+                        product["supplier_rating"] = ali_product.get('supplier_rating', 0)
+                        product["aliexpress_name"] = ali_product.get('name', '')  # Track matched name
 
                         enriched_count += 1
-                        print(f"   ✅ {product['name']}: ${ali_product.price:.2f} (rating: {ali_product.supplier_rating:.1f}/5)")
+                        price = ali_product.get('price', 0)
+                        rating = ali_product.get('supplier_rating', 0)
+                        print(f"   [SUCCESS] {product['name']}: ${price:.2f} (rating: {rating:.1f}/5)")
+                        
+                        # Show matched product name if different
+                        matched_name = ali_product.get('name', '')
+                        if matched_name and matched_name.lower() != product['name'].lower():
+                            print(f"       Matched: {matched_name[:50]}...")
                     else:
-                        print(f"   ⚠️  {product['name']}: No AliExpress matches found")
+                        print(f"   [WARNING]  {product['name']}: No AliExpress matches found")
 
                 except Exception as e:
-                    print(f"   ❌ {product['name']}: AliExpress error - {e}")
+                    print(f"   [ERROR] {product['name']}: AliExpress error - {e}")
                     continue
 
                 # Small delay to avoid rate limiting
                 await asyncio.sleep(0.5)
 
-        print(f"\n✅ AliExpress enrichment complete:")
+        print(f"\n[SUCCESS] AliExpress enrichment complete:")
         print(f"   Enriched: {enriched_count}/{total_count} products")
+        if filtered_count > 0:
+            print(f"   Filtered: {filtered_count} off-topic results removed")
         print(f"{'='*70}\n")
 
     def get_top_products_overall(
@@ -693,7 +781,7 @@ class MultiSourceDiscovery:
         total_count = sum(len(products) for products in niche_products.values())
 
         print(f"\n{'='*70}")
-        print(f"🔥 ENRICHING WITH TIKTOK SHOP DATA (Viral Potential)")
+        print(f"[HOT] ENRICHING WITH TIKTOK SHOP DATA (Viral Potential)")
         print(f"{'='*70}\n")
 
         for niche_name, products in niche_products.items():
@@ -729,13 +817,13 @@ class MultiSourceDiscovery:
                         product["tiktok_sales"] = matched_tiktok.get("sales_count", 0)
 
                         enriched_count += 1
-                        print(f"   🔥 {product['name']}: Viral Score {matched_tiktok.get('viral_score', 0):.1f}")
+                        print(f"   [HOT] {product['name']}: Viral Score {matched_tiktok.get('viral_score', 0):.1f}")
 
             except Exception as e:
-                print(f"   ❌ {niche_name}: TikTok error - {e}")
+                print(f"   [ERROR] {niche_name}: TikTok error - {e}")
                 continue
 
-        print(f"\n✅ TikTok enrichment complete:")
+        print(f"\n[SUCCESS] TikTok enrichment complete:")
         print(f"   Enriched: {enriched_count}/{total_count} products")
         if total_count > 0:
             print(f"   Coverage: {(enriched_count/total_count*100):.1f}%")
@@ -757,7 +845,7 @@ class MultiSourceDiscovery:
         total_count = sum(len(products) for products in niche_products.values())
 
         print(f"\n{'='*70}")
-        print(f"📊 ENRICHING WITH AMAZON BESTSELLERS DATA (Proven Demand)")
+        print(f"[STATS] ENRICHING WITH AMAZON BESTSELLERS DATA (Proven Demand)")
         print(f"{'='*70}\n")
 
         for niche_name, products in niche_products.items():
@@ -794,13 +882,13 @@ class MultiSourceDiscovery:
                         enriched_count += 1
                         rank_str = f"#{matched_bestseller.get('bestseller_rank', 'N/A')}"
                         demand_str = f"{matched_bestseller.get('demand_score', 0):.1f}"
-                        print(f"   📊 {product['name']}: Rank {rank_str}, Demand {demand_str}")
+                        print(f"   [STATS] {product['name']}: Rank {rank_str}, Demand {demand_str}")
 
             except Exception as e:
-                print(f"   ❌ {niche_name}: Amazon Bestsellers error - {e}")
+                print(f"   [ERROR] {niche_name}: Amazon Bestsellers error - {e}")
                 continue
 
-        print(f"\n✅ Amazon Bestsellers enrichment complete:")
+        print(f"\n[SUCCESS] Amazon Bestsellers enrichment complete:")
         print(f"   Enriched: {enriched_count}/{total_count} products")
         if total_count > 0:
             print(f"   Coverage: {(enriched_count/total_count*100):.1f}%")
@@ -830,7 +918,7 @@ class MultiSourceDiscovery:
             List of enriched, validated products ready to sell
         """
         print(f"\n{'='*70}")
-        print(f"🚀 ENRICHED DISCOVERY - Conservative Mode")
+        print(f"[START] ENRICHED DISCOVERY - Conservative Mode")
         print(f"{'='*70}")
         print(f"Niche: {niche}")
         print(f"Max products: {max_products}")
@@ -838,7 +926,7 @@ class MultiSourceDiscovery:
         print()
 
         # Step 1: Get trending keywords from Google Trends (FREE)
-        print(f"📊 STEP 1: Google Trends Discovery (FREE)...")
+        print(f"[STATS] STEP 1: Google Trends Discovery (FREE)...")
 
         try:
             # Use keywords from our predefined list
@@ -847,14 +935,14 @@ class MultiSourceDiscovery:
             if not trending_keywords:
                 trending_keywords = [niche]
 
-            print(f"✅ Found {len(trending_keywords)} trending keywords")
+            print(f"[SUCCESS] Found {len(trending_keywords)} trending keywords")
 
         except Exception as e:
-            print(f"⚠️  Google Trends error: {e}")
+            print(f"[WARNING]  Google Trends error: {e}")
             trending_keywords = [niche]
 
         # Step 2: Score keywords (FREE)
-        print(f"\n📊 STEP 2: Scoring keywords...")
+        print(f"\n[STATS] STEP 2: Scoring keywords...")
 
         scored_keywords = []
         for keyword in trending_keywords[:max_products * 2]:  # Get 2x to have options
@@ -878,22 +966,22 @@ class MultiSourceDiscovery:
                 await asyncio.sleep(1.0)  # Rate limit
 
             except Exception as e:
-                print(f"   ⚠️  Error scoring {keyword}: {e}")
+                print(f"   [WARNING]  Error scoring {keyword}: {e}")
                 continue
 
         # Sort by score, take top N
         scored_keywords.sort(key=lambda x: x['score'], reverse=True)
         top_keywords = scored_keywords[:max_products]
 
-        print(f"✅ Top {len(top_keywords)} keywords selected:")
+        print(f"[SUCCESS] Top {len(top_keywords)} keywords selected:")
         for kw in top_keywords[:3]:
             print(f"   • {kw['keyword']} (score: {kw['score']:.1f})")
 
         # Step 3: Enrich ONLY top keywords with Apify (COSTS MONEY)
-        print(f"\n💰 STEP 3: Apify Enrichment (Conservative - top {len(top_keywords)} only)...")
+        print(f"\n[PRICE] STEP 3: Apify Enrichment (Conservative - top {len(top_keywords)} only)...")
 
         if not self.cross_ref:
-            print("⚠️  Cross-reference engine unavailable, skipping enrichment")
+            print("[WARNING]  Cross-reference engine unavailable, skipping enrichment")
             return []
 
         enriched_products = []
@@ -972,11 +1060,11 @@ class MultiSourceDiscovery:
                 enriched_products.append(product)
 
             except Exception as e:
-                print(f"   ❌ Enrichment failed for {keyword}: {e}")
+                print(f"   [ERROR] Enrichment failed for {keyword}: {e}")
                 continue
 
         # Step 4: Filter and rank
-        print(f"\n📊 STEP 4: Final Ranking...")
+        print(f"\n[STATS] STEP 4: Final Ranking...")
 
         # Only keep products with Amazon URLs (sellable)
         sellable = [p for p in enriched_products if p.get('amazon_available')]
@@ -985,7 +1073,7 @@ class MultiSourceDiscovery:
         sellable.sort(key=lambda x: x['final_score'], reverse=True)
 
         print(f"\n{'='*70}")
-        print(f"✅ ENRICHED DISCOVERY COMPLETE")
+        print(f"[SUCCESS] ENRICHED DISCOVERY COMPLETE")
         print(f"{'='*70}")
         print(f"   Keywords analyzed: {len(top_keywords)}")
         print(f"   Products enriched: {len(enriched_products)}")
@@ -993,16 +1081,16 @@ class MultiSourceDiscovery:
 
         # Show top 3
         if sellable:
-            print(f"\n🏆 TOP SELLABLE PRODUCTS:\n")
+            print(f"\n[TOP] TOP SELLABLE PRODUCTS:\n")
             for i, p in enumerate(sellable[:3], 1):
                 print(f"   {i}. {p['name']}")
                 print(f"      Final Score: {p['final_score']:.1f}/100")
                 print(f"      Priority: {p['priority']}")
                 print(f"      Recommendation: {p['recommendation']}")
                 print(f"      Price: ${p.get('price', 0):.2f}")
-                print(f"      Amazon: {'✅' if p['amazon_available'] else '❌'}")
-                print(f"      TikTok: {'✅' if p.get('tiktok_available') else '❌'}")
-                print(f"      Reddit: {'✅' if p.get('reddit_available') else '❌'}")
+                print(f"      Amazon: {'[SUCCESS]' if p['amazon_available'] else '[ERROR]'}")
+                print(f"      TikTok: {'[SUCCESS]' if p.get('tiktok_available') else '[ERROR]'}")
+                print(f"      Reddit: {'[SUCCESS]' if p.get('reddit_available') else '[ERROR]'}")
                 print()
 
         print(f"{'='*70}\n")
@@ -1080,38 +1168,38 @@ class MultiSourceDiscovery:
             niches = ["smart_lighting", "home_security", "cleaning_gadgets"]
 
         print(f"\n{'='*70}")
-        print("🚀 UNIFIED QUAD-SOURCE PRODUCT DISCOVERY")
+        print("[START] UNIFIED QUAD-SOURCE PRODUCT DISCOVERY")
         print(f"{'='*70}\n")
-        print(f"📊 Configuration:")
+        print(f"[STATS] Configuration:")
         print(f"   Niches: {niches}")
         print(f"   Max per niche: {max_per_niche}")
         print(f"   Min trend score: {min_trend_score}")
-        print(f"\n📡 PRIMARY Discovery Sources (Find Products):")
-        print(f"   {'✅' if use_tiktok_shop and self.tiktok else '❌'} 1. TikTok Shop (social commerce sales)")
-        print(f"   {'✅' if use_amazon_bestsellers and self.amazon_bestsellers else '❌'} 2. Amazon Bestsellers (traditional e-commerce velocity)")
-        print(f"   {'✅' if use_shopify_competitors and self.shopify_competitor else '❌'} 3. Shopify Competitors (proven store winners)")
-        print(f"   ✅ 4. Google Trends (search trends)")
-        print(f"\n🔍 SECONDARY Sources (Cross-Reference & Enrich):")
-        print(f"   {'✅' if self.aliexpress_scraper else '❌'} AliExpress (dropship URLs + pricing)")
-        print(f"   {'✅' if self.reddit else '❌'} Reddit (sentiment validation)")
-        print(f"\n💡 Products found in MULTIPLE primary sources get BONUS scoring!")
+        print(f"\n PRIMARY Discovery Sources (Find Products):")
+        print(f"   {'[SUCCESS]' if use_tiktok_shop and self.tiktok else '[ERROR]'} 1. TikTok Shop (social commerce sales)")
+        print(f"   {'[SUCCESS]' if use_amazon_bestsellers and self.amazon_bestsellers else '[ERROR]'} 2. Amazon Bestsellers (traditional e-commerce velocity)")
+        print(f"   {'[SUCCESS]' if use_shopify_competitors and self.shopify_competitor else '[ERROR]'} 3. Shopify Competitors (proven store winners)")
+        print(f"   [SUCCESS] 4. Google Trends (search trends)")
+        print(f"\n[SEARCH] SECONDARY Sources (Cross-Reference & Enrich):")
+        print(f"   {'[SUCCESS]' if self.aliexpress_scraper else '[ERROR]'} AliExpress (dropship URLs + pricing)")
+        print(f"   {'[SUCCESS]' if self.reddit else '[ERROR]'} Reddit (sentiment validation)")
+        print(f"\n[TIP] Products found in MULTIPLE primary sources get BONUS scoring!")
         print(f"\n{'='*70}\n")
 
         all_products = []
         products_by_name = {}  # Dedupe by product name
 
         for niche in niches:
-            print(f"\n🎯 Processing niche: {niche.upper()}")
-            print(f"{'─'*70}")
+            print(f"\n[TARGET] Processing niche: {niche.upper()}")
+            print(f"{''*70}")
 
             niche_products = []
 
-            # ═══════════════════════════════════════════════════════════
+            # 
             # PRIMARY SOURCE 1: TikTok Shop (What's SELLING NOW)
-            # ═══════════════════════════════════════════════════════════
+            # 
             if use_tiktok_shop and self.tiktok:
-                print(f"\n🛍️  TikTok Shop Discovery (ACTUAL SALES DATA):")
-                print(f"{'─'*70}")
+                print(f"\n[SHOP]  TikTok Shop Discovery (ACTUAL SALES DATA):")
+                print(f"{''*70}")
                 try:
                     # Map niches to TikTok Shop categories
                     tiktok_categories = {
@@ -1135,7 +1223,7 @@ class MultiSourceDiscovery:
 
                     for tt_product in tiktok_products[:max_per_niche]:
                         product_name = tt_product.get('name', '')
-                        print(f"\n   🔥 TikTok: '{product_name}'")
+                        print(f"\n   [HOT] TikTok: '{product_name}'")
                         print(f"      Sales: {tt_product.get('sales_count', 0):,}")
                         print(f"      Price: ${tt_product.get('price', 0):.2f}")
                         print(f"      Reviews: {tt_product.get('review_count', 0)}")
@@ -1170,16 +1258,16 @@ class MultiSourceDiscovery:
                         products_by_name[product_name.lower()] = product_data  # Track for cross-referencing
 
                 except Exception as e:
-                    print(f"   ❌ TikTok Shop discovery failed: {e}")
+                    print(f"   [ERROR] TikTok Shop discovery failed: {e}")
                     import traceback
                     traceback.print_exc()
 
-            # ═══════════════════════════════════════════════════════════
+            # 
             # PRIMARY SOURCE 2: Amazon Bestsellers (What's SELLING on Traditional E-commerce)
-            # ═══════════════════════════════════════════════════════════
+            # 
             if use_amazon_bestsellers and self.amazon_bestsellers:
-                print(f"\n📦 Amazon Bestsellers Discovery (PROVEN VELOCITY):")
-                print(f"{'─'*70}")
+                print(f"\n[PACKAGE] Amazon Bestsellers Discovery (PROVEN VELOCITY):")
+                print(f"{''*70}")
                 try:
                     # Map niches to Amazon categories
                     amazon_categories = {
@@ -1202,14 +1290,14 @@ class MultiSourceDiscovery:
 
                     for amz_product in amazon_products[:max_per_niche]:
                         product_name = amz_product.get('name', '')
-                        print(f"\n   🏆 Amazon: '{product_name}'")
+                        print(f"\n   [TOP] Amazon: '{product_name}'")
                         print(f"      Rank: #{amz_product.get('bestseller_rank', '?')}")
                         print(f"      Reviews: {amz_product.get('reviews_count', 0):,}")
                         print(f"      Rating: {amz_product.get('rating', 0):.1f}")
 
                         # Check if product already exists (cross-reference)
                         if product_name.lower() in products_by_name:
-                            print(f"      🔗 CROSS-MATCH! Also found in {products_by_name[product_name.lower()]['primary_sources']}")
+                            print(f"      [LINK] CROSS-MATCH! Also found in {products_by_name[product_name.lower()]['primary_sources']}")
                             existing = products_by_name[product_name.lower()]
                             existing['primary_sources'].append('amazon_bestsellers')
                             existing['source_count'] += 1
@@ -1255,16 +1343,16 @@ class MultiSourceDiscovery:
                             products_by_name[product_name.lower()] = product_data
 
                 except Exception as e:
-                    print(f"   ❌ Amazon Bestsellers discovery failed: {e}")
+                    print(f"   [ERROR] Amazon Bestsellers discovery failed: {e}")
                     import traceback
                     traceback.print_exc()
 
-            # ═══════════════════════════════════════════════════════════
+            # 
             # PRIMARY SOURCE 3: Shopify Competitors (What Successful Stores are SELLING)
-            # ═══════════════════════════════════════════════════════════
+            # 
             if use_shopify_competitors and self.shopify_competitor:
-                print(f"\n🏪 Shopify Competitor Discovery (PROVEN WINNERS):")
-                print(f"{'─'*70}")
+                print(f"\n Shopify Competitor Discovery (PROVEN WINNERS):")
+                print(f"{''*70}")
                 try:
                     # Get products from successful Shopify stores in this niche
                     # You can configure competitor store URLs in settings or pass them in
@@ -1283,12 +1371,12 @@ class MultiSourceDiscovery:
 
                         for shop_product in shopify_products[:max_per_niche]:
                             product_name = shop_product.get('name', '')
-                            print(f"\n   🏬 Shopify: '{product_name}'")
+                            print(f"\n    Shopify: '{product_name}'")
                             print(f"      Price: ${shop_product.get('price', 0):.2f}")
 
                             # Check if product already exists (cross-reference)
                             if product_name.lower() in products_by_name:
-                                print(f"      🔗 CROSS-MATCH! Also found in {products_by_name[product_name.lower()]['primary_sources']}")
+                                print(f"      [LINK] CROSS-MATCH! Also found in {products_by_name[product_name.lower()]['primary_sources']}")
                                 existing = products_by_name[product_name.lower()]
                                 existing['primary_sources'].append('shopify_competitors')
                                 existing['source_count'] += 1
@@ -1322,19 +1410,19 @@ class MultiSourceDiscovery:
                                 products_by_name[product_name.lower()] = product_data
 
                 except Exception as e:
-                    print(f"   ❌ Shopify Competitors discovery failed: {e}")
+                    print(f"   [ERROR] Shopify Competitors discovery failed: {e}")
                     import traceback
                     traceback.print_exc()
 
-            # ═══════════════════════════════════════════════════════════
+            # 
             # PRIMARY SOURCE 4: Google Trends (What's TRENDING)
-            # ═══════════════════════════════════════════════════════════
-            print(f"\n📈 Google Trends Discovery (SEARCH INTENT):")
-            print(f"{'─'*70}")
+            # 
+            print(f"\n[TREND] Google Trends Discovery (SEARCH INTENT):")
+            print(f"{''*70}")
 
             keywords = self.TRENDING_KEYWORDS.get(niche, [])
             if not keywords:
-                print(f"⚠️  No keywords configured for {niche}")
+                print(f"[WARNING]  No keywords configured for {niche}")
             else:
                 print(f"   Analyzing ALL {len(keywords)} trending keywords (will return top {max_per_niche})...")
 
@@ -1346,14 +1434,14 @@ class MultiSourceDiscovery:
                     trend_score = await self._get_trend_score(keyword)
 
                     if trend_score < min_trend_score:
-                        print(f"   ⏭️  '{keyword}' trend score too low ({trend_score:.1f}) - skipping")
+                        print(f"   ⏭  '{keyword}' trend score too low ({trend_score:.1f}) - skipping")
                         continue
 
-                    print(f"\n   ✅ '{keyword}' - Trend score: {trend_score:.1f}")
+                    print(f"\n   [SUCCESS] '{keyword}' - Trend score: {trend_score:.1f}")
 
                     # Check if product already exists (cross-reference)
                     if keyword.lower() in products_by_name:
-                        print(f"      🔗 CROSS-MATCH! Also found in {products_by_name[keyword.lower()]['primary_sources']}")
+                        print(f"      [LINK] CROSS-MATCH! Also found in {products_by_name[keyword.lower()]['primary_sources']}")
                         existing = products_by_name[keyword.lower()]
                         existing['primary_sources'].append('google_trends')
                         existing['source_count'] += 1
@@ -1383,20 +1471,20 @@ class MultiSourceDiscovery:
                     else:
                         product_data['priority'] = 'LOW'
 
-                    print(f"      📊 Final Score: {final_score:.1f}/100 | {product_data['priority']} | {product_data['recommendation']}")
+                    print(f"      [STATS] Final Score: {final_score:.1f}/100 | {product_data['priority']} | {product_data['recommendation']}")
 
                     google_trends_products.append(product_data)
                     products_by_name[keyword.lower()] = product_data  # Track for cross-referencing
 
                 except Exception as e:
-                    print(f"   ❌ Error processing '{keyword}': {e}")
+                    print(f"   [ERROR] Error processing '{keyword}': {e}")
                     continue
 
             # Sort Google Trends products by score and take top max_per_niche
             google_trends_products.sort(key=lambda x: x.get('final_score', 0), reverse=True)
             top_google_trends = google_trends_products[:max_per_niche]
 
-            print(f"\n   📊 Selected top {len(top_google_trends)} Google Trends products (from {len(google_trends_products)} analyzed)")
+            print(f"\n   [STATS] Selected top {len(top_google_trends)} Google Trends products (from {len(google_trends_products)} analyzed)")
             niche_products.extend(top_google_trends)
 
             # Sort ALL niche products by final score (from all primary sources)
@@ -1406,10 +1494,10 @@ class MultiSourceDiscovery:
             top_products = niche_products[:max_per_niche]
             all_products.extend(top_products)
 
-            print(f"\n   ✅ Found {len(top_products)} products for {niche}")
+            print(f"\n   [SUCCESS] Found {len(top_products)} products for {niche}")
 
         print(f"\n{'='*70}")
-        print(f"✅ DISCOVERY COMPLETE: {len(all_products)} total products")
+        print(f"[SUCCESS] DISCOVERY COMPLETE: {len(all_products)} total products")
         print(f"{'='*70}\n")
 
         return all_products
@@ -1440,7 +1528,7 @@ class MultiSourceDiscovery:
 
         # Amazon research (velocity, reviews) - NOT for dropshipping!
         if self.amazon_bestsellers:
-            print(f"      🔍 Amazon research (velocity/reviews)...")
+            print(f"      [SEARCH] Amazon research (velocity/reviews)...")
             try:
                 amazon_products = await self.amazon_bestsellers.scrape_bestsellers(
                     category="Electronics",
@@ -1460,16 +1548,16 @@ class MultiSourceDiscovery:
                         ),
                         'amazon_reference_url': amazon_ref.get('source_url', ''),
                     })
-                    print(f"         ✅ Amazon: {amazon_ref.get('reviews_count', 0)} reviews, rank #{amazon_ref.get('bestseller_rank', '?')}")
+                    print(f"         [SUCCESS] Amazon: {amazon_ref.get('reviews_count', 0)} reviews, rank #{amazon_ref.get('bestseller_rank', '?')}")
                 else:
                     product_data['amazon_reference'] = False
             except Exception as e:
-                print(f"         ❌ Amazon lookup failed: {e}")
+                print(f"         [ERROR] Amazon lookup failed: {e}")
                 product_data['amazon_reference'] = False
 
         # AliExpress dropship URL (THIS is where we dropship from!)
         if self.aliexpress_scraper:
-            print(f"      📦 AliExpress dropship URL...")
+            print(f"      [PACKAGE] AliExpress dropship URL...")
             try:
                 ali_products = await self.aliexpress_scraper.search_products(
                     keyword=product_name,
@@ -1507,13 +1595,13 @@ class MultiSourceDiscovery:
                             'profit_margin': profit_margin
                         })
 
-                    print(f"         ✅ AliExpress: ${ali_product.get('price', 0):.2f}, {ali_product.get('orders', 0)} orders")
+                    print(f"         [SUCCESS] AliExpress: ${ali_product.get('price', 0):.2f}, {ali_product.get('orders', 0)} orders")
             except Exception as e:
-                print(f"         ❌ AliExpress lookup failed: {e}")
+                print(f"         [ERROR] AliExpress lookup failed: {e}")
 
         # Reddit sentiment
         if self.reddit:
-            print(f"      💬 Reddit sentiment...")
+            print(f"      [CHAT] Reddit sentiment...")
             try:
                 reddit_data = await self.reddit.get_product_sentiment(
                     product_name=product_name,
@@ -1525,9 +1613,9 @@ class MultiSourceDiscovery:
                         'reddit_sentiment': reddit_data.get('sentiment', 'neutral'),
                         'reddit_mentions': reddit_data.get('mentions', 0),
                     })
-                    print(f"         ✅ Reddit: {reddit_data.get('sentiment', 'neutral')} ({reddit_data.get('mentions', 0)} mentions)")
+                    print(f"         [SUCCESS] Reddit: {reddit_data.get('sentiment', 'neutral')} ({reddit_data.get('mentions', 0)} mentions)")
             except Exception as e:
-                print(f"         ❌ Reddit lookup failed: {e}")
+                print(f"         [ERROR] Reddit lookup failed: {e}")
 
         # Google Trends (if not already present from primary discovery)
         if not product_data.get('trend_score'):
@@ -1550,7 +1638,7 @@ class MultiSourceDiscovery:
         else:
             product_data['priority'] = 'LOW'
 
-        print(f"      📊 Final Score: {final_score:.1f}/100 | {product_data['priority']} | {product_data['recommendation']}")
+        print(f"      [STATS] Final Score: {final_score:.1f}/100 | {product_data['priority']} | {product_data['recommendation']}")
 
     def _calculate_final_score(self, product: Dict) -> float:
         """
@@ -1573,18 +1661,18 @@ class MultiSourceDiscovery:
         if source_count >= 4:
             # Found in ALL 4 primary sources = MAXIMUM BONUS!
             score += 20
-            print(f"         🎯 JACKPOT! Found in ALL 4 primary sources: {primary_sources}")
+            print(f"         [TARGET] JACKPOT! Found in ALL 4 primary sources: {primary_sources}")
         elif source_count == 3:
             # Found in 3 primary sources = STRONG SIGNAL
             score += 15
-            print(f"         🔥 Found in 3 primary sources: {primary_sources}")
+            print(f"         [HOT] Found in 3 primary sources: {primary_sources}")
         elif source_count == 2:
             # Found in 2 primary sources = GOOD SIGNAL
             score += 10
-            print(f"         ⭐ Found in 2 primary sources: {primary_sources}")
+            print(f"         [STAR] Found in 2 primary sources: {primary_sources}")
         else:
             # Only 1 primary source
-            print(f"         ℹ️  Found in 1 primary source: {primary_sources}")
+            print(f"         [INFO]  Found in 1 primary source: {primary_sources}")
 
         # TikTok Shop SALES (25%) - ACTUAL sales data!
         tiktok_sales = product.get('tiktok_sales', 0)
@@ -1650,27 +1738,27 @@ class MultiSourceDiscovery:
         # JACKPOT - Found in ALL 4 primary sources!
         if source_count >= 4:
             if score >= 70:
-                return f"🎯 BUY NOW - Found in ALL 4 sources! (Score: {score:.1f})"
+                return f"[TARGET] BUY NOW - Found in ALL 4 sources! (Score: {score:.1f})"
             elif score >= 60:
-                return f"🎯 STRONG BUY - All 4 sources agree! (Score: {score:.1f})"
+                return f"[TARGET] STRONG BUY - All 4 sources agree! (Score: {score:.1f})"
             else:
                 return f"CONSIDER - 4 sources but lower score ({score:.1f})"
 
         # Found in 3 primary sources = VERY STRONG
         elif source_count == 3:
             if score >= 75:
-                return f"🔥 BUY - 3 sources confirm! (Score: {score:.1f})"
+                return f"[HOT] BUY - 3 sources confirm! (Score: {score:.1f})"
             elif score >= 65:
-                return f"🔥 CONSIDER - 3 sources, good potential ({score:.1f})"
+                return f"[HOT] CONSIDER - 3 sources, good potential ({score:.1f})"
             else:
                 return f"MAYBE - 3 sources but verify ({score:.1f})"
 
         # Found in 2 primary sources = STRONG
         elif source_count == 2:
             if score >= 80:
-                return f"⭐ BUY - 2 sources + high score ({score:.1f})"
+                return f"[STAR] BUY - 2 sources + high score ({score:.1f})"
             elif score >= 70:
-                return f"⭐ CONSIDER - 2 sources confirm ({score:.1f})"
+                return f"[STAR] CONSIDER - 2 sources confirm ({score:.1f})"
             else:
                 return f"MAYBE - 2 sources but lower score ({score:.1f})"
 
@@ -1715,7 +1803,7 @@ class MultiSourceDiscovery:
             List of product dicts with Twitter viral metrics
         """
         if not self.xai_twitter:
-            print("⚠️  xAI Twitter Discovery not available")
+            print("[WARNING]  xAI Twitter Discovery not available")
             return []
         
         try:
@@ -1728,5 +1816,5 @@ class MultiSourceDiscovery:
             return [p.to_dict() for p in twitter_products]
 
         except Exception as e:
-            print(f"❌ Twitter discovery error: {e}")
+            print(f"[ERROR] Twitter discovery error: {e}")
             return []

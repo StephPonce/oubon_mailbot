@@ -36,7 +36,7 @@ async def nightly_summary_job():
     Runs at 3 AM UTC daily.
     Compresses unlimited raw learning_events into ~800-1000 token summaries.
     """
-    logger.info("🌙 Starting nightly summary job...")
+    logger.info(" Starting nightly summary job...")
 
     db = SessionLocal()
     try:
@@ -76,17 +76,17 @@ async def nightly_summary_job():
                 db.commit()
 
                 success_count += 1
-                logger.info(f"   ✓ User {user_id}: {summary_data['estimated_tokens']} tokens")
+                logger.info(f"   [OK] User {user_id}: {summary_data['estimated_tokens']} tokens")
 
             except Exception as e:
                 error_count += 1
-                logger.error(f"   ✗ User {user_id} failed: {e}")
+                logger.error(f"    User {user_id} failed: {e}")
                 db.rollback()
 
-        logger.info(f"✅ Nightly summary job complete: {success_count} succeeded, {error_count} failed")
+        logger.info(f"[SUCCESS] Nightly summary job complete: {success_count} succeeded, {error_count} failed")
 
     except Exception as e:
-        logger.error(f"❌ Nightly summary job failed: {e}")
+        logger.error(f"[ERROR] Nightly summary job failed: {e}")
         db.rollback()
     finally:
         db.close()
@@ -102,7 +102,7 @@ async def update_aggregated_tables():
     - ProductPerformance: Lifetime stats per product
     - TimeSeriesMetrics: Weekly/monthly rollups
     """
-    logger.info("📊 Updating aggregated performance tables...")
+    logger.info("[STATS] Updating aggregated performance tables...")
 
     db = SessionLocal()
     try:
@@ -121,10 +121,10 @@ async def update_aggregated_tables():
             _update_time_series(user_id, db)
 
         db.commit()
-        logger.info("✅ Aggregated tables updated")
+        logger.info("[SUCCESS] Aggregated tables updated")
 
     except Exception as e:
-        logger.error(f"❌ Aggregated table update failed: {e}")
+        logger.error(f"[ERROR] Aggregated table update failed: {e}")
         db.rollback()
     finally:
         db.close()
@@ -411,14 +411,14 @@ def setup_summary_jobs():
         )
 
         scheduler.start()
-        logger.info("✅ Summary background jobs scheduled:")
+        logger.info("[SUCCESS] Summary background jobs scheduled:")
         logger.info("   - Nightly summaries: 3:00 AM UTC")
         logger.info("   - Aggregated tables: 3:30 AM UTC")
 
         return scheduler
 
     except Exception as e:
-        logger.error(f"❌ Failed to setup summary jobs: {e}")
+        logger.error(f"[ERROR] Failed to setup summary jobs: {e}")
         return None
 
 
@@ -428,20 +428,20 @@ def shutdown_summary_jobs():
 
     if scheduler:
         scheduler.shutdown()
-        logger.info("✅ Summary jobs scheduler shut down")
+        logger.info("[SUCCESS] Summary jobs scheduler shut down")
 
 
 # Manual trigger functions for testing
 
 async def trigger_summary_job_now():
     """Manually trigger the summary job (for testing)."""
-    logger.info("🔄 Manually triggering summary job...")
+    logger.info("[REFRESH] Manually triggering summary job...")
     await nightly_summary_job()
 
 
 async def trigger_aggregation_now():
     """Manually trigger the aggregation job (for testing)."""
-    logger.info("🔄 Manually triggering aggregation job...")
+    logger.info("[REFRESH] Manually triggering aggregation job...")
     await update_aggregated_tables()
 
 

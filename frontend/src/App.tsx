@@ -1,30 +1,106 @@
-import { useEffect } from 'react';
-import { AIChatProvider } from './contexts/AIChatContext';
-import { ProductsProvider } from './contexts/ProductsContext';
-import OspraChat from './components/OspraChat';
-import Layout from './components/Layout';
-import { WelcomeModal, SetupWizard } from './components/onboarding';
-import { wsService } from './services/websocket';
-import { useOspraStore } from './store/ospra.store';
-import './index.css';
+// 
+// APP - Root component with routing
+// Uses Layout component for authenticated pages
+// 
+
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import { Layout } from './components/layout';
+
+// Auth Pages
+import Login from './pages/Login';
+import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
+// App Pages
+import Overview from './pages/Overview';
+import Products from './pages/Products';
+import Ads from './pages/Ads';
+import Emails from './pages/Emails';
+import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 
 export default function App() {
-  // WebSocket disabled - backend doesn't have /ws endpoint yet
-  useEffect(() => {
-    // Uncomment when backend WebSocket is implemented:
-    // wsService.connect().catch(() => {});
-    // return () => wsService.disconnect();
-    console.log('[App] WebSocket disabled - using REST polling');
-  }, []);
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
-    <AIChatProvider>
-      <ProductsProvider>
-        <Layout />
-        <OspraChat />
-        <WelcomeModal />
-        <SetupWizard />
-      </ProductsProvider>
-    </AIChatProvider>
+    <Routes>
+      {/* 
+          PUBLIC ROUTES (Auth Pages)
+           */}
+      
+      {/* Login - Redirect to dashboard if already authenticated */}
+      <Route 
+        path="/login" 
+        element={
+          !isLoading && isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login />
+          )
+        } 
+      />
+      
+      {/* Register - Redirect to dashboard if already authenticated */}
+      <Route 
+        path="/register" 
+        element={
+          !isLoading && isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Register />
+          )
+        } 
+      />
+      
+      {/* Forgot Password */}
+      <Route 
+        path="/forgot-password" 
+        element={<ForgotPassword />} 
+      />
+      
+      {/* Reset Password (with token) */}
+      <Route 
+        path="/reset-password" 
+        element={<ResetPassword />} 
+      />
+
+      {/* 
+          PROTECTED ROUTES (Require Auth)
+          Wrapped in Layout component with sidebar/header
+           */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Overview - Main dashboard / Oi's command center */}
+        <Route index element={<Overview />} />
+        
+        {/* Products - Discovery & management */}
+        <Route path="products" element={<Products />} />
+        
+        {/* Ads - Campaign management */}
+        <Route path="ads" element={<Ads />} />
+        
+        {/* Emails - Automation & support */}
+        <Route path="emails" element={<Emails />} />
+        
+        {/* Analytics - Deep metrics */}
+        <Route path="analytics" element={<Analytics />} />
+        
+        {/* Settings - Configuration */}
+        <Route path="settings" element={<Settings />} />
+      </Route>
+
+      {/* 
+          CATCH ALL - Redirect to dashboard
+           */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }

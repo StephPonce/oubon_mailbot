@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-🧪 LIVE EMAIL TEST - Ospra Intelligence
+[TEST] LIVE EMAIL TEST - Ospra Intelligence
 
 This script tests the full email automation pipeline with real Gmail:
 1. Connects to Gmail via OAuth
@@ -42,14 +42,14 @@ def print_header(text: str):
 
 def print_section(text: str):
     """Print a section divider."""
-    print(f"\n{'─'*70}")
+    print(f"\n{''*70}")
     print(f"  {text}")
-    print(f"{'─'*70}")
+    print(f"{''*70}")
 
 
 async def test_gmail_connection():
     """Test Gmail OAuth connection."""
-    print_section("📧 Testing Gmail Connection")
+    print_section("[EMAIL] Testing Gmail Connection")
     
     try:
         from app.gmail_client import GmailClient
@@ -62,7 +62,7 @@ async def test_gmail_connection():
         service = client._service() if callable(getattr(client, '_service', None)) else client.service
         profile = service.users().getProfile(userId='me').execute()
         
-        print(f"✅ Connected to Gmail!")
+        print(f"[SUCCESS] Connected to Gmail!")
         print(f"   Email: {profile.get('emailAddress')}")
         print(f"   Messages: {profile.get('messagesTotal', 0):,}")
         print(f"   Threads: {profile.get('threadsTotal', 0):,}")
@@ -70,8 +70,8 @@ async def test_gmail_connection():
         return client, service
         
     except Exception as e:
-        print(f"❌ Gmail connection failed: {e}")
-        print("\n⚠️  Make sure you have:")
+        print(f"[ERROR] Gmail connection failed: {e}")
+        print("\n[WARNING]  Make sure you have:")
         print("   1. .secrets/gmail_client_secret.json")
         print("   2. .secrets/gmail_token.json (run OAuth flow first)")
         return None, None
@@ -79,7 +79,7 @@ async def test_gmail_connection():
 
 async def fetch_unread_emails(service, limit: int = 10):
     """Fetch recent unread emails."""
-    print_section(f"📬 Fetching Unread Emails (limit: {limit})")
+    print_section(f" Fetching Unread Emails (limit: {limit})")
     
     try:
         # Search for unread emails
@@ -130,13 +130,13 @@ async def fetch_unread_emails(service, limit: int = 10):
         return emails
         
     except Exception as e:
-        print(f"❌ Failed to fetch emails: {e}")
+        print(f"[ERROR] Failed to fetch emails: {e}")
         return []
 
 
 async def process_emails(emails: list, dry_run: bool = True):
     """Process emails through the AI pipeline."""
-    print_section("🤖 Processing with AI")
+    print_section("[AI] Processing with AI")
     
     try:
         from ospra_os.email_automation.ai_responder import EmailAutomationAI
@@ -145,7 +145,7 @@ async def process_emails(emails: list, dry_run: bool = True):
         results = []
         
         for i, email in enumerate(emails, 1):
-            print(f"\n📧 Email {i}/{len(emails)}")
+            print(f"\n[EMAIL] Email {i}/{len(emails)}")
             print(f"   From: {email['from'][:50]}")
             print(f"   Subject: {email['subject'][:60]}")
             
@@ -171,12 +171,12 @@ async def process_emails(emails: list, dry_run: bool = True):
             
             # Print result
             if result.get('should_respond'):
-                print(f"   ✅ Category: {result['category']}")
-                print(f"   ⚡ Urgency: {result['urgency']}")
-                print(f"   😊 Sentiment: {result['sentiment']}")
+                print(f"   [SUCCESS] Category: {result['category']}")
+                print(f"   [FAST] Urgency: {result['urgency']}")
+                print(f"    Sentiment: {result['sentiment']}")
                 if result.get('order_number'):
-                    print(f"   🔢 Order: #{result['order_number']}")
-                print(f"\n   📝 Generated Response:")
+                    print(f"    Order: #{result['order_number']}")
+                print(f"\n   [NOTE] Generated Response:")
                 print(f"   {'-'*60}")
                 for line in result['response_text'].split('\n')[:8]:
                     print(f"   {line}")
@@ -184,12 +184,12 @@ async def process_emails(emails: list, dry_run: bool = True):
                     print(f"   ... (truncated)")
                 print(f"   {'-'*60}")
             else:
-                print(f"   ⏭️  AUTO-IGNORED: {result.get('reason', 'N/A')}")
+                print(f"   ⏭  AUTO-IGNORED: {result.get('reason', 'N/A')}")
         
         return results
         
     except Exception as e:
-        print(f"❌ Processing failed: {e}")
+        print(f"[ERROR] Processing failed: {e}")
         import traceback
         traceback.print_exc()
         return []
@@ -197,10 +197,10 @@ async def process_emails(emails: list, dry_run: bool = True):
 
 async def send_responses(service, results: list, dry_run: bool = True):
     """Send AI-generated responses (with confirmation)."""
-    print_section("📤 Sending Responses")
+    print_section(" Sending Responses")
     
     if dry_run:
-        print("   🔒 DRY RUN MODE - No emails will be sent")
+        print("   [LOCKED] DRY RUN MODE - No emails will be sent")
         print("   Run without --dry-run to send emails")
         return
     
@@ -213,9 +213,9 @@ async def send_responses(service, results: list, dry_run: bool = True):
     print(f"   Found {len(responses_to_send)} emails to respond to")
     
     # Confirm before sending
-    confirm = input("\n   ⚠️  Send these responses? (yes/no): ")
+    confirm = input("\n   [WARNING]  Send these responses? (yes/no): ")
     if confirm.lower() != 'yes':
-        print("   ❌ Cancelled")
+        print("   [ERROR] Cancelled")
         return
     
     # Send responses
@@ -238,15 +238,15 @@ async def send_responses(service, results: list, dry_run: bool = True):
                 body={'raw': raw, 'threadId': email['thread_id']}
             ).execute()
             
-            print(f"   ✅ Sent reply to: {email['from'][:40]}")
+            print(f"   [SUCCESS] Sent reply to: {email['from'][:40]}")
             
         except Exception as e:
-            print(f"   ❌ Failed to send: {e}")
+            print(f"   [ERROR] Failed to send: {e}")
 
 
 def print_summary(results: list):
     """Print test summary."""
-    print_header("📊 TEST SUMMARY")
+    print_header("[STATS] TEST SUMMARY")
     
     total = len(results)
     responded = sum(1 for r in results if r['result'].get('should_respond'))
@@ -264,21 +264,21 @@ def print_summary(results: list):
             urgencies[urg] = urgencies.get(urg, 0) + 1
     
     print(f"   Total Emails Processed: {total}")
-    print(f"   ✅ Responses Generated:  {responded}")
-    print(f"   ⏭️  Auto-Ignored:         {ignored}")
+    print(f"   [SUCCESS] Responses Generated:  {responded}")
+    print(f"   ⏭  Auto-Ignored:         {ignored}")
     print()
     
     if categories:
-        print("   📁 Categories:")
+        print("    Categories:")
         for cat, count in sorted(categories.items(), key=lambda x: -x[1]):
             print(f"      {cat}: {count}")
         print()
     
     if any(urgencies.values()):
-        print("   ⚡ Urgency Levels:")
+        print("   [FAST] Urgency Levels:")
         for urg, count in urgencies.items():
             if count > 0:
-                emoji = {'low': '🟢', 'medium': '🟡', 'high': '🟠', 'critical': '🔴'}[urg]
+                emoji = {'low': '', 'medium': '', 'high': '', 'critical': ''}[urg]
                 print(f"      {emoji} {urg}: {count}")
 
 
@@ -289,21 +289,21 @@ async def main():
     parser.add_argument('--limit', type=int, default=5, help='Max emails to process')
     args = parser.parse_args()
     
-    print_header("🧪 OSPRA INTELLIGENCE - LIVE EMAIL TEST")
-    print(f"   Mode: {'DRY RUN (safe)' if args.dry_run else '⚠️  LIVE (will send emails)'}")
+    print_header("[TEST] OSPRA INTELLIGENCE - LIVE EMAIL TEST")
+    print(f"   Mode: {'DRY RUN (safe)' if args.dry_run else '[WARNING]  LIVE (will send emails)'}")
     print(f"   Limit: {args.limit} emails")
     print(f"   Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
     # Step 1: Connect to Gmail
     client, service = await test_gmail_connection()
     if not service:
-        print("\n❌ Cannot proceed without Gmail connection")
+        print("\n[ERROR] Cannot proceed without Gmail connection")
         return
     
     # Step 2: Fetch emails
     emails = await fetch_unread_emails(service, limit=args.limit)
     if not emails:
-        print("\n✅ No unread emails to process!")
+        print("\n[SUCCESS] No unread emails to process!")
         return
     
     # Step 3: Process with AI
@@ -317,7 +317,7 @@ async def main():
     if results:
         print_summary(results)
     
-    print_header("✅ TEST COMPLETE")
+    print_header("[SUCCESS] TEST COMPLETE")
 
 
 if __name__ == "__main__":

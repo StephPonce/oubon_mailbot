@@ -1,5 +1,5 @@
 """
-⚠️ DEPRECATED - Use ospra_os.core.tiers instead
+[WARNING] DEPRECATED - Use ospra_os.core.tiers instead
 
 This file is maintained for backward compatibility only.
 All tier logic has been unified in ospra_os.core.tiers.
@@ -111,7 +111,7 @@ _LEGACY_TO_NEW = {
 
 class TierManager:
     """
-    ⚠️ DEPRECATED - Use TierEnforcer from ospra_os.core.tiers instead
+    [WARNING] DEPRECATED - Use TierEnforcer from ospra_os.core.tiers instead
     
     This class wraps the new tier system for backward compatibility.
     """
@@ -297,39 +297,39 @@ class TierManager:
 # ==================== MIGRATION GUIDE ====================
 
 MIGRATION_GUIDE = """
-╔══════════════════════════════════════════════════════════════════╗
-║              TIER MANAGER MIGRATION GUIDE                        ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  This file is DEPRECATED. Please migrate to the new system:     ║
-║                                                                  ║
-║  OLD (deprecated):                                               ║
-║    from ospra_os.subscription.tier_manager import TierManager    ║
-║    manager = TierManager(database_url)                           ║
-║    tier = await manager.get_user_tier(user_id)                   ║
-║                                                                  ║
-║  NEW (use this):                                                 ║
-║    from ospra_os.core import (                                   ║
-║        SubscriptionTier,                                         ║
-║        TierEnforcer,                                             ║
-║        get_tier_definition,                                      ║
-║    )                                                             ║
-║                                                                  ║
-║    # Get tier from user model directly                           ║
-║    user_tier = user.subscription_tier                            ║
-║                                                                  ║
-║    # Use enforcer for access control                             ║
-║    enforcer = TierEnforcer(user_tier)                            ║
-║    if enforcer.can_access('personal_learning'):                  ║
-║        # Enable personal learning                                ║
-║                                                                  ║
-║  Tier name mappings:                                             ║
-║    free    →  nest                                               ║
-║    starter →  flight                                             ║
-║    pro     →  soar                                               ║
-║    elite   →  stratosphere                                       ║
-║                                                                  ║
-╚══════════════════════════════════════════════════════════════════╝
+
+              TIER MANAGER MIGRATION GUIDE                        
+
+                                                                  
+  This file is DEPRECATED. Please migrate to the new system:     
+                                                                  
+  OLD (deprecated):                                               
+    from ospra_os.subscription.tier_manager import TierManager    
+    manager = TierManager(database_url)                           
+    tier = await manager.get_user_tier(user_id)                   
+                                                                  
+  NEW (use this):                                                 
+    from ospra_os.core import (                                   
+        SubscriptionTier,                                         
+        TierEnforcer,                                             
+        get_tier_definition,                                      
+    )                                                             
+                                                                  
+    # Get tier from user model directly                           
+    user_tier = user.subscription_tier                            
+                                                                  
+    # Use enforcer for access control                             
+    enforcer = TierEnforcer(user_tier)                            
+    if enforcer.can_access('personal_learning'):                  
+        # Enable personal learning                                
+                                                                  
+  Tier name mappings:                                             
+    free    →  nest                                               
+    starter →  flight                                             
+    pro     →  soar                                               
+    elite   →  stratosphere                                       
+                                                                  
+
 """
 
 if __name__ == "__main__":

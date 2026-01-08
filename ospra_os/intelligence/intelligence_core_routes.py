@@ -10,8 +10,8 @@ Endpoints:
 - Unified context (full, summary)
 - Actions (preview, execute, undo)
 - Tier management (check, upgrade)
-- 🧠 OSPRA DISCOVERY (REAL cross-source intelligence)
-- 🎨 DALL-E Image Generation
+- [BRAIN] OSPRA DISCOVERY (REAL cross-source intelligence)
+-  DALL-E Image Generation
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -286,7 +286,7 @@ async def intelligence_health():
 
 
 # ============================================================================
-# 🧠 OSPRA INTELLIGENCE DISCOVERY (FULLY INTEGRATED)
+# [BRAIN] OSPRA INTELLIGENCE DISCOVERY (FULLY INTEGRATED)
 # ============================================================================
 
 _ospra_engine = None
@@ -298,9 +298,9 @@ def _get_ospra_engine():
             from ospra_os.intelligence.ospra_engine import OspraIntelligenceEngine
             database_url = os.getenv('DATABASE_URL')
             _ospra_engine = OspraIntelligenceEngine(database_url=database_url)
-            logger.info("✅ Ospra Intelligence Engine initialized")
+            logger.info("[SUCCESS] Ospra Intelligence Engine initialized")
         except Exception as e:
-            logger.warning(f"⚠️ Ospra Engine not available: {e}")
+            logger.warning(f"[WARNING] Ospra Engine not available: {e}")
             _ospra_engine = None
     return _ospra_engine
 
@@ -308,7 +308,7 @@ def _get_ospra_engine():
 @router.post("/discover")
 async def discover_winning_products(request: DiscoverRequest):
     """
-    🔍 DISCOVER WINNING PRODUCTS
+    [SEARCH] DISCOVER WINNING PRODUCTS
     
     Uses ALL connected sources:
     - Google Trends
@@ -409,7 +409,7 @@ async def get_available_discovery_niches():
 
 
 # ============================================================================
-# 🎨 DALL-E IMAGE GENERATION
+#  DALL-E IMAGE GENERATION
 # ============================================================================
 
 @router.post("/images/generate")
@@ -498,7 +498,7 @@ async def get_image_generation_status():
 
 
 # ============================================================================
-# 🔗 ALL CONNECTIONS STATUS
+# [LINK] ALL CONNECTIONS STATUS
 # ============================================================================
 
 @router.get("/connections")

@@ -89,7 +89,7 @@ async def submit_onboarding_form(
         }
         
     except Exception as e:
-        logger.error(f"❌ Form submission error: {e}")
+        logger.error(f"[ERROR] Form submission error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -142,7 +142,7 @@ async def handle_calendly_webhook(
             email = invitee.get("email")
             scheduled_time = payload.get("payload", {}).get("event", {}).get("start_time")
             
-            logger.info(f"📅 Onboarding call scheduled: {email} at {scheduled_time}")
+            logger.info(f" Onboarding call scheduled: {email} at {scheduled_time}")
             
             # TODO: Update customer status
             # TODO: Send confirmation email
@@ -153,7 +153,7 @@ async def handle_calendly_webhook(
         return {"status": "ignored", "event": event_type}
         
     except Exception as e:
-        logger.error(f"❌ Calendly webhook error: {e}")
+        logger.error(f"[ERROR] Calendly webhook error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

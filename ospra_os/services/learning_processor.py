@@ -88,7 +88,7 @@ class LearningProcessor:
                 "weight_changes": {...}
             }
         """
-        print("🧠 Processing learning events...")
+        print("[BRAIN] Processing learning events...")
 
         # Find pending events
         query = self.db.query(AILearningEvent).filter(
@@ -100,7 +100,7 @@ class LearningProcessor:
 
         pending_events = query.all()
 
-        print(f"📚 Found {len(pending_events)} pending learning events")
+        print(f" Found {len(pending_events)} pending learning events")
 
         # Group events by user
         events_by_user = {}
@@ -120,7 +120,7 @@ class LearningProcessor:
 
         self.db.commit()
 
-        print(f"✅ Processed {total_processed} events for {len(events_by_user)} users")
+        print(f"[SUCCESS] Processed {total_processed} events for {len(events_by_user)} users")
 
         return {
             "events_processed": total_processed,
@@ -200,7 +200,7 @@ class LearningProcessor:
             event.processed = True
             event.processed_at = datetime.now()
 
-        print(f"🎯 Updated weights for user {user_id}:")
+        print(f"[TARGET] Updated weights for user {user_id}:")
         for factor, weight in new_weights.items():
             change = weight - current_weights.get(factor, 0.25)
             sign = "+" if change > 0 else ""
@@ -411,7 +411,7 @@ class LearningProcessor:
         Returns:
             Updated global weights
         """
-        print(f"🌍 Updating global weights for category: {category}")
+        print(f" Updating global weights for category: {category}")
 
         # Get all personal weights
         all_personal_weights = self.db.query(PersonalLearningWeights).filter(
@@ -419,7 +419,7 @@ class LearningProcessor:
         ).all()
 
         if not all_personal_weights:
-            print("⚠️  No personal weights found, keeping defaults")
+            print("[WARNING]  No personal weights found, keeping defaults")
             return self.DEFAULT_WEIGHTS
 
         # Average all personal weights
@@ -464,7 +464,7 @@ class LearningProcessor:
 
         self.db.commit()
 
-        print(f"✅ Global weights updated (version {global_record.version}):")
+        print(f"[SUCCESS] Global weights updated (version {global_record.version}):")
         for factor, weight in global_weights.items():
             print(f"   {factor}: {weight:.3f}")
 

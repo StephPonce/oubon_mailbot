@@ -38,7 +38,7 @@ async def calculate_global_patterns():
 
     Should run: Daily
     """
-    logger.info("🧠 Starting global pattern calculation...")
+    logger.info("[BRAIN] Starting global pattern calculation...")
 
     db = SessionLocal()
     try:
@@ -46,7 +46,7 @@ async def calculate_global_patterns():
         events = db.query(LearningEvent).all()
 
         if not events:
-            logger.warning("⚠️ No learning events found - skipping calculation")
+            logger.warning("[WARNING] No learning events found - skipping calculation")
             return
 
         # Aggregate stats by niche
@@ -183,14 +183,14 @@ async def calculate_global_patterns():
 
         db.commit()
 
-        logger.info("✅ Global patterns calculated:")
+        logger.info("[SUCCESS] Global patterns calculated:")
         logger.info(f"   Top niches: {', '.join([f'{n}({c:.1%})' for n, c in top_niches])}")
         logger.info(f"   Total sales: {len([e for e in events if e.event_type in ['sale', 'historical_sale']])}")
         logger.info(f"   Total revenue: ${total_revenue:,.2f}")
         logger.info(f"   Users contributing: {len(unique_users)}")
 
     except Exception as e:
-        logger.error(f"❌ Failed to calculate global patterns: {e}")
+        logger.error(f"[ERROR] Failed to calculate global patterns: {e}")
         import traceback
         traceback.print_exc()
     finally:
@@ -211,7 +211,7 @@ async def calculate_personal_patterns(user_id: int):
 
     Should run: Daily for each active user
     """
-    logger.info(f"👤 Calculating personal patterns for user {user_id}...")
+    logger.info(f" Calculating personal patterns for user {user_id}...")
 
     db = SessionLocal()
     try:
@@ -221,7 +221,7 @@ async def calculate_personal_patterns(user_id: int):
         ).all()
 
         if not events:
-            logger.warning(f"⚠️ No learning events for user {user_id} - skipping")
+            logger.warning(f"[WARNING] No learning events for user {user_id} - skipping")
             return
 
         # Aggregate user's niche performance
@@ -311,13 +311,13 @@ async def calculate_personal_patterns(user_id: int):
 
         db.commit()
 
-        logger.info(f"✅ Personal patterns calculated for user {user_id}:")
+        logger.info(f"[SUCCESS] Personal patterns calculated for user {user_id}:")
         logger.info(f"   Best niches: {', '.join(best_niche_names)}")
         logger.info(f"   Optimal price: ${optimal_price_range.get('min', 0):.2f} - ${optimal_price_range.get('max', 0):.2f}")
         logger.info(f"   Sales analyzed: {sales_count}")
 
     except Exception as e:
-        logger.error(f"❌ Failed to calculate personal patterns for user {user_id}: {e}")
+        logger.error(f"[ERROR] Failed to calculate personal patterns for user {user_id}: {e}")
         import traceback
         traceback.print_exc()
     finally:
@@ -330,7 +330,7 @@ async def calculate_all_personal_patterns():
 
     Should run: Daily
     """
-    logger.info("👥 Calculating personal patterns for all users...")
+    logger.info(" Calculating personal patterns for all users...")
 
     db = SessionLocal()
     try:
@@ -343,10 +343,10 @@ async def calculate_all_personal_patterns():
         for user_id in user_ids:
             await calculate_personal_patterns(user_id)
 
-        logger.info(f"✅ Personal patterns calculated for {len(user_ids)} users")
+        logger.info(f"[SUCCESS] Personal patterns calculated for {len(user_ids)} users")
 
     except Exception as e:
-        logger.error(f"❌ Failed to calculate all personal patterns: {e}")
+        logger.error(f"[ERROR] Failed to calculate all personal patterns: {e}")
     finally:
         db.close()
 
@@ -360,7 +360,7 @@ async def cleanup_old_events(days_to_keep: int = 90):
 
     Should run: Weekly or monthly
     """
-    logger.info(f"🧹 Cleaning up learning events older than {days_to_keep} days...")
+    logger.info(f" Cleaning up learning events older than {days_to_keep} days...")
 
     db = SessionLocal()
     try:
@@ -372,10 +372,10 @@ async def cleanup_old_events(days_to_keep: int = 90):
 
         db.commit()
 
-        logger.info(f"✅ Deleted {deleted_count} old learning events")
+        logger.info(f"[SUCCESS] Deleted {deleted_count} old learning events")
 
     except Exception as e:
-        logger.error(f"❌ Failed to cleanup old events: {e}")
+        logger.error(f"[ERROR] Failed to cleanup old events: {e}")
         db.rollback()
     finally:
         db.close()
@@ -430,7 +430,7 @@ def setup_learning_jobs():
 
         scheduler.start()
 
-        logger.info("✅ Learning analysis jobs scheduled")
+        logger.info("[SUCCESS] Learning analysis jobs scheduled")
         logger.info("   - Global patterns: Daily at 2 AM")
         logger.info("   - Personal patterns: Daily at 3 AM")
         logger.info("   - Cleanup: Weekly on Sunday at 4 AM")
@@ -438,10 +438,10 @@ def setup_learning_jobs():
         return scheduler
 
     except ImportError:
-        logger.warning("⚠️ APScheduler not installed - background jobs not scheduled")
+        logger.warning("[WARNING] APScheduler not installed - background jobs not scheduled")
         logger.info("   Install with: pip install apscheduler")
         logger.info("   Or run jobs manually via API endpoints")
         return None
     except Exception as e:
-        logger.error(f"❌ Failed to setup learning jobs: {e}")
+        logger.error(f"[ERROR] Failed to setup learning jobs: {e}")
         return None

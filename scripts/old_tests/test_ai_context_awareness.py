@@ -31,15 +31,15 @@ print("-" * 80)
 try:
     from ospra_os.database.multi_store_models import SessionLocal
     from ospra_os.intelligence.unified_context import get_unified_context_builder
-    print("✅ Unified context system imported")
+    print("[SUCCESS] Unified context system imported")
 except Exception as e:
-    print(f"❌ Failed to import: {e}")
+    print(f"[ERROR] Failed to import: {e}")
     exit(1)
 
 # Create database session
 db = SessionLocal()
 context_builder = get_unified_context_builder(db)
-print("✅ Context builder initialized")
+print("[SUCCESS] Context builder initialized")
 print()
 
 # Test 2: Build full unified context
@@ -53,7 +53,7 @@ async def build_context():
 
 context = asyncio.run(build_context())
 
-print("✅ Unified context built successfully")
+print("[SUCCESS] Unified context built successfully")
 print()
 
 # Test 3: Data source inventory
@@ -78,7 +78,7 @@ for source, description in data_sources.items():
         item_count = len(data) if data else 0
         has_data = bool(item_count)
 
-    status = "✅" if has_data else "⚠️ "
+    status = "[SUCCESS]" if has_data else "[WARNING] "
     print(f"{status} {source.upper()}")
     print(f"   {description}")
 
@@ -120,17 +120,17 @@ print("4. CORRELATION DETECTION")
 print("-" * 80)
 
 correlations = context.get("correlations", [])
-print(f"✅ {len(correlations)} correlations detected across data sources")
+print(f"[SUCCESS] {len(correlations)} correlations detected across data sources")
 print()
 
 if correlations:
     print("Top correlations:")
     for i, corr in enumerate(correlations[:5], 1):
         severity_emoji = {
-            "high": "🔴",
-            "medium": "🟡",
-            "low": "🟢"
-        }.get(corr.get("severity", "low"), "⚪")
+            "high": "",
+            "medium": "",
+            "low": ""
+        }.get(corr.get("severity", "low"), "")
 
         print(f"{i}. {severity_emoji} {corr.get('type', 'unknown').replace('_', ' ').title()}")
         print(f"   Severity: {corr.get('severity', 'unknown')}")
@@ -164,15 +164,15 @@ try:
 
     claude_key = os.getenv("CLAUDE_API_KEY")
     if not claude_key:
-        print("❌ CLAUDE_API_KEY not found")
+        print("[ERROR] CLAUDE_API_KEY not found")
         exit(1)
 
     provider = ClaudeProvider(api_key=claude_key)
-    print("✅ ClaudeProvider initialized")
+    print("[SUCCESS] ClaudeProvider initialized")
     print(f"   Model: {provider.model_name}")
     print()
 except Exception as e:
-    print(f"❌ Failed to initialize AI: {e}")
+    print(f"[ERROR] Failed to initialize AI: {e}")
     exit(1)
 
 # Test 7: Test AI with full context
@@ -281,7 +281,7 @@ completeness_report = {
 }
 
 for source, info in completeness_report.items():
-    status_icon = "✅" if info["status"] else "⚠️ "
+    status_icon = "[SUCCESS]" if info["status"] else "[WARNING] "
     print(f"{status_icon} {source}: {info['coverage']} coverage")
 
 print()
@@ -313,13 +313,13 @@ print()
 print("Active Data Sources:")
 for source, info in completeness_report.items():
     if info["status"]:
-        print(f"  ✅ {source}")
+        print(f"  [SUCCESS] {source}")
 
 print()
 print("Pending Data Sources (to be implemented):")
 for source, info in completeness_report.items():
     if not info["status"]:
-        print(f"  ⚠️  {source}")
+        print(f"  [WARNING]  {source}")
 
 print()
 print("=" * 80)

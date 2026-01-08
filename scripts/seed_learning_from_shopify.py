@@ -61,30 +61,30 @@ async def fetch_shopify_data(months_back: int = 12):
     }
 
     if not credentials["admin_api_token"]:
-        logger.error("❌ SHOPIFY_ACCESS_TOKEN not found in environment")
+        logger.error("[ERROR] SHOPIFY_ACCESS_TOKEN not found in environment")
         return [], []
 
     adapter = ShopifyAdapter(credentials)
 
     # Test connection
-    logger.info("🔌 Testing Shopify connection...")
+    logger.info("[PLUGIN] Testing Shopify connection...")
     conn_result = await adapter.test_connection()
     if not conn_result.get("success"):
-        logger.error(f"❌ Shopify connection failed: {conn_result}")
+        logger.error(f"[ERROR] Shopify connection failed: {conn_result}")
         return [], []
 
-    logger.info(f"✅ Connected to {conn_result.get('store_name')}")
+    logger.info(f"[SUCCESS] Connected to {conn_result.get('store_name')}")
 
     # Fetch orders from past N months
     since_date = datetime.utcnow() - timedelta(days=months_back * 30)
-    logger.info(f"📦 Fetching orders since {since_date.strftime('%Y-%m-%d')}...")
+    logger.info(f"[PACKAGE] Fetching orders since {since_date.strftime('%Y-%m-%d')}...")
 
     orders_result = await adapter.get_orders(limit=250, status="any", since=since_date)
     orders = orders_result.get("orders", [])
     logger.info(f"   Found {len(orders)} orders")
 
     # Fetch products
-    logger.info("📦 Fetching products...")
+    logger.info("[PACKAGE] Fetching products...")
     products_result = await adapter.get_products(limit=250, published_status="any")
     products = products_result.get("products", [])
     logger.info(f"   Found {len(products)} products")
@@ -141,7 +141,7 @@ async def seed_learning_events(orders: List[Dict], products: List[Dict], db: Ses
         products: List of Shopify products (for metadata)
         db: Database session
     """
-    logger.info("📝 Creating learning events from order history...")
+    logger.info("[NOTE] Creating learning events from order history...")
 
     # Build product lookup by ID
     product_lookup = {p["platform_product_id"]: p for p in products}
@@ -191,8 +191,8 @@ async def seed_learning_events(orders: List[Dict], products: List[Dict], db: Ses
 
     db.commit()
 
-    logger.info(f"✅ Created {events_created} learning events")
-    logger.info(f"💰 Total historical revenue: ${total_revenue:,.2f}")
+    logger.info(f"[SUCCESS] Created {events_created} learning events")
+    logger.info(f"[PRICE] Total historical revenue: ${total_revenue:,.2f}")
 
     return events_created, total_revenue
 
@@ -204,7 +204,7 @@ async def calculate_global_weights(db: SessionLocal):
     Args:
         db: Database session
     """
-    logger.info("🧠 Calculating global learning weights...")
+    logger.info("[BRAIN] Calculating global learning weights...")
 
     # Fetch all learning events
     events = db.query(LearningEvent).filter(
@@ -212,7 +212,7 @@ async def calculate_global_weights(db: SessionLocal):
     ).all()
 
     if not events:
-        logger.warning("⚠️ No learning events found - skipping weight calculation")
+        logger.warning("[WARNING] No learning events found - skipping weight calculation")
         return
 
     # Aggregate stats by niche
@@ -303,7 +303,7 @@ async def calculate_global_weights(db: SessionLocal):
 
     db.commit()
 
-    logger.info("✅ Global learning weights calculated:")
+    logger.info("[SUCCESS] Global learning weights calculated:")
     logger.info(f"   Top niches: {', '.join([f'{n}({c:.1%})' for n, c in top_niches])}")
     logger.info(f"   Total sales analyzed: {len(events)}")
     logger.info(f"   Total revenue: ${total_revenue:,.2f}")
@@ -317,7 +317,7 @@ async def calculate_personal_weights(user_id: int, db: SessionLocal):
         user_id: User ID
         db: Database session
     """
-    logger.info(f"👤 Calculating personal weights for user {user_id}...")
+    logger.info(f" Calculating personal weights for user {user_id}...")
 
     # Fetch user's learning events
     events = db.query(LearningEvent).filter(
@@ -326,7 +326,7 @@ async def calculate_personal_weights(user_id: int, db: SessionLocal):
     ).all()
 
     if not events:
-        logger.warning(f"⚠️ No learning events for user {user_id} - skipping personal weights")
+        logger.warning(f"[WARNING] No learning events for user {user_id} - skipping personal weights")
         return
 
     # Aggregate user's niche performance
@@ -396,7 +396,7 @@ async def calculate_personal_weights(user_id: int, db: SessionLocal):
 
     db.commit()
 
-    logger.info(f"✅ Personal weights calculated:")
+    logger.info(f"[SUCCESS] Personal weights calculated:")
     logger.info(f"   Best niches: {', '.join(best_niche_names)}")
     logger.info(f"   Optimal price range: ${optimal_price_range.get('min', 0):.2f} - ${optimal_price_range.get('max', 0):.2f}")
     logger.info(f"   Sales analyzed: {len(events)}")
@@ -405,22 +405,22 @@ async def calculate_personal_weights(user_id: int, db: SessionLocal):
 async def main():
     """Main seeding function"""
     print("=" * 80)
-    print("🌱 SEEDING LEARNING SYSTEM FROM SHOPIFY")
+    print(" SEEDING LEARNING SYSTEM FROM SHOPIFY")
     print("=" * 80)
     print()
 
     # Create tables if they don't exist
-    logger.info("📦 Creating database tables...")
+    logger.info("[PACKAGE] Creating database tables...")
     Base.metadata.create_all(bind=db_engine)
 
     # Fetch Shopify data
     orders, products = await fetch_shopify_data(months_back=12)
 
     if not orders:
-        logger.warning("⚠️ No orders found - nothing to seed")
+        logger.warning("[WARNING] No orders found - nothing to seed")
         print()
         print("=" * 80)
-        print("💡 TIP: Make sure you have Shopify orders in the past 12 months")
+        print("[TIP] TIP: Make sure you have Shopify orders in the past 12 months")
         print("=" * 80)
         return
 
@@ -439,16 +439,16 @@ async def main():
 
         print()
         print("=" * 80)
-        print("✅ SEEDING COMPLETE")
+        print("[SUCCESS] SEEDING COMPLETE")
         print("=" * 80)
         print()
-        print(f"📊 Summary:")
+        print(f"[STATS] Summary:")
         print(f"   - Learning events created: {events_count}")
         print(f"   - Total revenue analyzed: ${total_revenue:,.2f}")
-        print(f"   - Global weights: ✅ Calculated")
-        print(f"   - Personal weights (user 1): ✅ Calculated")
+        print(f"   - Global weights: [SUCCESS] Calculated")
+        print(f"   - Personal weights (user 1): [SUCCESS] Calculated")
         print()
-        print("🧪 Verification:")
+        print("[TEST] Verification:")
         print()
         print("   1. Check database:")
         print(f"      sqlite3 multi_store.db \"SELECT COUNT(*) FROM learning_events;\"")
@@ -464,7 +464,7 @@ async def main():
         print("=" * 80)
 
     except Exception as e:
-        logger.error(f"❌ Seeding failed: {e}")
+        logger.error(f"[ERROR] Seeding failed: {e}")
         import traceback
         traceback.print_exc()
     finally:

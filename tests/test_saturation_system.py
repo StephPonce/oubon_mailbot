@@ -35,7 +35,7 @@ async def test_database_tables():
     inspector = inspect(engine)
     tables = inspector.get_table_names()
 
-    print(f"\n✓ Found {len(tables)} tables in database:")
+    print(f"\n[OK] Found {len(tables)} tables in database:")
     for table in sorted(tables):
         print(f"  - {table}")
 
@@ -44,20 +44,20 @@ async def test_database_tables():
     missing_tables = [t for t in required_tables if t not in tables]
 
     if missing_tables:
-        print(f"\n✗ MISSING TABLES: {missing_tables}")
+        print(f"\n MISSING TABLES: {missing_tables}")
         return False
     else:
-        print(f"\n✓ All required tables exist!")
+        print(f"\n[OK] All required tables exist!")
 
         # Check columns for product_saturation
         columns = [c['name'] for c in inspector.get_columns('product_saturation')]
-        print(f"\n✓ product_saturation columns ({len(columns)}):")
+        print(f"\n[OK] product_saturation columns ({len(columns)}):")
         for col in columns:
             print(f"  - {col}")
 
         # Check columns for user_product_recommendations
         columns = [c['name'] for c in inspector.get_columns('user_product_recommendations')]
-        print(f"\n✓ user_product_recommendations columns ({len(columns)}):")
+        print(f"\n[OK] user_product_recommendations columns ({len(columns)}):")
         for col in columns:
             print(f"  - {col}")
 
@@ -81,7 +81,7 @@ async def test_saturation_tracker():
         niche="smart_home",
         saturation_threshold=5  # Low threshold for testing
     )
-    print(f"✓ Tracked product: {product1.product_name}")
+    print(f"[OK] Tracked product: {product1.product_name}")
     print(f"  - ID: {product1.id}")
     print(f"  - Users: {product1.total_users_count}/{product1.saturation_threshold}")
     print(f"  - Saturated: {product1.is_saturated}")
@@ -89,12 +89,12 @@ async def test_saturation_tracker():
     # Test 2: Check saturation status
     print("\n[Test 2.2] Checking saturation status...")
     is_saturated = await tracker.is_product_saturated(product_name="Smart WiFi Plug Test")
-    print(f"✓ Product saturated: {is_saturated}")
+    print(f"[OK] Product saturated: {is_saturated}")
 
     # Test 3: Get saturation count
     print("\n[Test 2.3] Getting saturation count...")
     count, threshold = await tracker.get_saturation_count("Smart WiFi Plug Test")
-    print(f"✓ Count: {count}/{threshold}")
+    print(f"[OK] Count: {count}/{threshold}")
 
     # Test 4: Recommend to users (simulate)
     print("\n[Test 2.4] Simulating user recommendations...")
@@ -106,13 +106,13 @@ async def test_saturation_tracker():
             was_deployed=True
         )
         if success:
-            print(f"✓ Recommended to user {user_id}")
+            print(f"[OK] Recommended to user {user_id}")
         else:
-            print(f"✗ Failed for user {user_id}: {error}")
+            print(f" Failed for user {user_id}: {error}")
 
     # Check if product is now saturated
     is_saturated_now = await tracker.is_product_saturated(product_saturation_id=product1.id)
-    print(f"\n✓ Product now saturated: {is_saturated_now}")
+    print(f"\n[OK] Product now saturated: {is_saturated_now}")
 
     # Test 5: Filter saturated products
     print("\n[Test 2.5] Testing product filtering...")
@@ -123,14 +123,14 @@ async def test_saturation_tracker():
     ]
 
     filtered = await tracker.filter_saturated_products(test_products, 'name')
-    print(f"✓ Original products: {len(test_products)}")
-    print(f"✓ Filtered products: {len(filtered)}")
-    print(f"✓ Removed {len(test_products) - len(filtered)} saturated products")
+    print(f"[OK] Original products: {len(test_products)}")
+    print(f"[OK] Filtered products: {len(filtered)}")
+    print(f"[OK] Removed {len(test_products) - len(filtered)} saturated products")
 
     # Test 6: Get saturation stats
     print("\n[Test 2.6] Getting saturation statistics...")
     stats = await tracker.get_saturation_stats(niche="smart_home")
-    print(f"✓ Statistics for smart_home niche:")
+    print(f"[OK] Statistics for smart_home niche:")
     print(f"  - Total products: {stats['total_products']}")
     print(f"  - Saturated: {stats['saturated_products']}")
     print(f"  - Unsaturated: {stats['unsaturated_products']}")
@@ -156,9 +156,9 @@ async def test_product_intelligence_integration():
     )
 
     if engine.saturation_tracker:
-        print("✓ SaturationTracker initialized in ProductIntelligenceEngine")
+        print("[OK] SaturationTracker initialized in ProductIntelligenceEngine")
     else:
-        print("✗ SaturationTracker NOT initialized")
+        print(" SaturationTracker NOT initialized")
         return False
 
     print("\n[Test 3.2] Discovering products (saturation filtering enabled)...")
@@ -167,7 +167,7 @@ async def test_product_intelligence_integration():
         max_per_niche=10
     )
 
-    print(f"✓ Discovered {len(products)} products")
+    print(f"[OK] Discovered {len(products)} products")
     if products:
         print(f"\nSample product:")
         print(f"  - Name: {products[0]['name']}")
@@ -180,9 +180,9 @@ async def test_product_intelligence_integration():
 
 async def main():
     """Run all tests"""
-    print("\n" + "█"*60)
+    print("\n" + ""*60)
     print("SATURATION TRACKING SYSTEM VERIFICATION")
-    print("█"*60)
+    print(""*60)
 
     try:
         # Test 1: Database tables
@@ -198,28 +198,28 @@ async def main():
         print("\n" + "="*60)
         print("TEST SUMMARY")
         print("="*60)
-        print(f"✓ Database Tables: {'PASSED' if test1_passed else 'FAILED'}")
-        print(f"✓ SaturationTracker Service: {'PASSED' if test2_passed else 'FAILED'}")
-        print(f"✓ Product Intelligence Integration: {'PASSED' if test3_passed else 'FAILED'}")
+        print(f"[OK] Database Tables: {'PASSED' if test1_passed else 'FAILED'}")
+        print(f"[OK] SaturationTracker Service: {'PASSED' if test2_passed else 'FAILED'}")
+        print(f"[OK] Product Intelligence Integration: {'PASSED' if test3_passed else 'FAILED'}")
 
         all_passed = test1_passed and test2_passed and test3_passed
 
         if all_passed:
-            print("\n" + "█"*60)
-            print("🎉 ALL TESTS PASSED - SYSTEM READY!")
-            print("█"*60)
+            print("\n" + ""*60)
+            print("[LAUNCH] ALL TESTS PASSED - SYSTEM READY!")
+            print(""*60)
             print("\nSaturation tracking is now active:")
-            print("  ✓ Products are tracked automatically")
-            print("  ✓ Saturated products are filtered")
-            print("  ✓ Max 100 users per product (default)")
-            print("  ✓ AutoDS problem prevented!")
+            print("  [OK] Products are tracked automatically")
+            print("  [OK] Saturated products are filtered")
+            print("  [OK] Max 100 users per product (default)")
+            print("  [OK] AutoDS problem prevented!")
             return 0
         else:
-            print("\n❌ SOME TESTS FAILED")
+            print("\n[ERROR] SOME TESTS FAILED")
             return 1
 
     except Exception as e:
-        print(f"\n❌ ERROR: {e}")
+        print(f"\n[ERROR] ERROR: {e}")
         import traceback
         traceback.print_exc()
         return 1

@@ -32,7 +32,7 @@ class TikTokAPI:
         Returns:
             List of video dicts
         """
-        logger.info(f"🔍 Searching TikTok: {keyword}")
+        logger.info(f"[SEARCH] Searching TikTok: {keyword}")
 
         if not self.api_key:
             logger.warning("TikTok API not configured, returning mock data")

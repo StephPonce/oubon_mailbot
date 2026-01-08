@@ -25,9 +25,9 @@ def test_shopify_adapter():
             AuthenticationError,
             RateLimitError
         )
-        print("✅ All imports successful")
+        print("[SUCCESS] All imports successful")
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return
 
     # Test 2: Initialize with mock credentials
@@ -47,13 +47,13 @@ def test_shopify_adapter():
         assert adapter.store_domain == "test-store.myshopify.com"
         assert "test-store.myshopify.com/admin/api/2024-01" in adapter.base_url
 
-        print(f"✅ Adapter initialized")
+        print(f"[SUCCESS] Adapter initialized")
         print(f"   Platform: {adapter.platform_name}")
         print(f"   API Version: {adapter.api_version}")
         print(f"   Store: {adapter.store_domain}")
 
     except Exception as e:
-        print(f"❌ Initialization failed: {e}")
+        print(f"[ERROR] Initialization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -63,12 +63,12 @@ def test_shopify_adapter():
     try:
         try:
             bad_adapter = ShopifyAdapter({})
-            print("❌ Should have raised AuthenticationError")
+            print("[ERROR] Should have raised AuthenticationError")
         except AuthenticationError:
-            print("✅ Correctly rejects missing credentials")
+            print("[SUCCESS] Correctly rejects missing credentials")
 
     except Exception as e:
-        print(f"❌ Credential validation failed: {e}")
+        print(f"[ERROR] Credential validation failed: {e}")
         return
 
     # Test 4: Test helper methods
@@ -78,13 +78,13 @@ def test_shopify_adapter():
         info = adapter.get_platform_info()
         assert info["platform"] == "shopify"
         assert info["api_version"] == "2024-01"
-        print("✅ get_platform_info() working")
+        print("[SUCCESS] get_platform_info() working")
 
         # track_request
         adapter.track_request()
         stats = adapter.get_request_stats()
         assert stats["total_requests"] == 1
-        print("✅ track_request() working")
+        print("[SUCCESS] track_request() working")
 
         # validate_product_data
         valid_product = {
@@ -93,10 +93,10 @@ def test_shopify_adapter():
             "sku": "SW-001"
         }
         adapter.validate_product_data(valid_product)
-        print("✅ validate_product_data() accepts valid data")
+        print("[SUCCESS] validate_product_data() accepts valid data")
 
     except Exception as e:
-        print(f"❌ Helper methods failed: {e}")
+        print(f"[ERROR] Helper methods failed: {e}")
         return
 
     # Test 5: Test data normalization
@@ -133,7 +133,7 @@ def test_shopify_adapter():
         assert normalized["price"] == 99.99
         assert len(normalized["images"]) == 2
         assert len(normalized["tags"]) == 3
-        print("✅ normalize_product() working correctly")
+        print("[SUCCESS] normalize_product() working correctly")
 
         # Test order normalization
         shopify_order = {
@@ -171,10 +171,10 @@ def test_shopify_adapter():
         assert normalized_order["order_number"] == "#1001"
         assert normalized_order["total_price"] == 109.99
         assert len(normalized_order["line_items"]) == 1
-        print("✅ normalize_order() working correctly")
+        print("[SUCCESS] normalize_order() working correctly")
 
     except Exception as e:
-        print(f"❌ Normalization failed: {e}")
+        print(f"[ERROR] Normalization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -188,10 +188,10 @@ def test_shopify_adapter():
 
         # Simulate bucket filling
         adapter._bucket_count = 35
-        print(f"✅ Rate limit bucket tracking: {adapter._bucket_count}/{adapter._bucket_max}")
+        print(f"[SUCCESS] Rate limit bucket tracking: {adapter._bucket_count}/{adapter._bucket_max}")
 
     except Exception as e:
-        print(f"❌ Rate limiting test failed: {e}")
+        print(f"[ERROR] Rate limiting test failed: {e}")
         return
 
     # Test 7: Test async method signatures
@@ -215,25 +215,25 @@ def test_shopify_adapter():
             method = getattr(adapter, method_name)
             assert asyncio.iscoroutinefunction(method), f"{method_name} should be async"
 
-        print(f"✅ All {len(methods_to_check)} abstract methods are async")
+        print(f"[SUCCESS] All {len(methods_to_check)} abstract methods are async")
 
     except Exception as e:
-        print(f"❌ Async signature test failed: {e}")
+        print(f"[ERROR] Async signature test failed: {e}")
         return
 
     print("\n" + "=" * 70)
-    print("✅ ALL SHOPIFY ADAPTER TESTS PASSED!")
+    print("[SUCCESS] ALL SHOPIFY ADAPTER TESTS PASSED!")
     print("=" * 70)
     print()
-    print("📋 Summary:")
-    print("   ✓ Shopify adapter properly inherits from PlatformAdapter")
-    print("   ✓ All 9 abstract methods implemented")
-    print("   ✓ Credential validation working")
-    print("   ✓ Data normalization working")
-    print("   ✓ Rate limiting logic in place")
-    print("   ✓ Helper methods functional")
+    print("[LIST] Summary:")
+    print("   [OK] Shopify adapter properly inherits from PlatformAdapter")
+    print("   [OK] All 9 abstract methods implemented")
+    print("   [OK] Credential validation working")
+    print("   [OK] Data normalization working")
+    print("   [OK] Rate limiting logic in place")
+    print("   [OK] Helper methods functional")
     print()
-    print("🎯 Shopify Adapter Features:")
+    print("[TARGET] Shopify Adapter Features:")
     print("   • Shopify Admin API 2024-01")
     print("   • Rate limiting (2 req/sec, bucket algorithm)")
     print("   • Product deployment with variants")
@@ -242,7 +242,7 @@ def test_shopify_adapter():
     print("   • Multi-location support")
     print("   • Comprehensive error handling")
     print()
-    print("📚 To test with real Shopify store:")
+    print(" To test with real Shopify store:")
     print("   1. Set SHOPIFY_STORE_URL in environment")
     print("   2. Set SHOPIFY_ACCESS_TOKEN in environment")
     print("   3. Run: python3 test_shopify_adapter_live.py")
@@ -264,7 +264,7 @@ def test_with_real_credentials():
     access_token = os.getenv("SHOPIFY_ACCESS_TOKEN")
 
     if not store_url or not access_token:
-        print("⚠️  No real credentials found in environment")
+        print("[WARNING]  No real credentials found in environment")
         print("   Set SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN to test")
         return
 
@@ -285,11 +285,11 @@ def test_with_real_credentials():
         result = await adapter.test_connection()
 
         if result.get("success"):
-            print(f"✅ Connected to: {result['store_name']}")
+            print(f"[SUCCESS] Connected to: {result['store_name']}")
             print(f"   URL: {result['store_url']}")
             print(f"   Currency: {result['currency']}")
         else:
-            print(f"❌ Connection failed: {result.get('error')}")
+            print(f"[ERROR] Connection failed: {result.get('error')}")
             return
 
         # Get store info
@@ -297,11 +297,11 @@ def test_with_real_credentials():
         info = await adapter.get_store_info()
 
         if info.get("success"):
-            print(f"✅ Store info retrieved")
+            print(f"[SUCCESS] Store info retrieved")
             print(f"   Plan: {info.get('plan')}")
             print(f"   Country: {info.get('country')}")
         else:
-            print(f"❌ Get store info failed: {info.get('error')}")
+            print(f"[ERROR] Get store info failed: {info.get('error')}")
 
         # Get products (first 5)
         print("\nFetching products...")
@@ -309,11 +309,11 @@ def test_with_real_credentials():
 
         if products.get("success"):
             count = products.get("total_count", 0)
-            print(f"✅ Retrieved {count} products")
+            print(f"[SUCCESS] Retrieved {count} products")
             for product in products.get("products", [])[:3]:
                 print(f"   - {product['title']}: ${product['price']}")
         else:
-            print(f"❌ Get products failed: {products.get('error')}")
+            print(f"[ERROR] Get products failed: {products.get('error')}")
 
         # Get orders (first 5)
         print("\nFetching orders...")
@@ -321,23 +321,23 @@ def test_with_real_credentials():
 
         if orders.get("success"):
             count = orders.get("total_count", 0)
-            print(f"✅ Retrieved {count} orders")
+            print(f"[SUCCESS] Retrieved {count} orders")
             for order in orders.get("orders", [])[:3]:
                 print(f"   - {order['order_number']}: ${order['total_price']} ({order['status']})")
         else:
-            print(f"❌ Get orders failed: {orders.get('error')}")
+            print(f"[ERROR] Get orders failed: {orders.get('error')}")
 
         # Show stats
         print("\nAPI Statistics:")
         stats = adapter.get_request_stats()
         print(f"   Total requests: {stats['total_requests']}")
 
-        print("\n✅ Live tests complete!")
+        print("\n[SUCCESS] Live tests complete!")
 
     try:
         asyncio.run(run_live_tests())
     except Exception as e:
-        print(f"❌ Live tests failed: {e}")
+        print(f"[ERROR] Live tests failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -350,5 +350,5 @@ if __name__ == "__main__":
     if os.getenv("SHOPIFY_STORE_URL") and os.getenv("SHOPIFY_ACCESS_TOKEN"):
         test_with_real_credentials()
     else:
-        print("💡 Tip: Set SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN environment")
+        print("[TIP] Tip: Set SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN environment")
         print("   variables to test with real Shopify API")

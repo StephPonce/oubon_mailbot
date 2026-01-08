@@ -79,12 +79,12 @@ class PerformanceTracker:
             
             self.sales_cache = sales_data
             
-            logger.info(f"✅ Fetched {len(sales_data)} sales from Shopify ({days_back} days)")
+            logger.info(f"[SUCCESS] Fetched {len(sales_data)} sales from Shopify ({days_back} days)")
             
             return sales_data
         
         except Exception as e:
-            logger.error(f"❌ Failed to fetch Shopify sales: {e}")
+            logger.error(f"[ERROR] Failed to fetch Shopify sales: {e}")
             return []
     
     async def fetch_customer_behavior(
@@ -130,12 +130,12 @@ class PerformanceTracker:
             
             self.behavior_cache = behavior_data
             
-            logger.info(f"✅ Fetched behavior data for {len(product_ids)} products")
+            logger.info(f"[SUCCESS] Fetched behavior data for {len(product_ids)} products")
             
             return behavior_data
         
         except Exception as e:
-            logger.error(f"❌ Failed to fetch behavior data: {e}")
+            logger.error(f"[ERROR] Failed to fetch behavior data: {e}")
             return []
     
     async def fetch_ad_performance(
@@ -181,12 +181,12 @@ class PerformanceTracker:
             
             self.ad_performance_cache = ad_data
             
-            logger.info(f"✅ Fetched ad performance for {len(ad_data)} campaigns")
+            logger.info(f"[SUCCESS] Fetched ad performance for {len(ad_data)} campaigns")
             
             return ad_data
         
         except Exception as e:
-            logger.error(f"❌ Failed to fetch ad performance: {e}")
+            logger.error(f"[ERROR] Failed to fetch ad performance: {e}")
             return []
     
     async def get_product_performance_summary(self, product_id: str) -> Dict:

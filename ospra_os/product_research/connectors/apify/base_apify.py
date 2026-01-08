@@ -88,7 +88,7 @@ class ApifyClient:
             'Content-Type': 'application/json'
         }
         
-        print(f"✅ Apify client initialized (token: {self.api_token[:10]}...)")
+        print(f"[SUCCESS] Apify client initialized (token: {self.api_token[:10]}...)")
     
     def is_available(self) -> bool:
         """Check if Apify is configured"""
@@ -144,7 +144,7 @@ class ApifyClient:
         # Convert actor ID format for API
         actor_id_safe = actor_id.replace('/', '~')
         
-        print(f"🚀 Starting Apify actor: {actor_id}")
+        print(f"[START] Starting Apify actor: {actor_id}")
         print(f"   Input: {run_input}")
         
         try:
@@ -162,7 +162,7 @@ class ApifyClient:
                 )
                 
                 if response.status_code not in [200, 201]:
-                    print(f"❌ Failed to start actor: {response.status_code}")
+                    print(f"[ERROR] Failed to start actor: {response.status_code}")
                     print(f"   Response: {response.text}")
                     return []
                 
@@ -197,11 +197,11 @@ class ApifyClient:
                         )
                         
                         results = results_response.json()
-                        print(f"✅ Actor completed! Got {len(results)} results")
+                        print(f"[SUCCESS] Actor completed! Got {len(results)} results")
                         return results
                     
                     elif status in ["FAILED", "ABORTED", "TIMED-OUT"]:
-                        print(f"❌ Actor {status}: {actor_id}")
+                        print(f"[ERROR] Actor {status}: {actor_id}")
                         return []
                     
                     # Still running
@@ -209,11 +209,11 @@ class ApifyClient:
                     if elapsed % 30 == 0:
                         print(f"   Still running... ({elapsed}s)")
                 
-                print(f"⏰ Timeout after {timeout_secs}s waiting for {actor_id}")
+                print(f"[ALARM] Timeout after {timeout_secs}s waiting for {actor_id}")
                 return []
                 
         except Exception as e:
-            print(f"❌ Error running actor {actor_id}: {e}")
+            print(f"[ERROR] Error running actor {actor_id}: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -235,7 +235,7 @@ class ApifyClient:
         - "Toys & Games"
         - "Pet Supplies"
         """
-        print(f"🏆 Fetching Amazon bestsellers: {category}")
+        print(f"[TOP] Fetching Amazon bestsellers: {category}")
         
         results = await self.run_actor(
             actor_id=self.ACTORS['amazon_bestsellers'],
@@ -270,7 +270,7 @@ class ApifyClient:
                 )
                 products.append(product)
             except Exception as e:
-                print(f"   ⚠️ Error parsing product: {e}")
+                print(f"   [WARNING] Error parsing product: {e}")
                 continue
         
         print(f"   Found {len(products)} bestsellers")
@@ -285,7 +285,7 @@ class ApifyClient:
         """
         Search Amazon products by keyword
         """
-        print(f"🔍 Searching Amazon for: {keyword}")
+        print(f"[SEARCH] Searching Amazon for: {keyword}")
         
         results = await self.run_actor(
             actor_id=self.ACTORS['amazon_search'],
@@ -323,7 +323,7 @@ class ApifyClient:
                 )
                 products.append(product)
             except Exception as e:
-                print(f"   ⚠️ Error parsing product: {e}")
+                print(f"   [WARNING] Error parsing product: {e}")
                 continue
         
         print(f"   Found {len(products)} products")
@@ -344,7 +344,7 @@ class ApifyClient:
         - coolgadgets
         - smarthome
         """
-        print(f"📱 Fetching TikTok trends: #{hashtag}")
+        print(f"[MOBILE] Fetching TikTok trends: #{hashtag}")
         
         results = await self.run_actor(
             actor_id=self.ACTORS['tiktok_hashtag'],
@@ -387,7 +387,7 @@ class ApifyClient:
                 
                 videos.append(video)
             except Exception as e:
-                print(f"   ⚠️ Error parsing video: {e}")
+                print(f"   [WARNING] Error parsing video: {e}")
                 continue
         
         # Sort by viral score
@@ -425,7 +425,7 @@ class ApifyClient:
         }
         
         for niche in niches:
-            print(f"\n🔍 Discovering products for: {niche}")
+            print(f"\n[SEARCH] Discovering products for: {niche}")
             
             # 1. Amazon bestsellers
             category = amazon_categories.get(niche.lower(), 'Home & Kitchen')
@@ -440,7 +440,7 @@ class ApifyClient:
                     product_dict['discovery_method'] = 'amazon_bestseller'
                     all_products.append(product_dict)
             except Exception as e:
-                print(f"   ⚠️ Amazon bestsellers failed: {e}")
+                print(f"   [WARNING] Amazon bestsellers failed: {e}")
             
             # 2. Amazon search
             try:
@@ -454,7 +454,7 @@ class ApifyClient:
                     product_dict['discovery_method'] = 'amazon_search'
                     all_products.append(product_dict)
             except Exception as e:
-                print(f"   ⚠️ Amazon search failed: {e}")
+                print(f"   [WARNING] Amazon search failed: {e}")
         
         # 3. TikTok viral (once for all niches)
         try:
@@ -476,9 +476,9 @@ class ApifyClient:
                     'niche': 'tiktok',
                 })
         except Exception as e:
-            print(f"   ⚠️ TikTok trends failed: {e}")
+            print(f"   [WARNING] TikTok trends failed: {e}")
         
-        print(f"\n✅ Total products discovered: {len(all_products)}")
+        print(f"\n[SUCCESS] Total products discovered: {len(all_products)}")
         return all_products
 
 
@@ -492,39 +492,39 @@ def get_apify_client(api_token: Optional[str] = None) -> ApifyClient:
 async def test_apify():
     """Test Apify connection and basic functionality"""
     print("\n" + "="*70)
-    print("🧪 TESTING APIFY INTEGRATION")
+    print("[TEST] TESTING APIFY INTEGRATION")
     print("="*70 + "\n")
     
     try:
         client = ApifyClient()
         
         # Test connection
-        print("1️⃣ Testing connection...")
+        print("1⃣ Testing connection...")
         connection = await client.test_connection()
         
         if connection['connected']:
-            print(f"   ✅ Connected as: {connection['username']}")
-            print(f"   📧 Email: {connection['email']}")
-            print(f"   💳 Plan: {connection['plan']}")
+            print(f"   [SUCCESS] Connected as: {connection['username']}")
+            print(f"   [EMAIL] Email: {connection['email']}")
+            print(f"   [PAYMENT] Plan: {connection['plan']}")
         else:
-            print(f"   ❌ Connection failed: {connection['error']}")
+            print(f"   [ERROR] Connection failed: {connection['error']}")
             return
         
         # Test Amazon bestsellers (small test)
-        print("\n2️⃣ Testing Amazon bestsellers...")
+        print("\n2⃣ Testing Amazon bestsellers...")
         bestsellers = await client.get_amazon_bestsellers(
             category="Home & Kitchen",
             max_items=5
         )
         
         for p in bestsellers[:3]:
-            print(f"   📦 {p.name[:50]}...")
-            print(f"      ${p.price:.2f} | ⭐{p.rating} | #{p.bestseller_rank}")
+            print(f"   [PACKAGE] {p.name[:50]}...")
+            print(f"      ${p.price:.2f} | [STAR]{p.rating} | #{p.bestseller_rank}")
         
-        print("\n✅ Apify integration working!")
+        print("\n[SUCCESS] Apify integration working!")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         import traceback
         traceback.print_exc()
 

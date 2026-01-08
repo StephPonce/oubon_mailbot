@@ -357,7 +357,7 @@ class CustomerNotification:
         """
         Internal method to send notification through configured channels
         """
-        logger.info(f"📬 Sending {notification['type']} notification for customer {notification.get('customer_name')}")
+        logger.info(f" Sending {notification['type']} notification for customer {notification.get('customer_name')}")
 
         # Log notification
         self.notifications_log.append(notification)
@@ -378,7 +378,7 @@ class CustomerNotification:
         Send email notification
         """
         # TODO: Integrate with email service (e.g., SendGrid, AWS SES)
-        logger.info(f"  📧 Email notification sent to {notification.get('customer_email')}")
+        logger.info(f"  [EMAIL] Email notification sent to {notification.get('customer_email')}")
 
     async def _send_slack(self, notification: Dict):
         """
@@ -386,37 +386,37 @@ class CustomerNotification:
         """
         # TODO: Integrate with Slack webhook
         slack_message = self._format_slack_message(notification)
-        logger.info(f"  💬 Slack notification sent: {slack_message}")
+        logger.info(f"  [CHAT] Slack notification sent: {slack_message}")
 
     async def _send_webhook(self, notification: Dict):
         """
         Send webhook notification
         """
         # TODO: Send to configured webhook URL
-        logger.info(f"  🔗 Webhook notification sent")
+        logger.info(f"  [LINK] Webhook notification sent")
 
     async def _save_in_app_notification(self, notification: Dict):
         """
         Save in-app notification to database
         """
         # TODO: Save to database for in-app notification center
-        logger.info(f"  🔔 In-app notification saved")
+        logger.info(f"   In-app notification saved")
 
     def _format_slack_message(self, notification: Dict) -> str:
         """
         Format notification for Slack
         """
         type_emojis = {
-            NotificationType.AT_RISK_CUSTOMER: "⚠️",
-            NotificationType.HIGH_CHURN_ALERT: "🚨",
-            NotificationType.SEGMENT_CHANGE: "🔄",
-            NotificationType.HIGH_VALUE_CUSTOMER: "💰",
-            NotificationType.CUSTOMER_LOST: "😢",
-            NotificationType.NEW_CHAMPION: "🏆",
-            NotificationType.LTV_MILESTONE: "🎯"
+            NotificationType.AT_RISK_CUSTOMER: "[WARNING]",
+            NotificationType.HIGH_CHURN_ALERT: "",
+            NotificationType.SEGMENT_CHANGE: "[REFRESH]",
+            NotificationType.HIGH_VALUE_CUSTOMER: "[PRICE]",
+            NotificationType.CUSTOMER_LOST: "",
+            NotificationType.NEW_CHAMPION: "[TOP]",
+            NotificationType.LTV_MILESTONE: "[TARGET]"
         }
 
-        emoji = type_emojis.get(notification['type'], "📢")
+        emoji = type_emojis.get(notification['type'], "")
         customer_name = notification.get('customer_name', 'Unknown')
         message = notification.get('message', '')
 

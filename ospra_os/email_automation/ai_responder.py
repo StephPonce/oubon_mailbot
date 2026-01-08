@@ -491,13 +491,13 @@ async def test():
     ]
     
     print("\n" + "="*70)
-    print("🧪 AI EMAIL RESPONDER v2.0 - COMPREHENSIVE TEST")
+    print("[TEST] AI EMAIL RESPONDER v2.0 - COMPREHENSIVE TEST")
     print("="*70)
     
     for i, test in enumerate(tests, 1):
-        print(f"\n{'─'*70}")
+        print(f"\n{''*70}")
         print(f"TEST {i}: {test['name']}")
-        print(f"{'─'*70}")
+        print(f"{''*70}")
         print(f"From: {test['from_name']} <{test['from']}>")
         print(f"Subject: {test['subject']}")
         
@@ -511,18 +511,18 @@ async def test():
         )
         
         if result.get('should_respond'):
-            print(f"\n✅ Category: {result['category']}")
-            print(f"⚡ Urgency: {result['urgency']}")
-            print(f"😊 Sentiment: {result['sentiment']}")
-            print(f"📧 Type: {result['response_type']}")
+            print(f"\n[SUCCESS] Category: {result['category']}")
+            print(f"[FAST] Urgency: {result['urgency']}")
+            print(f" Sentiment: {result['sentiment']}")
+            print(f"[EMAIL] Type: {result['response_type']}")
             if result.get('order_number'):
-                print(f"🔢 Order: #{result['order_number']}")
-            print(f"\n📝 Response:\n{result['response_text']}")
+                print(f" Order: #{result['order_number']}")
+            print(f"\n[NOTE] Response:\n{result['response_text']}")
         else:
-            print(f"\n⏭️  AUTO-IGNORED: {result.get('reason', 'N/A')}")
+            print(f"\n⏭  AUTO-IGNORED: {result.get('reason', 'N/A')}")
     
     print("\n" + "="*70)
-    print("✅ ALL TESTS COMPLETE")
+    print("[SUCCESS] ALL TESTS COMPLETE")
     print("="*70 + "\n")
 
 

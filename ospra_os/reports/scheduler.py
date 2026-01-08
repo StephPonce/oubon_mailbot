@@ -34,7 +34,7 @@ class ReportScheduler:
 
     async def start(self):
         """Start the scheduler background task"""
-        logger.info("🚀 Starting report scheduler...")
+        logger.info("[START] Starting report scheduler...")
         self.running = True
 
         # Load schedules from database
@@ -43,16 +43,16 @@ class ReportScheduler:
         # Start scheduler loop
         asyncio.create_task(self._scheduler_loop())
 
-        logger.info("✅ Report scheduler started")
+        logger.info("[SUCCESS] Report scheduler started")
 
     async def stop(self):
         """Stop the scheduler"""
-        logger.info("⏸️  Stopping report scheduler...")
+        logger.info("[PAUSE]  Stopping report scheduler...")
         self.running = False
 
     async def load_schedules(self):
         """Load active schedules from database"""
-        logger.info("📋 Loading report schedules...")
+        logger.info("[LIST] Loading report schedules...")
 
         # TODO: Load from database
         # For now, use mock data
@@ -88,7 +88,7 @@ class ReportScheduler:
         for schedule_id, schedule in self.schedules.items():
             schedule['next_run'] = self._calculate_next_run(schedule)
 
-        logger.info(f"✅ Loaded {len(self.schedules)} active schedules")
+        logger.info(f"[SUCCESS] Loaded {len(self.schedules)} active schedules")
 
     async def _scheduler_loop(self):
         """Main scheduler loop - checks every minute"""
@@ -96,7 +96,7 @@ class ReportScheduler:
             try:
                 await self._check_and_run_schedules()
             except Exception as e:
-                logger.error(f"❌ Scheduler error: {e}")
+                logger.error(f"[ERROR] Scheduler error: {e}")
 
             # Wait 1 minute before next check
             await asyncio.sleep(60)
@@ -115,12 +115,12 @@ class ReportScheduler:
 
             # Check if it's time to run
             if now >= next_run:
-                logger.info(f"⏰ Running scheduled report: {schedule['name']}")
+                logger.info(f"[ALARM] Running scheduled report: {schedule['name']}")
                 await self._run_scheduled_report(schedule)
 
                 # Calculate next run time
                 schedule['next_run'] = self._calculate_next_run(schedule)
-                logger.info(f"📅 Next run scheduled for: {schedule['next_run']}")
+                logger.info(f" Next run scheduled for: {schedule['next_run']}")
 
     async def _run_scheduled_report(self, schedule: Dict):
         """
@@ -138,11 +138,11 @@ class ReportScheduler:
             engine = get_report_engine()
             report_config = schedule['report_config']
 
-            logger.info(f"📊 Generating report: {report_config['name']}")
+            logger.info(f"[STATS] Generating report: {report_config['name']}")
             report_data = await engine.generate_report(report_config)
 
             # Render as PDF
-            logger.info("📄 Rendering PDF...")
+            logger.info("[FILE] Rendering PDF...")
             branding = report_config.get('branding')
             pdf_renderer = create_pdf_renderer(branding)
             pdf_bytes = pdf_renderer.render(report_data)
@@ -157,7 +157,7 @@ class ReportScheduler:
             with open(pdf_path, 'wb') as f:
                 f.write(pdf_bytes)
 
-            logger.info(f"✅ Report saved: {pdf_path}")
+            logger.info(f"[SUCCESS] Report saved: {pdf_path}")
 
             # Deliver to recipients
             recipients = schedule.get('recipients', {})
@@ -172,10 +172,10 @@ class ReportScheduler:
 
             # Update schedule statistics
             # TODO: Update in database
-            logger.info(f"✅ Scheduled report completed: {report_config['name']}")
+            logger.info(f"[SUCCESS] Scheduled report completed: {report_config['name']}")
 
         except Exception as e:
-            logger.error(f"❌ Failed to run scheduled report: {e}")
+            logger.error(f"[ERROR] Failed to run scheduled report: {e}")
             # TODO: Update failed_runs count in database
 
     async def _deliver_report(
@@ -196,27 +196,27 @@ class ReportScheduler:
             pdf_bytes: PDF file bytes
             recipients: Dict with email, slack, webhook destinations
         """
-        logger.info(f"📤 Delivering report: {report_name}")
+        logger.info(f" Delivering report: {report_name}")
 
         # Email delivery
         if 'email' in recipients and recipients['email']:
-            logger.info(f"📧 Sending to email: {recipients['email']}")
+            logger.info(f"[EMAIL] Sending to email: {recipients['email']}")
             # TODO: Integrate with email service
-            logger.info("⏸️  Email delivery not yet implemented")
+            logger.info("[PAUSE]  Email delivery not yet implemented")
 
         # Slack delivery
         if 'slack' in recipients and recipients['slack']:
-            logger.info(f"📱 Sending to Slack: {recipients['slack']}")
+            logger.info(f"[MOBILE] Sending to Slack: {recipients['slack']}")
             # TODO: Integrate with Slack
-            logger.info("⏸️  Slack delivery not yet implemented")
+            logger.info("[PAUSE]  Slack delivery not yet implemented")
 
         # Webhook delivery
         if 'webhook' in recipients and recipients['webhook']:
-            logger.info(f"🔗 Sending to webhook: {recipients['webhook']}")
+            logger.info(f"[LINK] Sending to webhook: {recipients['webhook']}")
             # TODO: POST to webhook
-            logger.info("⏸️  Webhook delivery not yet implemented")
+            logger.info("[PAUSE]  Webhook delivery not yet implemented")
 
-        logger.info("✅ Report delivery completed")
+        logger.info("[SUCCESS] Report delivery completed")
 
     def _calculate_next_run(self, schedule: Dict) -> datetime:
         """
@@ -293,7 +293,7 @@ class ReportScheduler:
         # Convert to UTC for storage
         next_run_utc = next_run.astimezone(ZoneInfo('UTC'))
 
-        logger.info(f"📅 Next run for '{schedule.get('name')}': {next_run_utc} UTC ({next_run} {timezone})")
+        logger.info(f" Next run for '{schedule.get('name')}': {next_run_utc} UTC ({next_run} {timezone})")
 
         return next_run_utc
 
@@ -317,7 +317,7 @@ class ReportScheduler:
 
         # TODO: Save to database
 
-        logger.info(f"✅ Schedule added: {schedule_id} - {schedule.get('name')}")
+        logger.info(f"[SUCCESS] Schedule added: {schedule_id} - {schedule.get('name')}")
 
         return schedule_id
 
@@ -326,9 +326,9 @@ class ReportScheduler:
         if schedule_id in self.schedules:
             del self.schedules[schedule_id]
             # TODO: Delete from database
-            logger.info(f"✅ Schedule removed: {schedule_id}")
+            logger.info(f"[SUCCESS] Schedule removed: {schedule_id}")
         else:
-            logger.warning(f"⚠️  Schedule not found: {schedule_id}")
+            logger.warning(f"[WARNING]  Schedule not found: {schedule_id}")
 
     async def update_schedule(self, schedule_id: str, updates: Dict):
         """Update an existing schedule"""
@@ -343,9 +343,9 @@ class ReportScheduler:
 
             # TODO: Update in database
 
-            logger.info(f"✅ Schedule updated: {schedule_id}")
+            logger.info(f"[SUCCESS] Schedule updated: {schedule_id}")
         else:
-            logger.warning(f"⚠️  Schedule not found: {schedule_id}")
+            logger.warning(f"[WARNING]  Schedule not found: {schedule_id}")
 
     def get_schedules(self) -> List[Dict]:
         """Get all active schedules"""

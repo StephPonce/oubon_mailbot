@@ -11,7 +11,7 @@ from app.settings import get_settings
 
 def main():
     """Check Gmail inbox and process new emails with smart replies."""
-    print(f"🕐 [{datetime.now()}] Starting email check...")
+    print(f"[TIME] [{datetime.now()}] Starting email check...")
 
     try:
         # Initialize
@@ -34,20 +34,20 @@ def main():
         )
 
         # Log results
-        print(f"✅ Processed: {result['processed']} emails")
-        print(f"📧 Replied: {result['replied']} emails")
-        print(f"🏷️  Labeled: {result['labeled']} emails")
+        print(f"[SUCCESS] Processed: {result['processed']} emails")
+        print(f"[EMAIL] Replied: {result['replied']} emails")
+        print(f"  Labeled: {result['labeled']} emails")
 
         if result['replied'] > 0:
-            print("📨 Replies sent:")
+            print(" Replies sent:")
             for detail in result['details']:
                 if detail.get('replied'):
                     print(f"   - {detail.get('from')}: {detail.get('subject')}")
 
-        print(f"✅ [{datetime.now()}] Email check complete!")
+        print(f"[SUCCESS] [{datetime.now()}] Email check complete!")
 
     except Exception as e:
-        print(f"❌ Error checking emails: {e}")
+        print(f"[ERROR] Error checking emails: {e}")
         import traceback
         traceback.print_exc()
         raise  # Re-raise so Render logs the error

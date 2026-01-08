@@ -1,39 +1,41 @@
 """
-Ospra OS Intelligence Module
+Ospra Intelligence Module
+=========================
 
-Claude AI business advisor integration
+The core intelligence engine for Ospra OS.
+
+Main Components:
+- ProductDiscoveryEngine: Multi-source product discovery (10 data sources)
+- ClaudeAdvisor: AI-powered business insights
+- BriefingEngine: Daily/weekly briefings
+- OpportunityScorer: Anti-saturation scoring
+
+Usage:
+    from ospra_os.intelligence import ProductDiscoveryEngine, get_engine
+    
+    engine = get_engine()
+    products = await engine.discover_products(niche="smart_home")
 """
 
-from .claude_advisor import (
-    ClaudeBusinessAdvisor,
-    get_daily_briefing,
-    get_weekly_report,
-    chat_with_claude
+# Main discovery engine
+from ospra_os.intelligence.product_discovery import (
+    ProductDiscoveryEngine,
+    get_engine,
+    discover_products,
 )
 
-try:
-    from .opportunity_scorer import (
-        OpportunityScorer,
-        get_opportunity_scorer,
-        score_opportunity,
-        find_opportunities,
-        OpportunityTier,
-        OpportunityScore
-    )
-    _HAS_OPPORTUNITY_SCORER = True
-except ImportError:
-    _HAS_OPPORTUNITY_SCORER = False
+# Backward compatibility aliases
+from ospra_os.intelligence.product_discovery import (
+    ProductDiscoveryEngine as ProductIntelligenceEngine,
+    ProductDiscoveryEngine as OspraIntelligenceEngine,
+    ProductDiscoveryEngine as UnifiedProductDiscoveryV3,
+)
 
 __all__ = [
-    'ClaudeBusinessAdvisor',
-    'get_daily_briefing',
-    'get_weekly_report',
-    'chat_with_claude',
-    # Opportunity Scorer
-    'OpportunityScorer',
-    'get_opportunity_scorer',
-    'score_opportunity',
-    'find_opportunities',
-    'OpportunityTier',
-    'OpportunityScore'
+    'ProductDiscoveryEngine',
+    'ProductIntelligenceEngine',
+    'OspraIntelligenceEngine',
+    'UnifiedProductDiscoveryV3',
+    'get_engine',
+    'discover_products',
 ]

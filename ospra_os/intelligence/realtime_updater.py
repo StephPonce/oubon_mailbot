@@ -50,7 +50,7 @@ class RealtimeUpdater:
             return
 
         self.is_running = True
-        logger.info(f"🚀 Starting realtime momentum updater (interval: {self.update_interval}s)")
+        logger.info(f"[START] Starting realtime momentum updater (interval: {self.update_interval}s)")
 
         # Run initial update
         await self.update_momentum()
@@ -76,7 +76,7 @@ class RealtimeUpdater:
         4. Updates cache with new data
         """
         try:
-            logger.info("📊 Updating product momentum...")
+            logger.info("[STATS] Updating product momentum...")
 
             from ospra_os.intelligence.momentum_tracker import get_momentum_tracker
 
@@ -118,12 +118,12 @@ class RealtimeUpdater:
             self.last_update = datetime.utcnow()
 
             logger.info(
-                f"✅ Momentum updated: {len(trending)} products, "
+                f"[SUCCESS] Momentum updated: {len(trending)} products, "
                 f"{len(breakouts)} breakouts, {len(movers_up)} movers up"
             )
 
         except Exception as e:
-            logger.error(f"❌ Momentum update failed: {e}")
+            logger.error(f"[ERROR] Momentum update failed: {e}")
             import traceback
             traceback.print_exc()
 
@@ -281,7 +281,7 @@ async def start_realtime_updates():
     updater = get_realtime_updater()
     # Start as background task
     asyncio.create_task(updater.start())
-    logger.info("✅ Realtime momentum updater started")
+    logger.info("[SUCCESS] Realtime momentum updater started")
 
 
 async def stop_realtime_updates():
@@ -292,4 +292,4 @@ async def stop_realtime_updates():
     """
     updater = get_realtime_updater()
     await updater.stop()
-    logger.info("✅ Realtime momentum updater stopped")
+    logger.info("[SUCCESS] Realtime momentum updater stopped")

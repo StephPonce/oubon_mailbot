@@ -205,22 +205,22 @@ def test_pattern_analysis():
 
     patterns = engine.analyze_product_patterns(days=30)
 
-    print(f"📊 Winners Found: {patterns['winners']['count']}")
+    print(f"[STATS] Winners Found: {patterns['winners']['count']}")
     print(f"   • Average Price: ${patterns['winners']['avg_price']:.2f}")
-    print(f"   • Average Rating: {patterns['winners']['avg_rating']:.1f}★")
+    print(f"   • Average Rating: {patterns['winners']['avg_rating']:.1f}")
     print(f"   • Average Conversion: {patterns['winners']['avg_conversion']:.2f}%")
     print(f"   • Price Range: ${patterns['winners']['price_range'][0]:.2f} - ${patterns['winners']['price_range'][1]:.2f}")
     print(f"   • Top Categories: {', '.join(patterns['winners']['common_categories'][:3])}")
     print()
 
-    print(f"📉 Losers Found: {patterns['losers']['count']}")
+    print(f"[DECLINE] Losers Found: {patterns['losers']['count']}")
     print(f"   • Average Price: ${patterns['losers']['avg_price']:.2f}")
-    print(f"   • Average Rating: {patterns['losers']['avg_rating']:.1f}★")
+    print(f"   • Average Rating: {patterns['losers']['avg_rating']:.1f}")
     print(f"   • Average Conversion: {patterns['losers']['avg_conversion']:.2f}%")
     print(f"   • Price Range: ${patterns['losers']['price_range'][0]:.2f} - ${patterns['losers']['price_range'][1]:.2f}")
     print()
 
-    print("💡 Insights:")
+    print("[TIP] Insights:")
     for insight in patterns['insights']:
         print(f"   • {insight}")
 
@@ -292,7 +292,7 @@ def test_recommendations():
         print(f"{i}. {product['name']}")
         print(f"   Score: {product['predicted_score']:.0f}/100")
         print(f"   Price: ${product['price']}")
-        print(f"   Rating: {product['rating']}★")
+        print(f"   Rating: {product['rating']}")
         print(f"   Reason: {product['recommendation_reason']}")
         print()
 
@@ -333,7 +333,7 @@ def test_performance_prediction():
     for product in test_products:
         print(f"Product: {product['name']}")
         print(f"  Price: ${product['price']}")
-        print(f"  Rating: {product['rating']}★")
+        print(f"  Rating: {product['rating']}")
         print(f"  Category: {product['category']}")
         print()
 
@@ -349,9 +349,9 @@ def test_performance_prediction():
         if prediction['risk_factors']:
             print(f"  Risk Factors:")
             for risk in prediction['risk_factors']:
-                print(f"    ⚠️  {risk}")
+                print(f"    [WARNING]  {risk}")
         else:
-            print(f"  ✅ No significant risk factors")
+            print(f"  [SUCCESS] No significant risk factors")
 
         print()
         print("-" * 80)
@@ -426,11 +426,11 @@ def test_learning_feedback():
     print()
 
     if result['accuracy'] >= 90:
-        print("✅ Excellent prediction accuracy!")
+        print("[SUCCESS] Excellent prediction accuracy!")
     elif result['accuracy'] >= 70:
-        print("✓ Good prediction accuracy")
+        print("[OK] Good prediction accuracy")
     else:
-        print("⚠️  Model needs improvement")
+        print("[WARNING]  Model needs improvement")
 
     print()
 
@@ -455,7 +455,7 @@ def main():
         test_learning_feedback()
 
         print("=" * 80)
-        print("✅ ALL TESTS COMPLETED SUCCESSFULLY")
+        print("[SUCCESS] ALL TESTS COMPLETED SUCCESSFULLY")
         print("=" * 80)
         print()
         print("Summary:")
@@ -471,7 +471,7 @@ def main():
     except Exception as e:
         print()
         print("=" * 80)
-        print("❌ TEST FAILED")
+        print("[ERROR] TEST FAILED")
         print("=" * 80)
         print()
         print(f"Error: {e}")

@@ -21,9 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Tier definitions
 class RankingTier:
-    ELITE = {"name": "ELITE", "emoji": "🏆", "range": (1, 3), "color": "#FFD700"}
-    TOP = {"name": "TOP", "emoji": "🥇", "range": (4, 10), "color": "#C0C0C0"}
-    RISING = {"name": "RISING", "emoji": "🥈", "range": (11, 20), "color": "#CD7F32"}
+    ELITE = {"name": "ELITE", "emoji": "[TOP]", "range": (1, 3), "color": "#FFD700"}
+    TOP = {"name": "TOP", "emoji": "[FIRST]", "range": (4, 10), "color": "#C0C0C0"}
+    RISING = {"name": "RISING", "emoji": "[SECOND]", "range": (11, 20), "color": "#CD7F32"}
 
 
 class RankingEngine:
@@ -182,7 +182,7 @@ class RankingEngine:
         elif RankingTier.RISING["range"][0] <= rank <= RankingTier.RISING["range"][1]:
             return RankingTier.RISING
         else:
-            return {"name": "UNRANKED", "emoji": "📊", "range": (21, 9999), "color": "#808080"}
+            return {"name": "UNRANKED", "emoji": "[STATS]", "range": (21, 9999), "color": "#808080"}
 
     async def get_current_rankings(self, limit: int = 20, store_id: Optional[int] = None) -> List[Dict]:
         """Get current top N products"""
@@ -213,7 +213,7 @@ class RankingEngine:
                 "product_name": product["product_name"],
                 "composite_score": product["composite_score"],
                 "rank": product["rank"],
-                "rank_change": "▲",  # Placeholder until we have history
+                "rank_change": "",  # Placeholder until we have history
                 "trend_direction": "up",
                 "trend_score": product.get("score_breakdown", {}).get("trend_score", 0)
             })
@@ -263,4 +263,4 @@ class RankingEngine:
         }
 
 
-logger.info("✅ RankingEngine initialized")
+logger.info("[SUCCESS] RankingEngine initialized")

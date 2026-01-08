@@ -1,12 +1,17 @@
 """
 Unified Product Deployment API
 Routes for deploying products to Shopify, Amazon, and WooCommerce
+
+[SECURE] SECURED with JWT Authentication
 """
 from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from ospra_os.core.settings import Settings, get_settings
 import os
+
+# JWT Authentication
+from ospra_os.auth.dependencies import require_auth, require_tier, TokenPayload
 
 # Import platform adapters (using unified adapter pattern)
 try:
@@ -60,8 +65,10 @@ class StoreConfig(BaseModel):
 # Helper Functions
 # ============================================================================
 
-def get_shopify_deployer(settings: Settings = Depends(get_settings)) -> Optional[ShopifyProductDeployer]:
+def get_shopify_deployer(settings: Settings = Depends(get_settings)):
     """Get Shopify deployer instance"""
+    from ospra_os.platforms.shopify_deployer import ShopifyProductDeployer
+    
     shopify_token = os.getenv("SHOPIFY_API_TOKEN")
     shopify_store = os.getenv("SHOPIFY_STORE", "rxxj7d-1i.myshopify.com")
 
@@ -74,8 +81,13 @@ def get_shopify_deployer(settings: Settings = Depends(get_settings)) -> Optional
     )
 
 
-def get_amazon_client(settings: Settings = Depends(get_settings)) -> Optional[AmazonSellerAPI]:
+def get_amazon_client(settings: Settings = Depends(get_settings)):
     """Get Amazon SP-API client instance"""
+    try:
+        from ospra_os.platforms.amazon_seller_api import AmazonSellerAPI
+    except ImportError:
+        return None
+    
     refresh_token = os.getenv("AMAZON_REFRESH_TOKEN")
     client_id = os.getenv("AMAZON_CLIENT_ID")
     client_secret = os.getenv("AMAZON_CLIENT_SECRET")
@@ -93,8 +105,13 @@ def get_amazon_client(settings: Settings = Depends(get_settings)) -> Optional[Am
 def get_woocommerce_client(
     store_url: Optional[str] = None,
     settings: Settings = Depends(get_settings)
-) -> Optional[WooCommerceConnector]:
+):
     """Get WooCommerce connector instance"""
+    try:
+        from ospra_os.platforms.woocommerce_connector import WooCommerceConnector
+    except ImportError:
+        return None
+    
     store_url = store_url or os.getenv("WOOCOMMERCE_STORE_URL")
     consumer_key = os.getenv("WOOCOMMERCE_CONSUMER_KEY")
     consumer_secret = os.getenv("WOOCOMMERCE_CONSUMER_SECRET")
@@ -116,6 +133,7 @@ def get_woocommerce_client(
 @router.post("/product")
 async def deploy_product(
     request: ProductDeployRequest,
+    user: TokenPayload = Depends(require_auth),
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -137,6 +155,8 @@ async def deploy_product(
         "optimize_seo": true
     }
     ```
+    
+    [SECURE] Requires authentication
     """
     results = {}
 
@@ -212,7 +232,7 @@ async def deploy_product(
             db = SessionLocal()
             try:
                 event = LearningEvent(
-                    user_id=1,  # TODO: Get actual user_id from request
+                    user_id=user.user_id,  # Use authenticated user ID
                     event_type="product_deployed",
                     details={
                         "product_id": request.product_id,
@@ -222,6 +242,7 @@ async def deploy_product(
                         "platforms": list(results.keys()),
                         "successful_platforms": [p for p, r in results.items() if r.get("success", False)],
                         "source": "deployment_api",
+                        "deployed_by": user.email,
                         # Store AI score if available
                         "predicted_score": product_data.get("ai_score", product_data.get("score", None)),
                         "deployment_timestamp": datetime.utcnow().isoformat()
@@ -247,13 +268,15 @@ async def deploy_product(
         "requested_platforms": request.platforms,
         "successful_platforms": successful_platforms,
         "results": results,
-        "success": len(successful_platforms) > 0
+        "success": len(successful_platforms) > 0,
+        "deployed_by": user.email
     }
 
 
 @router.post("/bulk")
 async def bulk_deploy_products(
     request: BulkDeployRequest,
+    user: TokenPayload = Depends(require_tier("flight")),  # Requires Flight tier+
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -269,6 +292,8 @@ async def bulk_deploy_products(
         "platforms": ["shopify", "woocommerce"]
     }
     ```
+    
+    [SECURE] Requires Flight tier or higher
     """
     deployment_results = []
 
@@ -281,7 +306,7 @@ async def bulk_deploy_products(
             optimize_seo=request.optimize_seo
         )
 
-        result = await deploy_product(product_request, settings)
+        result = await deploy_product(product_request, user, settings)
         deployment_results.append(result)
 
     # Summary statistics
@@ -294,7 +319,8 @@ async def bulk_deploy_products(
         "total_products": total_products,
         "successful_deployments": successful_deployments,
         "failed_deployments": total_products - successful_deployments,
-        "results": deployment_results
+        "results": deployment_results,
+        "deployed_by": user.email
     }
 
 
@@ -302,12 +328,15 @@ async def bulk_deploy_products(
 async def sync_store_orders(
     store_id: str,
     platform: str,
+    user: TokenPayload = Depends(require_auth),
     settings: Settings = Depends(get_settings)
 ):
     """
     Sync orders from a specific store
 
     Platforms: shopify, amazon, woocommerce
+    
+    [SECURE] Requires authentication
     """
     orders = []
 
@@ -346,9 +375,14 @@ async def sync_store_orders(
 
 
 @router.get("/platforms/status")
-async def get_platform_status(settings: Settings = Depends(get_settings)):
+async def get_platform_status(
+    user: TokenPayload = Depends(require_auth),
+    settings: Settings = Depends(get_settings)
+):
     """
     Check connection status for all platforms
+    
+    [SECURE] Requires authentication
     """
     status = {}
 
@@ -400,10 +434,13 @@ async def get_platform_status(settings: Settings = Depends(get_settings)):
 @router.post("/shopify/publish/{product_id}")
 async def publish_shopify_product(
     product_id: int,
+    user: TokenPayload = Depends(require_auth),
     settings: Settings = Depends(get_settings)
 ):
     """
     Publish a draft Shopify product (make it live)
+    
+    [SECURE] Requires authentication
     """
     shopify = get_shopify_deployer(settings)
 
@@ -423,12 +460,15 @@ async def update_inventory(
     platform: str,
     product_id: str,
     quantity: int,
+    user: TokenPayload = Depends(require_auth),
     settings: Settings = Depends(get_settings)
 ):
     """
     Update inventory quantity across platforms
 
     Platforms: shopify, amazon, woocommerce
+    
+    [SECURE] Requires authentication
     """
     if platform == "shopify":
         shopify = get_shopify_deployer(settings)
@@ -460,7 +500,11 @@ async def update_inventory(
 
 @router.get("/health")
 async def deployment_health_check():
-    """Health check for deployment service"""
+    """
+    Health check for deployment service
+    
+    [WARNING] Public endpoint (no auth required)
+    """
     return {
         "status": "healthy",
         "service": "Product Deployment API",

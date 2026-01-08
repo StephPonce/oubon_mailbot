@@ -72,7 +72,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     tables_to_create = [t for t in whitelabel_tables if t not in existing_tables]
 
     if not tables_to_create:
-        logger.info("✅ All white-label tables already exist")
+        logger.info("[SUCCESS] All white-label tables already exist")
         logger.info("")
         logger.info("Existing white-label tables:")
         for table in whitelabel_tables:
@@ -98,7 +98,7 @@ def run_migration(database_url: str = "sqlite:///./data/ospra_os.db"):
     created_tables = [t for t in whitelabel_tables if t in new_tables]
 
     logger.info("")
-    logger.info(f"✅ Created {len(created_tables)} white-label tables:")
+    logger.info(f"[SUCCESS] Created {len(created_tables)} white-label tables:")
     for table in created_tables:
         # Get columns
         columns = inspector.get_columns(table)

@@ -19,7 +19,7 @@ class InventoryEmailAlerts:
         self.alert_email = os.getenv("INVENTORY_ALERT_EMAIL", "alerts@example.com")
         self.enabled = os.getenv("INVENTORY_ALERTS_ENABLED", "true").lower() == "true"
 
-        logger.info(f"✅ Inventory email alerts initialized (enabled: {self.enabled})")
+        logger.info(f"[SUCCESS] Inventory email alerts initialized (enabled: {self.enabled})")
 
     def generate_alert_email(
         self,
@@ -37,15 +37,15 @@ class InventoryEmailAlerts:
             Dictionary with email subject and HTML body
         """
         if alert_type == "CRITICAL_STOCKOUT":
-            subject = f"🚨 URGENT: {len(products)} Product(s) at Critical Stock Level"
+            subject = f" URGENT: {len(products)} Product(s) at Critical Stock Level"
             urgency_text = "CRITICAL - Immediate Action Required"
             color = "#ef4444"
         elif alert_type == "LOW_STOCK":
-            subject = f"⚠️ Warning: {len(products)} Product(s) Running Low on Stock"
+            subject = f"[WARNING] Warning: {len(products)} Product(s) Running Low on Stock"
             urgency_text = "WARNING - Action Needed Soon"
             color = "#f59e0b"
         else:
-            subject = f"📊 Inventory Alert: {len(products)} Product(s) Need Attention"
+            subject = f"[STATS] Inventory Alert: {len(products)} Product(s) Need Attention"
             urgency_text = "Notice"
             color = "#3b82f6"
 
@@ -148,7 +148,7 @@ class InventoryEmailAlerts:
 
             <!-- Recommended Actions -->
             <div style="background-color: #eff6ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px;">📋 Recommended Actions</h3>
+                <h3 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px;">[LIST] Recommended Actions</h3>
                 <ul style="margin: 0; padding-left: 20px; color: #374151;">
                     <li style="margin-bottom: 8px;">Review each product's reorder recommendation and create purchase orders</li>
                     <li style="margin-bottom: 8px;">Contact suppliers to confirm lead times and availability</li>
@@ -192,7 +192,7 @@ class InventoryEmailAlerts:
             Result dictionary with success status
         """
         if not self.enabled:
-            logger.warning("⚠️  Email alerts are disabled")
+            logger.warning("[WARNING]  Email alerts are disabled")
             return {
                 "success": False,
                 "message": "Email alerts are disabled",
@@ -200,7 +200,7 @@ class InventoryEmailAlerts:
             }
 
         if not products:
-            logger.info("ℹ️  No products need alerts")
+            logger.info("[INFO]  No products need alerts")
             return {
                 "success": False,
                 "message": "No products need alerts",
@@ -211,13 +211,13 @@ class InventoryEmailAlerts:
             # Generate email content
             email_data = self.generate_alert_email(products, alert_type)
 
-            logger.info(f"📧 Alert email generated for {len(products)} products")
+            logger.info(f"[EMAIL] Alert email generated for {len(products)} products")
             logger.info(f"   Subject: {email_data['subject']}")
             logger.info(f"   Recipient: {email_data['recipient']}")
 
             # In production, this would send via Gmail API or SMTP
             # For now, we'll log the alert
-            logger.info("✅ Stockout alert would be sent (email sending not configured)")
+            logger.info("[SUCCESS] Stockout alert would be sent (email sending not configured)")
 
             return {
                 "success": True,
@@ -229,7 +229,7 @@ class InventoryEmailAlerts:
             }
 
         except Exception as e:
-            logger.error(f"❌ Failed to send stockout alert: {e}")
+            logger.error(f"[ERROR] Failed to send stockout alert: {e}")
             return {
                 "success": False,
                 "message": f"Failed to send alert: {str(e)}",

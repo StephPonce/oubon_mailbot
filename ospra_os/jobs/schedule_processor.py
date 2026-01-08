@@ -13,7 +13,7 @@ async def process_schedules():
     Activates pending schedules and completes expired ones
     """
     print(f"\n{'='*70}")
-    print(f"⏰ SCHEDULE PROCESSOR - {datetime.utcnow().isoformat()}")
+    print(f"[ALARM] SCHEDULE PROCESSOR - {datetime.utcnow().isoformat()}")
     print(f"{'='*70}\n")
 
     settings = get_settings()
@@ -24,19 +24,19 @@ async def process_schedules():
         activated = await manager.process_pending_schedules()
 
         if activated:
-            print(f"\n✅ Activated {len(activated)} schedules")
+            print(f"\n[SUCCESS] Activated {len(activated)} schedules")
 
         # Complete expired schedules
         expired = await manager.check_expired_schedules()
 
         if expired:
-            print(f"\n✅ Completed {len(expired)} expired schedules")
+            print(f"\n[SUCCESS] Completed {len(expired)} expired schedules")
 
         if not activated and not expired:
             print("   No schedules to process")
 
     except Exception as e:
-        print(f"❌ Schedule processor error: {e}")
+        print(f"[ERROR] Schedule processor error: {e}")
         import traceback
         traceback.print_exc()
 

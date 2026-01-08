@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     SENTRY_TRACES_SAMPLE_RATE: float = Field(default=0.1)  # 10% of transactions
     SENTRY_PROFILES_SAMPLE_RATE: float = Field(default=0.1)  # 10% profiling
 
-    # Gmail
-    GMAIL_USER_EMAIL: str
+    # Gmail (optional for production without email features)
+    GMAIL_USER_EMAIL: str = Field(default="noreply@ospra.io")
     GMAIL_TOKEN_PATH: str = Field(default=".secrets/gmail/token.json")
     GMAIL_CREDENTIALS_PATH: str = Field(default=".secrets/gmail/credentials.json")
 
@@ -205,9 +205,12 @@ class Settings(BaseSettings):
 
     @field_validator("GMAIL_USER_EMAIL", "GMAIL_REPLY_FROM", mode="after")
     @classmethod
-    def _validate_emails(cls, v: str) -> str:
-        if not v or "@" not in v:
-            raise ValueError("Missing/invalid Gmail address in settings")
+    def _validate_emails(cls, v: Optional[str]) -> Optional[str]:
+        # Allow None/empty for production deployments without email features
+        if v is None:
+            return None
+        if v and "@" not in v:
+            raise ValueError(f"Invalid email address: {v}")
         return v
 
     @field_validator("GMAIL_CREDENTIALS_PATH", "GMAIL_TOKEN_PATH", mode="after")

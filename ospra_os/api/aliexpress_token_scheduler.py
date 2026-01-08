@@ -18,14 +18,14 @@ async def scheduled_token_refresh():
     Scheduled task that runs daily to check and refresh tokens
     """
     print("\n" + "=" * 80)
-    print(f"⏰ SCHEDULED TOKEN REFRESH - {datetime.now().isoformat()}")
+    print(f"[ALARM] SCHEDULED TOKEN REFRESH - {datetime.now().isoformat()}")
     print("=" * 80)
 
     try:
         results = await refresh_all_tokens()
-        print(f"✅ Scheduled refresh completed: {results}")
+        print(f"[SUCCESS] Scheduled refresh completed: {results}")
     except Exception as e:
-        print(f"❌ Scheduled refresh failed: {e}")
+        print(f"[ERROR] Scheduled refresh failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -50,21 +50,21 @@ def start_token_refresh_scheduler():
 
         # Start the scheduler
         scheduler.start()
-        print("✅ AliExpress token refresh scheduler started")
+        print("[SUCCESS] AliExpress token refresh scheduler started")
         print("   Schedule: Daily at 2:00 AM UTC")
         print("   Refresh window: 7 days before expiry")
 
     except Exception as e:
-        print(f"❌ Failed to start token refresh scheduler: {e}")
+        print(f"[ERROR] Failed to start token refresh scheduler: {e}")
 
 
 def stop_token_refresh_scheduler():
     """Stop the background scheduler"""
     try:
         scheduler.shutdown(wait=False)
-        print("✅ AliExpress token refresh scheduler stopped")
+        print("[SUCCESS] AliExpress token refresh scheduler stopped")
     except Exception as e:
-        print(f"❌ Failed to stop token refresh scheduler: {e}")
+        print(f"[ERROR] Failed to stop token refresh scheduler: {e}")
 
 
 async def check_tokens_on_startup():
@@ -74,13 +74,13 @@ async def check_tokens_on_startup():
     This runs once when the server starts to ensure tokens are valid.
     """
     print("\n" + "=" * 80)
-    print("🚀 STARTUP TOKEN CHECK")
+    print("[START] STARTUP TOKEN CHECK")
     print("=" * 80)
 
     try:
         results = await refresh_all_tokens()
-        print(f"✅ Startup token check completed: {results}")
+        print(f"[SUCCESS] Startup token check completed: {results}")
     except Exception as e:
-        print(f"❌ Startup token check failed: {e}")
+        print(f"[ERROR] Startup token check failed: {e}")
         import traceback
         traceback.print_exc()

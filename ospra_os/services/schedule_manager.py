@@ -92,7 +92,7 @@ class ScheduleManager:
 
             session.commit()
 
-            print(f"✅ Schedule created: {schedule_id}")
+            print(f"[SUCCESS] Schedule created: {schedule_id}")
             print(f"   Activation: {scheduled_start}")
             print(f"   Budget: ${daily_budget}/day")
 
@@ -104,7 +104,7 @@ class ScheduleManager:
             }
 
         except Exception as e:
-            print(f"❌ Schedule creation error: {e}")
+            print(f"[ERROR] Schedule creation error: {e}")
             session.rollback()
             return {
                 'success': False,
@@ -134,7 +134,7 @@ class ScheduleManager:
             if not pending:
                 return []
 
-            print(f"\n⏰ Processing {len(pending)} pending schedules...")
+            print(f"\n[ALARM] Processing {len(pending)} pending schedules...")
 
             results = []
 
@@ -145,12 +145,12 @@ class ScheduleManager:
             session.commit()
 
             successful = sum(1 for r in results if r.get('success'))
-            print(f"✅ Activated {successful}/{len(pending)} schedules")
+            print(f"[SUCCESS] Activated {successful}/{len(pending)} schedules")
 
             return results
 
         except Exception as e:
-            print(f"❌ Schedule processing error: {e}")
+            print(f"[ERROR] Schedule processing error: {e}")
             session.rollback()
             return []
         finally:
@@ -163,7 +163,7 @@ class ScheduleManager:
     ) -> Dict:
         """Activate a single schedule"""
         try:
-            print(f"\n🚀 Activating schedule: {schedule.id}")
+            print(f"\n[START] Activating schedule: {schedule.id}")
             print(f"   Product: {schedule.product_name}")
 
             if not self.meta_builder:
@@ -205,7 +205,7 @@ class ScheduleManager:
                 )
                 session.add(log)
 
-                print(f"✅ Schedule activated! Campaign: {campaign_result['campaign_id']}")
+                print(f"[SUCCESS] Schedule activated! Campaign: {campaign_result['campaign_id']}")
 
                 return {
                     'success': True,
@@ -217,7 +217,7 @@ class ScheduleManager:
                 raise Exception(f"Platform {schedule.platform} not supported yet")
 
         except Exception as e:
-            print(f"❌ Activation failed: {e}")
+            print(f"[ERROR] Activation failed: {e}")
 
             schedule.status = ScheduleStatus.FAILED
 
@@ -255,7 +255,7 @@ class ScheduleManager:
             if not expired:
                 return []
 
-            print(f"\n⏰ Processing {len(expired)} expired schedules...")
+            print(f"\n[ALARM] Processing {len(expired)} expired schedules...")
 
             results = []
 
@@ -268,7 +268,7 @@ class ScheduleManager:
             return results
 
         except Exception as e:
-            print(f"❌ Expiry check error: {e}")
+            print(f"[ERROR] Expiry check error: {e}")
             session.rollback()
             return []
         finally:
@@ -281,7 +281,7 @@ class ScheduleManager:
     ) -> Dict:
         """Complete/pause an expired schedule"""
         try:
-            print(f"⏹️  Completing schedule: {schedule.id}")
+            print(f"[STOP]  Completing schedule: {schedule.id}")
 
             # Pause Meta campaign
             if schedule.platform == 'meta' and schedule.campaign_id and self.meta_client:
@@ -301,7 +301,7 @@ class ScheduleManager:
             )
             session.add(log)
 
-            print(f"✅ Schedule completed")
+            print(f"[SUCCESS] Schedule completed")
 
             return {
                 'success': True,
@@ -309,7 +309,7 @@ class ScheduleManager:
             }
 
         except Exception as e:
-            print(f"❌ Completion error: {e}")
+            print(f"[ERROR] Completion error: {e}")
             return {
                 'success': False,
                 'schedule_id': schedule.id,
@@ -391,7 +391,7 @@ class ScheduleManager:
                 return False
 
             if schedule.status != ScheduleStatus.PENDING:
-                print(f"⚠️  Cannot cancel schedule with status: {schedule.status.value}")
+                print(f"[WARNING]  Cannot cancel schedule with status: {schedule.status.value}")
                 return False
 
             schedule.status = ScheduleStatus.CANCELLED
@@ -406,12 +406,12 @@ class ScheduleManager:
 
             session.commit()
 
-            print(f"✅ Schedule cancelled: {schedule_id}")
+            print(f"[SUCCESS] Schedule cancelled: {schedule_id}")
 
             return True
 
         except Exception as e:
-            print(f"❌ Cancel error: {e}")
+            print(f"[ERROR] Cancel error: {e}")
             session.rollback()
             return False
         finally:

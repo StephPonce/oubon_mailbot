@@ -109,7 +109,7 @@ class ProductDiscoveryEngine:
             }
         """
         print(f"\n{'='*70}")
-        print(f"🚀 PRODUCT DISCOVERY: {niche.upper()}")
+        print(f"[START] PRODUCT DISCOVERY: {niche.upper()}")
         print(f"{'='*70}\n")
 
         start_time = datetime.now()
@@ -117,7 +117,7 @@ class ProductDiscoveryEngine:
 
         # Step 1: Search X/Twitter for viral products (via xAI Grok)
         if include_twitter and self.twitter.is_available():
-            print(f"🐦 Step 1: Searching X/Twitter for '{niche}' (via xAI Grok)...")
+            print(f" Step 1: Searching X/Twitter for '{niche}' (via xAI Grok)...")
             try:
                 twitter_products = await self.twitter.discover_viral_products(
                     niche=niche,
@@ -138,36 +138,36 @@ class ProductDiscoveryEngine:
                         sentiment=tp.sentiment_score
                     )
                     all_candidates.append(candidate)
-                print(f"   ✅ Found {len(twitter_products)} viral products on X/Twitter\n")
+                print(f"   [SUCCESS] Found {len(twitter_products)} viral products on X/Twitter\n")
             except Exception as e:
-                print(f"   ❌ X/Twitter search failed: {e}\n")
+                print(f"   [ERROR] X/Twitter search failed: {e}\n")
         else:
-            print("   ⏭️  X/Twitter search skipped (xAI not configured)\n")
+            print("   ⏭  X/Twitter search skipped (xAI not configured)\n")
 
         # Step 2: Check Google Trends for validation
         if include_trends:
-            print(f"📈 Step 2: Checking Google Trends for '{niche}'...")
+            print(f"[TREND] Step 2: Checking Google Trends for '{niche}'...")
             try:
                 trends_data = await self.google_trends.search(niche)
                 all_candidates.extend(trends_data)
-                print(f"   ✅ Got trend data: Score {trends_data[0].trend_score if trends_data else 'N/A'}\n")
+                print(f"   [SUCCESS] Got trend data: Score {trends_data[0].trend_score if trends_data else 'N/A'}\n")
             except Exception as e:
-                print(f"   ⚠️  Google Trends check failed: {e}\n")
+                print(f"   [WARNING]  Google Trends check failed: {e}\n")
 
         # Step 3: Search AliExpress for sourcing (if OAuth available)
         if include_aliexpress and self.aliexpress.is_available():
-            print(f"📦 Step 3: Finding AliExpress sourcing options...")
+            print(f"[PACKAGE] Step 3: Finding AliExpress sourcing options...")
             try:
                 aliexpress_products = await self.aliexpress.search(niche, limit=10)
                 all_candidates.extend(aliexpress_products)
-                print(f"   ✅ Found {len(aliexpress_products)} sourcing options\n")
+                print(f"   [SUCCESS] Found {len(aliexpress_products)} sourcing options\n")
             except Exception as e:
-                print(f"   ⚠️  AliExpress search failed: {e}\n")
+                print(f"   [WARNING]  AliExpress search failed: {e}\n")
         else:
-            print("   ⏭️  AliExpress search skipped (OAuth not ready)\n")
+            print("   ⏭  AliExpress search skipped (OAuth not ready)\n")
 
         if not all_candidates:
-            print("❌ No products found from any source\n")
+            print("[ERROR] No products found from any source\n")
             return {
                 "niche": niche,
                 "total_found": 0,
@@ -180,7 +180,7 @@ class ProductDiscoveryEngine:
             }
 
         # Step 4: Score and rank all candidates
-        print(f"🎯 Step 4: Scoring {len(all_candidates)} total candidates...")
+        print(f"[TARGET] Step 4: Scoring {len(all_candidates)} total candidates...")
         ranked = self.scorer.rank(all_candidates, limit=max_results * 2)
 
         # Step 5: Filter by minimum score
@@ -200,14 +200,14 @@ class ProductDiscoveryEngine:
 
         search_time = datetime.now() - start_time
 
-        print(f"   ✅ Scored all products\n")
+        print(f"   [SUCCESS] Scored all products\n")
         print(f"{'='*70}")
-        print(f"✅ DISCOVERY COMPLETE")
+        print(f"[SUCCESS] DISCOVERY COMPLETE")
         print(f"{'='*70}")
         print(f"Found: {len(filtered)} products above score {min_score}")
-        print(f"  🔥 HIGH PRIORITY: {priority_counts['high']}")
-        print(f"  ✅ MEDIUM PRIORITY: {priority_counts['medium']}")
-        print(f"  ⚠️  LOW PRIORITY: {priority_counts['low']}")
+        print(f"  [HOT] HIGH PRIORITY: {priority_counts['high']}")
+        print(f"  [SUCCESS] MEDIUM PRIORITY: {priority_counts['medium']}")
+        print(f"  [WARNING]  LOW PRIORITY: {priority_counts['low']}")
         print(f"Search time: {search_time.total_seconds():.1f}s\n")
 
         return {
@@ -240,7 +240,7 @@ class ProductDiscoveryEngine:
                 }
             }
         """
-        print(f"\n🔍 VALIDATING: {product_name}")
+        print(f"\n[SEARCH] VALIDATING: {product_name}")
         print("-" * 70)
 
         validation = {
@@ -270,10 +270,10 @@ class ProductDiscoveryEngine:
                         "purchase_intent": sentiment_data.get("purchase_intent", {}),
                         "sample_tweets": sentiment_data.get("sample_tweets", [])[:3],
                     }
-                    print(f"   ✅ Found {validation['twitter_mentions']} mentions on X/Twitter")
+                    print(f"   [SUCCESS] Found {validation['twitter_mentions']} mentions on X/Twitter")
                     print(f"   Sentiment: {sentiment_data.get('sentiment', 'N/A')} ({sentiment_data.get('sentiment_score', 0):.2f})")
             except Exception as e:
-                print(f"   ⚠️  X/Twitter check failed: {e}")
+                print(f"   [WARNING]  X/Twitter check failed: {e}")
 
         # Check Google Trends
         try:
@@ -286,9 +286,9 @@ class ProductDiscoveryEngine:
                     "trend_score": trends_results[0].trend_score,
                     "search_volume": trends_results[0].search_volume,
                 }
-                print(f"   ✅ Trend score: {trends_results[0].trend_score}/100")
+                print(f"   [SUCCESS] Trend score: {trends_results[0].trend_score}/100")
         except Exception as e:
-            print(f"   ⚠️  Trends check failed: {e}")
+            print(f"   [WARNING]  Trends check failed: {e}")
 
         # Check sourcing availability
         if self.aliexpress.is_available():
@@ -305,9 +305,9 @@ class ProductDiscoveryEngine:
                             "max": max(s.price for s in sourcing if s.price),
                         }
                     }
-                    print(f"   ✅ Found {len(sourcing)} sourcing options")
+                    print(f"   [SUCCESS] Found {len(sourcing)} sourcing options")
             except Exception as e:
-                print(f"   ⚠️  Sourcing check failed: {e}")
+                print(f"   [WARNING]  Sourcing check failed: {e}")
 
         # Calculate overall score based on validation data
         score = 0.0
@@ -345,13 +345,13 @@ class ProductDiscoveryEngine:
         # Determine priority and recommendation
         if score >= 7.0:
             validation["priority"] = "HIGH"
-            validation["recommendation"] = "🔥 STRONG CANDIDATE - High demand, trending, and sourceable"
+            validation["recommendation"] = "[HOT] STRONG CANDIDATE - High demand, trending, and sourceable"
         elif score >= 4.0:
             validation["priority"] = "MEDIUM"
-            validation["recommendation"] = "✅ MODERATE CANDIDATE - Some validation signals present"
+            validation["recommendation"] = "[SUCCESS] MODERATE CANDIDATE - Some validation signals present"
         else:
             validation["priority"] = "LOW"
-            validation["recommendation"] = "⚠️  WEAK CANDIDATE - Limited validation data"
+            validation["recommendation"] = "[WARNING]  WEAK CANDIDATE - Limited validation data"
 
         print(f"\n   Score: {validation['overall_score']}/10")
         print(f"   Priority: {validation['priority']}")

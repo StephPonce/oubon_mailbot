@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-12-27T22:28:15.410212",
+  "dalle": "PASS",
+  "e2e_pipeline": {
+    "trend_discovery": {
+      "trend_keyword": "smart led strip lights",
+      "trend_score": 85,
+      "category": "smart_home"
+    },
+    "product_match": {
+      "productNameEn": "Smart WiFi LED Strip Lights RGB 5050",
+      "sellPrice": 12.99,
+      "productImage": "https://example.com/image.jpg",
+      "pid": "test_123"
+    },
+    "ai_analysis": null,
+    "shopify_ready": {
+      "title": "Smart WiFi LED Strip Lights RGB 5050",
+      "body_html": "<p>Trending smart home product with AI-verified market potential.</p>",
+      "vendor": "Ospra Intelligence",
+      "product_type": "smart_home",
+      "tags": [
+        "trending",
+        "ai-selected",
+        "ospra-verified"
+      ],
+      "variants": [
+        {
+          "price": "32.475",
+          "inventory_management": "shopify",
+          "inventory_quantity": 100
+        }
+      ],
+      "images": [
+        {
+          "src": "https://example.com/image.jpg"
+        }
+      ]
+    },
+    "image_generation": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-WZc0vbU1XrCuDyncWboP9J5y/user-ElR6OZwoYmGwzQeji8lHWt5f/img-ybn9KuH7TPwBEUmegswICtpW.png?st=2025-12-28T03%3A28%3A15Z&se=2025-12-28T05%3A28%3A15Z&sp=r&sv=2024-08-04&sr=b&rscd=inline&rsct=image/png&skoid=8b33a531-2df9-46a3-bc02-d4b1430a422c&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-12-27T22%3A45%3A53Z&ske=2025-12-28T22%3A45%3A53Z&sks=b&skv=2024-08-04&sig=LpCVSOrpIY2NZp8mqcuROm7o234DmUZWZOdA/29rZcc%3D"
+  },
+  "frontend": {
+    "found_routes": 4,
+    "missing_routes": 1,
+    "frontend_components": 4,
+    "api_integrations": 13
+  }
+}

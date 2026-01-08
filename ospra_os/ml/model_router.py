@@ -8,10 +8,10 @@ Intelligently routes AI tasks to the optimal model based on:
 - Model availability
 
 Architecture:
-┌─────────────┐
-│ Task Router │ ──► Local Llama (80% tasks, $0)
-└─────────────┘ ──► Cheap API (15% tasks, ~$45/mo)
-                ──► Claude (5% tasks, premium quality)
+
+ Task Router   Local Llama (80% tasks, $0)
+  Cheap API (15% tasks, ~$45/mo)
+                 Claude (5% tasks, premium quality)
 """
 
 import os

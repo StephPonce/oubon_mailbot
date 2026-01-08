@@ -15,7 +15,7 @@ async def get_email_stats(settings: Settings) -> Dict[str, Any]:
         from app.analytics import get_analytics_summary
         return get_analytics_summary(settings.database_url)
     except Exception as e:
-        print(f"⚠️  Email stats error: {e}")
+        print(f"[WARNING]  Email stats error: {e}")
         return {
             "total_processed": 0,
             "total_replied": 0,
@@ -51,7 +51,7 @@ async def get_product_discoveries(settings: Settings) -> Dict[str, Any]:
             "products": products[:6]  # Top 6 for dashboard
         }
     except Exception as e:
-        print(f"⚠️  Product discovery error: {e}")
+        print(f"[WARNING]  Product discovery error: {e}")
         return {"total": 0, "products": [], "error": str(e)}
 
 
@@ -83,7 +83,7 @@ async def get_reddit_sentiment(settings: Settings) -> Dict[str, Any]:
             ]
         }
     except Exception as e:
-        print(f"⚠️  Reddit sentiment error: {e}")
+        print(f"[WARNING]  Reddit sentiment error: {e}")
         return {"trending": [], "error": str(e)}
 
 
@@ -344,7 +344,7 @@ async def dashboard_page():
 <body>
     <div class="container">
         <header>
-            <h1>🚀 Ospra OS Dashboard</h1>
+            <h1>[START] Ospra OS Dashboard</h1>
             <p class="subtitle">Autonomous E-commerce Command Center</p>
         </header>
 
@@ -353,7 +353,7 @@ async def dashboard_page():
         </div>
 
         <div style="text-align: center;">
-            <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh Data</button>
+            <button class="refresh-btn" onclick="loadDashboard()">[REFRESH] Refresh Data</button>
         </div>
     </div>
 
@@ -370,7 +370,7 @@ async def dashboard_page():
                     <!-- Status Overview -->
                     <div class="grid">
                         <div class="card">
-                            <h2>📧 Email Automation</h2>
+                            <h2>[EMAIL] Email Automation</h2>
                             <div class="stat">
                                 <span class="stat-label">Total Processed</span>
                                 <span class="stat-value">${data.email.total_processed || 0}</span>
@@ -386,7 +386,7 @@ async def dashboard_page():
                         </div>
 
                         <div class="card">
-                            <h2>🔌 API Status</h2>
+                            <h2>[PLUGIN] API Status</h2>
                             <div class="stat">
                                 <span class="stat-label">Reddit API</span>
                                 <span class="status-badge ${data.status.reddit_api ? 'status-active' : 'status-inactive'}">
@@ -406,7 +406,7 @@ async def dashboard_page():
                         </div>
 
                         <div class="card">
-                            <h2>📊 Product Discoveries</h2>
+                            <h2>[STATS] Product Discoveries</h2>
                             <div class="stat">
                                 <span class="stat-label">Products Found</span>
                                 <span class="stat-value">${data.products.total || 0}</span>
@@ -424,7 +424,7 @@ async def dashboard_page():
 
                     <!-- Product Discoveries -->
                     <div class="card" style="margin-bottom: 20px;">
-                        <h2>🎯 Top Product Opportunities</h2>
+                        <h2>[TARGET] Top Product Opportunities</h2>
                         ${data.products.products && data.products.products.length > 0 ? `
                             <div class="product-grid">
                                 ${data.products.products.map(p => `
@@ -444,13 +444,13 @@ async def dashboard_page():
 
                     <!-- Reddit Sentiment -->
                     <div class="card">
-                        <h2>💬 Reddit Community Trending</h2>
+                        <h2>[CHAT] Reddit Community Trending</h2>
                         ${data.reddit.trending && data.reddit.trending.length > 0 ? `
                             ${data.reddit.trending.map(item => `
                                 <div class="reddit-item">
                                     <div class="reddit-title">${item.name}</div>
                                     <div class="reddit-stats">
-                                        ⬆️ ${item.upvotes} upvotes • 💬 ${item.comments} comments • Score: ${item.score?.toFixed(1) || 'N/A'}
+                                         ${item.upvotes} upvotes • [CHAT] ${item.comments} comments • Score: ${item.score?.toFixed(1) || 'N/A'}
                                     </div>
                                 </div>
                             `).join('')}
@@ -462,7 +462,7 @@ async def dashboard_page():
                 content.innerHTML = `
                     <div class="card">
                         <div class="error">
-                            ⚠️ Error loading dashboard: ${error.message}
+                            [WARNING] Error loading dashboard: ${error.message}
                         </div>
                     </div>
                 `;

@@ -211,7 +211,7 @@ class HybridLearningEngine:
             )
             self.session.add(global_weights)
             self.session.commit()
-            logger.info("🧠 Initialized Global Brain with default weights")
+            logger.info("[BRAIN] Initialized Global Brain with default weights")
     
     # ==================== GLOBAL BRAIN ====================
     
@@ -286,7 +286,7 @@ class HybridLearningEngine:
                 }
             )
             
-            logger.info(f"🧠 Global Brain updated: {len(sales_data)} sales from {tier} user")
+            logger.info(f"[BRAIN] Global Brain updated: {len(sales_data)} sales from {tier} user")
             
             return {
                 "success": True,
@@ -471,7 +471,7 @@ class HybridLearningEngine:
                 }
             )
             
-            logger.info(f"👤 Personal layer updated for user {user_id}: {len(sales_data)} sales")
+            logger.info(f" Personal layer updated for user {user_id}: {len(sales_data)} sales")
             
             return {
                 "success": True,
@@ -740,7 +740,7 @@ class HybridLearningEngine:
         
         self.session.commit()
         
-        logger.info(f"🎛️ Custom weights set for user {user_id}")
+        logger.info(f" Custom weights set for user {user_id}")
         
         return {
             "success": True,
@@ -875,7 +875,7 @@ class HybridLearningEngine:
 def init_hybrid_learning():
     """Initialize hybrid learning tables"""
     Base.metadata.create_all(bind=engine)
-    logger.info("✅ Hybrid learning tables created")
+    logger.info("[SUCCESS] Hybrid learning tables created")
 
 
 # ============================================================================
@@ -890,4 +890,4 @@ def get_learning_engine(session: Session = None) -> HybridLearningEngine:
 # Initialize on import
 if __name__ == "__main__":
     init_hybrid_learning()
-    print("✅ Hybrid Learning Engine initialized")
+    print("[SUCCESS] Hybrid Learning Engine initialized")

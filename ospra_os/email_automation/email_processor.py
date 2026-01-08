@@ -187,7 +187,7 @@ class EmailProcessor:
 
             if is_customer_response:
                 can_reply = True
-                print(f"✅ Allowing reply to {message_id} - customer responded in thread")
+                print(f"[SUCCESS] Allowing reply to {message_id} - customer responded in thread")
             else:
                 # Check if we need a follow-up (previous reply was template during quiet hours)
                 session = get_followup_session(self.settings.database_url)
@@ -202,7 +202,7 @@ class EmailProcessor:
                 can_reply = followup is not None
 
                 if not can_reply:
-                    print(f"⏭️  Skipping reply to {message_id} - already replied (not a follow-up)")
+                    print(f"⏭  Skipping reply to {message_id} - already replied (not a follow-up)")
 
         # Generate and send reply if enabled
         replied = False
@@ -423,9 +423,9 @@ class EmailProcessor:
             session.commit()
             session.close()
 
-            print(f"📝 Saved for follow-up: {from_email} - {subject}")
+            print(f"[NOTE] Saved for follow-up: {from_email} - {subject}")
 
         except Exception as e:
-            print(f"❌ Error saving for follow-up: {e}")
+            print(f"[ERROR] Error saving for follow-up: {e}")
             import traceback
             traceback.print_exc()

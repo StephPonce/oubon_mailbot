@@ -59,45 +59,45 @@ class ProductDiscoveryPipeline:
         # Step 1: Search Reddit for trending products
         if include_reddit and self.reddit.is_available():
             try:
-                print(f"🔍 Searching Reddit for '{niche}'...")
+                print(f"[SEARCH] Searching Reddit for '{niche}'...")
                 reddit_products = await self.reddit.search(niche, time_filter="month", limit=20)
                 all_candidates.extend(reddit_products)
-                print(f"✅ Reddit: Found {len(reddit_products)} candidates")
+                print(f"[SUCCESS] Reddit: Found {len(reddit_products)} candidates")
             except Exception as e:
-                print(f"⚠️  Reddit search failed: {e}")
+                print(f"[WARNING]  Reddit search failed: {e}")
 
         # Step 2: Search Google Trends for validation
         if include_trends:
             try:
-                print(f"📈 Checking Google Trends for '{niche}'...")
+                print(f"[TREND] Checking Google Trends for '{niche}'...")
                 trends_products = await self.google_trends.search(niche, category=None)
                 all_candidates.extend(trends_products)
-                print(f"✅ Google Trends: Found {len(trends_products)} candidates")
+                print(f"[SUCCESS] Google Trends: Found {len(trends_products)} candidates")
             except Exception as e:
-                print(f"⚠️  Google Trends search failed: {e}")
+                print(f"[WARNING]  Google Trends search failed: {e}")
 
         # Step 3: Search AliExpress for sourcing
         if include_aliexpress and self.aliexpress.is_available():
             try:
-                print(f"📦 Searching AliExpress for '{niche}'...")
+                print(f"[PACKAGE] Searching AliExpress for '{niche}'...")
                 aliexpress_products = await self.aliexpress.search(niche)
                 all_candidates.extend(aliexpress_products)
-                print(f"✅ AliExpress: Found {len(aliexpress_products)} candidates")
+                print(f"[SUCCESS] AliExpress: Found {len(aliexpress_products)} candidates")
             except Exception as e:
-                print(f"⚠️  AliExpress search failed: {e}")
+                print(f"[WARNING]  AliExpress search failed: {e}")
 
         if not all_candidates:
-            print("❌ No products found from any source")
+            print("[ERROR] No products found from any source")
             return []
 
         # Step 4: Score and rank all candidates
-        print(f"🎯 Scoring {len(all_candidates)} total candidates...")
+        print(f"[TARGET] Scoring {len(all_candidates)} total candidates...")
         ranked = self.scorer.rank(all_candidates, limit=max_results * 2)  # Get 2x for filtering
 
         # Step 5: Filter by minimum score
         filtered = [r for r in ranked if r["score"] >= min_score][:max_results]
 
-        print(f"✅ Pipeline complete: {len(filtered)} products above score {min_score}")
+        print(f"[SUCCESS] Pipeline complete: {len(filtered)} products above score {min_score}")
         return filtered
 
     async def discover_niche_winners(
@@ -121,16 +121,16 @@ class ProductDiscoveryPipeline:
         if self.reddit.is_available():
             for subreddit in subreddits:
                 try:
-                    print(f"🔍 Scanning r/{subreddit}...")
+                    print(f"[SEARCH] Scanning r/{subreddit}...")
                     products = await self.reddit.get_subreddit_products(
                         subreddit=subreddit,
                         time_filter="week",
                         limit=25
                     )
                     all_candidates.extend(products)
-                    print(f"✅ r/{subreddit}: Found {len(products)} products")
+                    print(f"[SUCCESS] r/{subreddit}: Found {len(products)} products")
                 except Exception as e:
-                    print(f"⚠️  r/{subreddit} failed: {e}")
+                    print(f"[WARNING]  r/{subreddit} failed: {e}")
 
         if not all_candidates:
             return []
@@ -143,7 +143,7 @@ class ProductDiscoveryPipeline:
             for product in ranked[:max_results]:
                 try:
                     product_name = product["product"]["name"]
-                    print(f"📦 Finding sourcing for: {product_name}")
+                    print(f"[PACKAGE] Finding sourcing for: {product_name}")
 
                     # Search AliExpress for this product
                     sourcing_options = await self.aliexpress.search(product_name, limit=3)
@@ -159,9 +159,9 @@ class ProductDiscoveryPipeline:
                             }
                             for s in sourcing_options[:3]
                         ]
-                        print(f"✅ Found {len(sourcing_options)} sourcing options")
+                        print(f"[SUCCESS] Found {len(sourcing_options)} sourcing options")
                 except Exception as e:
-                    print(f"⚠️  Sourcing lookup failed: {e}")
+                    print(f"[WARNING]  Sourcing lookup failed: {e}")
                     product["sourcing"] = []
 
         return ranked[:max_results]
@@ -176,7 +176,7 @@ class ProductDiscoveryPipeline:
         Returns:
             Validation report with scores and recommendations
         """
-        print(f"🔍 Validating product idea: '{product_name}'")
+        print(f"[SEARCH] Validating product idea: '{product_name}'")
 
         validation = {
             "product_name": product_name,
@@ -199,7 +199,7 @@ class ProductDiscoveryPipeline:
                         "top_post": reddit_results[0].url if reddit_results else None
                     }
             except Exception as e:
-                print(f"⚠️  Reddit validation failed: {e}")
+                print(f"[WARNING]  Reddit validation failed: {e}")
 
         # Check Google Trends
         try:
@@ -210,7 +210,7 @@ class ProductDiscoveryPipeline:
                     "search_volume": trends_results[0].search_volume
                 }
         except Exception as e:
-            print(f"⚠️  Trends validation failed: {e}")
+            print(f"[WARNING]  Trends validation failed: {e}")
 
         # Check sourcing availability
         if self.aliexpress.is_available():
@@ -224,7 +224,7 @@ class ProductDiscoveryPipeline:
                         "max": max(s.price for s in sourcing if s.price)
                     }
             except Exception as e:
-                print(f"⚠️  Sourcing check failed: {e}")
+                print(f"[WARNING]  Sourcing check failed: {e}")
 
         # Calculate overall score
         score = 0.0
@@ -239,11 +239,11 @@ class ProductDiscoveryPipeline:
 
         # Generate recommendation
         if score >= 8:
-            validation["recommendation"] = "✅ STRONG - High demand, community interest, and available sourcing"
+            validation["recommendation"] = "[SUCCESS] STRONG - High demand, community interest, and available sourcing"
         elif score >= 5:
-            validation["recommendation"] = "⚠️  MODERATE - Some validation, proceed with caution"
+            validation["recommendation"] = "[WARNING]  MODERATE - Some validation, proceed with caution"
         else:
-            validation["recommendation"] = "❌ WEAK - Limited validation, risky opportunity"
+            validation["recommendation"] = "[ERROR] WEAK - Limited validation, risky opportunity"
 
-        print(f"✅ Validation complete: Score {validation['overall_score']}/10")
+        print(f"[SUCCESS] Validation complete: Score {validation['overall_score']}/10")
         return validation

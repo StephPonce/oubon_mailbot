@@ -7,10 +7,10 @@ Single source of truth for ALL tier definitions, features, and limits.
 Sky/Flight themed subscription tiers: Nest → Flight → Soar → Stratosphere
 
 Theme: Journey from grounded to the stars
-- 🪺 Nest: Grounded, watching, learning (Free)
-- ✈️ Flight: Taken off, building momentum ($29)
-- 🦅 Soar: High altitude, seeing what others can't ($79)
-- 🌌 Stratosphere: Edge of space, first to everything ($199)
+-  Nest: Grounded, watching, learning (Free)
+-  Flight: Taken off, building momentum ($29)
+-  Soar: High altitude, seeing what others can't ($79)
+-  Stratosphere: Edge of space, first to everything ($199)
 
 IMPORT THIS FILE - Don't define tiers anywhere else!
 """
@@ -29,10 +29,10 @@ class SubscriptionTier(str, Enum):
     Ospra subscription tiers - Sky/flight theme
     
     The journey of an Osprey:
-    🪺 Nest → Just hatched, learning the world (Free)
-    ✈️ Flight → First flight, building confidence ($29)
-    🦅 Soar → Mastery, riding thermals effortlessly ($79)
-    🌌 Stratosphere → Beyond limits, touching the stars ($199)
+     Nest → Just hatched, learning the world (Free)
+     Flight → First flight, building confidence ($29)
+     Soar → Mastery, riding thermals effortlessly ($79)
+     Stratosphere → Beyond limits, touching the stars ($199)
     """
     NEST = "nest"
     FLIGHT = "flight"
@@ -53,19 +53,19 @@ TIER_HIERARCHY = {
 
 TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
     
-    # ═══════════════════════════════════════════════════════════════
-    # 🪺 NEST (FREE) - "See What's Possible"
-    # ═══════════════════════════════════════════════════════════════
+    # 
+    #  NEST (FREE) - "See What's Possible"
+    # 
     SubscriptionTier.NEST: {
         "name": "Nest",
         "tagline": "See what's possible.",
         "description": "Get a taste of Ospra's product intelligence. Perfect for exploring.",
-        "emoji": "🪺",
+        "emoji": "",
         "price": 0,
         "price_display": "Free",
         "color": "#8B7355",  # Earthy brown
         
-        # ─── Product Discovery ───
+        #  Product Discovery 
         "products_per_week": 10,
         "search_filters": "basic",  # Basic only
         "ai_score": False,
@@ -74,7 +74,7 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "trend_velocity": False,
         "niche_analysis": False,
         
-        # ─── Intelligence & Learning ───
+        #  Intelligence & Learning 
         "global_brain": "basic",  # Basic global insights
         "anonymized_success_rates": False,
         "personal_learning": False,
@@ -85,21 +85,21 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "drop_product_alerts": False,
         "competitor_monitoring": False,
         
-        # ─── Store Operations ───
+        #  Store Operations 
         "store_limit": 1,
         "one_click_deploy": False,
         "bulk_deploy": False,
         "ai_listing_copy": False,
         "ai_pricing_suggestions": False,
         
-        # ─── Order Fulfillment ───
+        #  Order Fulfillment 
         "fulfillment_method": "manual",  # manual, affiliate, auto
         "affiliate_links": False,
         "affiliate_commission": False,
         "order_tracking_sync": False,
         "auto_ordering": False,
         
-        # ─── Prophecizer (Inventory) ───
+        #  Prophecizer (Inventory) 
         "real_time_stock": False,
         "days_until_stockout": False,
         "low_stock_alerts": False,
@@ -110,33 +110,33 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "revenue_at_risk": False,
         "supplier_quality_monitoring": False,
         
-        # ─── Email Automation ───
+        #  Email Automation 
         "email_templates": 0,
         "ai_draft_replies": False,
         "quiet_hours_routing": False,
         "order_lookup_in_replies": False,
         "auto_classification": False,
         
-        # ─── Advertising ───
+        #  Advertising 
         "ai_ad_copy": False,
         "ad_platform_connections": False,
         "ad_scheduling": False,
         "ad_budget_management": False,
         "cross_platform_analytics": False,
         
-        # ─── AliExpress Integration ───
+        #  AliExpress Integration 
         "aliexpress_search_results_limit": 50,
         "aliexpress_searches_per_day": 10,
         "aliexpress_enrichment": False,  # Dropshipping API enrichment
         "aliexpress_auto_ordering": False,
         
-        # ─── Support & Team ───
+        #  Support & Team 
         "support_type": "community",
         "support_response_time": None,
         "team_seats": 1,
         "dedicated_manager": False,
         
-        # ─── Feature Lists for UI ───
+        #  Feature Lists for UI 
         "features": [
             "10 curated products per week",
             "Basic search filters",
@@ -154,28 +154,28 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         ]
     },
     
-    # ═══════════════════════════════════════════════════════════════
-    # ✈️ FLIGHT ($29) - "Start Selling Smarter"
-    # ═══════════════════════════════════════════════════════════════
+    # 
+    #  FLIGHT ($29) - "Start Selling Smarter"
+    # 
     SubscriptionTier.FLIGHT: {
         "name": "Flight",
         "tagline": "Start selling smarter.",
         "description": "Everything you need to launch your first store with intelligence.",
-        "emoji": "✈️",
+        "emoji": "",
         "price": 29,
         "price_display": "$29/month",
         "color": "#87CEEB",  # Sky blue
         
-        # ─── Product Discovery ───
+        #  Product Discovery 
         "products_per_week": 50,
         "search_filters": "full",
         "ai_score": True,
         "ai_score_reasoning": False,  # Just the number, no explanation
-        "saturation_indicator": "basic",  # 🟢🟡🔴 only
+        "saturation_indicator": "basic",  #  only
         "trend_velocity": False,
         "niche_analysis": False,
         
-        # ─── Intelligence & Learning ───
+        #  Intelligence & Learning 
         "global_brain": "full",
         "anonymized_success_rates": True,  # "73% of sellers succeeded"
         "personal_learning": False,
@@ -186,21 +186,21 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "drop_product_alerts": False,
         "competitor_monitoring": False,
         
-        # ─── Store Operations ───
+        #  Store Operations 
         "store_limit": 1,
         "one_click_deploy": True,
         "bulk_deploy": False,
         "ai_listing_copy": "basic",
         "ai_pricing_suggestions": False,
         
-        # ─── Order Fulfillment ───
+        #  Order Fulfillment 
         "fulfillment_method": "affiliate",
         "affiliate_links": True,
         "affiliate_commission": "5-10%",
         "order_tracking_sync": False,
         "auto_ordering": False,
         
-        # ─── Prophecizer (Inventory) ───
+        #  Prophecizer (Inventory) 
         "real_time_stock": False,
         "days_until_stockout": False,
         "low_stock_alerts": False,
@@ -211,38 +211,38 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "revenue_at_risk": False,
         "supplier_quality_monitoring": False,
         
-        # ─── Email Automation ───
+        #  Email Automation 
         "email_templates": 5,
         "ai_draft_replies": False,
         "quiet_hours_routing": False,
         "order_lookup_in_replies": False,
         "auto_classification": False,
         
-        # ─── Advertising ───
+        #  Advertising 
         "ai_ad_copy": "basic",
         "ad_platform_connections": False,
         "ad_scheduling": False,
         "ad_budget_management": False,
         "cross_platform_analytics": False,
         
-        # ─── AliExpress Integration ───
+        #  AliExpress Integration 
         "aliexpress_search_results_limit": 100,
         "aliexpress_searches_per_day": 50,
         "aliexpress_enrichment": False,
         "aliexpress_auto_ordering": False,
         
-        # ─── Support & Team ───
+        #  Support & Team 
         "support_type": "email",
         "support_response_time": "48hr",
         "team_seats": 1,
         "dedicated_manager": False,
         
-        # ─── Feature Lists for UI ───
+        #  Feature Lists for UI 
         "features": [
             "50 curated products per week",
             "Full search & filters",
             "AI Score (1-10) for each product",
-            "Basic saturation indicator (🟢🟡🔴)",
+            "Basic saturation indicator ()",
             "1 Shopify store",
             "One-click deploy to Shopify",
             "Basic AI listing copy",
@@ -263,20 +263,20 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         ]
     },
     
-    # ═══════════════════════════════════════════════════════════════
-    # 🦅 SOAR ($79) - "Run Your Business, Not Just a Store" ⭐ POPULAR
-    # ═══════════════════════════════════════════════════════════════
+    # 
+    #  SOAR ($79) - "Run Your Business, Not Just a Store" [STAR] POPULAR
+    # 
     SubscriptionTier.SOAR: {
         "name": "Soar",
         "tagline": "Run your business, not just a store.",
         "description": "Full automation suite for serious sellers. This is where businesses scale.",
-        "emoji": "🦅",
+        "emoji": "",
         "price": 79,
         "price_display": "$79/month",
         "color": "#0EA5E9",  # Bright blue
         "popular": True,  # Mark as most popular
         
-        # ─── Product Discovery ───
+        #  Product Discovery 
         "products_per_week": -1,  # Unlimited
         "search_filters": "full_saved",  # Full + saved searches
         "ai_score": True,
@@ -285,10 +285,10 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "trend_velocity": True,
         "niche_analysis": "weekly",
         
-        # ─── Intelligence & Learning ───
+        #  Intelligence & Learning 
         "global_brain": "full",
         "anonymized_success_rates": True,
-        "personal_learning": True,  # 🔥 AI learns from YOUR sales
+        "personal_learning": True,  # [HOT] AI learns from YOUR sales
         "accelerated_learning": False,
         "custom_weights": False,
         "ai_briefings": True,
@@ -296,21 +296,21 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "drop_product_alerts": True,
         "competitor_monitoring": False,
         
-        # ─── Store Operations ───
+        #  Store Operations 
         "store_limit": 5,
         "one_click_deploy": True,
         "bulk_deploy": False,
         "ai_listing_copy": "full_seo",
         "ai_pricing_suggestions": True,
         
-        # ─── Order Fulfillment ───
+        #  Order Fulfillment 
         "fulfillment_method": "affiliate",
         "affiliate_links": True,
         "affiliate_commission": "5-10%",
         "order_tracking_sync": True,
         "auto_ordering": False,
         
-        # ─── Prophecizer (Inventory) 🔥 ───
+        #  Prophecizer (Inventory) [HOT] 
         "real_time_stock": True,
         "days_until_stockout": True,
         "low_stock_alerts": True,
@@ -321,33 +321,33 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         "revenue_at_risk": False,
         "supplier_quality_monitoring": False,
         
-        # ─── Email Automation 🔥 ───
+        #  Email Automation [HOT] 
         "email_templates": -1,  # Unlimited
         "ai_draft_replies": True,
         "quiet_hours_routing": True,
         "order_lookup_in_replies": True,
         "auto_classification": True,
         
-        # ─── Advertising ───
+        #  Advertising 
         "ai_ad_copy": "full",
         "ad_platform_connections": "view",  # View metrics only
         "ad_scheduling": False,
         "ad_budget_management": False,
         "cross_platform_analytics": True,
         
-        # ─── AliExpress Integration ───
+        #  AliExpress Integration 
         "aliexpress_search_results_limit": 500,
         "aliexpress_searches_per_day": 200,
-        "aliexpress_enrichment": True,  # 🔥 Real-time stock, shipping, variants
+        "aliexpress_enrichment": True,  # [HOT] Real-time stock, shipping, variants
         "aliexpress_auto_ordering": False,
         
-        # ─── Support & Team ───
+        #  Support & Team 
         "support_type": "priority",
         "support_response_time": "24hr",
         "team_seats": 2,
         "dedicated_manager": False,
         
-        # ─── Feature Lists for UI ───
+        #  Feature Lists for UI 
         "features": [
             "Unlimited product discovery",
             "Full search + saved searches",
@@ -358,10 +358,10 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
             "5 Shopify stores",
             "One-click deploy with SEO captions",
             "AI pricing suggestions",
-            "🧠 Personal AI learning (learns YOUR patterns)",
+            "[BRAIN] Personal AI learning (learns YOUR patterns)",
             "Weekly AI business briefings",
             "\"Drop this product\" alerts",
-            "📊 Real-time inventory monitoring",
+            "[STATS] Real-time inventory monitoring",
             "Days-until-stockout predictions",
             "Low stock email alerts",
             "Restock recommendations",
@@ -384,107 +384,107 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
         ]
     },
     
-    # ═══════════════════════════════════════════════════════════════
-    # 🌌 STRATOSPHERE ($199) - "Your AI Operations Team"
-    # ═══════════════════════════════════════════════════════════════
+    # 
+    #  STRATOSPHERE ($199) - "Your AI Operations Team"
+    # 
     SubscriptionTier.STRATOSPHERE: {
         "name": "Stratosphere",
         "tagline": "Your AI-powered operations team.",
         "description": "Hands-off automation. Ospra becomes your virtual COO.",
-        "emoji": "🌌",
+        "emoji": "",
         "price": 199,
         "price_display": "$199/month",
         "color": "#7C3AED",  # Purple (space)
         
-        # ─── Product Discovery ───
+        #  Product Discovery 
         "products_per_week": -1,  # Unlimited
         "search_filters": "full_saved_api",  # Full + saved + API access
         "ai_score": True,
         "ai_score_reasoning": True,
-        "ai_score_custom_weights": True,  # 🔥 Customize what matters
-        "saturation_indicator": "ospra_internal",  # 🔥 "47 Ospra users have this"
+        "ai_score_custom_weights": True,  # [HOT] Customize what matters
+        "saturation_indicator": "ospra_internal",  # [HOT] "47 Ospra users have this"
         "trend_velocity": True,
-        "trend_velocity_early_alerts": True,  # 🔥 Early alerts
+        "trend_velocity_early_alerts": True,  # [HOT] Early alerts
         "niche_analysis": "daily",
         
-        # ─── Intelligence & Learning ───
+        #  Intelligence & Learning 
         "global_brain": "full",
         "anonymized_success_rates": True,
         "personal_learning": True,
-        "accelerated_learning": True,  # 🔥 Faster adaptation
-        "custom_weights": True,  # 🔥 "I care more about margin than volume"
+        "accelerated_learning": True,  # [HOT] Faster adaptation
+        "custom_weights": True,  # [HOT] "I care more about margin than volume"
         "ai_briefings": True,
-        "ai_briefing_frequency": "daily",  # 🔥 Daily briefings
+        "ai_briefing_frequency": "daily",  # [HOT] Daily briefings
         "revenue_projections": True,
-        "revenue_projection_scenarios": True,  # 🔥 What-if scenarios
+        "revenue_projection_scenarios": True,  # [HOT] What-if scenarios
         "drop_product_alerts": True,
-        "drop_product_alternatives": True,  # 🔥 Suggests replacements
+        "drop_product_alternatives": True,  # [HOT] Suggests replacements
         "competitor_monitoring": True,
         
-        # ─── Store Operations ───
+        #  Store Operations 
         "store_limit": -1,  # Unlimited
         "one_click_deploy": True,
-        "bulk_deploy": True,  # 🔥 Deploy multiple at once
-        "ai_listing_copy": "full_seo_ab",  # 🔥 + A/B test variants
+        "bulk_deploy": True,  # [HOT] Deploy multiple at once
+        "ai_listing_copy": "full_seo_ab",  # [HOT] + A/B test variants
         "ai_pricing_suggestions": True,
-        "ai_pricing_competitor_aware": True,  # 🔥 Knows competitor prices
+        "ai_pricing_competitor_aware": True,  # [HOT] Knows competitor prices
         
-        # ─── Order Fulfillment 🔥 ───
+        #  Order Fulfillment [HOT] 
         "fulfillment_method": "auto",
         "affiliate_links": True,
         "affiliate_commission": "5-10%",
         "order_tracking_sync": True,
-        "auto_ordering": True,  # 🔥 1-Click auto-order to AliExpress
+        "auto_ordering": True,  # [HOT] 1-Click auto-order to AliExpress
         
-        # ─── Prophecizer (Inventory) 🔥 Full Suite ───
+        #  Prophecizer (Inventory) [HOT] Full Suite 
         "real_time_stock": True,
         "days_until_stockout": True,
         "low_stock_alerts": True,
-        "low_stock_alert_channels": ["email", "sms"],  # 🔥 + SMS
+        "low_stock_alert_channels": ["email", "sms"],  # [HOT] + SMS
         "restock_recommendations": True,
-        "auto_restock_request": True,  # 🔥 Auto-request restocks
-        "seasonality_adjustments": True,  # 🔥 Q4 spike awareness
-        "revenue_at_risk": True,  # 🔥 "$1,234 at risk if stockout"
-        "supplier_quality_monitoring": True,  # 🔥 Monitor seller ratings
+        "auto_restock_request": True,  # [HOT] Auto-request restocks
+        "seasonality_adjustments": True,  # [HOT] Q4 spike awareness
+        "revenue_at_risk": True,  # [HOT] "$1,234 at risk if stockout"
+        "supplier_quality_monitoring": True,  # [HOT] Monitor seller ratings
         
-        # ─── Email Automation ───
+        #  Email Automation 
         "email_templates": -1,  # Unlimited
         "ai_draft_replies": True,
         "quiet_hours_routing": True,
         "order_lookup_in_replies": True,
         "auto_classification": True,
         
-        # ─── Advertising 🔥 Full Control ───
-        "ai_ad_copy": "full_angles",  # 🔥 Multiple marketing angles
-        "ad_platform_connections": "full",  # 🔥 Full control
-        "ad_scheduling": True,  # 🔥
-        "ad_budget_management": True,  # 🔥
+        #  Advertising [HOT] Full Control 
+        "ai_ad_copy": "full_angles",  # [HOT] Multiple marketing angles
+        "ad_platform_connections": "full",  # [HOT] Full control
+        "ad_scheduling": True,  # [HOT]
+        "ad_budget_management": True,  # [HOT]
         "cross_platform_analytics": True,
-        "cross_platform_analytics_realtime": True,  # 🔥 Real-time
+        "cross_platform_analytics_realtime": True,  # [HOT] Real-time
         
-        # ─── AliExpress Integration ───
+        #  AliExpress Integration 
         "aliexpress_search_results_limit": -1,  # Unlimited
         "aliexpress_searches_per_day": -1,  # Unlimited
         "aliexpress_enrichment": True,
-        "aliexpress_auto_ordering": True,  # 🔥
+        "aliexpress_auto_ordering": True,  # [HOT]
         
-        # ─── Support & Team ───
+        #  Support & Team 
         "support_type": "dedicated",
         "support_response_time": "priority",
         "team_seats": 5,
-        "dedicated_manager": True,  # 🔥 Dedicated success manager
+        "dedicated_manager": True,  # [HOT] Dedicated success manager
         
-        # ─── Feature Lists for UI ───
+        #  Feature Lists for UI 
         "features": [
-            "🚀 Everything in Soar, plus:",
+            "[START] Everything in Soar, plus:",
             "Unlimited Shopify stores",
             "API access for custom integrations",
             "AI Score with custom weights",
-            "🔥 Internal Ospra saturation data",
+            "[HOT] Internal Ospra saturation data",
             "\"47 Ospra users have this product\"",
             "Early trend velocity alerts",
             "Daily niche analysis",
-            "🧠 Accelerated personal AI learning",
+            "[BRAIN] Accelerated personal AI learning",
             "Custom AI weight adjustments",
             "Daily AI business briefings",
             "Revenue projections + scenarios",
@@ -493,15 +493,15 @@ TIER_DEFINITIONS: Dict[SubscriptionTier, Dict[str, Any]] = {
             "Bulk deploy to all stores",
             "A/B test listing variants",
             "Competitor-aware pricing",
-            "🛒 1-Click auto-ordering fulfillment",
+            "[CART] 1-Click auto-ordering fulfillment",
             "Direct API order placement",
-            "📊 Full Prophecizer suite",
+            "[STATS] Full Prophecizer suite",
             "SMS + email low stock alerts",
             "Auto-restock requests",
             "Seasonality adjustments",
             "Revenue-at-risk calculations",
             "Supplier quality monitoring",
-            "📢 Full ad control",
+            " Full ad control",
             "Ad scheduling & budgeting",
             "Real-time cross-platform analytics",
             "Dedicated success manager",
@@ -671,9 +671,9 @@ def get_tier_comparison_matrix() -> Dict[str, Dict]:
             if value == -1:
                 tier_data[display_name] = "Unlimited"
             elif value is True:
-                tier_data[display_name] = "✅"
+                tier_data[display_name] = "[SUCCESS]"
             elif value is False:
-                tier_data[display_name] = "❌"
+                tier_data[display_name] = "[ERROR]"
             elif isinstance(value, str) and value:
                 tier_data[display_name] = value.replace("_", " ").title()
             else:
@@ -765,9 +765,9 @@ class TierEnforcer:
 def log_tier_access(user_id: int, tier: SubscriptionTier, feature: str, allowed: bool):
     """Log tier access attempts for analytics"""
     if allowed:
-        logger.debug(f"✅ User {user_id} ({tier.value}) accessed {feature}")
+        logger.debug(f"[SUCCESS] User {user_id} ({tier.value}) accessed {feature}")
     else:
-        logger.info(f"🔒 User {user_id} ({tier.value}) blocked from {feature}")
+        logger.info(f"[LOCKED] User {user_id} ({tier.value}) blocked from {feature}")
 
 
 # ==================== EXPORT ====================

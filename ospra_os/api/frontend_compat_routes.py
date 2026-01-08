@@ -473,4 +473,4 @@ async def frontend_compat_health():
     }
 
 
-logger.info("✅ Frontend compatibility routes loaded")
+logger.info("[SUCCESS] Frontend compatibility routes loaded")

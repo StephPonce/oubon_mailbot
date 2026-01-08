@@ -35,7 +35,7 @@ class CampaignBuilder:
         """
         try:
             print(f"\n{'='*70}")
-            print(f"🚀 BUILDING META AD CAMPAIGN")
+            print(f"[START] BUILDING META AD CAMPAIGN")
             print(f"{'='*70}")
             print(f"Product: {product.get('name', 'Unknown')[:50]}")
             print(f"Budget: ${daily_budget:.2f}/day")
@@ -44,7 +44,7 @@ class CampaignBuilder:
             campaign_name = f"{product.get('name', 'Product')[:30]} - {self._get_timestamp()}"
 
             # Step 1: Generate ad copy variations
-            print("📝 Step 1: Generating AI ad copy...")
+            print("[NOTE] Step 1: Generating AI ad copy...")
             ad_variations = await self.ad_generator.generate_ad_copy(product)
 
             if not ad_variations:
@@ -54,7 +54,7 @@ class CampaignBuilder:
                 }
 
             # Step 2: Create campaign
-            print("\n📢 Step 2: Creating campaign...")
+            print("\n Step 2: Creating campaign...")
             campaign = await self.client.create_campaign(
                 name=campaign_name,
                 objective='OUTCOME_SALES',
@@ -70,7 +70,7 @@ class CampaignBuilder:
             campaign_id = campaign['id']
 
             # Step 3: Create ad set
-            print("\n🎯 Step 3: Creating ad set...")
+            print("\n[TARGET] Step 3: Creating ad set...")
 
             targeting = target_audience or self._get_default_targeting(product)
 
@@ -92,7 +92,7 @@ class CampaignBuilder:
             ad_set_id = ad_set['id']
 
             # Step 4 & 5: Create creatives and ads
-            print("\n🎨 Step 4-5: Creating ad creatives and ads...")
+            print("\n Step 4-5: Creating ad creatives and ads...")
 
             ads_created = []
 
@@ -107,7 +107,7 @@ class CampaignBuilder:
                 )
 
                 if not creative:
-                    print(f"⚠️  Failed to create creative {i}")
+                    print(f"[WARNING]  Failed to create creative {i}")
                     continue
 
                 # Create ad
@@ -140,7 +140,7 @@ class CampaignBuilder:
             }
 
             print(f"\n{'='*70}")
-            print(f"✅ CAMPAIGN BUILD COMPLETE")
+            print(f"[SUCCESS] CAMPAIGN BUILD COMPLETE")
             print(f"{'='*70}")
             print(f"Campaign ID: {campaign_id}")
             print(f"Ad Set ID: {ad_set_id}")
@@ -151,7 +151,7 @@ class CampaignBuilder:
             return result
 
         except Exception as e:
-            print(f"❌ Campaign build error: {e}")
+            print(f"[ERROR] Campaign build error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -221,7 +221,7 @@ class CampaignBuilder:
         """Create campaigns for multiple products"""
         import asyncio
 
-        print(f"\n🚀 Bulk creating campaigns for {len(products)} products...")
+        print(f"\n[START] Bulk creating campaigns for {len(products)} products...")
 
         results = []
 
@@ -238,6 +238,6 @@ class CampaignBuilder:
             await asyncio.sleep(3)
 
         successful = sum(1 for r in results if r.get('success'))
-        print(f"\n✅ Created {successful}/{len(products)} campaigns successfully")
+        print(f"\n[SUCCESS] Created {successful}/{len(products)} campaigns successfully")
 
         return results

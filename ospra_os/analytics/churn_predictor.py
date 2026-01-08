@@ -46,7 +46,7 @@ class ChurnPredictor:
         Returns:
             Churn probability (0.0 = will stay, 1.0 = will churn)
         """
-        logger.info(f"🔮 Calculating churn probability for: {customer_id}")
+        logger.info(f" Calculating churn probability for: {customer_id}")
 
         # Extract metrics
         days_since_last_order = customer_data.get('days_since_last_order', 0)
@@ -96,7 +96,7 @@ class ChurnPredictor:
         # Clamp to 0.0-1.0
         churn_probability = max(0.0, min(1.0, churn_probability))
 
-        logger.info(f"📊 Churn probability: {churn_probability:.0%} (recency: {recency_score:.2f}, freq: {frequency_score:.2f}, engagement: {engagement_score:.2f}, trend: {trend_score:.2f})")
+        logger.info(f"[STATS] Churn probability: {churn_probability:.0%} (recency: {recency_score:.2f}, freq: {frequency_score:.2f}, engagement: {engagement_score:.2f}, trend: {trend_score:.2f})")
 
         return round(churn_probability, 2)
 
@@ -232,7 +232,7 @@ class ChurnPredictor:
         Returns:
             Detailed churn analysis with factors and recommendations
         """
-        logger.info(f"📋 Analyzing churn factors for: {customer_id}")
+        logger.info(f"[LIST] Analyzing churn factors for: {customer_id}")
 
         churn_probability = await self.calculate_churn_probability(customer_id, customer_data)
 
@@ -333,22 +333,22 @@ class ChurnPredictor:
 
         if risk_level == "HIGH":
             if ltv > 300:
-                recommendations.append("🎯 Personal outreach - high LTV customer at risk")
-                recommendations.append("📞 Phone call or personalized email from account manager")
+                recommendations.append("[TARGET] Personal outreach - high LTV customer at risk")
+                recommendations.append(" Phone call or personalized email from account manager")
 
-            recommendations.append("💰 Send win-back email with 15-20% discount")
-            recommendations.append("🎁 Exclusive offer based on purchase history")
+            recommendations.append("[PRICE] Send win-back email with 15-20% discount")
+            recommendations.append("[GIFT] Exclusive offer based on purchase history")
 
         elif risk_level == "MEDIUM":
-            recommendations.append("📧 Re-engagement campaign")
-            recommendations.append("🛍️ Feature products from favorite category")
-            recommendations.append("⭐ Showcase new arrivals they might like")
+            recommendations.append("[EMAIL] Re-engagement campaign")
+            recommendations.append("[SHOP] Feature products from favorite category")
+            recommendations.append("[STAR] Showcase new arrivals they might like")
 
         if segment in ['AT_RISK', 'HIBERNATING']:
-            recommendations.append("📊 Add to win-back automation sequence")
+            recommendations.append("[STATS] Add to win-back automation sequence")
 
         if ltv > 200:
-            recommendations.append("🏆 VIP perks: early access, free shipping")
+            recommendations.append("[TOP] VIP perks: early access, free shipping")
 
         return recommendations
 
@@ -371,7 +371,7 @@ class ChurnPredictor:
         Returns:
             List of at-risk customers with details
         """
-        logger.info(f"⚠️  Finding at-risk customers (threshold: {threshold:.0%})...")
+        logger.info(f"[WARNING]  Finding at-risk customers (threshold: {threshold:.0%})...")
 
         at_risk = []
 
@@ -403,7 +403,7 @@ class ChurnPredictor:
         # Combine: high LTV first
         combined = high_ltv_risk + other_risk
 
-        logger.info(f"✅ Found {len(combined)} at-risk customers ({len(high_ltv_risk)} high LTV)")
+        logger.info(f"[SUCCESS] Found {len(combined)} at-risk customers ({len(high_ltv_risk)} high LTV)")
 
         return combined[:limit]
 
@@ -419,7 +419,7 @@ class ChurnPredictor:
         Returns:
             List of period churn rates
         """
-        logger.info(f"📊 Calculating churn rate trend for {periods} periods...")
+        logger.info(f"[STATS] Calculating churn rate trend for {periods} periods...")
 
         # TODO: Calculate from database
         # For now, return mock data
@@ -451,7 +451,7 @@ class ChurnPredictor:
         Returns:
             Save rate as decimal (0.0 to 1.0)
         """
-        logger.info("📊 Calculating win-back save rate...")
+        logger.info("[STATS] Calculating win-back save rate...")
 
         # TODO: Calculate from campaign results
         # For now, return mock rate
@@ -470,4 +470,4 @@ def get_churn_predictor(db_session=None):
     return _churn_predictor
 
 
-logger.info("✅ Churn Predictor module loaded")
+logger.info("[SUCCESS] Churn Predictor module loaded")

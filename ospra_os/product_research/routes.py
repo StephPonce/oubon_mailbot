@@ -103,7 +103,7 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
 
     for connector in connectors:
         if not connector.is_available():
-            print(f"⚠️  {connector.name} not available (missing API key)")
+            print(f"[WARNING]  {connector.name} not available (missing API key)")
             continue
 
         try:
@@ -115,10 +115,10 @@ async def find_products(request: FindProductsRequest, settings: Settings = Depen
                 candidates = await connector.get_trending(category=request.category, limit=request.max_results)
 
             all_candidates.extend(candidates)
-            print(f"✅ {connector.name}: Found {len(candidates)} candidates")
+            print(f"[SUCCESS] {connector.name}: Found {len(candidates)} candidates")
 
         except Exception as e:
-            print(f"❌ {connector.name} error: {e}")
+            print(f"[ERROR] {connector.name} error: {e}")
             continue
 
     if not all_candidates:
@@ -491,7 +491,7 @@ async def discover_twitter_viral(
         ProductResponse(
             name=p.get("name", "Unknown Product"),
             score=p.get("viral_score", 0.0),
-            recommendation=p.get("buy_signal", "⏸️ WATCH"),
+            recommendation=p.get("buy_signal", "[PAUSE] WATCH"),
             source="twitter_xai",
             details=p
         )

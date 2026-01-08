@@ -1,73 +1,192 @@
-# React + TypeScript + Vite
+# 🦅 Ospra Intelligence - Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Liquid glass aesthetic dashboard for AI-powered e-commerce automation.
 
-Currently, two official plugins are available:
+## 🚀 Quick Start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+# Navigate to frontend
+cd frontend
 
-## React Compiler
+# Install dependencies
+npm install
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+# Start dev server
+npm run dev
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Open in browser
+open http://localhost:5173
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 📦 Features
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Pages
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/login` | LoginForm | Authentication |
+| `/register` | RegisterForm | New account creation |
+| `/dashboard` | Dashboard | Main command center |
+| `/oi` | OiChat | AI chat interface |
+| `/products` | ProductDiscovery | Product search & deploy |
+| `/autopilot` | AutopilotControl | Automation settings |
+| `/actions` | ActionQueue | AI action review |
+| `/settings` | Settings | Account management |
+
+### Authentication
+
+- JWT-based authentication
+- Automatic token refresh
+- Tier-based access control
+- Protected routes
+
+### Key Components
+
+- **AuthProvider** - Wraps app with auth state
+- **ProtectedRoute** - Route protection
+- **useAuth()** - Auth state hook
+- **authService** - API authentication
+
+## 🔧 Configuration
+
+Create `.env` in frontend root:
+
+```env
+VITE_API_URL=http://localhost:8000
 ```
+
+For production:
+
+```env
+VITE_API_URL=https://api.ospra.io
+```
+
+## 🎨 Design System
+
+### Colors
+
+| Name | Value | Usage |
+|------|-------|-------|
+| Purple | `#8b5cf6` | Primary accent |
+| Cyan | `#06b6d4` | Secondary accent |
+| Dark | `#0f172a` | Background |
+
+### Components
+
+All components use the liquid glass aesthetic:
+
+```jsx
+// Glass card
+<div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6">
+  {/* Content */}
+</div>
+
+// Gradient button
+<button className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold">
+  Action
+</button>
+```
+
+## 📁 Project Structure
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   ├── auth/
+│   │   │   ├── LoginForm.jsx
+│   │   │   ├── RegisterForm.jsx
+│   │   │   └── ProtectedRoute.jsx
+│   │   ├── Dashboard.jsx
+│   │   ├── OiChat.jsx
+│   │   ├── ProductDiscovery.jsx
+│   │   ├── AutopilotControl.jsx
+│   │   ├── ActionQueue.jsx
+│   │   └── Settings.jsx
+│   ├── hooks/
+│   │   └── useAuth.jsx
+│   ├── services/
+│   │   ├── auth.js
+│   │   └── api.js
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── index.css
+├── index.html
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+└── postcss.config.js
+```
+
+## 🔌 API Integration
+
+The frontend connects to these backend endpoints:
+
+### Authentication
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+
+### OI Chat
+- `POST /api/ai/chat`
+- `POST /api/nl/parse`
+- `GET /api/nl/examples`
+
+### Products
+- `GET /api/products/discover`
+- `GET /api/products/trending`
+- `POST /api/products/search`
+- `POST /api/deploy/product`
+
+### Autopilot
+- `GET /api/autopilot/status`
+- `GET /api/autopilot/config`
+- `POST /api/autopilot/enable`
+- `POST /api/autopilot/disable`
+- `POST /api/autopilot/presets/{preset}`
+
+### Actions
+- `GET /api/ai/actions`
+- `POST /api/ai/actions/{id}/accept`
+- `POST /api/ai/actions/{id}/decline`
+
+## 🚢 Deployment
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+Output in `dist/` folder.
+
+### Deploy to Vercel
+
+```bash
+vercel deploy --prod
+```
+
+### Environment Variables
+
+Set `VITE_API_URL` in Vercel dashboard.
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Node.js 18+
+- Backend running on port 8000
+
+### Commands
+
+```bash
+npm run dev      # Start dev server
+npm run build    # Build for production
+npm run preview  # Preview production build
+npm run lint     # Run ESLint
+```
+
+---
+
+Made with 🧠 by Ospra Intelligence

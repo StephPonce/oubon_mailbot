@@ -15,11 +15,11 @@ from ospra_os.core.settings import get_settings
 def run_migrations():
     """Run all pending migrations"""
     print("\n" + "=" * 70)
-    print("🔄 DATABASE MIGRATION - Complete Anti-AutoDS System")
+    print("[REFRESH] DATABASE MIGRATION - Complete Anti-AutoDS System")
     print("=" * 70)
 
     settings = get_settings()
-    print(f"\n📍 Database: {settings.database_url}")
+    print(f"\n[LOCATION] Database: {settings.database_url}")
 
     engine = create_engine(settings.database_url)
 
@@ -27,10 +27,10 @@ def run_migrations():
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
 
-    print(f"\n📊 Current State:")
+    print(f"\n[STATS] Current State:")
     print(f"   Existing tables: {len(existing_tables)}")
 
-    print("\n🔨 Creating/updating tables...")
+    print("\n Creating/updating tables...")
 
     # Create all tables (will skip existing ones)
     Base.metadata.create_all(engine)
@@ -44,13 +44,13 @@ def run_migrations():
     print("\n" + "-" * 70)
 
     if new_tables:
-        print(f"✅ Added {len(new_tables)} new tables:")
+        print(f"[SUCCESS] Added {len(new_tables)} new tables:")
         for table in sorted(new_tables):
-            print(f"   ✓ {table}")
+            print(f"   [OK] {table}")
     else:
-        print("✅ No new tables needed - all tables already exist")
+        print("[SUCCESS] No new tables needed - all tables already exist")
 
-    print(f"\n📊 Final State:")
+    print(f"\n[STATS] Final State:")
     print(f"   Total tables: {len(updated_tables)}")
 
     # List all differentiation tables
@@ -60,24 +60,24 @@ def run_migrations():
         'user_product_recommendations'
     ]
 
-    print("\n📋 Differentiation System Tables:")
+    print("\n[LIST] Differentiation System Tables:")
     for table in differentiation_tables:
         if table in updated_tables:
-            print(f"   ✅ {table}")
+            print(f"   [SUCCESS] {table}")
         else:
-            print(f"   ❌ {table} - MISSING!")
+            print(f"   [ERROR] {table} - MISSING!")
 
     # List all tables
-    print("\n📋 All Database Tables:")
+    print("\n[LIST] All Database Tables:")
     for table in sorted(updated_tables):
         # Highlight differentiation tables
         if table in differentiation_tables:
-            print(f"   ★ {table} (differentiation)")
+            print(f"    {table} (differentiation)")
         else:
             print(f"   - {table}")
 
     print("\n" + "=" * 70)
-    print("✅ MIGRATION COMPLETE!")
+    print("[SUCCESS] MIGRATION COMPLETE!")
     print("=" * 70)
     print("\nThe Complete Anti-AutoDS System database is ready.")
     print("All required tables have been created.\n")

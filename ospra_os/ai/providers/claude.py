@@ -48,16 +48,22 @@ class ClaudeProvider(AIProvider):
         "claude-3-haiku-20240307",       # Haiku 3 (stable fallback)
     ]
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: Optional[str] = None):
         """
         Initialize Claude provider with API key.
 
         Args:
-            api_key: Anthropic API key (starts with "sk-ant-")
+            api_key: Anthropic API key (starts with "sk-ant-"). 
+                     If not provided, uses ANTHROPIC_API_KEY env var.
 
         Raises:
             APIKeyError: If API key is invalid or missing
         """
+        import os
+        api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise APIKeyError("ANTHROPIC_API_KEY not configured")
+            
         super().__init__(api_key)
 
         # Set provider details
@@ -203,6 +209,8 @@ class ClaudeProvider(AIProvider):
         Args:
             message: User's question or message
             context: Optional context (products, metrics, preferences)
+                     If context["system_prompt"] is provided, use it directly.
+                     This allows OiService to inject context-aware prompts.
 
         Returns:
             AI response as formatted string
@@ -210,8 +218,15 @@ class ClaudeProvider(AIProvider):
         Raises:
             InvalidResponseError: If Claude returns invalid data
         """
-        # Build system prompt with context
-        system_prompt = self._build_chat_system_prompt(context)
+        # Check if a system_prompt was provided in context (from OiService)
+        # This allows OiService to inject fully built context-aware prompts
+        if context and "system_prompt" in context:
+            system_prompt = context["system_prompt"]
+            logger.debug("Using system prompt from context (OiService)")
+        else:
+            # Fallback to building our own prompt
+            system_prompt = self._build_chat_system_prompt(context)
+            logger.debug("Building system prompt internally")
 
         # Build user message
         user_message = message
@@ -469,27 +484,41 @@ FORMATTING RULES:
 Keep responses concise, specific, and immediately actionable.
 """
 
-        if context:
-            system_prompt += "\n\nCURRENT CONTEXT:\n"
+        # Handle None or empty context gracefully
+        if not context:
+            return system_prompt
+        
+        system_prompt += "\n\nCURRENT CONTEXT:\n"
 
-            if "store_metrics" in context:
-                metrics = context["store_metrics"]
-                system_prompt += f"- Store Niche: {metrics.get('niche', 'N/A')}\n"
-                system_prompt += f"- Total Revenue: ${metrics.get('total_revenue', 0):,.2f}\n"
-                system_prompt += f"- Conversion Rate: {metrics.get('conversion_rate', 0):.1f}%\n"
+        # Store metrics - check both key existence AND that value is a dict
+        metrics = context.get("store_metrics")
+        if metrics and isinstance(metrics, dict):
+            system_prompt += f"- Store Niche: {metrics.get('niche', 'N/A')}\n"
+            total_revenue = metrics.get('total_revenue', 0) or 0
+            conversion_rate = metrics.get('conversion_rate', 0) or 0
+            system_prompt += f"- Total Revenue: ${total_revenue:,.2f}\n"
+            system_prompt += f"- Conversion Rate: {conversion_rate:.1f}%\n"
 
-            if "current_products" in context:
-                products = context["current_products"]
-                system_prompt += f"- Number of Products: {len(products)}\n"
-                if products:
-                    top_product = max(products, key=lambda p: p.get('revenue', 0))
-                    system_prompt += f"- Top Product: {top_product.get('name', 'N/A')} (${top_product.get('revenue', 0):,.2f})\n"
+        # Current products - check both key existence AND that value is a list
+        products = context.get("current_products")
+        if products and isinstance(products, list):
+            system_prompt += f"- Number of Products: {len(products)}\n"
+            if products:
+                try:
+                    top_product = max(products, key=lambda p: p.get('revenue', 0) if isinstance(p, dict) else 0)
+                    if isinstance(top_product, dict):
+                        system_prompt += f"- Top Product: {top_product.get('name', 'N/A')} (${top_product.get('revenue', 0):,.2f})\n"
+                except (ValueError, TypeError):
+                    pass  # Empty list or invalid data
 
-            if "recent_activity" in context:
-                activities = context["recent_activity"][:3]  # Last 3 activities
-                if activities:
-                    system_prompt += "- Recent Activity:\n"
-                    for activity in activities:
+        # Recent activity - check both key existence AND that value is a list
+        activities = context.get("recent_activity")
+        if activities and isinstance(activities, list):
+            activities = activities[:3]  # Last 3 activities
+            if activities:
+                system_prompt += "- Recent Activity:\n"
+                for activity in activities:
+                    if activity:  # Skip None/empty
                         system_prompt += f"  • {activity}\n"
 
         return system_prompt

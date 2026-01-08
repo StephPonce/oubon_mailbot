@@ -40,7 +40,7 @@ class AmazonBestsellersScraper(ApifyConnector):
             logger.warning("Amazon bestsellers scraper not available - Apify not configured")
             return []
 
-        logger.info(f"📊 Scraping Amazon bestsellers: category={category}, country={country}")
+        logger.info(f"[STATS] Scraping Amazon bestsellers: category={category}, country={country}")
 
         # Build category URL for bestsellers
         category_url = f"https://www.amazon.com/Best-Sellers-{category.replace(' ', '-')}/zgbs"
@@ -68,11 +68,11 @@ class AmazonBestsellersScraper(ApifyConnector):
                     logger.error(f"Error parsing Amazon product: {e}")
                     continue
 
-            logger.info(f"✅ Parsed {len(products)} Amazon bestsellers")
+            logger.info(f"[SUCCESS] Parsed {len(products)} Amazon bestsellers")
             return products
 
         except Exception as e:
-            logger.error(f"❌ Amazon bestsellers scraping failed: {e}")
+            logger.error(f"[ERROR] Amazon bestsellers scraping failed: {e}")
             return []
 
     async def scrape_new_releases(
@@ -98,7 +98,7 @@ class AmazonBestsellersScraper(ApifyConnector):
             logger.warning("Amazon new releases scraper not available")
             return []
 
-        logger.info(f"🆕 Scraping Amazon new releases: category={category}")
+        logger.info(f"[NEW] Scraping Amazon new releases: category={category}")
 
         run_input = {
             "category": category,
@@ -120,11 +120,11 @@ class AmazonBestsellersScraper(ApifyConnector):
                 if product:
                     products.append(product)
 
-            logger.info(f"✅ Found {len(products)} new releases")
+            logger.info(f"[SUCCESS] Found {len(products)} new releases")
             return products
 
         except Exception as e:
-            logger.error(f"❌ Amazon new releases scraping failed: {e}")
+            logger.error(f"[ERROR] Amazon new releases scraping failed: {e}")
             return []
 
     async def scrape_movers_and_shakers(
@@ -151,7 +151,7 @@ class AmazonBestsellersScraper(ApifyConnector):
             logger.warning("Amazon movers & shakers scraper not available")
             return []
 
-        logger.info(f"🚀 Scraping Amazon movers & shakers: category={category}")
+        logger.info(f"[START] Scraping Amazon movers & shakers: category={category}")
 
         run_input = {
             "category": category,
@@ -173,11 +173,11 @@ class AmazonBestsellersScraper(ApifyConnector):
                 if product:
                     products.append(product)
 
-            logger.info(f"✅ Found {len(products)} movers & shakers")
+            logger.info(f"[SUCCESS] Found {len(products)} movers & shakers")
             return products
 
         except Exception as e:
-            logger.error(f"❌ Amazon movers & shakers scraping failed: {e}")
+            logger.error(f"[ERROR] Amazon movers & shakers scraping failed: {e}")
             return []
 
     def _parse_bestseller_item(
@@ -338,7 +338,7 @@ class AmazonBestsellersScraper(ApifyConnector):
         Returns:
             Dict mapping category to list of products
         """
-        logger.info(f"📊 Batch scraping {len(categories)} categories")
+        logger.info(f"[STATS] Batch scraping {len(categories)} categories")
 
         results = {}
 
@@ -351,13 +351,13 @@ class AmazonBestsellersScraper(ApifyConnector):
                 )
                 results[category] = products
 
-                logger.info(f"✅ {category}: {len(products)} products")
+                logger.info(f"[SUCCESS] {category}: {len(products)} products")
 
             except Exception as e:
-                logger.error(f"❌ Failed to scrape {category}: {e}")
+                logger.error(f"[ERROR] Failed to scrape {category}: {e}")
                 results[category] = []
 
         total_products = sum(len(prods) for prods in results.values())
-        logger.info(f"✅ Batch complete: {total_products} total products")
+        logger.info(f"[SUCCESS] Batch complete: {total_products} total products")
 
         return results

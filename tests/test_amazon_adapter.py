@@ -25,9 +25,9 @@ def test_amazon_adapter():
             AuthenticationError,
             RateLimitError
         )
-        print("✅ All imports successful")
+        print("[SUCCESS] All imports successful")
     except ImportError as e:
-        print(f"❌ Import failed: {e}")
+        print(f"[ERROR] Import failed: {e}")
         return
 
     # Test 2: Initialize with mock credentials
@@ -52,14 +52,14 @@ def test_amazon_adapter():
         assert adapter.marketplace_id == "ATVPDKIKX0DER"
         assert "sellingpartnerapi-na.amazon.com" in adapter.base_url
 
-        print(f"✅ Adapter initialized")
+        print(f"[SUCCESS] Adapter initialized")
         print(f"   Platform: {adapter.platform_name}")
         print(f"   API Version: {adapter.api_version}")
         print(f"   Marketplace: {adapter.marketplace_id}")
         print(f"   Base URL: {adapter.base_url}")
 
     except Exception as e:
-        print(f"❌ Initialization failed: {e}")
+        print(f"[ERROR] Initialization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -69,13 +69,13 @@ def test_amazon_adapter():
     try:
         try:
             bad_adapter = AmazonAdapter({})
-            print("❌ Should have raised AuthenticationError")
+            print("[ERROR] Should have raised AuthenticationError")
         except AuthenticationError as e:
-            print("✅ Correctly rejects missing credentials")
+            print("[SUCCESS] Correctly rejects missing credentials")
             print(f"   Error: {str(e)[:80]}...")
 
     except Exception as e:
-        print(f"❌ Credential validation failed: {e}")
+        print(f"[ERROR] Credential validation failed: {e}")
         return
 
     # Test 4: Test helper methods
@@ -85,13 +85,13 @@ def test_amazon_adapter():
         info = adapter.get_platform_info()
         assert info["platform"] == "amazon"
         assert info["api_version"] == "2021-06-30"
-        print("✅ get_platform_info() working")
+        print("[SUCCESS] get_platform_info() working")
 
         # track_request
         adapter.track_request()
         stats = adapter.get_request_stats()
         assert stats["total_requests"] == 1
-        print("✅ track_request() working")
+        print("[SUCCESS] track_request() working")
 
         # validate_product_data
         valid_product = {
@@ -100,10 +100,10 @@ def test_amazon_adapter():
             "sku": "SW-001"
         }
         adapter.validate_product_data(valid_product)
-        print("✅ validate_product_data() accepts valid data")
+        print("[SUCCESS] validate_product_data() accepts valid data")
 
     except Exception as e:
-        print(f"❌ Helper methods failed: {e}")
+        print(f"[ERROR] Helper methods failed: {e}")
         return
 
     # Test 5: Test data normalization
@@ -142,7 +142,7 @@ def test_amazon_adapter():
         assert normalized_order["customer_email"] == "customer@example.com"
         assert normalized_order["customer_name"] == "John Doe"
         assert normalized_order["status"] == "Shipped"
-        print("✅ normalize_order() working correctly")
+        print("[SUCCESS] normalize_order() working correctly")
 
         # Test product normalization
         amazon_product = {
@@ -168,10 +168,10 @@ def test_amazon_adapter():
         assert normalized["title"] == "Smart LED Light Bulb"
         assert normalized["price"] == 24.99
         assert normalized["sku"] == "TEST-SKU-001"
-        print("✅ normalize_product() working correctly")
+        print("[SUCCESS] normalize_product() working correctly")
 
     except Exception as e:
-        print(f"❌ Normalization failed: {e}")
+        print(f"[ERROR] Normalization failed: {e}")
         import traceback
         traceback.print_exc()
         return
@@ -182,12 +182,12 @@ def test_amazon_adapter():
         # Check rate limit constants
         assert adapter.ORDERS_RATE_LIMIT == 0.0055
         assert adapter.CATALOG_RATE_LIMIT == 0.1
-        print(f"✅ Rate limits configured:")
+        print(f"[SUCCESS] Rate limits configured:")
         print(f"   Orders: {adapter.ORDERS_RATE_LIMIT}s (~200/hour)")
         print(f"   Catalog: {adapter.CATALOG_RATE_LIMIT}s (~600/hour)")
 
     except Exception as e:
-        print(f"❌ Rate limiting test failed: {e}")
+        print(f"[ERROR] Rate limiting test failed: {e}")
         return
 
     # Test 7: Test marketplace mapping
@@ -203,11 +203,11 @@ def test_amazon_adapter():
             endpoint = adapter.MARKETPLACE_ENDPOINTS.get(marketplace_id)
             assert expected_domain in endpoint
 
-        print("✅ Marketplace endpoint mapping working")
+        print("[SUCCESS] Marketplace endpoint mapping working")
         print(f"   {len(adapter.MARKETPLACE_ENDPOINTS)} marketplaces configured")
 
     except Exception as e:
-        print(f"❌ Marketplace mapping test failed: {e}")
+        print(f"[ERROR] Marketplace mapping test failed: {e}")
         return
 
     # Test 8: Test async method signatures
@@ -231,10 +231,10 @@ def test_amazon_adapter():
             method = getattr(adapter, method_name)
             assert asyncio.iscoroutinefunction(method), f"{method_name} should be async"
 
-        print(f"✅ All {len(methods_to_check)} abstract methods are async")
+        print(f"[SUCCESS] All {len(methods_to_check)} abstract methods are async")
 
     except Exception as e:
-        print(f"❌ Async signature test failed: {e}")
+        print(f"[ERROR] Async signature test failed: {e}")
         return
 
     # Test 9: Test MVP method responses (without real API)
@@ -246,59 +246,59 @@ def test_amazon_adapter():
             assert result["success"] is False
             assert "not yet implemented" in result["error"]
             assert "note" in result
-            print("✅ deploy_product() returns helpful guidance")
+            print("[SUCCESS] deploy_product() returns helpful guidance")
 
             # get_products should return guidance
             result = await adapter.get_products()
             assert result["success"] is False
             assert "Reports API" in result["note"]
-            print("✅ get_products() returns implementation guidance")
+            print("[SUCCESS] get_products() returns implementation guidance")
 
             # update_inventory should return guidance
             result = await adapter.update_inventory("B08N5WRWNW", 100)
             assert result["success"] is False
             assert "FBA" in result["note"] or "FBM" in result["note"]
-            print("✅ update_inventory() returns FBA/FBM guidance")
+            print("[SUCCESS] update_inventory() returns FBA/FBM guidance")
 
         asyncio.run(test_mvp_methods())
 
     except Exception as e:
-        print(f"❌ MVP method tests failed: {e}")
+        print(f"[ERROR] MVP method tests failed: {e}")
         import traceback
         traceback.print_exc()
         return
 
     print("\n" + "=" * 70)
-    print("✅ ALL AMAZON ADAPTER TESTS PASSED!")
+    print("[SUCCESS] ALL AMAZON ADAPTER TESTS PASSED!")
     print("=" * 70)
     print()
-    print("📋 Summary:")
-    print("   ✓ Amazon adapter properly inherits from PlatformAdapter")
-    print("   ✓ All 9 abstract methods implemented")
-    print("   ✓ Credential validation working (7 required fields)")
-    print("   ✓ Data normalization working (orders & products)")
-    print("   ✓ Rate limiting configured (endpoint-specific)")
-    print("   ✓ Marketplace mapping working (10 marketplaces)")
-    print("   ✓ Helper methods functional")
-    print("   ✓ MVP methods return helpful guidance")
+    print("[LIST] Summary:")
+    print("   [OK] Amazon adapter properly inherits from PlatformAdapter")
+    print("   [OK] All 9 abstract methods implemented")
+    print("   [OK] Credential validation working (7 required fields)")
+    print("   [OK] Data normalization working (orders & products)")
+    print("   [OK] Rate limiting configured (endpoint-specific)")
+    print("   [OK] Marketplace mapping working (10 marketplaces)")
+    print("   [OK] Helper methods functional")
+    print("   [OK] MVP methods return helpful guidance")
     print()
-    print("🎯 Amazon Adapter Features (MVP):")
+    print("[TARGET] Amazon Adapter Features (MVP):")
     print("   • Amazon Selling Partner API (SP-API)")
     print("   • API Version: 2021-06-30 (Catalog Items)")
     print("   • Rate limiting (varies by endpoint)")
-    print("   • Order syncing with metrics ✅")
-    print("   • Store info retrieval ✅")
+    print("   • Order syncing with metrics [SUCCESS]")
+    print("   • Store info retrieval [SUCCESS]")
     print("   • Multi-marketplace support (US, CA, EU, JP, AU)")
     print("   • AWS Signature V4 + LWA OAuth authentication")
     print("   • Graceful degradation if SP-API library unavailable")
     print()
-    print("⚠️  MVP Limitations (Documented in Code):")
+    print("[WARNING]  MVP Limitations (Documented in Code):")
     print("   • Product creation: Requires product type definitions, brand approval")
     print("   • Product listing: Requires Reports API (async report generation)")
     print("   • Inventory updates: Complex (FBA vs FBM)")
     print("   • Price updates: Requires Listings Items API + SKU")
     print()
-    print("📚 To test with real Amazon SP-API:")
+    print(" To test with real Amazon SP-API:")
     print("   1. Set AMAZON_MARKETPLACE_ID in environment (e.g., ATVPDKIKX0DER)")
     print("   2. Set AMAZON_SELLER_ID")
     print("   3. Set AMAZON_REFRESH_TOKEN")
@@ -344,7 +344,7 @@ def test_with_real_credentials():
     missing = [k for k, v in required_creds.items() if not v]
 
     if missing:
-        print("⚠️  Missing required credentials:")
+        print("[WARNING]  Missing required credentials:")
         for cred in missing:
             print(f"   - {cred}")
         print()
@@ -374,11 +374,11 @@ def test_with_real_credentials():
         result = await adapter.test_connection()
 
         if result.get("success"):
-            print(f"✅ Connected to: {result['store_name']}")
+            print(f"[SUCCESS] Connected to: {result['store_name']}")
             print(f"   Marketplace: {result['marketplace_id']}")
             print(f"   URL: {result['store_url']}")
         else:
-            print(f"❌ Connection failed: {result.get('error')}")
+            print(f"[ERROR] Connection failed: {result.get('error')}")
             return
 
         # Get store info
@@ -386,12 +386,12 @@ def test_with_real_credentials():
         info = await adapter.get_store_info()
 
         if info.get("success"):
-            print(f"✅ Store info retrieved")
+            print(f"[SUCCESS] Store info retrieved")
             print(f"   Plan: {info.get('plan')}")
             print(f"   Country: {info.get('country')}")
             print(f"   Currency: {info.get('currency')}")
         else:
-            print(f"❌ Get store info failed: {info.get('error')}")
+            print(f"[ERROR] Get store info failed: {info.get('error')}")
 
         # Get orders (last 30 days, first 5)
         print("\nFetching orders (last 30 days)...")
@@ -399,35 +399,35 @@ def test_with_real_credentials():
 
         if orders.get("success"):
             count = orders.get("total_count", 0)
-            print(f"✅ Retrieved {count} orders")
+            print(f"[SUCCESS] Retrieved {count} orders")
             for order in orders.get("orders", [])[:3]:
                 print(f"   - {order['order_number']}: ${order['total_price']} ({order['status']})")
         else:
-            print(f"❌ Get orders failed: {orders.get('error')}")
+            print(f"[ERROR] Get orders failed: {orders.get('error')}")
 
         # Sync orders
         print("\nSyncing orders...")
         sync_result = await adapter.sync_orders()
 
         if sync_result.get("success"):
-            print(f"✅ Orders synced: {sync_result['orders_synced']}")
+            print(f"[SUCCESS] Orders synced: {sync_result['orders_synced']}")
             metrics = sync_result.get("metrics", {})
             print(f"   Total Revenue: ${metrics.get('total_revenue', 0):.2f}")
             print(f"   Avg Order Value: ${metrics.get('avg_order_value', 0):.2f}")
         else:
-            print(f"❌ Sync failed: {sync_result.get('error')}")
+            print(f"[ERROR] Sync failed: {sync_result.get('error')}")
 
         # Show stats
         print("\nAPI Statistics:")
         stats = adapter.get_request_stats()
         print(f"   Total requests: {stats['total_requests']}")
 
-        print("\n✅ Live tests complete!")
+        print("\n[SUCCESS] Live tests complete!")
 
     try:
         asyncio.run(run_live_tests())
     except Exception as e:
-        print(f"❌ Live tests failed: {e}")
+        print(f"[ERROR] Live tests failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     if all(os.getenv(cred) for cred in all_creds):
         test_with_real_credentials()
     else:
-        print("💡 Tip: Set all Amazon SP-API credentials to test with real API:")
+        print("[TIP] Tip: Set all Amazon SP-API credentials to test with real API:")
         print("   AMAZON_MARKETPLACE_ID, AMAZON_SELLER_ID, AMAZON_REFRESH_TOKEN,")
         print("   AMAZON_CLIENT_ID, AMAZON_CLIENT_SECRET,")
         print("   AMAZON_AWS_ACCESS_KEY, AMAZON_AWS_SECRET_KEY")

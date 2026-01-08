@@ -945,9 +945,9 @@ class AmazonSPAPIClient:
             # Try simple API call (get catalog)
             result = self.search_catalog(keywords="test", page_size=1)
 
-            logger.info("✅ Amazon SP-API connection successful")
+            logger.info("[SUCCESS] Amazon SP-API connection successful")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Amazon SP-API connection failed: {e}")
+            logger.error(f"[ERROR] Amazon SP-API connection failed: {e}")
             return False
