@@ -58,9 +58,17 @@ def get_engine(database_url: str = None):
             "Set it to your PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/dbname)"
         )
 
-    # Handle Render's postgres:// URL format (needs postgresql://)
+    # Handle different PostgreSQL URL formats
     if url.startswith("postgres://"):
+        # Render's default format - convert to postgresql://
         url = url.replace("postgres://", "postgresql://", 1)
+
+    # Remove any existing driver specification (like +asyncpg, +psycopg2, etc.)
+    if url.startswith("postgresql+"):
+        # Extract the base URL without the driver (e.g., postgresql+asyncpg:// -> postgresql://)
+        driver_end = url.find("://")
+        if driver_end > 0:
+            url = "postgresql://" + url[driver_end + 3:]
 
     # Verify it's a PostgreSQL URL
     if not url.startswith("postgresql://"):
@@ -69,10 +77,9 @@ def get_engine(database_url: str = None):
             "Expected format: postgresql://user:pass@host:5432/dbname"
         )
 
-    # Force psycopg2 driver (synchronous) instead of asyncpg to avoid MissingGreenlet errors
+    # Force psycopg2 driver (synchronous) to avoid MissingGreenlet errors
     # This ensures compatibility with synchronous FastAPI startup events
-    if "postgresql://" in url and "+psycopg2" not in url:
-        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
     engine = create_engine(
         url,
