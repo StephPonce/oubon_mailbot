@@ -1,8 +1,15 @@
 """Database models for email tracking and follow-ups."""
 from datetime import datetime
-from sqlalchemy import Column, String, Boolean, DateTime, Text, create_engine
+from sqlalchemy import Column, String, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
+# Use centralized database engine (handles PostgreSQL with psycopg2)
+import os
+import sys
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ospra_os.database.connection import get_engine
 
 Base = declarative_base()
 
@@ -35,10 +42,8 @@ class EmailFollowup(Base):
 
 def init_followup_db(database_url: str):
     """Initialize the follow-up tracking database."""
-    # Convert async URL to sync for table creation
-    sync_url = database_url.replace("+aiosqlite", "")
-
-    engine = create_engine(sync_url, echo=False)
+    # Use centralized engine (handles PostgreSQL URL rewriting)
+    engine = get_engine(database_url)
     Base.metadata.create_all(engine)
     print("✅ Follow-up tracking database initialized")
 
@@ -47,7 +52,7 @@ def init_followup_db(database_url: str):
 
 def get_followup_session(database_url: str):
     """Get a database session for follow-up tracking."""
-    sync_url = database_url.replace("+aiosqlite", "")
-    engine = create_engine(sync_url, echo=False)
+    # Use centralized engine (handles PostgreSQL URL rewriting)
+    engine = get_engine(database_url)
     Session = sessionmaker(bind=engine)
     return Session()

@@ -3,9 +3,14 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import json
+import os
+import sys
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ospra_os.database.connection import get_engine
 
 Base = declarative_base()
 
@@ -72,8 +77,8 @@ class Analytics:
     """Analytics tracking and reporting."""
 
     def __init__(self, database_url: str):
-        sync_url = database_url.replace("+aiosqlite", "")
-        self.engine = create_engine(sync_url, echo=False)
+        # Use centralized engine (handles PostgreSQL URL rewriting)
+        self.engine = get_engine(database_url)
         Base.metadata.create_all(self.engine)
         Session = sessionmaker(bind=self.engine)
         self.session = Session()
@@ -210,8 +215,8 @@ class Analytics:
 
 def init_analytics_db(database_url: str):
     """Initialize analytics database."""
-    sync_url = database_url.replace("+aiosqlite", "")
-    engine = create_engine(sync_url, echo=False)
+    # Use centralized engine (handles PostgreSQL URL rewriting)
+    engine = get_engine(database_url)
     Base.metadata.create_all(engine)
     print("✅ Analytics database initialized")
 
