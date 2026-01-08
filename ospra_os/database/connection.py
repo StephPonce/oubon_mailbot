@@ -23,14 +23,9 @@ from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
-# Get database URL from environment (PostgreSQL required)
+# Get database URL from environment (PostgreSQL required for production)
+# Note: This is read at import time but validated at runtime in get_engine()
 DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise ValueError(
-        "DATABASE_URL environment variable is required for PostgreSQL connection. "
-        "Set it to your PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/dbname)"
-    )
 
 
 def get_pool_args() -> dict:
@@ -55,6 +50,13 @@ def get_engine(database_url: str = None):
     Cached to ensure single engine instance across the application.
     """
     url = database_url or DATABASE_URL
+
+    # Validate DATABASE_URL is set (only checked at runtime, not import time)
+    if not url:
+        raise ValueError(
+            "DATABASE_URL environment variable is required for PostgreSQL connection. "
+            "Set it to your PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/dbname)"
+        )
 
     # Handle Render's postgres:// URL format (needs postgresql://)
     if url.startswith("postgres://"):
