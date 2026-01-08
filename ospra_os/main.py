@@ -874,8 +874,8 @@ async def startup_event():
     # Initialize Ad Schedule database
     try:
         from ospra_os.models.ad_schedule import Base
-        from sqlalchemy import create_engine
-        engine = create_engine(settings.database_url)
+        from ospra_os.database.connection import get_engine
+        engine = get_engine(settings.database_url)
         Base.metadata.create_all(engine)
         print("[SUCCESS] Ad Schedule database initialized")
     except Exception as e:
@@ -884,8 +884,8 @@ async def startup_event():
     # Initialize Report database
     try:
         from ospra_os.models.report import init_report_tables
-        from sqlalchemy import create_engine
-        engine = create_engine(settings.database_url)
+        from ospra_os.database.connection import get_engine
+        engine = get_engine(settings.database_url)
         init_report_tables(engine)
         print("[SUCCESS] Report database initialized")
     except Exception as e:
