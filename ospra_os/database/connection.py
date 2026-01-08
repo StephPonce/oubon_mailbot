@@ -69,6 +69,11 @@ def get_engine(database_url: str = None):
             "Expected format: postgresql://user:pass@host:5432/dbname"
         )
 
+    # Force psycopg2 driver (synchronous) instead of asyncpg to avoid MissingGreenlet errors
+    # This ensures compatibility with synchronous FastAPI startup events
+    if "postgresql://" in url and "+psycopg2" not in url:
+        url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
     engine = create_engine(
         url,
         **get_pool_args(),
