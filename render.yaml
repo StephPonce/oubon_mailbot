@@ -5,13 +5,13 @@ databases:
   - name: ospra-db
     databaseName: ospra_intelligence
     user: ospra
-    plan: starter  # $7/mo - 1GB storage, 256MB RAM
+    plan: starter
 
 services:
   - type: web
     name: ospra-intelligence-api
     runtime: python
-    plan: starter  # $7/mo - always on, no sleep
+    plan: starter
     region: oregon
     buildCommand: |
       pip install --upgrade pip
