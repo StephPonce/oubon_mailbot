@@ -5,7 +5,7 @@ databases:
   - name: ospra-db
     databaseName: ospra_intelligence
     user: ospra
-    plan: free  # Free PostgreSQL tier
+    plan: starter  # $7/mo - 1GB storage, 256MB RAM
 
 services:
   - type: web
@@ -20,9 +20,36 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
+      # System
       - key: PYTHON_VERSION
         value: "3.11"
+
+      # Database
       - key: DATABASE_URL
         fromDatabase:
           name: ospra-db
           property: connectionString
+
+      # AI API Keys (set these in Render Dashboard > Environment)
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+
+      # AliExpress Credentials (set in Render Dashboard > Environment)
+      - key: ALIEXPRESS_APP_KEY
+        sync: false
+      - key: ALIEXPRESS_APP_SECRET
+        sync: false
+      - key: ALIEXPRESS_ACCESS_TOKEN
+        sync: false
+
+      # Other API Keys (set in Render Dashboard > Environment)
+      - key: CJ_ACCESS_TOKEN
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false
