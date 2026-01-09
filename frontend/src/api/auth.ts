@@ -109,7 +109,7 @@ function parseErrorMessage(data: any, fallback: string = 'An error occurred'): s
 
 export const authApi = {
   // Register new user
-  register: async (credentials: { name: string; email: string; password: string }): Promise<AuthResponse> => {
+  register: async (credentials: { name: string; email: string; password: string; tier?: string }): Promise<AuthResponse> => {
     try {
       const response = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',

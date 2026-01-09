@@ -1,13 +1,20 @@
 // 
 // REGISTER PAGE
-// Create new account
+// Create new account with tier selection
 // 
 
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, Zap, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Eye, EyeOff, CheckCircle2, Check } from 'lucide-react';
 import { authApi } from '../api/auth';
 import { useAuth } from '../contexts/AuthContext';
+
+const TIERS = [
+  { id: 'nest', name: 'Nest', price: 'Free', description: '10 products/week • 1 store' },
+  { id: 'flight', name: 'Flight', price: '$29/mo', description: '50 products/week • 3 stores' },
+  { id: 'soar', name: 'Soar', price: '$79/mo', description: '200 products/week • 10 stores' },
+  { id: 'stratosphere', name: 'Stratosphere', price: '$199/mo', description: 'Unlimited • Priority support' },
+];
 
 export default function Register() {
   const navigate = useNavigate();
@@ -18,6 +25,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedTier, setSelectedTier] = useState('nest');
   const [showPassword, setShowPassword] = useState(false);
   
   // UI state
@@ -56,11 +64,12 @@ export default function Register() {
 
     setIsSubmitting(true);
 
-    // Register
+    // Register with selected tier
     const result = await authApi.register({
       name: name.trim(),
       email: email.trim(),
       password,
+      tier: selectedTier,  // Send selected tier
     });
 
     if (result.success) {
@@ -120,7 +129,7 @@ export default function Register() {
               Create Account
             </h1>
             <p className="text-secondary text-sm">
-              Start with the free Nest tier. Upgrade anytime.
+              Start your e-commerce automation journey
             </p>
           </div>
 
@@ -241,15 +250,35 @@ export default function Register() {
               )}
             </div>
 
-            {/* Free Tier Info */}
-            <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-lg"></span>
-                <span className="text-sm font-medium text-primary">Starting with Nest (Free)</span>
+            {/* Tier Selection */}
+            <div>
+              <label className="label">Select Plan</label>
+              <div className="grid grid-cols-2 gap-2">
+                {TIERS.map((tier) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => setSelectedTier(tier.id)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      selectedTier === tier.id
+                        ? 'border-purple-500 bg-purple-500/20'
+                        : 'border-white/10 bg-white/5 hover:border-white/20'
+                    }`}
+                    disabled={isSubmitting}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-medium text-sm text-primary">{tier.name}</span>
+                      <span className="text-xs text-secondary">{tier.price}</span>
+                    </div>
+                    <p className="text-xs text-tertiary">{tier.description}</p>
+                    {selectedTier === tier.id && (
+                      <div className="absolute top-2 right-2">
+                        <Check className="w-4 h-4 text-purple-400" />
+                      </div>
+                    )}
+                  </button>
+                ))}
               </div>
-              <p className="text-xs text-tertiary">
-                10 products/week • 1 store • Basic features
-              </p>
             </div>
 
             {/* Submit Button */}
@@ -291,7 +320,7 @@ export default function Register() {
         {/* Version Badge */}
         <div className="text-center mt-6">
           <span className="text-xs text-muted">
-            Ospra Intelligence V5 • Product Discovery Engine
+            Powered by Oi • Ospra Intelligence
           </span>
         </div>
       </div>

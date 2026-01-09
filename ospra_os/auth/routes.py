@@ -51,6 +51,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, description="Minimum 8 characters")
     name: Optional[str] = None
+    tier: Optional[str] = "nest"  # Default to nest if not specified
 
 
 class LoginRequest(BaseModel):
@@ -115,18 +116,23 @@ def _get_user_by_id(user_id: int) -> Optional[dict]:
     return None
 
 
-def _create_user(email: str, password_hash: str, name: Optional[str] = None) -> dict:
+def _create_user(email: str, password_hash: str, name: Optional[str] = None, tier: str = "nest") -> dict:
     """Create user in mock DB."""
     global _user_id_counter
     
     from datetime import datetime
+    
+    # Validate tier
+    valid_tiers = ["nest", "flight", "soar", "stratosphere"]
+    if tier.lower() not in valid_tiers:
+        tier = "nest"
     
     user = {
         "id": _user_id_counter,
         "email": email.lower(),
         "password_hash": password_hash,
         "name": name,
-        "tier": "nest",  # Default tier
+        "tier": tier.lower(),
         "created_at": datetime.utcnow().isoformat(),
     }
     
@@ -164,11 +170,12 @@ async def register(request: RegisterRequest):
     # Hash password
     password_hash = hash_password(request.password)
     
-    # Create user
+    # Create user with selected tier
     user = _create_user(
         email=request.email,
         password_hash=password_hash,
-        name=request.name
+        name=request.name,
+        tier=request.tier or "nest"
     )
     
     logger.info(f"New user registered: {user['email']} (ID: {user['id']})")
