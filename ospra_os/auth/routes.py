@@ -140,7 +140,7 @@ def _create_user(email: str, password_hash: str, name: Optional[str] = None) -> 
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register")
 async def register(request: RegisterRequest):
     """
     Register a new user account.
@@ -180,15 +180,24 @@ async def register(request: RegisterRequest):
         tier=user["tier"]
     )
     
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        token_type=tokens.token_type,
-        expires_in=tokens.expires_in
-    )
+    # Return tokens WITH user object (frontend expects this)
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "token_type": tokens.token_type,
+        "expires_in": tokens.expires_in,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user.get("name"),
+            "tier": user["tier"],
+            "subscription_tier": user["tier"],  # Backend field name
+            "created_at": user.get("created_at")
+        }
+    }
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 async def login(request: LoginRequest):
     """
     Login with email and password.
@@ -222,12 +231,21 @@ async def login(request: LoginRequest):
         tier=user["tier"]
     )
     
-    return TokenResponse(
-        access_token=tokens.access_token,
-        refresh_token=tokens.refresh_token,
-        token_type=tokens.token_type,
-        expires_in=tokens.expires_in
-    )
+    # Return tokens WITH user object (frontend expects this)
+    return {
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "token_type": tokens.token_type,
+        "expires_in": tokens.expires_in,
+        "user": {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user.get("name"),
+            "tier": user["tier"],
+            "subscription_tier": user["tier"],
+            "created_at": user.get("created_at")
+        }
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse)

@@ -22,6 +22,10 @@ from typing import Optional, List, Dict
 from pydantic import BaseModel
 import logging
 
+# Security - Rate Limiting (PHASE 1 SECURITY)
+from slowapi.errors import RateLimitExceeded
+from ospra_os.security.rate_limiting import limiter, rate_limit_exceeded_handler
+
 # Multi-Tenant Isolation (GROK RECOMMENDATION #14)
 from ospra_os.tenancy.middleware import TenantMiddleware, StoreContextMiddleware
 
@@ -690,10 +694,18 @@ except Exception as e:
 
 app = FastAPI(title="OspraOS API", version="0.1")
 
-# 
+#
+# SECURITY: Rate Limiting Setup (PHASE 1)
+# Must be configured BEFORE middleware to protect all endpoints
+#
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+print("[SUCCESS] ✓ Rate limiting enabled (Phase 1 Security)")
+
+#
 # OBSERVABILITY SETUP (TECHNICAL FIX T5)
 # Must be configured BEFORE other middleware for proper request tracking
-# 
+#
 if _HAS_OBSERVABILITY:
     settings = get_settings()
 
@@ -720,11 +732,17 @@ if _HAS_OBSERVABILITY:
 
     logger.info("[SUCCESS] Observability initialized successfully")
 
-# CORS middleware - Allow frontend to connect
+#
+# CORS middleware - Restricted to ospra.io + localhost for dev (PHASE 1 SECURITY)
+#
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Vite dev servers (all possible ports)
+        # Production domains - Primary ospra.io domain only
+        "https://ospra.io",
+        "https://www.ospra.io",
+        "https://app.ospra.io",
+        # Development - Localhost only (all ports for flexibility)
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:5175",
@@ -733,21 +751,14 @@ app.add_middleware(
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
         "http://127.0.0.1:5176",
-        # Alternative dev servers
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        # Cloudflare tunnel
-        "https://blond-ross-ticket-duplicate.trycloudflare.com",
-        # Production domains
-        "https://ospra.io",
-        "https://www.ospra.io",
-        "https://app.oubonshop.com",
-        "https://policies.oubonshop.com",
     ],
     allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],  # Allow all headers (Authorization, Content-Type, etc.)
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Store-ID"],
 )
+print("[SUCCESS] ✓ CORS restricted to ospra.io + localhost (Phase 1 Security)")
 
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
@@ -758,6 +769,12 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(StoreContextMiddleware)  # Extract store_id from query params/headers
 app.add_middleware(TenantMiddleware)  # Extract tenant_id from JWT token
 print("[SUCCESS] Tenant isolation middleware registered (GROK #14)")
+
+# Tier Enforcement (PHASE 1 SECURITY)
+# Enforces subscription limits and feature access based on user tier
+from ospra_os.middleware.tier_enforcement import TierEnforcementMiddleware
+app.add_middleware(TierEnforcementMiddleware)
+print("[SUCCESS] ✓ Tier enforcement middleware active (Phase 1 Security)")
 
 # Mount static files for product images (only if directory exists)
 import os
