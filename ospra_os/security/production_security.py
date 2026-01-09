@@ -25,8 +25,7 @@ from collections import defaultdict
 from functools import wraps
 
 from fastapi import Request, HTTPException, Response
-from fastapi.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 logger = logging.getLogger(__name__)
 
