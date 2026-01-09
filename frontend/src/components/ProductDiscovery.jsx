@@ -1,15 +1,14 @@
 /**
  * OSPRA INTELLIGENCE - PRODUCT DISCOVERY
  * ======================================
- * v4 - Jan 2025: Real data, NO mock scores, Professional captions
+ * v5 - Jan 2025: FIXED - Real scores, image toggle, auto-analysis
  * 
- * Features:
- * - Single Oi Score (0-100) on cards - NO source badges
- * - Click card → Detail panel with REAL score breakdown (no random numbers)
- * - PROFESSIONAL captions (NO emojis, NO hashtags)
- * - AI Analysis button for deep product insights
- * - Proper supplier link extraction
- * - Data sources citation
+ * FIXES:
+ * - Image toggle between AI generated and original supplier images
+ * - Auto-generate AI analysis when opening product detail
+ * - Fixed regenerate image button
+ * - Shows "estimated" label when scores are defaults
+ * - All images array shown in detail view
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -17,7 +16,8 @@ import {
   Search, Package, TrendingUp, Rocket, BarChart3, Tag, Loader2, Filter, 
   ArrowRight, Eye, AlertTriangle, RefreshCw, X, ExternalLink, Brain,
   ShoppingCart, Copy, Check, ChevronRight, Star, Link2, Database, 
-  Zap, Target, Sparkles, DollarSign, Camera, Wand2, MessageSquare
+  Zap, Target, Sparkles, DollarSign, Camera, Wand2, MessageSquare,
+  ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
@@ -40,7 +40,23 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     profit = suggestedPrice - costPrice;
   }
   
-  const imageUrl = p.image_url || p.imageUrl || p.image || p.main_image || p.productMainImageUrl || null;
+  // Collect ALL image URLs
+  const allImages = [];
+  const mainImage = p.image_url || p.imageUrl || p.image || p.main_image || p.productMainImageUrl || null;
+  if (mainImage) allImages.push(mainImage);
+  
+  // Add additional images if available
+  if (p.images && Array.isArray(p.images)) {
+    p.images.forEach(img => {
+      const url = typeof img === 'string' ? img : img.url;
+      if (url && !allImages.includes(url)) allImages.push(url);
+    });
+  }
+  if (p.additional_images && Array.isArray(p.additional_images)) {
+    p.additional_images.forEach(img => {
+      if (img && !allImages.includes(img)) allImages.push(img);
+    });
+  }
   
   // Oi Score - the single unified score
   const oiScore = Math.round(p.oi_score || p.score || p.final_score || p.productScore || p.opportunity_score || 50);
@@ -50,20 +66,26 @@ function normalizeProduct(p, fallbackNiche = 'general') {
                       p.promotionLink || p.promotion_link || p.supplier_url || p.supplierUrl ||
                       p.product_url || p.productUrl || p.url || null;
   
-  // Compute score breakdown from actual data OR derive consistently from oi_score (NO RANDOMNESS)
-  const demandScore = p.demand_score || p.demandScore || Math.round(oiScore * 0.95);
-  const trendScore = p.trend_score || p.trendScore || Math.round(oiScore * 0.9);
-  const competitionScore = p.competition_score || p.competitionScore || Math.round(60 + (oiScore - 50) * 0.4);
-  const viralScore = p.viral_score || p.viralScore || Math.round(oiScore * 0.85);
+  // Check if scores are REAL or DEFAULT (50 = default)
+  const hasRealDemandScore = p.demand_score !== undefined && p.demand_score !== 50;
+  const hasRealTrendScore = p.trend_score !== undefined && p.trend_score !== 50;
+  const hasRealSentimentScore = p.sentiment_score !== undefined && p.sentiment_score !== 50;
+  const hasAnyRealScores = hasRealDemandScore || hasRealTrendScore || hasRealSentimentScore || (p.sales_count > 0);
+  
+  // Score breakdown - mark as estimated if default
+  const demandScore = p.demand_score || p.demandScore || 50;
+  const trendScore = p.trend_score || p.trendScore || 50;
+  const sentimentScore = p.sentiment_score || p.sentimentScore || 50;
+  const viralScore = p.viral_score || p.viralScore || 50;
   const profitMargin = (suggestedPrice > 0 && costPrice > 0) ? Math.round((profit / suggestedPrice) * 100) : 50;
   const profitScore = p.profit_score || p.profitScore || Math.min(100, profitMargin * 1.5);
-  const sentimentScore = p.sentiment_score || p.sentimentScore || Math.round(50 + (oiScore - 50) * 0.3);
   
   return {
     id: p.id || p.product_id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     title: p.title || p.name || p.product_title || 'Untitled Product',
-    image_url: imageUrl,
+    image_url: mainImage,
     ai_image_url: p.ai_image_url || null,
+    all_images: allImages,
     cost_price: parseFloat(costPrice.toFixed(2)),
     suggested_price: parseFloat(suggestedPrice.toFixed(2)),
     profit: parseFloat(profit.toFixed(2)),
@@ -75,13 +97,13 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     supplier_url: supplierUrl,
     sales_count: p.sales_count || p.salesCount || p.productSalesCount || 0,
     rating: p.rating || null,
-    // STABLE score breakdown (computed once, never changes)
+    // Score breakdown with estimation flag
     demand_score: demandScore,
     trend_score: trendScore,
-    competition_score: competitionScore,
+    sentiment_score: sentimentScore,
     viral_score: viralScore,
     profit_score: profitScore,
-    sentiment_score: sentimentScore,
+    scores_estimated: !hasAnyRealScores,
     commission_rate: p.commission_rate || p.commissionRate || null,
     recommendation: p.recommendation || null,
     reasons: p.reasons || [],
@@ -144,6 +166,14 @@ function ProductCard({ product, onClick }) {
           </div>
         )}
         
+        {/* Estimated Score Warning */}
+        {product.scores_estimated && (
+          <div className="absolute top-3 left-3 px-2 py-1 rounded-full bg-yellow-500/80 text-black text-xs font-medium flex items-center gap-1" title="Scores are estimated - limited data available">
+            <Info className="w-3 h-3" />
+            Est.
+          </div>
+        )}
+        
         {/* Oi Score Badge - THE ONLY BADGE ON CARDS */}
         <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl bg-gradient-to-br ${getScoreBgColor(product.oi_score)} border backdrop-blur-sm`}>
           <div className="flex items-center gap-1.5">
@@ -200,7 +230,128 @@ function ProductCard({ product, onClick }) {
 }
 
 // ============================================================================
-// COMPONENT: Product Detail Panel - STABLE scores, PROFESSIONAL captions
+// COMPONENT: Image Gallery with Toggle
+// ============================================================================
+function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
+  const [showAiImage, setShowAiImage] = useState(!!aiImageUrl);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [imageError, setImageError] = useState(false);
+  
+  const allOriginalImages = product.all_images || [product.image_url].filter(Boolean);
+  const currentOriginalImage = allOriginalImages[selectedImageIndex] || product.image_url;
+  const displayImage = showAiImage && aiImageUrl ? aiImageUrl : currentOriginalImage;
+  
+  return (
+    <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-white font-semibold flex items-center gap-2">
+          <Camera className="w-4 h-4 text-purple-400" />
+          Product Images
+        </h4>
+        
+        <div className="flex items-center gap-2">
+          {/* Image Type Toggle */}
+          <button
+            onClick={() => setShowAiImage(!showAiImage)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all ${
+              showAiImage 
+                ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300'
+                : 'bg-white/5 border border-white/10 text-white/60'
+            }`}
+          >
+            {showAiImage ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+            {showAiImage ? 'AI Image' : 'Original'}
+          </button>
+          
+          {/* Regenerate Button */}
+          <button
+            onClick={onRegenerateAi}
+            disabled={regenerating}
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
+          >
+            {regenerating ? (
+              <>
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Wand2 className="w-3 h-3" />
+                {aiImageUrl ? 'Regenerate' : 'Generate AI'}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+      
+      {/* Main Image Display */}
+      <div className="relative aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/10 to-cyan-500/10 mb-3">
+        {displayImage && !imageError ? (
+          <img 
+            src={displayImage} 
+            alt={product.title} 
+            className="w-full h-full object-contain"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center flex-col gap-3">
+            <Package className="w-16 h-16 text-white/20" />
+            <p className="text-white/40 text-sm">No image available</p>
+          </div>
+        )}
+        
+        {/* Image Type Badge */}
+        <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
+          showAiImage && aiImageUrl 
+            ? 'bg-purple-500/80 text-white' 
+            : 'bg-white/20 text-white/80'
+        }`}>
+          {showAiImage && aiImageUrl ? (
+            <><Sparkles className="w-3 h-3" /> AI Generated</>
+          ) : (
+            <><ImageIcon className="w-3 h-3" /> Original</>
+          )}
+        </div>
+      </div>
+      
+      {/* Thumbnail Strip (Original Images Only) */}
+      {allOriginalImages.length > 1 && !showAiImage && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {allOriginalImages.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setSelectedImageIndex(idx)}
+              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                selectedImageIndex === idx 
+                  ? 'border-purple-500' 
+                  : 'border-transparent opacity-60 hover:opacity-100'
+              }`}
+            >
+              <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+      
+      {/* AI Image Notice */}
+      {!aiImageUrl && (
+        <p className="text-white/40 text-xs mt-2 text-center">
+          Click "Generate AI" to create a professional lifestyle photo (~$0.04)
+        </p>
+      )}
+      
+      {/* Comparison Note */}
+      {aiImageUrl && (
+        <p className="text-white/40 text-xs mt-2 text-center">
+          Toggle between AI and Original to compare. AI images are styled for Oubon Shop branding.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// COMPONENT: Product Detail Panel - Auto-analysis, image toggle
 // ============================================================================
 function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct }) {
   const [caption, setCaption] = useState('');
@@ -211,26 +362,40 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct }) {
   const [generatingImage, setGeneratingImage] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [currentAiImageUrl, setCurrentAiImageUrl] = useState(product.ai_image_url);
+  const [analysisError, setAnalysisError] = useState(null);
   
-  const displayImage = currentAiImageUrl || product.image_url;
+  // AUTO-GENERATE ANALYSIS ON MOUNT
+  useEffect(() => {
+    generateSEOCaption();
+    generateAIAnalysis(); // Auto-generate analysis when panel opens
+  }, [product.id]);
   
-  // Generate AI image for this specific product
+  // Generate AI image for this specific product - FIXED
   const generateAiImage = async () => {
     setGeneratingImage(true);
     try {
-      const response = await api.generateProductImage(
-        product.title,
-        product.niche,
-        product.image_url
-      );
-      if (response.success && response.ai_image_url) {
-        setCurrentAiImageUrl(response.ai_image_url);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/images/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_title: product.title,
+          niche: product.niche || 'smart_home',
+          original_image_url: product.image_url,
+          tags: product.tags || [product.niche],
+          force_regenerate: true  // Force new generation
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.ai_image_url) {
+        setCurrentAiImageUrl(data.ai_image_url);
         // Update parent if callback provided
         if (onUpdateProduct) {
-          onUpdateProduct({ ...product, ai_image_url: response.ai_image_url });
+          onUpdateProduct({ ...product, ai_image_url: data.ai_image_url });
         }
       } else {
-        alert('Failed to generate AI image. Check if OPENAI_API_KEY is configured.');
+        alert('Failed to generate AI image. ' + (data.error || 'Check if OPENAI_API_KEY is configured.'));
       }
     } catch (error) {
       console.error('AI image generation failed:', error);
@@ -240,19 +405,14 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct }) {
     }
   };
 
-  // STABLE score breakdown - computed once, memoized, NO random values
+  // STABLE score breakdown - computed once, memoized
   const scoreBreakdown = useMemo(() => [
-    { key: 'demand_score', label: 'Demand', icon: TrendingUp, color: 'text-green-400', value: product.demand_score },
-    { key: 'trend_score', label: 'Trend', icon: Zap, color: 'text-cyan-400', value: product.trend_score },
-    { key: 'sentiment_score', label: 'Sentiment', icon: MessageSquare, color: 'text-blue-400', value: product.sentiment_score },
-    { key: 'viral_score', label: 'Viral Potential', icon: Sparkles, color: 'text-pink-400', value: product.viral_score },
-    { key: 'profit_score', label: 'Profit Margin', icon: DollarSign, color: 'text-purple-400', value: product.profit_score },
+    { key: 'demand_score', label: 'Demand', icon: TrendingUp, color: 'text-green-400', value: product.demand_score, estimated: product.demand_score === 50 },
+    { key: 'trend_score', label: 'Trend', icon: Zap, color: 'text-cyan-400', value: product.trend_score, estimated: product.trend_score === 50 },
+    { key: 'sentiment_score', label: 'Sentiment', icon: MessageSquare, color: 'text-blue-400', value: product.sentiment_score, estimated: product.sentiment_score === 50 },
+    { key: 'viral_score', label: 'Viral Potential', icon: Sparkles, color: 'text-pink-400', value: product.viral_score, estimated: product.viral_score === 50 },
+    { key: 'profit_score', label: 'Profit Margin', icon: DollarSign, color: 'text-purple-400', value: product.profit_score, estimated: false },
   ], [product.demand_score, product.trend_score, product.sentiment_score, product.viral_score, product.profit_score]);
-
-  // Generate initial caption on mount
-  useEffect(() => {
-    generateSEOCaption();
-  }, [product.id]); // Only regenerate when product changes
 
   const generateSEOCaption = async () => {
     setGeneratingCaption(true);
@@ -279,52 +439,20 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct }) {
       .trim();
     const nicheFormatted = p.niche.replace(/_/g, ' ');
     
-    const templates = {
-      smart_home: `${cleanTitle}
+    return `${cleanTitle}
 
-Transform your living space with intelligent technology designed for modern life. This device integrates seamlessly into your daily routine, offering both convenience and reliability.
+Transform your ${nicheFormatted} experience with this thoughtfully designed essential. Quality construction ensures reliability while the modern design complements any space.
 
-Built with premium materials and backed by our satisfaction guarantee. Experience the future of home automation.
-
-Free shipping on orders over $50. 30-day returns.`,
-
-      kitchen: `${cleanTitle}
-
-Elevate your culinary experience with this thoughtfully designed kitchen essential. Quality construction ensures years of reliable performance while making meal preparation more efficient.
-
-Join thousands of satisfied home chefs who have upgraded their kitchen.`,
-
-      fitness: `${cleanTitle}
-
-Designed for results. This fitness equipment helps you maximize every workout, whether at home or on the go. Durable construction meets ergonomic design.
-
-Start your journey to better health today.`,
-
-      beauty: `${cleanTitle}
-
-Professional-grade beauty tools for salon-quality results at home. Gentle yet effective, designed to enhance your natural beauty.
-
-Premium quality you can feel. Results you can see.`,
-
-      tech: `${cleanTitle}
-
-Cutting-edge technology meets intuitive design. Experience seamless performance that keeps up with your lifestyle.
-
-Modern solutions for modern life.`,
-    };
-
-    return templates[p.niche] || `${cleanTitle}
-
-Thoughtfully designed for everyday use. This ${nicheFormatted} essential combines quality craftsmanship with practical functionality.
-
-Premium quality at an exceptional value. Satisfaction guaranteed.`;
+Free shipping on orders over $50. 30-day hassle-free returns.`;
   };
 
   const generateAIAnalysis = async () => {
     setGeneratingAnalysis(true);
+    setAnalysisError(null);
+    
     try {
-      // Call the dedicated analysis endpoint
-      const response = await fetch('/api/oi/analyze-product', {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiBase}/api/oi/analyze-product`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -343,9 +471,14 @@ Premium quality at an exceptional value. Satisfaction guaranteed.`;
             rating: product.rating,
             source: product.source,
             data_sources: product.data_sources,
+            scores_estimated: product.scores_estimated,
           }
         })
       });
+      
+      if (!response.ok) {
+        throw new Error(`API returned ${response.status}`);
+      }
       
       const data = await response.json();
       
@@ -358,41 +491,36 @@ SUMMARY
 ${a.summary || 'No summary available.'}
 
 STRENGTHS
-${(a.strengths || []).map(s => `• ${s}`).join('\n')}
+${(a.strengths || []).map(s => `• ${s}`).join('\n') || '• No specific strengths identified'}
 
 RISKS
-${(a.risks || []).map(r => `• ${r}`).join('\n')}
+${(a.risks || []).map(r => `• ${r}`).join('\n') || '• Standard market risks apply'}
 
 TARGET AUDIENCE
 ${a.target_audience || 'General consumers'}
 
 MARKETING ANGLES
-${(a.marketing_angles || []).map(m => `• ${m}`).join('\n')}
+${(a.marketing_angles || []).map(m => `• ${m}`).join('\n') || '• Focus on product benefits'}
 
 AD SPEND RECOMMENDATION
 ${a.ad_spend_recommendation || 'Start with $5-10/day'}
 
 PRICE STRATEGY
-${a.price_strategy || 'Current pricing is competitive'}
+${a.price_strategy || 'Current pricing appears competitive'}
 
 COMPETITION
 ${a.competition_assessment || 'Moderate competition in this niche'}
 
 SEASONAL FACTORS
-${a.seasonal_factors || 'Year-round demand'}`;
+${a.seasonal_factors || 'Year-round demand expected'}`;
         
         setAiAnalysis(formatted);
       } else {
-        // Fallback to chat endpoint
-        const chatResponse = await api.chat(
-          `Analyze this product for e-commerce potential:\n\nProduct: ${product.title}\nPrice: $${product.suggested_price} (Cost: $${product.cost_price})\nNiche: ${product.niche}\nScore: ${product.oi_score}/100\n\nProvide: verdict (BUY/SKIP/WATCH), strengths, risks, target audience, marketing angles, ad spend recommendation.`,
-          { dashboard_context: { current_page: 'products' } }
-        );
-        setAiAnalysis(chatResponse.message || chatResponse.response || 'Analysis not available');
+        setAnalysisError('Analysis returned empty. API may not have Claude key configured.');
       }
     } catch (error) {
       console.error('AI Analysis failed:', error);
-      setAiAnalysis('Analysis failed. Please check your API connection and try again.');
+      setAnalysisError(`Analysis failed: ${error.message}. Check API connection.`);
     } finally {
       setGeneratingAnalysis(false);
     }
@@ -447,58 +575,27 @@ ${a.seasonal_factors || 'Year-round demand'}`;
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Product Image */}
-          <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-white font-semibold flex items-center gap-2">
-                <Camera className="w-4 h-4 text-purple-400" />
-                Product Image
-              </h4>
-              <div className="flex items-center gap-2">
-                {currentAiImageUrl && (
-                  <span className="px-2 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> AI Enhanced
-                  </span>
-                )}
-                <button
-                  onClick={generateAiImage}
-                  disabled={generatingImage}
-                  className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
-                >
-                  {generatingImage ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="w-3 h-3" />
-                      {currentAiImageUrl ? 'Regenerate' : 'Generate AI Image'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-            <div className="relative aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/10 to-cyan-500/10">
-              {displayImage ? (
-                <img src={displayImage} alt={product.title} className="w-full h-full object-contain" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center flex-col gap-3">
-                  <Package className="w-16 h-16 text-white/20" />
-                  <p className="text-white/40 text-sm">No image available</p>
-                </div>
-              )}
-            </div>
-            {!currentAiImageUrl && (
-              <p className="text-white/40 text-xs mt-2 text-center">
-                Click "Generate AI Image" to create a professional lifestyle photo (~$0.04)
-              </p>
-            )}
-          </div>
+          {/* Image Gallery with Toggle */}
+          <ImageGallery 
+            product={product}
+            aiImageUrl={currentAiImageUrl}
+            onRegenerateAi={generateAiImage}
+            regenerating={generatingImage}
+          />
 
           {/* Product Title + Oi Score */}
           <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
             <h3 className="text-lg font-bold text-white mb-4">{product.title}</h3>
+            
+            {/* Estimated Scores Warning */}
+            {product.scores_estimated && (
+              <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
+                <Info className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                <p className="text-yellow-200 text-sm">
+                  Scores are estimated due to limited data. Connect more APIs for accurate metrics.
+                </p>
+              </div>
+            )}
             
             {/* MAIN Oi Score */}
             <div className={`p-4 rounded-xl bg-gradient-to-br ${getScoreBgColor(product.oi_score)} border`}>
@@ -508,7 +605,7 @@ ${a.seasonal_factors || 'Year-round demand'}`;
                     <Brain className="w-6 h-6 text-purple-400" />
                   </div>
                   <div>
-                    <p className="text-white/60 text-sm">Oi Score</p>
+                    <p className="text-white/60 text-sm">Oi Score {product.scores_estimated && <span className="text-yellow-400">(Est.)</span>}</p>
                     <p className={`text-3xl font-bold ${getScoreColor(product.oi_score)}`}>{product.oi_score}</p>
                   </div>
                 </div>
@@ -522,7 +619,7 @@ ${a.seasonal_factors || 'Year-round demand'}`;
             </div>
           </div>
 
-          {/* Oi Score Breakdown - STABLE VALUES */}
+          {/* Oi Score Breakdown */}
           <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
             <h4 className="text-white font-semibold mb-4 flex items-center gap-2">
               <Brain className="w-4 h-4 text-purple-400" />
@@ -540,7 +637,10 @@ ${a.seasonal_factors || 'Year-round demand'}`;
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-white/70 text-sm">{item.label}</span>
+                        <span className="text-white/70 text-sm">
+                          {item.label}
+                          {item.estimated && <span className="text-yellow-400 text-xs ml-1">(Est.)</span>}
+                        </span>
                         <span className={`font-bold ${item.color}`}>{value}</span>
                       </div>
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
@@ -580,12 +680,13 @@ ${a.seasonal_factors || 'Year-round demand'}`;
             </div>
           </div>
 
-          {/* AI Analysis Section */}
+          {/* AI Analysis Section - AUTO-LOADED */}
           <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-white font-semibold flex items-center gap-2">
                 <Brain className="w-4 h-4 text-purple-400" />
                 AI Analysis
+                {generatingAnalysis && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
               </h4>
               <button
                 onClick={generateAIAnalysis}
@@ -599,20 +700,29 @@ ${a.seasonal_factors || 'Year-round demand'}`;
                   </>
                 ) : (
                   <>
-                    <Wand2 className="w-4 h-4" />
-                    Generate Analysis
+                    <RefreshCw className="w-4 h-4" />
+                    Refresh
                   </>
                 )}
               </button>
             </div>
             
-            {aiAnalysis ? (
+            {generatingAnalysis && !aiAnalysis ? (
+              <div className="p-8 text-center">
+                <Loader2 className="w-8 h-8 animate-spin text-purple-400 mx-auto mb-3" />
+                <p className="text-white/60 text-sm">Generating AI analysis...</p>
+              </div>
+            ) : aiAnalysis ? (
               <div className="p-4 rounded-xl bg-white/5 border border-white/10">
                 <pre className="text-white/80 text-sm whitespace-pre-wrap font-sans">{aiAnalysis}</pre>
               </div>
+            ) : analysisError ? (
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                <p className="text-red-300 text-sm">{analysisError}</p>
+              </div>
             ) : (
               <p className="text-white/40 text-sm text-center py-8">
-                Click "Generate Analysis" for AI-powered insights on this product
+                Analysis loading...
               </p>
             )}
           </div>
@@ -664,6 +774,11 @@ ${a.seasonal_factors || 'Year-round demand'}`;
               {activeSourceKeys.length === 0 && product.source && (
                 <div className="px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30 text-blue-300 text-xs flex items-center gap-2">
                   {product.source.replace(/_/g, ' ')} <Check className="w-3 h-3" />
+                </div>
+              )}
+              {activeSourceKeys.length === 0 && !product.source && (
+                <div className="px-3 py-2 rounded-lg border bg-yellow-500/10 border-yellow-500/30 text-yellow-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-3 h-3" /> Limited data sources
                 </div>
               )}
             </div>
@@ -818,6 +933,7 @@ export function ProductDiscovery() {
   const [rateLimit, setRateLimit] = useState(null);
   const [selectedProduct, setSelectedProductState] = useState(null);
   const [hasMockData, setHasMockData] = useState(false);
+  const [hasEstimatedScores, setHasEstimatedScores] = useState(false);
   const [enableAiImages, setEnableAiImages] = useState(false);
   const [generatingImages, setGeneratingImages] = useState(false);
 
@@ -849,6 +965,7 @@ export function ProductDiscovery() {
   const loadProducts = async () => {
     setLoading(true);
     setHasMockData(false);
+    setHasEstimatedScores(false);
     
     try {
       let niche = filter === 'trending' ? 'smart_home' : filter === 'recommended' ? 'tech' : 'fitness';
@@ -856,7 +973,9 @@ export function ProductDiscovery() {
       const loadedProducts = Array.isArray(response) ? response : (response.products || []);
       const normalizedProducts = loadedProducts.map(p => normalizeProduct(p, niche));
       const mockCount = normalizedProducts.filter(p => p.is_mock).length;
+      const estimatedCount = normalizedProducts.filter(p => p.scores_estimated).length;
       setHasMockData(mockCount > 0);
+      setHasEstimatedScores(estimatedCount > normalizedProducts.length / 2);
       setProducts(normalizedProducts);
       trackInteraction('filter', { filter, result_count: normalizedProducts.length, mock_count: mockCount, ai_images: enableAiImages });
     } catch (error) {
@@ -974,6 +1093,17 @@ export function ProductDiscovery() {
           <div>
             <p className="text-yellow-200 font-medium">Showing Demo Products</p>
             <p className="text-yellow-200/70 text-sm">APIs returned empty data. Check backend logs for connection issues.</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Estimated Scores Warning */}
+      {hasEstimatedScores && !hasMockData && (
+        <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center gap-3">
+          <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
+          <div>
+            <p className="text-blue-200 font-medium">Limited Data Available</p>
+            <p className="text-blue-200/70 text-sm">Scores marked "Est." are estimates. Connect Google Trends, TikTok, and sentiment APIs for accurate metrics.</p>
           </div>
         </div>
       )}

@@ -3,19 +3,25 @@ AI Image Generator for Oubon Shop
 ==================================
 Generates brand-consistent product images using AI (OpenAI DALL-E 3)
 
+IMPORTANT LIMITATION:
+DALL-E 3 is TEXT-TO-IMAGE only. It cannot see or refine the original product image.
+The AI generates a NEW image based on the product title and category, styled for
+the Oubon Shop aesthetic. This is NOT image-to-image transformation.
+
+To get true image refinement, you would need:
+- Stability AI img2img
+- Midjourney (no API)
+- GPT-4 Vision + DALL-E combo (expensive)
+
+Current approach: Generate professional lifestyle shots based on product description
+that match the Oubon Shop brand aesthetic.
+
 Features:
 - E-commerce ready product shots
 - Oubon Shop brand aesthetic (clean, modern, minimalist)
 - Automatic prompt engineering based on product data
 - Caching to avoid regenerating same products
 - Fallback handling
-
-Brand Guidelines (Oubon Shop):
-- Smart Home / Home Goods focus
-- Clean, minimalist backgrounds
-- Soft, warm lighting
-- Modern lifestyle aesthetic
-- Professional product photography style
 """
 
 import os
@@ -36,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 STABILITY_API_KEY = os.getenv('STABILITY_API_KEY')  # Fallback option
-GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')  # Gemini Imagen 3
+GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')
 
 # Cache directory for generated images
 CACHE_DIR = Path(__file__).parent.parent.parent / "generated_images"
@@ -44,37 +50,25 @@ CACHE_DIR.mkdir(exist_ok=True)
 
 # Oubon Shop Brand Aesthetic
 BRAND_STYLE = """
-Professional e-commerce product photography style.
-Clean white or soft gradient background.
-Soft, warm studio lighting with subtle shadows.
+Professional e-commerce product photography.
+Clean white or soft neutral background.
+Soft diffused studio lighting.
 Modern minimalist aesthetic.
 High-end lifestyle product shot.
-Sharp focus on product, shallow depth of field.
-No text, logos, or watermarks.
-8K quality, photorealistic.
+Product clearly visible and centered.
+Sharp focus, high detail.
+No text, logos, watermarks, or people.
+Photorealistic, 8K quality.
 """
-
-# Category-specific styling
-CATEGORY_STYLES = {
-    "smart_home": "Smart home device in modern living room setting, ambient LED glow, tech-forward aesthetic",
-    "lighting": "Illuminated product showing light effect, warm ambiance, cozy home setting",
-    "kitchen": "Clean kitchen counter setting, marble or wood surface, cooking lifestyle",
-    "fitness": "Active lifestyle setting, gym or home workout space, energetic mood",
-    "beauty": "Spa-like setting, soft pink or neutral tones, luxurious feel",
-    "tech": "Sleek tech setup, desk or workspace, modern gadget aesthetic",
-    "home_decor": "Styled home interior, lifestyle shot, interior design magazine quality",
-    "organization": "Organized space, satisfying arrangement, before/after transformation feel",
-    "outdoor": "Natural outdoor setting, adventure lifestyle, durable quality feel",
-    "pet": "Happy pet interaction, warm family home setting, playful energy",
-}
 
 
 class AIImageGenerator:
     """
     AI-powered product image generator for Oubon Shop brand consistency.
     
-    Uses OpenAI DALL-E 3 for high-quality e-commerce product shots.
-    Falls back to original supplier images if generation fails.
+    NOTE: This generates NEW images based on product descriptions.
+    It does NOT refine or modify the original supplier images.
+    The original image URL is stored for comparison but not used in generation.
     """
     
     def __init__(self):
@@ -121,33 +115,64 @@ class AIImageGenerator:
     
     def _build_prompt(self, product_title: str, niche: str, tags: list = None) -> str:
         """
-        Build optimized prompt for product image generation.
+        Build SPECIFIC prompt for product image generation.
         
-        Combines:
-        - Product-specific details
-        - Category aesthetic
-        - Oubon Shop brand style
+        Key: Extract the actual product type from the title for accurate generation.
         """
-        # Clean product title
-        clean_title = product_title.replace('-', ' ').replace('_', ' ')
-        # Remove excessive marketing words
-        for word in ['Premium', 'Quality', 'Best', 'Hot Sale', 'New', '2024', '2025']:
-            clean_title = clean_title.replace(word, '').strip()
+        # Clean and extract product type from title
+        clean_title = product_title.lower()
         
-        # Get category-specific style
-        category_style = CATEGORY_STYLES.get(niche, "Modern lifestyle product setting")
+        # Remove marketing fluff
+        fluff_words = ['hot sale', 'new', '2024', '2025', 'premium', 'quality', 
+                       'best', 'cheap', 'fashion', 'free shipping', 'wholesale',
+                       'dropshipping', 'for home', 'for kitchen', 'portable']
+        for word in fluff_words:
+            clean_title = clean_title.replace(word, '')
         
-        # Build the prompt
-        prompt = f"""
-Product: {clean_title}
-
-Style: {category_style}
-
-{BRAND_STYLE}
-
-Create a professional e-commerce product photograph suitable for a premium smart home and lifestyle store called "Oubon Shop". The image should make customers want to buy this product immediately.
-""".strip()
+        # Clean up
+        clean_title = ' '.join(clean_title.split())
         
+        # Extract key product words (nouns)
+        # This is a simplified extraction - ideally would use NLP
+        product_words = [w for w in clean_title.split() if len(w) > 3]
+        product_type = ' '.join(product_words[:5]) if product_words else clean_title
+        
+        # Category-specific settings
+        settings = {
+            "smart_home": "on a minimalist wooden desk in a modern home office",
+            "lighting": "glowing softly in a cozy living room at dusk",
+            "kitchen": "on a clean marble countertop in a bright modern kitchen",
+            "fitness": "on a yoga mat in a bright home gym space",
+            "beauty": "on a vanity with soft pink ambient lighting",
+            "tech": "on a sleek desk setup with subtle RGB ambient lighting",
+            "home_decor": "styled in a modern minimalist interior",
+            "organization": "showing organized items in a clean space",
+            "outdoor": "in natural outdoor setting with soft daylight",
+            "pet": "with soft natural lighting in a cozy home",
+        }
+        
+        setting = settings.get(niche, "in a clean modern home environment")
+        
+        # Build very specific prompt
+        prompt = f"""Create a professional e-commerce product photograph of:
+
+PRODUCT: {product_type}
+
+SETTING: {setting}
+
+STYLE REQUIREMENTS:
+- Clean, uncluttered background
+- Soft diffused lighting from the left
+- Product is the clear focal point
+- Modern, premium aesthetic matching a high-end home store
+- No people, hands, or faces
+- No text, watermarks, or logos
+- Photorealistic style, not illustration
+- Sharp product detail, slight depth of field blur on background
+
+This is for Oubon Shop, a premium smart home and lifestyle e-commerce store.
+The image should make customers want to purchase this product immediately."""
+
         return prompt
     
     async def generate_product_image(
@@ -161,20 +186,25 @@ Create a professional e-commerce product photograph suitable for a premium smart
         """
         Generate AI product image for Oubon Shop aesthetic.
         
+        NOTE: The original_image_url is stored but NOT used in generation.
+        DALL-E 3 cannot do image-to-image. The AI creates a new image
+        based purely on the text description.
+        
         Args:
-            product_title: Product name/title
+            product_title: Product name/title (CRITICAL for good generation)
             niche: Product category (smart_home, kitchen, etc.)
-            original_image_url: Original supplier image (kept as fallback)
+            original_image_url: Original supplier image (for reference/fallback)
             tags: Product tags for context
             force_regenerate: Skip cache and regenerate
             
         Returns:
             {
                 "ai_image_url": str,  # Generated image URL
-                "original_image_url": str,  # Original supplier image
+                "original_image_url": str,  # Original supplier image (unchanged)
                 "prompt_used": str,  # Prompt for transparency
                 "generated_at": str,
-                "source": "openai" | "stability" | "cache" | "fallback"
+                "source": "openai" | "stability" | "cache" | "fallback",
+                "note": str  # Important info about the generation
             }
         """
         cache_key = self._get_cache_key(product_title, niche)
@@ -186,7 +216,8 @@ Create a professional e-commerce product photograph suitable for a premium smart
             return {
                 **cached,
                 "source": "cache",
-                "original_image_url": original_image_url
+                "original_image_url": original_image_url,
+                "note": "AI-generated lifestyle image (cached). Toggle to see original."
             }
         
         # Generate prompt
@@ -198,6 +229,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
             if result:
                 result["original_image_url"] = original_image_url
                 result["prompt_used"] = prompt
+                result["note"] = "AI-generated lifestyle image. May differ from actual product. Toggle to see original."
                 # Cache the result
                 self.cache[cache_key] = {
                     "ai_image_url": result["ai_image_url"],
@@ -212,6 +244,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
             if result:
                 result["original_image_url"] = original_image_url
                 result["prompt_used"] = prompt
+                result["note"] = "AI-generated lifestyle image. May differ from actual product."
                 self.cache[cache_key] = {
                     "ai_image_url": result["ai_image_url"],
                     "generated_at": result["generated_at"],
@@ -225,6 +258,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
             if result:
                 result["original_image_url"] = original_image_url
                 result["prompt_used"] = prompt
+                result["note"] = "AI-generated lifestyle image."
                 self.cache[cache_key] = {
                     "ai_image_url": result["ai_image_url"],
                     "generated_at": result["generated_at"],
@@ -239,7 +273,8 @@ Create a professional e-commerce product photograph suitable for a premium smart
             "original_image_url": original_image_url,
             "prompt_used": prompt,
             "generated_at": datetime.now().isoformat(),
-            "source": "fallback"
+            "source": "fallback",
+            "note": "AI generation unavailable. Showing original supplier image."
         }
     
     async def _generate_openai(self, prompt: str, product_title: str) -> Optional[Dict]:
@@ -257,7 +292,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
                         "prompt": prompt,
                         "n": 1,
                         "size": "1024x1024",
-                        "quality": "standard",  # Use "hd" for higher quality (costs more)
+                        "quality": "standard",
                         "style": "natural"  # More photorealistic
                     },
                     timeout=aiohttp.ClientTimeout(total=60)
@@ -284,26 +319,14 @@ Create a professional e-commerce product photograph suitable for a premium smart
             return None
     
     async def _generate_gemini(self, prompt: str, product_title: str) -> Optional[Dict]:
-        """
-        Generate image using Google Gemini Imagen 3.
-        
-        Imagen 3 is Google's latest image generation model, available via Gemini API.
-        Requires GOOGLE_AI_API_KEY or GEMINI_API_KEY environment variable.
-        """
+        """Generate image using Google Gemini Imagen 3"""
         try:
             async with aiohttp.ClientSession() as session:
-                # Using Imagen 3 via Gemini API
                 async with session.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={GOOGLE_AI_API_KEY}",
-                    headers={
-                        "Content-Type": "application/json"
-                    },
+                    headers={"Content-Type": "application/json"},
                     json={
-                        "instances": [
-                            {
-                                "prompt": prompt
-                            }
-                        ],
+                        "instances": [{"prompt": prompt}],
                         "parameters": {
                             "sampleCount": 1,
                             "aspectRatio": "1:1",
@@ -315,14 +338,11 @@ Create a professional e-commerce product photograph suitable for a premium smart
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        # Gemini returns base64 image data
                         predictions = data.get("predictions", [])
                         if predictions and predictions[0].get("bytesBase64Encoded"):
-                            # Save base64 to file and return path/URL
                             import base64
                             image_data = base64.b64decode(predictions[0]["bytesBase64Encoded"])
                             
-                            # Generate unique filename
                             safe_title = product_title[:30].replace(' ', '_').replace('/', '_')
                             filename = f"gemini_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
                             filepath = CACHE_DIR / filename
@@ -330,30 +350,27 @@ Create a professional e-commerce product photograph suitable for a premium smart
                             with open(filepath, 'wb') as f:
                                 f.write(image_data)
                             
-                            # Return local file path (frontend can use as image src)
-                            logger.info(f"[SUCCESS] Generated AI image (Gemini Imagen 3): {product_title[:40]}...")
+                            logger.info(f"[SUCCESS] Generated AI image (Gemini): {product_title[:40]}...")
                             return {
                                 "ai_image_url": f"/generated_images/{filename}",
                                 "generated_at": datetime.now().isoformat(),
                                 "source": "gemini"
                             }
-                        else:
-                            logger.warning(f"Gemini returned no predictions: {data}")
-                            return None
+                        return None
                     else:
                         error = await response.text()
                         logger.error(f"Gemini error ({response.status}): {error[:200]}")
                         return None
                         
         except asyncio.TimeoutError:
-            logger.error("Gemini timeout - image generation took too long")
+            logger.error("Gemini timeout")
             return None
         except Exception as e:
             logger.error(f"Gemini generation failed: {e}")
             return None
     
     async def _generate_stability(self, prompt: str, product_title: str) -> Optional[Dict]:
-        """Generate image using Stability AI (Stable Diffusion)"""
+        """Generate image using Stability AI"""
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -366,7 +383,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
                     json={
                         "text_prompts": [
                             {"text": prompt, "weight": 1},
-                            {"text": "blurry, low quality, distorted, watermark, text", "weight": -1}
+                            {"text": "blurry, low quality, distorted, watermark, text, cartoon, illustration", "weight": -1}
                         ],
                         "cfg_scale": 7,
                         "height": 1024,
@@ -378,12 +395,19 @@ Create a professional e-commerce product photograph suitable for a premium smart
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        # Stability returns base64, would need to save/host
-                        # For now, return a placeholder indicating success
+                        import base64
+                        image_data = base64.b64decode(data['artifacts'][0]['base64'])
+                        
+                        safe_title = product_title[:30].replace(' ', '_').replace('/', '_')
+                        filename = f"stability_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                        filepath = CACHE_DIR / filename
+                        
+                        with open(filepath, 'wb') as f:
+                            f.write(image_data)
+                        
                         logger.info(f"[SUCCESS] Generated AI image (Stability): {product_title[:40]}...")
-                        # In production, save base64 to storage and return URL
                         return {
-                            "ai_image_url": f"data:image/png;base64,{data['artifacts'][0]['base64'][:100]}...",
+                            "ai_image_url": f"/generated_images/{filename}",
                             "generated_at": datetime.now().isoformat(),
                             "source": "stability"
                         }
@@ -401,16 +425,7 @@ Create a professional e-commerce product photograph suitable for a premium smart
         products: list,
         max_concurrent: int = 3
     ) -> list:
-        """
-        Generate AI images for multiple products.
-        
-        Args:
-            products: List of product dicts with title, niche, image_url
-            max_concurrent: Max concurrent API calls (rate limiting)
-            
-        Returns:
-            Products with ai_image_url added
-        """
+        """Generate AI images for multiple products"""
         semaphore = asyncio.Semaphore(max_concurrent)
         
         async def process_product(product: dict) -> dict:
@@ -429,7 +444,6 @@ Create a professional e-commerce product photograph suitable for a premium smart
         tasks = [process_product(p) for p in products]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        # Filter out failures
         successful = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
@@ -443,9 +457,9 @@ Create a professional e-commerce product photograph suitable for a premium smart
         return successful
 
 
-# ============================================================================
+# =============================================================================
 # SINGLETON & CONVENIENCE FUNCTIONS
-# ============================================================================
+# =============================================================================
 
 _image_generator = None
 
@@ -462,11 +476,7 @@ async def generate_product_image(
     niche: str = "smart_home",
     original_image_url: str = None
 ) -> str:
-    """
-    Quick function to generate a single product image.
-    
-    Returns the AI image URL (or original as fallback).
-    """
+    """Quick function to generate a single product image"""
     generator = get_image_generator()
     result = await generator.generate_product_image(
         product_title=product_title,
@@ -477,10 +487,6 @@ async def generate_product_image(
 
 
 async def enhance_products_with_ai_images(products: list) -> list:
-    """
-    Enhance a list of products with AI-generated images.
-    
-    Use this after product discovery to add brand-consistent images.
-    """
+    """Enhance a list of products with AI-generated images"""
     generator = get_image_generator()
     return await generator.generate_batch(products)
