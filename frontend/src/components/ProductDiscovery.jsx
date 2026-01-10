@@ -41,23 +41,33 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     profit = suggestedPrice - costPrice;
   }
   
-  // Collect ALL image URLs
-  const allImages = [];
+  // Collect ALL image URLs from backend
   const mainImage = p.image_url || p.imageUrl || p.image || p.main_image || p.productMainImageUrl || null;
-  if (mainImage) allImages.push(mainImage);
   
-  // Add additional images if available
-  if (p.images && Array.isArray(p.images)) {
-    p.images.forEach(img => {
-      const url = typeof img === 'string' ? img : img.url;
-      if (url && !allImages.includes(url)) allImages.push(url);
-    });
+  // PRIORITY: Use backend's all_images if available (from product_discovery.py V3)
+  let allImages = [];
+  if (p.all_images && Array.isArray(p.all_images) && p.all_images.length > 0) {
+    allImages = [...p.all_images];
+  } else {
+    // Fallback: build from various fields
+    if (mainImage) allImages.push(mainImage);
+    
+    // Add additional images if available
+    if (p.images && Array.isArray(p.images)) {
+      p.images.forEach(img => {
+        const url = typeof img === 'string' ? img : img.url;
+        if (url && !allImages.includes(url)) allImages.push(url);
+      });
+    }
+    if (p.additional_images && Array.isArray(p.additional_images)) {
+      p.additional_images.forEach(img => {
+        if (img && !allImages.includes(img)) allImages.push(img);
+      });
+    }
   }
-  if (p.additional_images && Array.isArray(p.additional_images)) {
-    p.additional_images.forEach(img => {
-      if (img && !allImages.includes(img)) allImages.push(img);
-    });
-  }
+  
+  // Image count from backend or calculated
+  const imageCount = p.image_count || allImages.length;
   
   // Oi Score - the single unified score
   const oiScore = Math.round(p.oi_score || p.score || p.final_score || p.productScore || p.opportunity_score || 50);
@@ -87,6 +97,7 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     image_url: mainImage,
     ai_image_url: p.ai_image_url || null,
     all_images: allImages,
+    image_count: imageCount,
     cost_price: parseFloat(costPrice.toFixed(2)),
     suggested_price: parseFloat(suggestedPrice.toFixed(2)),
     profit: parseFloat(profit.toFixed(2)),
@@ -164,6 +175,14 @@ function ProductCard({ product, onClick }) {
           <div className="absolute bottom-3 right-3 px-2 py-1 rounded-full bg-purple-500/80 text-white text-xs font-medium flex items-center gap-1">
             <Sparkles className="w-3 h-3" />
             AI
+          </div>
+        )}
+        
+        {/* Multi-Image Badge - shows when product has multiple source images */}
+        {!hasAiImage && product.image_count > 1 && (
+          <div className="absolute bottom-3 right-3 px-2 py-1 rounded-full bg-cyan-500/80 text-white text-xs font-medium flex items-center gap-1">
+            <ImageIcon className="w-3 h-3" />
+            {product.image_count}
           </div>
         )}
         
@@ -338,6 +357,11 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
       {!aiImageUrl && (
         <p className="text-white/40 text-xs mt-2 text-center">
           Click "Generate AI" to create a professional lifestyle photo (~$0.04)
+          {allOriginalImages.length > 1 && (
+            <span className="block text-cyan-400 mt-1">
+              💡 {allOriginalImages.length} images available - use "Compare AI Modes" to analyze all angles
+            </span>
+          )}
         </p>
       )}
       

@@ -396,7 +396,7 @@ class ProductDiscoveryEngine:
     # =========================================================================
     
     async def _fetch_aliexpress(self, keyword: str, count: int) -> List[Dict]:
-        """Fetch from AliExpress API"""
+        """Fetch from AliExpress API with ALL product images for AI analysis"""
         products = []
         
         try:
@@ -414,6 +414,35 @@ class ProductDiscoveryEngine:
                 suggested_price = round(cost_price * 2.5, 2)
                 profit = round(suggested_price - cost_price, 2)
                 
+                # === CAPTURE ALL PRODUCT IMAGES FOR AI ===
+                main_image = item.get('product_main_image_url', '')
+                
+                # AliExpress API returns product_small_image_urls in various formats
+                small_images_data = item.get('product_small_image_urls', {})
+                additional_images = []
+                
+                # Handle different formats from AliExpress API
+                if isinstance(small_images_data, dict):
+                    # Format: {"string": ["url1", "url2", ...]}
+                    additional_images = small_images_data.get('string', [])
+                elif isinstance(small_images_data, list):
+                    # Format: ["url1", "url2", ...]
+                    additional_images = small_images_data
+                elif isinstance(small_images_data, str):
+                    # Single URL as string
+                    additional_images = [small_images_data]
+                
+                # Build complete image list (deduplicated)
+                all_images = [main_image] if main_image else []
+                for img in additional_images:
+                    if img and img not in all_images and img.startswith('http'):
+                        all_images.append(img)
+                
+                # Limit to 10 images max (enough for AI analysis)
+                all_images = all_images[:10]
+                
+                logger.debug(f"[IMAGES] {item.get('product_title', '')[:30]}: {len(all_images)} images captured")
+                
                 product = {
                     "product_id": str(item.get('product_id', '')),
                     "title": item.get('product_title', 'AliExpress Product'),
@@ -422,7 +451,11 @@ class ProductDiscoveryEngine:
                     "supplier_cost": cost_price,
                     "suggested_price": suggested_price,
                     "profit": profit,
-                    "image_url": item.get('product_main_image_url', ''),
+                    # Primary image for display
+                    "image_url": main_image,
+                    # ALL images for AI analysis (up to 10)
+                    "all_images": all_images,
+                    "image_count": len(all_images),
                     "affiliate_link": item.get('promotion_link', ''),
                     "supplier_url": item.get('promotion_link', ''),
                     "source": "aliexpress",
@@ -437,7 +470,8 @@ class ProductDiscoveryEngine:
                             "cost": cost_price,
                             "orders": item.get('lastest_volume', 0),
                             "commission": item.get('commission_rate', '0'),
-                            "url": item.get('promotion_link', '')
+                            "url": item.get('promotion_link', ''),
+                            "image_count": len(all_images)
                         }
                     },
                     "discovered_at": datetime.now().isoformat()

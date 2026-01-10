@@ -355,11 +355,18 @@ export function AIImageComparison({
       setProductTitle(product.title || '');
       setProductNiche(product.niche || 'smart_home');
       
-      // Collect all available images from product
-      const urls = [];
-      if (product.image_url) urls.push(product.image_url);
-      if (product.additional_images) urls.push(...product.additional_images.slice(0, 2));
-      if (product.images) urls.push(...product.images.slice(0, 3 - urls.length));
+      // Collect all available images from product - prioritize all_images from backend
+      let urls = [];
+      
+      if (product.all_images && Array.isArray(product.all_images) && product.all_images.length > 0) {
+        // Use pre-collected images from backend (up to 3 for AI)
+        urls = product.all_images.slice(0, 3);
+      } else {
+        // Fallback: build from various fields
+        if (product.image_url) urls.push(product.image_url);
+        if (product.additional_images) urls.push(...product.additional_images.slice(0, 2));
+        if (product.images) urls.push(...product.images.slice(0, 3 - urls.length));
+      }
       
       setImageUrls(urls.length > 0 ? urls : ['']);
     }
