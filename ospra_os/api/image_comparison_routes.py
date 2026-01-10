@@ -153,10 +153,27 @@ async def compare_all_modes(request: CompareRequest):
 @router.get("/compare/status")
 async def get_compare_status():
     """Check which comparison modes are available"""
+    import os
+    
     if not IMAGE_GENERATOR_AVAILABLE:
-        return {"available": False, "modes": []}
+        return {"available": False, "modes": [], "api_keys_status": {}}
     
     generator = get_image_generator()
+    
+    # Get actual key status (for debugging)
+    openai_key = os.getenv('OPENAI_API_KEY')
+    stability_key = os.getenv('STABILITY_API_KEY')
+    
+    api_keys_status = {
+        "openai": {
+            "configured": bool(openai_key),
+            "key_preview": f"{openai_key[:8]}..." if openai_key else None
+        },
+        "stability": {
+            "configured": bool(stability_key),
+            "key_preview": f"{stability_key[:8]}..." if stability_key else None
+        }
+    }
     
     modes = []
     
@@ -190,11 +207,25 @@ async def get_compare_status():
             "speed": "Medium (~5s)",
             "accuracy": "Best match - keeps exact shape"
         })
+    else:
+        # Show disabled mode with instructions
+        modes.append({
+            "id": "img2img",
+            "name": "Image Transform (Stability AI)",
+            "description": "DISABLED: Add STABILITY_API_KEY to Render Dashboard to enable",
+            "requires_original": True,
+            "cost": "$0.03",
+            "speed": "Medium (~5s)",
+            "accuracy": "Best match - keeps exact shape",
+            "disabled": True,
+            "disabled_reason": "STABILITY_API_KEY not configured in environment"
+        })
     
     return {
         "available": True,
         "modes": modes,
         "openai_configured": generator.openai_available,
         "stability_configured": generator.stability_available,
+        "api_keys_status": api_keys_status,
         "note": "Use POST /api/images/compare to test all modes on a product"
     }

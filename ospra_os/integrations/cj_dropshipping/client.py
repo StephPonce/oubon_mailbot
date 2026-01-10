@@ -248,7 +248,7 @@ class CJDropshippingClient:
         return result if isinstance(result, list) else []
     
     def _normalize_product(self, item: dict) -> Optional[Dict]:
-        """Normalize CJ product data to standard format"""
+        """Normalize CJ product data to standard format with ALL images"""
         try:
             # Get price - CJ uses sellPrice for our cost
             cost_price = float(item.get('sellPrice') or item.get('productPrice') or 0)
@@ -260,12 +260,41 @@ class CJDropshippingClient:
             suggested_price = round(cost_price * 2.5, 2)
             profit = round(suggested_price - cost_price, 2)
             
-            # Get main image - handle string or list
-            image_url = item.get('productImage', '')
-            if not image_url and item.get('productImageSet'):
-                image_url = item['productImageSet'][0] if isinstance(item['productImageSet'], list) else item['productImageSet']
-            if isinstance(image_url, list) and image_url:
-                image_url = image_url[0]
+            # === CAPTURE ALL PRODUCT IMAGES ===
+            all_images = []
+            
+            # Primary image
+            main_image = item.get('productImage', '')
+            if main_image and isinstance(main_image, str) and main_image.startswith('http'):
+                all_images.append(main_image)
+            elif isinstance(main_image, list) and main_image:
+                all_images.extend([img for img in main_image if img and img.startswith('http')])
+            
+            # Product image set (contains ALL angles)
+            image_set = item.get('productImageSet', [])
+            if isinstance(image_set, str):
+                image_set = [image_set]
+            if isinstance(image_set, list):
+                for img in image_set:
+                    if img and isinstance(img, str) and img.startswith('http') and img not in all_images:
+                        all_images.append(img)
+            
+            # Also check for variant images
+            variants = item.get('variants', []) or item.get('sku_list', [])
+            if isinstance(variants, list):
+                for variant in variants:
+                    if isinstance(variant, dict):
+                        var_img = variant.get('variantImage') or variant.get('image')
+                        if var_img and isinstance(var_img, str) and var_img.startswith('http') and var_img not in all_images:
+                            all_images.append(var_img)
+            
+            # Limit to 10 images max
+            all_images = all_images[:10]
+            
+            # Use first image as main display image
+            image_url = all_images[0] if all_images else ''
+            
+            logger.debug(f"[IMAGES] CJ {item.get('productNameEn', '')[:30]}: {len(all_images)} images captured")
             
             # Determine warehouse
             warehouse = item.get('sourceFrom', '') or item.get('countryCode', 'CN')
@@ -288,10 +317,12 @@ class CJDropshippingClient:
                 "suggested_price": suggested_price,
                 "profit": profit,
                 
-                # Images
+                # Images - PRIMARY + ALL
                 "image_url": image_url,
                 "main_image": image_url,
                 "productMainImageUrl": image_url,
+                "all_images": all_images,
+                "image_count": len(all_images),
                 
                 # Metadata
                 "source": "cj_dropshipping",
@@ -317,7 +348,8 @@ class CJDropshippingClient:
                         "warehouse": warehouse,
                         "us_warehouse": us_warehouse,
                         "eu_warehouse": eu_warehouse,
-                        "url": f"https://cjdropshipping.com/product/{pid}.html" if pid else None
+                        "url": f"https://cjdropshipping.com/product/{pid}.html" if pid else None,
+                        "image_count": len(all_images)
                     }
                 },
                 

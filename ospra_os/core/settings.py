@@ -172,7 +172,15 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def _fix_postgres_url(cls, v: str) -> str:
-        """Convert postgres:// to postgresql:// for SQLAlchemy compatibility."""
+        """Convert postgres:// to postgresql:// for SQLAlchemy compatibility.
+        Also check DATABASE_URL env var directly (without prefix) for Render compatibility.
+        """
+        # Priority: Check DATABASE_URL without prefix (Render standard)
+        import os
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            v = db_url
+        
         if v and v.startswith("postgres://"):
             return v.replace("postgres://", "postgresql://", 1)
         return v
