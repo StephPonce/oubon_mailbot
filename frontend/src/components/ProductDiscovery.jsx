@@ -354,7 +354,7 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
 // ============================================================================
 // COMPONENT: Product Detail Panel - Auto-analysis, image toggle
 // ============================================================================
-function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct }) {
+function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onCompare }) {
   const [caption, setCaption] = useState('');
   const [deploying, setDeploying] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -583,6 +583,18 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
             onRegenerateAi={generateAiImage}
             regenerating={generatingImage}
           />
+          
+          {/* Compare AI Modes Button */}
+          {product.image_url && onCompare && (
+            <button
+              onClick={() => onCompare(product)}
+              className="w-full py-3 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-medium hover:bg-cyan-500/30 flex items-center justify-center gap-2 transition-all"
+            >
+              <Beaker className="w-5 h-5" />
+              Compare All AI Image Modes
+              <span className="text-cyan-400/60 text-sm">(~$0.14)</span>
+            </button>
+          )}
 
           {/* Product Title + Oi Score */}
           <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
@@ -1236,6 +1248,10 @@ export function ProductDiscovery() {
               p.id === updatedProduct.id ? updatedProduct : p
             ));
             setSelectedProductState(updatedProduct);
+          }}
+          onCompare={(product) => {
+            setComparisonProduct(product);
+            setShowComparison(true);
           }}
         />
       )}
