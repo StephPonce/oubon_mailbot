@@ -39,6 +39,8 @@ services:
         sync: false
       - key: XAI_API_KEY
         sync: false
+      - key: STABILITY_API_KEY
+        sync: false
 
       # AliExpress Credentials (set in Render Dashboard > Environment)
       - key: ALIEXPRESS_APP_KEY

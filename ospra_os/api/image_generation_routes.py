@@ -1,11 +1,11 @@
 """
-AI Image Generation & Comparison API Routes
-============================================
-Endpoints for generating brand-consistent product images.
+AI Image Generation & Comparison API Routes - V3
+=================================================
+Enhanced with multi-image support and better error handling.
 
 Modes:
 - text_only: DALL-E from title (fast, cheap, may not match)
-- vision_enhanced: GPT-4V analyzes → DALL-E generates (good match)
+- vision_enhanced: GPT-4V analyzes multiple images → DALL-E generates (good match)
 - img2img: Stability transforms original (best match)
 
 Routes:
@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Literal
 import logging
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +48,14 @@ class ImageGenerateRequest(BaseModel):
     product_title: str
     niche: str = "smart_home"
     original_image_url: Optional[str] = None
+    additional_image_urls: Optional[List[str]] = None  # NEW: Multiple images
     tags: Optional[List[str]] = []
     force_regenerate: bool = False
     mode: Literal["text_only", "vision_enhanced", "img2img"] = "vision_enhanced"
 
 
 class BatchImageRequest(BaseModel):
-    products: List[dict]  # List of products with title, niche, image_url
+    products: List[dict]  # List of products with title, niche, image_url, additional_images
     max_concurrent: int = 2
     mode: Literal["text_only", "vision_enhanced", "img2img"] = "vision_enhanced"
 
@@ -62,6 +64,7 @@ class CompareRequest(BaseModel):
     product_title: str
     niche: str = "smart_home"
     original_image_url: Optional[str] = None
+    additional_image_urls: Optional[List[str]] = None  # NEW: Multiple images
     modes: Optional[List[str]] = None  # If None, try all available modes
 
 
@@ -91,16 +94,18 @@ async def get_image_service_status():
             "description": "Generates new image from product title only",
             "provider": "DALL-E 3",
             "cost": "~$0.04",
-            "quality": "May not match original product"
+            "quality": "May not match original product",
+            "supports_multi_image": False
         })
         available_modes.append({
             "mode": "vision_enhanced", 
             "name": "Vision Enhanced",
-            "description": "AI analyzes original image, then generates matching styled version",
+            "description": "AI analyzes up to 3 product images, then generates matching styled version",
             "provider": "GPT-4V + DALL-E 3",
             "cost": "~$0.06-0.08",
             "quality": "Good match to original product",
-            "recommended": True
+            "recommended": True,
+            "supports_multi_image": True
         })
     
     if generator.stability_available:
@@ -110,8 +115,13 @@ async def get_image_service_status():
             "description": "Transforms original image while keeping product structure",
             "provider": "Stability AI",
             "cost": "~$0.02-0.04",
-            "quality": "Best match - keeps exact product shape"
+            "quality": "Best match - keeps exact product shape",
+            "supports_multi_image": False
         })
+    
+    # Check API keys explicitly
+    openai_key = os.getenv('OPENAI_API_KEY')
+    stability_key = os.getenv('STABILITY_API_KEY')
     
     return {
         "available": True,
@@ -121,7 +131,16 @@ async def get_image_service_status():
         "modes": available_modes,
         "default_mode": "vision_enhanced" if generator.openai_available else "img2img" if generator.stability_available else "text_only",
         "cached_images": len(generator.cache),
-        "message": "Ready to generate brand-consistent product images"
+        "api_keys": {
+            "openai": f"{openai_key[:20]}..." if openai_key else "NOT SET",
+            "stability": f"{stability_key[:20]}..." if stability_key else "NOT SET"
+        },
+        "features": {
+            "multi_image_support": True,
+            "niche_specific_styling": True,
+            "enhanced_prompts": True
+        },
+        "message": "V3 ready - Multi-image support enabled with niche-specific styling"
     }
 
 
@@ -134,12 +153,15 @@ async def generate_image(request: ImageGenerateRequest):
     """
     Generate AI product image for Oubon Shop aesthetic.
     
+    V3 Features:
+    - Multi-image input: Pass additional_image_urls for better AI context
+    - Niche-specific styling: AI uses category-appropriate aesthetics
+    - Enhanced prompts: More detailed instructions for better results
+    
     Modes:
     - text_only: Fast, cheap, but may not match original product
-    - vision_enhanced: GPT-4V analyzes original → DALL-E generates (recommended)
+    - vision_enhanced: GPT-4V analyzes up to 3 images → DALL-E generates (recommended)
     - img2img: Stability AI transforms original (best structure match)
-    
-    Returns AI-generated image URL and keeps original as reference.
     """
     if not IMAGE_GENERATOR_AVAILABLE:
         raise HTTPException(
@@ -160,7 +182,6 @@ async def generate_image(request: ImageGenerateRequest):
     
     # Check if we need original image for requested mode
     if mode in ["vision_enhanced", "img2img"] and not request.original_image_url:
-        # Can't do vision/img2img without original image
         mode = "text_only"
         logger.warning("No original image provided, falling back to text_only mode")
     
@@ -169,6 +190,7 @@ async def generate_image(request: ImageGenerateRequest):
             product_title=request.product_title,
             niche=request.niche,
             original_image_url=request.original_image_url,
+            additional_image_urls=request.additional_image_urls,  # NEW
             tags=request.tags,
             force_regenerate=request.force_regenerate,
             mode=mode
@@ -178,6 +200,8 @@ async def generate_image(request: ImageGenerateRequest):
             "success": True,
             "requested_mode": request.mode,
             "actual_mode": result.get("mode", mode),
+            "images_provided": 1 + len(request.additional_image_urls or []),
+            "images_analyzed": result.get("images_analyzed", 0),
             **result
         }
         
@@ -198,7 +222,11 @@ async def generate_batch_images(request: BatchImageRequest):
     """
     Generate AI images for multiple products.
     
-    Useful for enhancing discovery results with brand-consistent images.
+    Each product can include:
+    - title: Product name
+    - niche: Category
+    - image_url: Primary image
+    - additional_images: List of additional angles (up to 2)
     """
     if not IMAGE_GENERATOR_AVAILABLE:
         raise HTTPException(
@@ -220,7 +248,8 @@ async def generate_batch_images(request: BatchImageRequest):
             "products": enhanced_products,
             "total": len(enhanced_products),
             "mode": request.mode,
-            "generated": sum(1 for p in enhanced_products if p.get('image_source') not in ['fallback', 'error'])
+            "generated": sum(1 for p in enhanced_products if p.get('image_source') not in ['fallback', 'error']),
+            "multi_image_used": sum(1 for p in enhanced_products if p.get('images_analyzed', 0) > 1)
         }
         
     except Exception as e:
@@ -234,6 +263,7 @@ async def regenerate_product_image(
     product_title: str,
     niche: str = "smart_home",
     original_image_url: str = None,
+    additional_image_urls: List[str] = None,
     mode: str = "vision_enhanced"
 ):
     """Force regenerate image for a specific product"""
@@ -247,6 +277,7 @@ async def regenerate_product_image(
             product_title=product_title,
             niche=niche,
             original_image_url=original_image_url,
+            additional_image_urls=additional_image_urls,
             force_regenerate=True,
             mode=mode
         )
@@ -255,6 +286,7 @@ async def regenerate_product_image(
             "success": True,
             "product_id": product_id,
             "mode": result.get("mode", mode),
+            "images_analyzed": result.get("images_analyzed", 0),
             **result
         }
         
@@ -275,6 +307,10 @@ async def get_compare_status():
     
     generator = get_image_generator()
     
+    # Check API keys
+    openai_key = os.getenv('OPENAI_API_KEY')
+    stability_key = os.getenv('STABILITY_API_KEY')
+    
     modes = []
     
     if generator.openai_available:
@@ -285,16 +321,19 @@ async def get_compare_status():
             "requires_original": False,
             "cost": "$0.04",
             "speed": "Fast (~3s)",
-            "accuracy": "May not match product"
+            "accuracy": "May not match product",
+            "supports_multi_image": False
         })
         modes.append({
             "id": "vision_enhanced", 
             "name": "Vision Enhanced (GPT-4V + DALL-E)",
-            "description": "AI analyzes your image first, then generates matching styled version",
+            "description": "AI analyzes up to 3 images, then generates matching styled version",
             "requires_original": True,
             "cost": "$0.07",
             "speed": "Medium (~8s)",
-            "accuracy": "Good match"
+            "accuracy": "Good match",
+            "supports_multi_image": True,
+            "recommended": True
         })
     
     if generator.stability_available:
@@ -305,7 +344,8 @@ async def get_compare_status():
             "requires_original": True,
             "cost": "$0.03",
             "speed": "Medium (~5s)",
-            "accuracy": "Best match - keeps exact shape"
+            "accuracy": "Best match - keeps exact shape",
+            "supports_multi_image": False
         })
     
     return {
@@ -313,6 +353,10 @@ async def get_compare_status():
         "modes": modes,
         "openai_configured": generator.openai_available,
         "stability_configured": generator.stability_available,
+        "api_keys_status": {
+            "openai": "✅ Set" if openai_key else "❌ Not set",
+            "stability": "✅ Set" if stability_key else "❌ Not set"
+        },
         "note": "Use POST /api/images/compare to test all modes on a product"
     }
 
@@ -322,16 +366,14 @@ async def compare_all_modes(request: CompareRequest):
     """
     Generate images with ALL available modes for side-by-side comparison.
     
-    This helps you decide which mode works best for your products.
+    V3: Now supports multiple input images for vision_enhanced mode.
     
-    Example response:
+    Example request:
     {
-        "original": "https://...",
-        "results": {
-            "text_only": { "url": "...", "cost": "$0.04", "time": "3.2s" },
-            "vision_enhanced": { "url": "...", "cost": "$0.07", "time": "8.1s" },
-            "img2img": { "url": "...", "cost": "$0.03", "time": "5.4s" }
-        }
+        "product_title": "Smart LED Desk Lamp",
+        "niche": "smart_home",
+        "original_image_url": "https://...",
+        "additional_image_urls": ["https://...", "https://..."]  // Optional
     }
     """
     if not IMAGE_GENERATOR_AVAILABLE:
@@ -357,10 +399,16 @@ async def compare_all_modes(request: CompareRequest):
             detail="No image generation modes available. Configure OPENAI_API_KEY or STABILITY_API_KEY."
         )
     
+    # Count total images
+    total_images = 1 if request.original_image_url else 0
+    total_images += len(request.additional_image_urls or [])
+    
     results = {
         "product_title": request.product_title,
         "niche": request.niche,
         "original_image_url": request.original_image_url,
+        "additional_images_provided": len(request.additional_image_urls or []),
+        "total_images": total_images,
         "modes_tested": modes_to_test,
         "comparisons": {}
     }
@@ -377,10 +425,14 @@ async def compare_all_modes(request: CompareRequest):
         start_time = time.time()
         
         try:
+            # Only pass additional images for vision_enhanced
+            additional = request.additional_image_urls if mode == "vision_enhanced" else None
+            
             result = await generator.generate_product_image(
                 product_title=request.product_title,
                 niche=request.niche,
                 original_image_url=request.original_image_url,
+                additional_image_urls=additional,
                 force_regenerate=True,  # Always regenerate for comparison
                 mode=mode
             )
@@ -393,11 +445,14 @@ async def compare_all_modes(request: CompareRequest):
                 "source": result.get("source"),
                 "time_seconds": round(elapsed, 2),
                 "estimated_cost": f"${cost_estimates.get(mode, 0.05):.2f}",
+                "images_analyzed": result.get("images_analyzed", 0),
                 "note": result.get("note", ""),
-                "product_analysis": result.get("product_analysis", None)  # Only for vision mode
+                "product_analysis": result.get("product_analysis", None),
+                "prompt_preview": result.get("prompt_used", "")[:200] + "..." if result.get("prompt_used") else None
             }
             
         except Exception as e:
+            logger.error(f"[COMPARE] {mode} failed: {e}")
             results["comparisons"][mode] = {
                 "success": False,
                 "error": str(e),
@@ -413,9 +468,10 @@ async def compare_all_modes(request: CompareRequest):
             "reason": "Keeps original product structure while enhancing style"
         }
     elif "vision_enhanced" in successful_modes:
+        imgs = results["comparisons"]["vision_enhanced"].get("images_analyzed", 0)
         results["recommendation"] = {
             "best_match": "vision_enhanced",
-            "reason": "AI analyzed your product before generating"
+            "reason": f"AI analyzed {imgs} image(s) for accurate product recreation"
         }
     elif "text_only" in successful_modes:
         results["recommendation"] = {
@@ -432,3 +488,46 @@ async def compare_all_modes(request: CompareRequest):
     results["total_cost"] = f"${total_cost:.2f}"
     
     return results
+
+
+# ============================================================================
+# DEBUG ENDPOINT
+# ============================================================================
+
+@router.get("/debug")
+async def debug_image_generation():
+    """Debug endpoint to check configuration and diagnose issues"""
+    
+    openai_key = os.getenv('OPENAI_API_KEY')
+    stability_key = os.getenv('STABILITY_API_KEY')
+    
+    debug_info = {
+        "module_loaded": IMAGE_GENERATOR_AVAILABLE,
+        "environment": {
+            "OPENAI_API_KEY": f"{openai_key[:20]}..." if openai_key else "NOT SET ❌",
+            "STABILITY_API_KEY": f"{stability_key[:20]}..." if stability_key else "NOT SET ❌",
+            "GOOGLE_AI_API_KEY": "Set" if os.getenv('GOOGLE_AI_API_KEY') else "NOT SET"
+        },
+        "recommendations": []
+    }
+    
+    if not openai_key:
+        debug_info["recommendations"].append(
+            "Set OPENAI_API_KEY for text_only and vision_enhanced modes"
+        )
+    
+    if not stability_key:
+        debug_info["recommendations"].append(
+            "Set STABILITY_API_KEY for img2img mode (best for product accuracy)"
+        )
+    
+    if IMAGE_GENERATOR_AVAILABLE:
+        generator = get_image_generator()
+        debug_info["generator"] = {
+            "openai_available": generator.openai_available,
+            "stability_available": generator.stability_available,
+            "gemini_available": generator.gemini_available,
+            "cache_size": len(generator.cache)
+        }
+    
+    return debug_info
