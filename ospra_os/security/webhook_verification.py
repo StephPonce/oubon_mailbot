@@ -47,6 +47,7 @@ class WebhookConfig:
         "lemonsqueezy": "X-Signature",
         "aliexpress": "X-AE-Signature",
         "cj": "X-CJ-Signature",
+        "tiktok": "X-TikTok-Signature",
     }
     
     # Max age for webhook timestamps (prevent replay attacks)
@@ -59,6 +60,7 @@ class WebhookConfig:
         "lemonsqueezy": "LEMONSQUEEZY_WEBHOOK_SECRET",
         "aliexpress": "ALIEXPRESS_WEBHOOK_SECRET",
         "cj": "CJ_WEBHOOK_SECRET",
+        "tiktok": "TIKTOK_WEBHOOK_SECRET",
     }
 
 
@@ -126,6 +128,8 @@ class WebhookVerifier:
             return self.verify_aliexpress(body, signature)
         elif provider == "cj":
             return self.verify_cj(body, signature)
+        elif provider == "tiktok":
+            return self.verify_tiktok(body, signature)
         else:
             logger.error(f"Unknown provider: {provider}")
             return False
@@ -271,31 +275,60 @@ class WebhookVerifier:
     def verify_cj(self, body: bytes, signature: str) -> bool:
         """
         Verify CJ Dropshipping webhook signature.
-        
+
         CJ uses HMAC-SHA256 with hex encoding.
         """
         secret = self.secrets.get("cj")
         if not secret:
             return False
-        
+
         try:
             computed = hmac.new(
                 secret.encode('utf-8'),
                 body,
                 hashlib.sha256
             ).hexdigest()
-            
+
             is_valid = hmac.compare_digest(computed, signature)
-            
+
             if not is_valid:
                 logger.warning("CJ webhook signature mismatch")
-            
+
             return is_valid
-            
+
         except Exception as e:
             logger.error(f"CJ verification error: {e}")
             return False
-    
+
+    def verify_tiktok(self, body: bytes, signature: str) -> bool:
+        """
+        Verify TikTok webhook signature.
+
+        TikTok uses HMAC-SHA256 with hex encoding.
+        Header: X-TikTok-Signature
+        """
+        secret = self.secrets.get("tiktok")
+        if not secret:
+            return False
+
+        try:
+            computed = hmac.new(
+                secret.encode('utf-8'),
+                body,
+                hashlib.sha256
+            ).hexdigest()
+
+            is_valid = hmac.compare_digest(computed, signature)
+
+            if not is_valid:
+                logger.warning("TikTok webhook signature mismatch")
+
+            return is_valid
+
+        except Exception as e:
+            logger.error(f"TikTok verification error: {e}")
+            return False
+
     def is_configured(self, provider: str) -> bool:
         """Check if a provider's webhook secret is configured."""
         return provider.lower() in self.secrets
@@ -508,7 +541,7 @@ def generate_test_signature(
         ).hexdigest()
         return f"t={timestamp},v1={signature}"
     
-    elif provider in ["lemonsqueezy", "cj"]:
+    elif provider in ["lemonsqueezy", "cj", "tiktok"]:
         return hmac.new(
             secret.encode('utf-8'),
             body,

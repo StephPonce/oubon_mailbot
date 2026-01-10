@@ -17,12 +17,13 @@ import {
   ArrowRight, Eye, AlertTriangle, RefreshCw, X, ExternalLink, Brain,
   ShoppingCart, Copy, Check, ChevronRight, Star, Link2, Database, 
   Zap, Target, Sparkles, DollarSign, Camera, Wand2, MessageSquare,
-  ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft
+  ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft, Beaker
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
 import { api } from '../services/api';
 import { PageLayout } from './Layout';
+import { AIImageComparison } from './AIImageComparison';
 
 // ============================================================================
 // HELPER: Normalize product data from any API source
@@ -936,6 +937,8 @@ export function ProductDiscovery() {
   const [hasEstimatedScores, setHasEstimatedScores] = useState(false);
   const [enableAiImages, setEnableAiImages] = useState(false);
   const [generatingImages, setGeneratingImages] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonProduct, setComparisonProduct] = useState(null);
 
   useEffect(() => {
     loadProducts();
@@ -1161,23 +1164,32 @@ export function ProductDiscovery() {
             </label>
             <span className="text-white/40 text-xs">(~$0.04/image)</span>
           </div>
-          <button
-            onClick={generateAiImages}
-            disabled={generatingImages || products.length === 0}
-            className="px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 text-sm font-medium hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {generatingImages ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                Generate AI Images
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowComparison(true)}
+              className="px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 flex items-center gap-2"
+            >
+              <Beaker className="w-4 h-4" />
+              Compare AI Modes
+            </button>
+            <button
+              onClick={generateAiImages}
+              disabled={generatingImages || products.length === 0}
+              className="px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 text-sm font-medium hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {generatingImages ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate AI Images
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1224,6 +1236,18 @@ export function ProductDiscovery() {
               p.id === updatedProduct.id ? updatedProduct : p
             ));
             setSelectedProductState(updatedProduct);
+          }}
+        />
+      )}
+
+      {/* AI Image Comparison Modal */}
+      {showComparison && (
+        <AIImageComparison
+          product={comparisonProduct || selectedProduct}
+          isModal={true}
+          onClose={() => {
+            setShowComparison(false);
+            setComparisonProduct(null);
           }}
         />
       )}

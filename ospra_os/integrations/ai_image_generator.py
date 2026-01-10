@@ -1,27 +1,14 @@
 """
-AI Image Generator for Oubon Shop
-==================================
-Generates brand-consistent product images using AI (OpenAI DALL-E 3)
+AI Image Generator for Oubon Shop - V2 with Image-to-Image
+==========================================================
 
-IMPORTANT LIMITATION:
-DALL-E 3 is TEXT-TO-IMAGE only. It cannot see or refine the original product image.
-The AI generates a NEW image based on the product title and category, styled for
-the Oubon Shop aesthetic. This is NOT image-to-image transformation.
+THREE MODES:
+1. TEXT-TO-IMAGE (DALL-E 3) - Generates new image from title only
+2. VISION-TO-IMAGE (GPT-4V + DALL-E) - Analyzes original, generates matching styled image
+3. IMAGE-TO-IMAGE (Stability AI) - Transforms original while keeping product structure
 
-To get true image refinement, you would need:
-- Stability AI img2img
-- Midjourney (no API)
-- GPT-4 Vision + DALL-E combo (expensive)
-
-Current approach: Generate professional lifestyle shots based on product description
-that match the Oubon Shop brand aesthetic.
-
-Features:
-- E-commerce ready product shots
-- Oubon Shop brand aesthetic (clean, modern, minimalist)
-- Automatic prompt engineering based on product data
-- Caching to avoid regenerating same products
-- Fallback handling
+The VISION and IMG2IMG modes actually "see" the original product image,
+resulting in much better matches to the actual product.
 """
 
 import os
@@ -30,7 +17,8 @@ import hashlib
 import json
 import aiohttp
 import asyncio
-from typing import Optional, Dict
+import base64
+from typing import Optional, Dict, Literal
 from datetime import datetime
 from pathlib import Path
 
@@ -41,139 +29,87 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-STABILITY_API_KEY = os.getenv('STABILITY_API_KEY')  # Fallback option
+STABILITY_API_KEY = os.getenv('STABILITY_API_KEY')
 GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')
+CLIPDROP_API_KEY = os.getenv('CLIPDROP_API_KEY')  # Optional - for background removal
 
-# Cache directory for generated images
+# Cache directory
 CACHE_DIR = Path(__file__).parent.parent.parent / "generated_images"
 CACHE_DIR.mkdir(exist_ok=True)
 
-# Oubon Shop Brand Aesthetic
-BRAND_STYLE = """
-Professional e-commerce product photography.
-Clean white or soft neutral background.
-Soft diffused studio lighting.
-Modern minimalist aesthetic.
-High-end lifestyle product shot.
-Product clearly visible and centered.
-Sharp focus, high detail.
-No text, logos, watermarks, or people.
-Photorealistic, 8K quality.
-"""
+# Generation modes
+GenerationMode = Literal["text_only", "vision_enhanced", "img2img"]
 
 
 class AIImageGenerator:
     """
-    AI-powered product image generator for Oubon Shop brand consistency.
+    Multi-mode AI image generator.
     
-    NOTE: This generates NEW images based on product descriptions.
-    It does NOT refine or modify the original supplier images.
-    The original image URL is stored for comparison but not used in generation.
+    Modes:
+    - text_only: DALL-E 3 from title (fast, cheap, may not match product)
+    - vision_enhanced: GPT-4V analyzes image → DALL-E generates (good match, more expensive)
+    - img2img: Stability AI transforms image (best match, keeps product structure)
     """
     
     def __init__(self):
         self.openai_available = bool(OPENAI_API_KEY)
         self.stability_available = bool(STABILITY_API_KEY)
         self.gemini_available = bool(GOOGLE_AI_API_KEY)
+        self.clipdrop_available = bool(CLIPDROP_API_KEY)
         self.cache = {}
         self._load_cache()
         
+        # Log available modes
+        modes = []
         if self.openai_available:
-            logger.info("[SUCCESS] AI Image Generator ready (OpenAI DALL-E 3)")
-        elif self.gemini_available:
-            logger.info("[SUCCESS] AI Image Generator ready (Google Gemini Imagen 3)")
-        elif self.stability_available:
-            logger.info("[SUCCESS] AI Image Generator ready (Stability AI)")
-        else:
-            logger.warning("[WARNING] AI Image Generator: No API keys found (OPENAI_API_KEY, GEMINI_API_KEY, or STABILITY_API_KEY)")
+            modes.append("text_only")
+            modes.append("vision_enhanced")  # GPT-4V + DALL-E
+        if self.stability_available:
+            modes.append("img2img")
+        
+        logger.info(f"[SUCCESS] AI Image Generator ready. Available modes: {modes}")
     
     def _load_cache(self):
         """Load image cache from disk"""
-        cache_file = CACHE_DIR / "image_cache.json"
+        cache_file = CACHE_DIR / "image_cache_v2.json"
         if cache_file.exists():
             try:
                 with open(cache_file, 'r') as f:
                     self.cache = json.load(f)
-                logger.info(f" Loaded {len(self.cache)} cached images")
-            except Exception as e:
-                logger.warning(f"Cache load failed: {e}")
+            except:
                 self.cache = {}
     
     def _save_cache(self):
         """Save image cache to disk"""
-        cache_file = CACHE_DIR / "image_cache.json"
+        cache_file = CACHE_DIR / "image_cache_v2.json"
         try:
             with open(cache_file, 'w') as f:
                 json.dump(self.cache, f, indent=2)
         except Exception as e:
             logger.warning(f"Cache save failed: {e}")
     
-    def _get_cache_key(self, product_title: str, niche: str) -> str:
-        """Generate unique cache key for product"""
-        content = f"{product_title}:{niche}".lower().strip()
+    def _get_cache_key(self, product_title: str, niche: str, mode: str) -> str:
+        """Generate unique cache key"""
+        content = f"{product_title}:{niche}:{mode}".lower().strip()
         return hashlib.md5(content.encode()).hexdigest()[:16]
     
-    def _build_prompt(self, product_title: str, niche: str, tags: list = None) -> str:
-        """
-        Build SPECIFIC prompt for product image generation.
-        
-        Key: Extract the actual product type from the title for accurate generation.
-        """
-        # Clean and extract product type from title
-        clean_title = product_title.lower()
-        
-        # Remove marketing fluff
-        fluff_words = ['hot sale', 'new', '2024', '2025', 'premium', 'quality', 
-                       'best', 'cheap', 'fashion', 'free shipping', 'wholesale',
-                       'dropshipping', 'for home', 'for kitchen', 'portable']
-        for word in fluff_words:
-            clean_title = clean_title.replace(word, '')
-        
-        # Clean up
-        clean_title = ' '.join(clean_title.split())
-        
-        # Extract key product words (nouns)
-        # This is a simplified extraction - ideally would use NLP
-        product_words = [w for w in clean_title.split() if len(w) > 3]
-        product_type = ' '.join(product_words[:5]) if product_words else clean_title
-        
-        # Category-specific settings
-        settings = {
-            "smart_home": "on a minimalist wooden desk in a modern home office",
-            "lighting": "glowing softly in a cozy living room at dusk",
-            "kitchen": "on a clean marble countertop in a bright modern kitchen",
-            "fitness": "on a yoga mat in a bright home gym space",
-            "beauty": "on a vanity with soft pink ambient lighting",
-            "tech": "on a sleek desk setup with subtle RGB ambient lighting",
-            "home_decor": "styled in a modern minimalist interior",
-            "organization": "showing organized items in a clean space",
-            "outdoor": "in natural outdoor setting with soft daylight",
-            "pet": "with soft natural lighting in a cozy home",
-        }
-        
-        setting = settings.get(niche, "in a clean modern home environment")
-        
-        # Build very specific prompt
-        prompt = f"""Create a professional e-commerce product photograph of:
-
-PRODUCT: {product_type}
-
-SETTING: {setting}
-
-STYLE REQUIREMENTS:
-- Clean, uncluttered background
-- Soft diffused lighting from the left
-- Product is the clear focal point
-- Modern, premium aesthetic matching a high-end home store
-- No people, hands, or faces
-- No text, watermarks, or logos
-- Photorealistic style, not illustration
-- Sharp product detail, slight depth of field blur on background
-
-This is for Oubon Shop, a premium smart home and lifestyle e-commerce store.
-The image should make customers want to purchase this product immediately."""
-
-        return prompt
+    async def _download_image_as_base64(self, image_url: str) -> Optional[str]:
+        """Download image and convert to base64"""
+        if not image_url:
+            return None
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                    if response.status == 200:
+                        image_bytes = await response.read()
+                        return base64.b64encode(image_bytes).decode('utf-8')
+        except Exception as e:
+            logger.warning(f"Failed to download image: {e}")
+        return None
+    
+    # =========================================================================
+    # MAIN GENERATION METHOD
+    # =========================================================================
     
     async def generate_product_image(
         self,
@@ -181,104 +117,334 @@ The image should make customers want to purchase this product immediately."""
         niche: str = "smart_home",
         original_image_url: str = None,
         tags: list = None,
-        force_regenerate: bool = False
+        force_regenerate: bool = False,
+        mode: GenerationMode = "vision_enhanced"  # Default to vision mode
     ) -> Dict:
         """
-        Generate AI product image for Oubon Shop aesthetic.
-        
-        NOTE: The original_image_url is stored but NOT used in generation.
-        DALL-E 3 cannot do image-to-image. The AI creates a new image
-        based purely on the text description.
+        Generate AI product image with multiple modes.
         
         Args:
-            product_title: Product name/title (CRITICAL for good generation)
-            niche: Product category (smart_home, kitchen, etc.)
-            original_image_url: Original supplier image (for reference/fallback)
-            tags: Product tags for context
-            force_regenerate: Skip cache and regenerate
-            
-        Returns:
-            {
-                "ai_image_url": str,  # Generated image URL
-                "original_image_url": str,  # Original supplier image (unchanged)
-                "prompt_used": str,  # Prompt for transparency
-                "generated_at": str,
-                "source": "openai" | "stability" | "cache" | "fallback",
-                "note": str  # Important info about the generation
-            }
+            product_title: Product name
+            niche: Category (smart_home, kitchen, etc.)
+            original_image_url: Original supplier image URL
+            tags: Product tags
+            force_regenerate: Skip cache
+            mode: Generation mode
+                - "text_only": DALL-E from title (doesn't see original)
+                - "vision_enhanced": GPT-4V analyzes → DALL-E generates (sees original)
+                - "img2img": Stability transforms original (best match)
         """
-        cache_key = self._get_cache_key(product_title, niche)
+        cache_key = self._get_cache_key(product_title, niche, mode)
         
-        # Check cache first
+        # Check cache
         if not force_regenerate and cache_key in self.cache:
             cached = self.cache[cache_key]
-            logger.info(f" Using cached image for: {product_title[:40]}...")
             return {
                 **cached,
                 "source": "cache",
+                "mode": mode,
                 "original_image_url": original_image_url,
-                "note": "AI-generated lifestyle image (cached). Toggle to see original."
             }
         
-        # Generate prompt
-        prompt = self._build_prompt(product_title, niche, tags)
+        # Choose generation method based on mode and availability
+        result = None
         
-        # Try OpenAI DALL-E 3 (Primary)
-        if self.openai_available:
-            result = await self._generate_openai(prompt, product_title)
-            if result:
-                result["original_image_url"] = original_image_url
-                result["prompt_used"] = prompt
-                result["note"] = "AI-generated lifestyle image. May differ from actual product. Toggle to see original."
-                # Cache the result
-                self.cache[cache_key] = {
-                    "ai_image_url": result["ai_image_url"],
-                    "generated_at": result["generated_at"],
-                }
-                self._save_cache()
-                return result
+        if mode == "img2img" and self.stability_available and original_image_url:
+            # Best mode: Transform original image
+            result = await self._generate_img2img_stability(
+                product_title, niche, original_image_url
+            )
         
-        # Try Google Gemini Imagen 3 (Fallback 1)
-        if self.gemini_available:
-            result = await self._generate_gemini(prompt, product_title)
-            if result:
-                result["original_image_url"] = original_image_url
-                result["prompt_used"] = prompt
-                result["note"] = "AI-generated lifestyle image. May differ from actual product."
-                self.cache[cache_key] = {
-                    "ai_image_url": result["ai_image_url"],
-                    "generated_at": result["generated_at"],
-                }
-                self._save_cache()
-                return result
+        elif mode == "vision_enhanced" and self.openai_available and original_image_url:
+            # Vision mode: GPT-4V analyzes → DALL-E generates
+            result = await self._generate_vision_enhanced(
+                product_title, niche, original_image_url
+            )
         
-        # Try Stability AI as fallback (Fallback 2)
-        if self.stability_available:
-            result = await self._generate_stability(prompt, product_title)
-            if result:
-                result["original_image_url"] = original_image_url
-                result["prompt_used"] = prompt
-                result["note"] = "AI-generated lifestyle image."
-                self.cache[cache_key] = {
-                    "ai_image_url": result["ai_image_url"],
-                    "generated_at": result["generated_at"],
-                }
-                self._save_cache()
-                return result
+        elif self.openai_available:
+            # Fallback: Text-only DALL-E
+            result = await self._generate_text_only_dalle(product_title, niche)
         
-        # Fallback to original image
-        logger.warning(f"[WARNING] AI generation failed, using original image for: {product_title[:40]}...")
+        elif self.stability_available:
+            # Fallback: Text-only Stability
+            result = await self._generate_text_only_stability(product_title, niche)
+        
+        # Handle result
+        if result and result.get("ai_image_url"):
+            result["original_image_url"] = original_image_url
+            result["mode"] = mode
+            # Cache
+            self.cache[cache_key] = {
+                "ai_image_url": result["ai_image_url"],
+                "generated_at": result["generated_at"],
+                "mode": mode,
+            }
+            self._save_cache()
+            return result
+        
+        # Final fallback
         return {
-            "ai_image_url": original_image_url,  # Use original as fallback
+            "ai_image_url": original_image_url,
             "original_image_url": original_image_url,
-            "prompt_used": prompt,
             "generated_at": datetime.now().isoformat(),
             "source": "fallback",
-            "note": "AI generation unavailable. Showing original supplier image."
+            "mode": "none",
+            "note": "AI generation unavailable. Showing original."
         }
     
-    async def _generate_openai(self, prompt: str, product_title: str) -> Optional[Dict]:
-        """Generate image using OpenAI DALL-E 3"""
+    # =========================================================================
+    # MODE 1: VISION ENHANCED (GPT-4V → DALL-E 3)
+    # =========================================================================
+    
+    async def _generate_vision_enhanced(
+        self, 
+        product_title: str, 
+        niche: str, 
+        original_image_url: str
+    ) -> Optional[Dict]:
+        """
+        Two-step generation:
+        1. GPT-4 Vision analyzes the original product image
+        2. DALL-E 3 generates a new styled image based on that analysis
+        
+        This ensures the AI actually "sees" the product before generating.
+        """
+        logger.info(f"[VISION] Analyzing original image: {product_title[:40]}...")
+        
+        # Step 1: Analyze original image with GPT-4 Vision
+        try:
+            async with aiohttp.ClientSession() as session:
+                # GPT-4 Vision analysis
+                vision_response = await session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "gpt-4o",  # GPT-4 with vision
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": f"""Analyze this product image for e-commerce photography recreation.
+
+Product Title: {product_title}
+Category: {niche}
+
+Describe the product in EXTREME detail for image generation:
+1. What EXACTLY is the product? (specific type, shape, components)
+2. What color(s) is it?
+3. What material does it appear to be made of?
+4. What is its approximate size/proportions?
+5. Any distinctive features, buttons, lights, textures?
+6. What makes this product unique?
+
+Be VERY specific. I will use your description to generate a professional e-commerce photo.
+Respond with ONLY the product description, no other text."""
+                                    },
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": original_image_url,
+                                            "detail": "high"
+                                        }
+                                    }
+                                ]
+                            }
+                        ],
+                        "max_tokens": 500
+                    },
+                    timeout=aiohttp.ClientTimeout(total=30)
+                )
+                
+                if vision_response.status != 200:
+                    error = await vision_response.text()
+                    logger.error(f"GPT-4V error: {error[:200]}")
+                    return None
+                
+                vision_data = await vision_response.json()
+                product_description = vision_data["choices"][0]["message"]["content"]
+                
+                logger.info(f"[VISION] Got product description, generating image...")
+                
+                # Step 2: Generate with DALL-E using the detailed description
+                dalle_prompt = f"""Create a professional e-commerce product photograph.
+
+PRODUCT DESCRIPTION (from analysis of actual product):
+{product_description}
+
+PHOTOGRAPHY STYLE:
+- Clean white or soft gradient background
+- Professional studio lighting from left side
+- Product centered and clearly visible
+- Modern, premium aesthetic for a high-end home store
+- Sharp focus on product details
+- No people, hands, text, logos, or watermarks
+- Photorealistic, magazine-quality image
+
+This is for Oubon Shop, a premium smart home and lifestyle store."""
+
+                dalle_response = await session.post(
+                    "https://api.openai.com/v1/images/generations",
+                    headers={
+                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "dall-e-3",
+                        "prompt": dalle_prompt,
+                        "n": 1,
+                        "size": "1024x1024",
+                        "quality": "standard",
+                        "style": "natural"
+                    },
+                    timeout=aiohttp.ClientTimeout(total=60)
+                )
+                
+                if dalle_response.status == 200:
+                    dalle_data = await dalle_response.json()
+                    image_url = dalle_data["data"][0]["url"]
+                    
+                    logger.info(f"[SUCCESS] Vision-enhanced image generated: {product_title[:40]}...")
+                    
+                    return {
+                        "ai_image_url": image_url,
+                        "generated_at": datetime.now().isoformat(),
+                        "source": "openai_vision",
+                        "product_analysis": product_description[:200] + "...",
+                        "note": "AI analyzed original product and generated matching styled image."
+                    }
+                else:
+                    error = await dalle_response.text()
+                    logger.error(f"DALL-E error: {error[:200]}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Vision-enhanced generation failed: {e}")
+            return None
+    
+    # =========================================================================
+    # MODE 2: IMAGE-TO-IMAGE (Stability AI)
+    # =========================================================================
+    
+    async def _generate_img2img_stability(
+        self, 
+        product_title: str, 
+        niche: str, 
+        original_image_url: str
+    ) -> Optional[Dict]:
+        """
+        True image-to-image transformation using Stability AI.
+        
+        This keeps the product structure but transforms the style/background.
+        Best option for maintaining product accuracy.
+        """
+        logger.info(f"[IMG2IMG] Transforming original image: {product_title[:40]}...")
+        
+        # Download original image
+        image_base64 = await self._download_image_as_base64(original_image_url)
+        if not image_base64:
+            logger.warning("Could not download original image for img2img")
+            return None
+        
+        # Style prompt for transformation
+        style_prompt = f"""Professional e-commerce product photo.
+Clean white studio background.
+Soft professional lighting.
+Modern minimalist aesthetic.
+Premium quality product shot for {niche.replace('_', ' ')} category.
+Sharp focus, high detail.
+Magazine quality photography."""
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Use Stability AI image-to-image endpoint
+                form = aiohttp.FormData()
+                form.add_field('init_image', 
+                              base64.b64decode(image_base64),
+                              filename='image.png',
+                              content_type='image/png')
+                form.add_field('init_image_mode', 'IMAGE_STRENGTH')
+                form.add_field('image_strength', '0.35')  # 0.35 = keep most of original structure
+                form.add_field('text_prompts[0][text]', style_prompt)
+                form.add_field('text_prompts[0][weight]', '1')
+                form.add_field('text_prompts[1][text]', 'blurry, low quality, distorted, watermark, text, cartoon')
+                form.add_field('text_prompts[1][weight]', '-1')
+                form.add_field('cfg_scale', '7')
+                form.add_field('samples', '1')
+                form.add_field('steps', '30')
+                
+                async with session.post(
+                    "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
+                    headers={
+                        "Authorization": f"Bearer {STABILITY_API_KEY}",
+                        "Accept": "application/json"
+                    },
+                    data=form,
+                    timeout=aiohttp.ClientTimeout(total=90)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Save the generated image
+                        result_base64 = data['artifacts'][0]['base64']
+                        image_bytes = base64.b64decode(result_base64)
+                        
+                        safe_title = product_title[:30].replace(' ', '_').replace('/', '_').replace('\\', '_')
+                        filename = f"img2img_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                        filepath = CACHE_DIR / filename
+                        
+                        with open(filepath, 'wb') as f:
+                            f.write(image_bytes)
+                        
+                        logger.info(f"[SUCCESS] Img2Img transformation complete: {product_title[:40]}...")
+                        
+                        return {
+                            "ai_image_url": f"/generated_images/{filename}",
+                            "generated_at": datetime.now().isoformat(),
+                            "source": "stability_img2img",
+                            "note": "Transformed original product image while keeping structure."
+                        }
+                    else:
+                        error = await response.text()
+                        logger.error(f"Stability img2img error ({response.status}): {error[:200]}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Img2Img generation failed: {e}")
+            return None
+    
+    # =========================================================================
+    # MODE 3: TEXT-ONLY (Original methods)
+    # =========================================================================
+    
+    async def _generate_text_only_dalle(self, product_title: str, niche: str) -> Optional[Dict]:
+        """Text-only DALL-E generation (doesn't see original image)"""
+        
+        # Clean title
+        clean_title = product_title.lower()
+        for word in ['hot sale', 'new', '2024', '2025', 'premium', 'quality', 'best', 'cheap']:
+            clean_title = clean_title.replace(word, '')
+        clean_title = ' '.join(clean_title.split())
+        
+        prompt = f"""Professional e-commerce product photograph of: {clean_title}
+
+Category: {niche.replace('_', ' ')}
+
+Style:
+- Clean white or neutral background
+- Professional studio lighting
+- Product centered and clearly visible
+- Modern minimalist aesthetic
+- Sharp focus, high detail
+- No people, text, or watermarks
+- Photorealistic photography
+
+For a premium smart home and lifestyle e-commerce store."""
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -293,84 +459,32 @@ The image should make customers want to purchase this product immediately."""
                         "n": 1,
                         "size": "1024x1024",
                         "quality": "standard",
-                        "style": "natural"  # More photorealistic
+                        "style": "natural"
                     },
                     timeout=aiohttp.ClientTimeout(total=60)
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        image_url = data["data"][0]["url"]
-                        logger.info(f"[SUCCESS] Generated AI image (OpenAI): {product_title[:40]}...")
                         return {
-                            "ai_image_url": image_url,
+                            "ai_image_url": data["data"][0]["url"],
                             "generated_at": datetime.now().isoformat(),
-                            "source": "openai"
+                            "source": "openai_text",
+                            "note": "Generated from product title only (didn't analyze original)."
                         }
-                    else:
-                        error = await response.text()
-                        logger.error(f"OpenAI error ({response.status}): {error[:200]}")
-                        return None
-                        
-        except asyncio.TimeoutError:
-            logger.error("OpenAI timeout - image generation took too long")
-            return None
+                    return None
         except Exception as e:
-            logger.error(f"OpenAI generation failed: {e}")
+            logger.error(f"DALL-E text generation failed: {e}")
             return None
     
-    async def _generate_gemini(self, prompt: str, product_title: str) -> Optional[Dict]:
-        """Generate image using Google Gemini Imagen 3"""
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key={GOOGLE_AI_API_KEY}",
-                    headers={"Content-Type": "application/json"},
-                    json={
-                        "instances": [{"prompt": prompt}],
-                        "parameters": {
-                            "sampleCount": 1,
-                            "aspectRatio": "1:1",
-                            "safetyFilterLevel": "block_some",
-                            "personGeneration": "dont_allow"
-                        }
-                    },
-                    timeout=aiohttp.ClientTimeout(total=90)
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        predictions = data.get("predictions", [])
-                        if predictions and predictions[0].get("bytesBase64Encoded"):
-                            import base64
-                            image_data = base64.b64decode(predictions[0]["bytesBase64Encoded"])
-                            
-                            safe_title = product_title[:30].replace(' ', '_').replace('/', '_')
-                            filename = f"gemini_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                            filepath = CACHE_DIR / filename
-                            
-                            with open(filepath, 'wb') as f:
-                                f.write(image_data)
-                            
-                            logger.info(f"[SUCCESS] Generated AI image (Gemini): {product_title[:40]}...")
-                            return {
-                                "ai_image_url": f"/generated_images/{filename}",
-                                "generated_at": datetime.now().isoformat(),
-                                "source": "gemini"
-                            }
-                        return None
-                    else:
-                        error = await response.text()
-                        logger.error(f"Gemini error ({response.status}): {error[:200]}")
-                        return None
-                        
-        except asyncio.TimeoutError:
-            logger.error("Gemini timeout")
-            return None
-        except Exception as e:
-            logger.error(f"Gemini generation failed: {e}")
-            return None
-    
-    async def _generate_stability(self, prompt: str, product_title: str) -> Optional[Dict]:
-        """Generate image using Stability AI"""
+    async def _generate_text_only_stability(self, product_title: str, niche: str) -> Optional[Dict]:
+        """Text-only Stability generation"""
+        
+        clean_title = ' '.join(product_title.lower().split()[:10])
+        
+        prompt = f"""Professional e-commerce product photo of {clean_title}.
+Clean white background, studio lighting, modern minimalist style.
+Sharp focus, high detail, photorealistic."""
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -383,7 +497,7 @@ The image should make customers want to purchase this product immediately."""
                     json={
                         "text_prompts": [
                             {"text": prompt, "weight": 1},
-                            {"text": "blurry, low quality, distorted, watermark, text, cartoon, illustration", "weight": -1}
+                            {"text": "blurry, low quality, cartoon, watermark", "weight": -1}
                         ],
                         "cfg_scale": 7,
                         "height": 1024,
@@ -395,35 +509,35 @@ The image should make customers want to purchase this product immediately."""
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        import base64
-                        image_data = base64.b64decode(data['artifacts'][0]['base64'])
+                        image_bytes = base64.b64decode(data['artifacts'][0]['base64'])
                         
                         safe_title = product_title[:30].replace(' ', '_').replace('/', '_')
                         filename = f"stability_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
                         filepath = CACHE_DIR / filename
                         
                         with open(filepath, 'wb') as f:
-                            f.write(image_data)
+                            f.write(image_bytes)
                         
-                        logger.info(f"[SUCCESS] Generated AI image (Stability): {product_title[:40]}...")
                         return {
                             "ai_image_url": f"/generated_images/{filename}",
                             "generated_at": datetime.now().isoformat(),
-                            "source": "stability"
+                            "source": "stability_text",
+                            "note": "Generated from product title only."
                         }
-                    else:
-                        error = await response.text()
-                        logger.error(f"Stability error ({response.status}): {error[:200]}")
-                        return None
-                        
+                    return None
         except Exception as e:
-            logger.error(f"Stability generation failed: {e}")
+            logger.error(f"Stability text generation failed: {e}")
             return None
+    
+    # =========================================================================
+    # BATCH GENERATION
+    # =========================================================================
     
     async def generate_batch(
         self,
         products: list,
-        max_concurrent: int = 3
+        max_concurrent: int = 2,  # Lower for vision mode (more API calls)
+        mode: GenerationMode = "vision_enhanced"
     ) -> list:
         """Generate AI images for multiple products"""
         semaphore = asyncio.Semaphore(max_concurrent)
@@ -434,11 +548,13 @@ The image should make customers want to purchase this product immediately."""
                     product_title=product.get('title', 'Product'),
                     niche=product.get('niche', 'smart_home'),
                     original_image_url=product.get('image_url') or product.get('main_image'),
-                    tags=product.get('tags', [])
+                    tags=product.get('tags', []),
+                    mode=mode
                 )
-                product['ai_image_url'] = result['ai_image_url']
-                product['original_image_url'] = result['original_image_url']
-                product['image_source'] = result['source']
+                product['ai_image_url'] = result.get('ai_image_url')
+                product['original_image_url'] = result.get('original_image_url')
+                product['image_source'] = result.get('source', 'unknown')
+                product['image_mode'] = result.get('mode', mode)
                 return product
         
         tasks = [process_product(p) for p in products]
@@ -474,19 +590,24 @@ def get_image_generator() -> AIImageGenerator:
 async def generate_product_image(
     product_title: str,
     niche: str = "smart_home",
-    original_image_url: str = None
+    original_image_url: str = None,
+    mode: GenerationMode = "vision_enhanced"
 ) -> str:
     """Quick function to generate a single product image"""
     generator = get_image_generator()
     result = await generator.generate_product_image(
         product_title=product_title,
         niche=niche,
-        original_image_url=original_image_url
+        original_image_url=original_image_url,
+        mode=mode
     )
-    return result['ai_image_url']
+    return result.get('ai_image_url', original_image_url)
 
 
-async def enhance_products_with_ai_images(products: list) -> list:
+async def enhance_products_with_ai_images(
+    products: list, 
+    mode: GenerationMode = "vision_enhanced"
+) -> list:
     """Enhance a list of products with AI-generated images"""
     generator = get_image_generator()
-    return await generator.generate_batch(products)
+    return await generator.generate_batch(products, mode=mode)

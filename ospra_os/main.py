@@ -24,7 +24,7 @@ import logging
 
 # Security - Rate Limiting (PHASE 1 SECURITY)
 from slowapi.errors import RateLimitExceeded
-from ospra_os.security.rate_limiting import limiter, rate_limit_exceeded_handler
+from ospra_os.security.rate_limiting import limiter, rate_limit_exceeded_handler, get_tier_limit
 
 # Multi-Tenant Isolation (GROK RECOMMENDATION #14)
 from ospra_os.tenancy.middleware import TenantMiddleware, StoreContextMiddleware
@@ -760,6 +760,18 @@ app.add_middleware(
 )
 print("[SUCCESS] ✓ CORS restricted to ospra.io + localhost (Phase 1 Security)")
 
+# Request Timeout Protection (PHASE 1 SECURITY)
+# Prevents requests from hanging indefinitely by enforcing 30-second timeout
+from ospra_os.middleware.timeout_middleware import TimeoutMiddleware
+app.add_middleware(TimeoutMiddleware, timeout_seconds=30)
+print("[SUCCESS] ✓ Request timeout protection active (30s limit)")
+
+# Custom Rate Limiting (PHASE 1 SECURITY)
+# In-memory rate limiter with tier-based limits (upgradable to Redis)
+from ospra_os.middleware.custom_rate_limiter import CustomRateLimitMiddleware
+app.add_middleware(CustomRateLimitMiddleware, get_tier_limit_func=get_tier_limit)
+print("[SUCCESS] ✓ Custom rate limiting active (tier-based, in-memory)")
+
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
@@ -1324,7 +1336,7 @@ if _HAS_IMAGE_PROCESSING and image_router:
     app.include_router(image_router)  # exposes /api/images/*
 
 if _HAS_AI_CHAT and ai_chat_router:
-    app.include_router(ai_chat_router)  # exposes /api/ai/chat and /api/claude/chat
+    app.include_router(ai_chat_router, prefix="/api")  # exposes /api/ai/chat and /api/claude/chat
 
 if _HAS_IMAGE_GENERATION and image_generation_router:
     app.include_router(image_generation_router)  # exposes /api/images/generate, /api/images/status (AI product images)

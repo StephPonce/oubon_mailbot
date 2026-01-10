@@ -128,6 +128,14 @@ class Settings(BaseSettings):
     ALIEXPRESS_API_KEY: Optional[str] = None  # App Key
     ALIEXPRESS_APP_SECRET: Optional[str] = None  # App Secret
 
+    # Webhook Security (Phase 2A Security)
+    SHOPIFY_WEBHOOK_SECRET: Optional[str] = None  # Shopify webhook signature verification
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None  # Stripe webhook signature verification
+    LEMONSQUEEZY_WEBHOOK_SECRET: Optional[str] = None  # LemonSqueezy webhook signature verification
+    ALIEXPRESS_WEBHOOK_SECRET: Optional[str] = None  # AliExpress webhook signature verification
+    CJ_WEBHOOK_SECRET: Optional[str] = None  # CJ Dropshipping webhook signature verification
+    TIKTOK_WEBHOOK_SECRET: Optional[str] = None  # TikTok webhook signature verification
+
     # Amazon Product Advertising API (PA-API 5.0)
     AMAZON_ACCESS_KEY: Optional[str] = None  # PA-API Access Key
     AMAZON_SECRET_KEY: Optional[str] = None  # PA-API Secret Key

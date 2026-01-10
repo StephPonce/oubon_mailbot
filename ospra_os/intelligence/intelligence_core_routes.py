@@ -24,6 +24,10 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# PHASE 1 SECURITY: Auth dependencies for tier-based access control
+from ospra_os.auth.dependencies import require_tier
+from ospra_os.auth.jwt_handler import TokenPayload
+
 from ospra_os.database.multi_store_models import get_db
 from ospra_os.intelligence.unified_context import get_unified_context_builder
 from ospra_os.intelligence.briefing_engine import get_briefing_engine
@@ -80,8 +84,14 @@ class BannerGenerateRequest(BaseModel):
 async def get_morning_briefing(
     user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
 ):
+    """
+    Generate morning AI briefing (Soar/Stratosphere tier required).
+
+    Security: Authentication and tier validation happen BEFORE expensive AI operations.
+    """
     engine = get_briefing_engine(db)
     return await engine.generate_morning_briefing(user_id, store_id)
 
@@ -91,8 +101,14 @@ async def get_on_demand_briefing(
     user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
     focus: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
 ):
+    """
+    Generate on-demand AI briefing (Soar/Stratosphere tier required).
+
+    Security: Authentication and tier validation happen BEFORE expensive AI operations.
+    """
     engine = get_briefing_engine(db)
     return {
         "briefing_text": await engine.generate_on_demand_briefing(user_id, store_id, focus),
@@ -306,10 +322,13 @@ def _get_ospra_engine():
 
 
 @router.post("/discover")
-async def discover_winning_products(request: DiscoverRequest):
+async def discover_winning_products(
+    request: DiscoverRequest,
+    current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
+):
     """
-    [SEARCH] DISCOVER WINNING PRODUCTS
-    
+    [SEARCH] DISCOVER WINNING PRODUCTS (Soar/Stratosphere tier required)
+
     Uses ALL connected sources:
     - Google Trends
     - TikTok
@@ -318,8 +337,10 @@ async def discover_winning_products(request: DiscoverRequest):
     - Reddit
     - Amazon
     - Apify
-    
+
     Only products scoring 7.5+ are saved.
+
+    Security: Authentication and tier validation happen BEFORE expensive multi-source AI discovery.
     """
     engine = _get_ospra_engine()
     niches = request.niches or ['smart_home', 'fitness', 'tech_accessories']
@@ -413,8 +434,15 @@ async def get_available_discovery_niches():
 # ============================================================================
 
 @router.post("/images/generate")
-async def generate_product_images(request: ImageGenerateRequest):
-    """Generate AI product lifestyle images using DALL-E 3"""
+async def generate_product_images(
+    request: ImageGenerateRequest,
+    current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
+):
+    """
+    Generate AI product lifestyle images using DALL-E 3 (Soar/Stratosphere tier required).
+
+    Security: Authentication and tier validation happen BEFORE expensive DALL-E 3 operations.
+    """
     try:
         from ospra_os.media.ai_image_generator import AIImageGenerator
         
@@ -454,8 +482,15 @@ async def generate_product_images(request: ImageGenerateRequest):
 
 
 @router.post("/images/banner")
-async def generate_marketing_banner(request: BannerGenerateRequest):
-    """Generate marketing banner for ads"""
+async def generate_marketing_banner(
+    request: BannerGenerateRequest,
+    current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
+):
+    """
+    Generate marketing banner for ads (Soar/Stratosphere tier required).
+
+    Security: Authentication and tier validation happen BEFORE expensive DALL-E 3 operations.
+    """
     try:
         from ospra_os.media.ai_image_generator import AIImageGenerator
         

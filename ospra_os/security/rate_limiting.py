@@ -22,11 +22,24 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     Custom handler for rate limit exceeded errors.
 
     Returns a user-friendly JSON response with retry-after header.
+    Also logs to security.log for monitoring.
     """
+    # Standard logging
     logger.warning(
         f"Rate limit exceeded for {get_remote_address(request)} "
         f"on {request.url.path}"
     )
+
+    # Security logging (PHASE 1 SECURITY)
+    try:
+        from ospra_os.security.auth_logger import log_rate_limit_exceeded
+        log_rate_limit_exceeded(
+            ip_address=get_remote_address(request),
+            endpoint=request.url.path,
+            user_id=None  # No user ID available at this level
+        )
+    except Exception as e:
+        logger.error(f"Failed to log rate limit to security log: {e}")
 
     return JSONResponse(
         status_code=429,
