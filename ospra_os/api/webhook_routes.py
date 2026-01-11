@@ -207,6 +207,43 @@ async def shopify_inventory_updated(
 # LEMONSQUEEZY WEBHOOKS (Payments/Subscriptions)
 # =============================================================================
 
+async def upgrade_user_tier(user_id: int, tier: str, db_session=None):
+    """
+    Upgrade user's subscription tier after successful payment.
+    """
+    from ospra_os.database.connection import get_session
+    from ospra_os.database.multi_store_models import User, SubscriptionTier
+    from datetime import datetime
+    
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+    }
+    
+    session = db_session or get_session()
+    try:
+        user = session.query(User).filter(User.id == user_id).first()
+        if user:
+            user.subscription_tier = tier_map.get(tier.lower(), SubscriptionTier.NEST)
+            user.subscription_started = datetime.utcnow()
+            user.updated_at = datetime.utcnow()
+            session.commit()
+            logger.info(f"[SUCCESS] User {user_id} upgraded to {tier}")
+            return True
+        else:
+            logger.error(f"[ERROR] User {user_id} not found for tier upgrade")
+            return False
+    except Exception as e:
+        logger.error(f"[ERROR] Failed to upgrade user {user_id}: {e}")
+        session.rollback()
+        return False
+    finally:
+        if not db_session:
+            session.close()
+
+
 @router.post("/lemonsqueezy/subscription")
 async def lemonsqueezy_subscription(
     background_tasks: BackgroundTasks,
@@ -225,30 +262,47 @@ async def lemonsqueezy_subscription(
         
         meta = data.get("meta", {})
         event_name = meta.get("event_name")
+        custom_data = meta.get("custom_data", {})
         
         attributes = data.get("data", {}).get("attributes", {})
         user_email = attributes.get("user_email")
         status = attributes.get("status")
         variant_name = attributes.get("variant_name")  # Tier name
         
-        logger.info(f"[PAYMENT] LemonSqueezy {event_name}: {user_email} - {variant_name} ({status})")
+        # Get user_id and tier from custom data (sent during checkout)
+        user_id = custom_data.get("user_id")
+        tier = custom_data.get("tier")
         
-        # Map variant to tier
-        tier_mapping = {
-            "Nest": "nest",
-            "Flight": "flight",
-            "Soar": "soar",
-            "Stratosphere": "stratosphere"
-        }
-        tier = tier_mapping.get(variant_name, "nest")
+        logger.info(f"[PAYMENT] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, tier={tier}, status={status}")
         
-        # TODO: Update user tier in database
-        # background_tasks.add_task(update_user_tier, user_email, tier, status)
+        # Handle different events
+        if event_name == "subscription_created" and status == "active":
+            # New subscription - upgrade user
+            if user_id and tier:
+                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+                logger.info(f"[SUCCESS] Scheduled tier upgrade for user {user_id} to {tier}")
+            else:
+                logger.warning(f"[WARNING] Missing user_id or tier in custom_data")
+        
+        elif event_name == "subscription_updated":
+            if status == "active" and user_id and tier:
+                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+            elif status in ["cancelled", "expired", "past_due"]:
+                # Downgrade to free tier
+                if user_id:
+                    background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                    logger.info(f"[DOWNGRADE] User {user_id} subscription {status}")
+        
+        elif event_name == "subscription_cancelled":
+            # Downgrade to free tier
+            if user_id:
+                background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                logger.info(f"[DOWNGRADE] User {user_id} subscription cancelled")
         
         return {
             "success": True,
             "event": event_name,
-            "user_email": user_email,
+            "user_id": user_id,
             "tier": tier,
             "status": status
         }
@@ -275,16 +329,35 @@ async def lemonsqueezy_order(
         
         meta = data.get("meta", {})
         event_name = meta.get("event_name")
+        custom_data = meta.get("custom_data", {})
         
         attributes = data.get("data", {}).get("attributes", {})
         user_email = attributes.get("user_email")
         total = attributes.get("total_formatted")
+        status = attributes.get("status")
         
-        logger.info(f"[PRICE] LemonSqueezy {event_name}: {user_email} - {total}")
+        # Get user_id and tier from custom data
+        user_id = custom_data.get("user_id")
+        tier = custom_data.get("tier")
+        
+        logger.info(f"[PRICE] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, total={total}, status={status}")
+        
+        # Handle successful order (one-time or first subscription payment)
+        if event_name == "order_created" and status == "paid":
+            if user_id and tier:
+                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+                logger.info(f"[SUCCESS] Order paid - upgrading user {user_id} to {tier}")
+        
+        elif event_name == "order_refunded":
+            # Refund - downgrade to free
+            if user_id:
+                background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                logger.warning(f"[REFUND] Order refunded - downgrading user {user_id}")
         
         return {
             "success": True,
             "event": event_name,
+            "user_id": user_id,
             "user_email": user_email,
             "total": total
         }

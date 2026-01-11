@@ -174,8 +174,8 @@ async def upgrade_subscription(
     """
     Upgrade subscription to a new tier.
     
-    In production, this would redirect to LemonSqueezy checkout.
-    For development, it directly updates the tier.
+    Paid tiers REQUIRE payment via LemonSqueezy checkout.
+    Only downgrades to Nest (free) are processed directly.
     """
     tier_map = {
         "nest": SubscriptionTier.NEST,
@@ -202,42 +202,79 @@ async def upgrade_subscription(
     
     is_upgrade = new_index > current_index
     is_downgrade = new_index < current_index
+    is_same = new_index == current_index
     
-    # Check for LemonSqueezy integration in production
-    lemonsqueezy_api_key = os.getenv("LEMONSQUEEZY_API_KEY")
-    
-    if lemonsqueezy_api_key and is_upgrade and tier_lower != "nest":
-        # In production, create LemonSqueezy checkout session
-        # For now, just return a placeholder checkout URL
+    # Already on this tier
+    if is_same:
         return {
             "success": True,
-            "action": "redirect",
-            "checkout_url": f"https://ospra.lemonsqueezy.com/checkout?tier={tier_lower}",
-            "message": f"Redirecting to checkout for {TIER_PLANS[tier_lower]['name']} plan"
+            "action": "none",
+            "message": f"You're already on the {TIER_PLANS[tier_lower]['name']} plan"
         }
     
-    # Direct tier update (for development or free tier)
-    new_tier = tier_map[tier_lower]
-    user.subscription_tier = new_tier
-    user.subscription_started = datetime.utcnow()
-    user.updated_at = datetime.utcnow()
+    # DOWNGRADE to free tier - process directly
+    if tier_lower == "nest":
+        user.subscription_tier = SubscriptionTier.NEST
+        user.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(user)
+        
+        return {
+            "success": True,
+            "action": "downgraded",
+            "message": "Downgraded to Nest (free) plan",
+            "subscription": {
+                "tier": "nest",
+                "tier_name": "Nest",
+                "features": TIER_PLANS["nest"]["features"],
+                "limits": TIER_PLANS["nest"]["limits"],
+            }
+        }
     
-    db.commit()
-    db.refresh(user)
+    # UPGRADE to paid tier - REQUIRE LemonSqueezy checkout
+    # LemonSqueezy Product/Variant IDs (set these to your actual IDs)
+    lemonsqueezy_store_id = os.getenv("LEMONSQUEEZY_STORE_ID")
+    lemonsqueezy_products = {
+        "flight": {
+            "monthly": os.getenv("LEMONSQUEEZY_FLIGHT_MONTHLY_VARIANT"),
+            "yearly": os.getenv("LEMONSQUEEZY_FLIGHT_YEARLY_VARIANT"),
+        },
+        "soar": {
+            "monthly": os.getenv("LEMONSQUEEZY_SOAR_MONTHLY_VARIANT"),
+            "yearly": os.getenv("LEMONSQUEEZY_SOAR_YEARLY_VARIANT"),
+        },
+        "stratosphere": {
+            "monthly": os.getenv("LEMONSQUEEZY_STRATOSPHERE_MONTHLY_VARIANT"),
+            "yearly": os.getenv("LEMONSQUEEZY_STRATOSPHERE_YEARLY_VARIANT"),
+        },
+    }
     
-    tier_value = user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier)
+    # Get the correct variant ID
+    billing_cycle = request.billing_cycle.lower() if request.billing_cycle else "monthly"
+    variant_id = lemonsqueezy_products.get(tier_lower, {}).get(billing_cycle)
+    
+    if not variant_id or not lemonsqueezy_store_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Payment system not configured. Please contact support."
+        )
+    
+    # Build LemonSqueezy checkout URL with user data for webhook
+    checkout_url = (
+        f"https://{lemonsqueezy_store_id}.lemonsqueezy.com/checkout/buy/{variant_id}"
+        f"?checkout[email]={user.email}"
+        f"&checkout[custom][user_id]={user.id}"
+        f"&checkout[custom][tier]={tier_lower}"
+    )
     
     return {
         "success": True,
-        "action": "updated",
-        "message": f"{'Upgraded' if is_upgrade else 'Changed'} to {TIER_PLANS[tier_lower]['name']} plan",
-        "subscription": {
-            "tier": tier_value,
-            "tier_name": TIER_PLANS[tier_lower]["name"],
-            "features": TIER_PLANS[tier_lower]["features"],
-            "limits": TIER_PLANS[tier_lower]["limits"],
-        },
-        "user": user_to_dict(user)
+        "action": "redirect",
+        "checkout_url": checkout_url,
+        "message": f"Complete payment to upgrade to {TIER_PLANS[tier_lower]['name']}",
+        "tier": tier_lower,
+        "price": TIER_PLANS[tier_lower]["price"] if billing_cycle == "monthly" else TIER_PLANS[tier_lower]["price_yearly"],
+        "billing_cycle": billing_cycle
     }
 
 
