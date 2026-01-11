@@ -3,6 +3,7 @@ AUTHENTICATION API ROUTES
 =========================
 
 Endpoints for user authentication and session management.
+Now uses PostgreSQL database for persistent user storage.
 
 Endpoints:
 - POST /api/auth/register - Create new account
@@ -13,12 +14,14 @@ Endpoints:
 - GET /api/auth/verify - Verify token validity
 
 Author: Ospra OS
-Date: December 2024
+Date: December 2024 (Fixed January 2026 - PostgreSQL)
 """
 
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
+from sqlalchemy.orm import Session
+from datetime import datetime
 import logging
 import os
 
@@ -36,6 +39,10 @@ from .dependencies import (
     optional_auth,
     TokenPayload
 )
+
+# Database imports - USE REAL POSTGRESQL DATABASE
+from ospra_os.database.connection import get_db
+from ospra_os.database.multi_store_models import User, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
@@ -94,52 +101,62 @@ class MessageResponse(BaseModel):
 
 
 # ============================================================================
-# MOCK USER DATABASE (Replace with real database in production)
+# DATABASE HELPER FUNCTIONS - POSTGRESQL
 # ============================================================================
 
-# In-memory user storage for development
-# TODO: Replace with Supabase/PostgreSQL in production
-_users_db: dict = {}
-_user_id_counter = 1
+def _get_user_by_email(db: Session, email: str) -> Optional[User]:
+    """Get user by email from PostgreSQL database."""
+    return db.query(User).filter(User.email == email.lower()).first()
 
 
-def _get_user_by_email(email: str) -> Optional[dict]:
-    """Get user by email from mock DB."""
-    return _users_db.get(email.lower())
+def _get_user_by_id(db: Session, user_id: int) -> Optional[User]:
+    """Get user by ID from PostgreSQL database."""
+    return db.query(User).filter(User.id == user_id).first()
 
 
-def _get_user_by_id(user_id: int) -> Optional[dict]:
-    """Get user by ID from mock DB."""
-    for user in _users_db.values():
-        if user["id"] == user_id:
-            return user
-    return None
-
-
-def _create_user(email: str, password_hash: str, name: Optional[str] = None, tier: str = "nest") -> dict:
-    """Create user in mock DB."""
-    global _user_id_counter
-    
-    from datetime import datetime
-    
-    # Validate tier
-    valid_tiers = ["nest", "flight", "soar", "stratosphere"]
-    if tier.lower() not in valid_tiers:
-        tier = "nest"
-    
-    user = {
-        "id": _user_id_counter,
-        "email": email.lower(),
-        "password_hash": password_hash,
-        "name": name,
-        "tier": tier.lower(),
-        "created_at": datetime.utcnow().isoformat(),
+def _create_user(db: Session, email: str, password_hash: str, name: Optional[str] = None, tier: str = "nest") -> User:
+    """Create user in PostgreSQL database."""
+    # Validate and map tier
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+        # Legacy mappings
+        "free": SubscriptionTier.NEST,
+        "starter": SubscriptionTier.FLIGHT,
+        "pro": SubscriptionTier.SOAR,
+        "enterprise": SubscriptionTier.STRATOSPHERE,
     }
     
-    _users_db[email.lower()] = user
-    _user_id_counter += 1
+    subscription_tier = tier_map.get(tier.lower(), SubscriptionTier.NEST)
+    
+    user = User(
+        email=email.lower(),
+        password_hash=password_hash,
+        name=name,
+        subscription_tier=subscription_tier,
+        created_at=datetime.utcnow(),
+        is_active=True,
+    )
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     
     return user
+
+
+def _user_to_dict(user: User) -> dict:
+    """Convert User model to dictionary."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "tier": user.subscription_tier.value if user.subscription_tier else "nest",
+        "subscription_tier": user.subscription_tier.value if user.subscription_tier else "nest",
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+    }
 
 
 # ============================================================================
@@ -147,14 +164,15 @@ def _create_user(email: str, password_hash: str, name: Optional[str] = None, tie
 # ============================================================================
 
 @router.post("/register")
-async def register(request: RegisterRequest):
+async def register(request: RegisterRequest, db: Session = Depends(get_db)):
     """
     Register a new user account.
     
     Returns access and refresh tokens on successful registration.
+    Users are persisted to PostgreSQL database.
     """
     # Check if user exists
-    if _get_user_by_email(request.email):
+    if _get_user_by_email(db, request.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
@@ -170,21 +188,25 @@ async def register(request: RegisterRequest):
     # Hash password
     password_hash = hash_password(request.password)
     
-    # Create user with selected tier
+    # Create user in PostgreSQL
     user = _create_user(
+        db=db,
         email=request.email,
         password_hash=password_hash,
         name=request.name,
         tier=request.tier or "nest"
     )
     
-    logger.info(f"New user registered: {user['email']} (ID: {user['id']})")
+    logger.info(f"New user registered: {user.email} (ID: {user.id})")
+    
+    # Get tier value
+    tier = user.subscription_tier.value if user.subscription_tier else "nest"
     
     # Generate tokens
     tokens = create_token_pair(
-        user_id=user["id"],
-        email=user["email"],
-        tier=user["tier"]
+        user_id=user.id,
+        email=user.email,
+        tier=tier
     )
     
     # Return tokens WITH user object (frontend expects this)
@@ -193,26 +215,19 @@ async def register(request: RegisterRequest):
         "refresh_token": tokens.refresh_token,
         "token_type": tokens.token_type,
         "expires_in": tokens.expires_in,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "tier": user["tier"],
-            "subscription_tier": user["tier"],  # Backend field name
-            "created_at": user.get("created_at")
-        }
+        "user": _user_to_dict(user)
     }
 
 
 @router.post("/login")
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with email and password.
     
     Returns access and refresh tokens on successful login.
     """
-    # Find user
-    user = _get_user_by_email(request.email)
+    # Find user in PostgreSQL
+    user = _get_user_by_email(db, request.email)
     
     if not user:
         logger.warning(f"Login attempt for non-existent email: {request.email}")
@@ -222,20 +237,27 @@ async def login(request: LoginRequest):
         )
     
     # Verify password
-    if not verify_password(request.password, user["password_hash"]):
+    if not verify_password(request.password, user.password_hash):
         logger.warning(f"Failed login attempt for: {request.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password"
         )
     
-    logger.info(f"User logged in: {user['email']} (ID: {user['id']})")
+    # Update last login
+    user.last_login = datetime.utcnow()
+    db.commit()
+    
+    logger.info(f"User logged in: {user.email} (ID: {user.id})")
+    
+    # Get tier value
+    tier = user.subscription_tier.value if user.subscription_tier else "nest"
     
     # Generate tokens
     tokens = create_token_pair(
-        user_id=user["id"],
-        email=user["email"],
-        tier=user["tier"]
+        user_id=user.id,
+        email=user.email,
+        tier=tier
     )
     
     # Return tokens WITH user object (frontend expects this)
@@ -244,26 +266,18 @@ async def login(request: LoginRequest):
         "refresh_token": tokens.refresh_token,
         "token_type": tokens.token_type,
         "expires_in": tokens.expires_in,
-        "user": {
-            "id": user["id"],
-            "email": user["email"],
-            "name": user.get("name"),
-            "tier": user["tier"],
-            "subscription_tier": user["tier"],
-            "created_at": user.get("created_at")
-        }
+        "user": _user_to_dict(user)
     }
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(request: RefreshRequest):
+async def refresh_tokens(request: RefreshRequest, db: Session = Depends(get_db)):
     """
     Refresh access token using refresh token.
     
     Also rotates refresh token for security.
     """
     # Get user's current tier (might have changed)
-    # For now, decode the refresh token to get user info
     from .jwt_handler import validate_refresh_token
     
     payload = validate_refresh_token(request.refresh_token)
@@ -273,9 +287,9 @@ async def refresh_tokens(request: RefreshRequest):
             detail="Invalid or expired refresh token"
         )
     
-    # Get current user tier from DB
-    user = _get_user_by_id(payload.user_id)
-    tier = user["tier"] if user else "nest"
+    # Get current user tier from PostgreSQL
+    user = _get_user_by_id(db, payload.user_id)
+    tier = user.subscription_tier.value if user and user.subscription_tier else "nest"
     
     # Refresh tokens
     result = refresh_access_token(request.refresh_token, tier)
@@ -325,12 +339,15 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(user: TokenPayload = Depends(require_auth)):
+async def get_current_user_info(
+    user: TokenPayload = Depends(require_auth),
+    db: Session = Depends(get_db)
+):
     """
     Get current authenticated user's information.
     """
-    # Get full user data from DB
-    full_user = _get_user_by_id(user.user_id)
+    # Get full user data from PostgreSQL
+    full_user = _get_user_by_id(db, user.user_id)
     
     if not full_user:
         raise HTTPException(
@@ -338,12 +355,14 @@ async def get_current_user_info(user: TokenPayload = Depends(require_auth)):
             detail="User not found"
         )
     
+    tier = full_user.subscription_tier.value if full_user.subscription_tier else "nest"
+    
     return UserResponse(
-        id=full_user["id"],
-        email=full_user["email"],
-        name=full_user.get("name"),
-        tier=full_user["tier"],
-        created_at=full_user.get("created_at")
+        id=full_user.id,
+        email=full_user.email,
+        name=full_user.name,
+        tier=tier,
+        created_at=full_user.created_at.isoformat() if full_user.created_at else None
     )
 
 
@@ -391,7 +410,7 @@ async def get_token_details(
 # ============================================================================
 
 @router.get("/debug/users")
-async def list_users():
+async def list_users(db: Session = Depends(get_db)):
     """
     [DEBUG] List all users.
     
@@ -403,19 +422,11 @@ async def list_users():
             detail="Not available in production"
         )
     
-    # Return users without password hashes
+    users = db.query(User).all()
+    
     return {
-        "users": [
-            {
-                "id": u["id"],
-                "email": u["email"],
-                "name": u.get("name"),
-                "tier": u["tier"],
-                "created_at": u.get("created_at")
-            }
-            for u in _users_db.values()
-        ],
-        "count": len(_users_db)
+        "users": [_user_to_dict(u) for u in users],
+        "count": len(users)
     }
 
 
@@ -423,7 +434,8 @@ async def list_users():
 async def set_user_tier(
     email: str,
     tier: str,
-    user: TokenPayload = Depends(require_auth)
+    user: TokenPayload = Depends(require_auth),
+    db: Session = Depends(get_db)
 ):
     """
     [DEBUG] Set a user's tier.
@@ -436,28 +448,32 @@ async def set_user_tier(
             detail="Not available in production"
         )
     
-    valid_tiers = ["nest", "flight", "soar", "stratosphere", "admin"]
-    if tier.lower() not in valid_tiers:
+    tier_map = {
+        "nest": SubscriptionTier.NEST,
+        "flight": SubscriptionTier.FLIGHT,
+        "soar": SubscriptionTier.SOAR,
+        "stratosphere": SubscriptionTier.STRATOSPHERE,
+        "admin": SubscriptionTier.STRATOSPHERE,  # Admin gets highest tier
+    }
+    
+    if tier.lower() not in tier_map:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid tier. Must be one of: {valid_tiers}"
+            detail=f"Invalid tier. Must be one of: {list(tier_map.keys())}"
         )
     
-    target_user = _get_user_by_email(email)
+    target_user = _get_user_by_email(db, email)
     if not target_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
     
-    target_user["tier"] = tier.lower()
+    target_user.subscription_tier = tier_map[tier.lower()]
+    db.commit()
     
     return {
         "success": True,
         "message": f"Set {email} to tier: {tier}",
-        "user": {
-            "id": target_user["id"],
-            "email": target_user["email"],
-            "tier": target_user["tier"]
-        }
+        "user": _user_to_dict(target_user)
     }
