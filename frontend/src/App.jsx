@@ -14,7 +14,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { SidebarProvider } from './hooks/useSidebar';
 import { DashboardProvider } from './hooks/useDashboardContext';
-import { LoginForm, RegisterForm, ForgotPasswordForm, ProtectedRoute, PublicOnlyRoute } from './components/auth';
+import { LoginForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm, ProtectedRoute, PublicOnlyRoute } from './components/auth';
 import Dashboard from './components/Dashboard';
 import ProductDiscovery from './components/ProductDiscovery';
 import AutopilotControl from './components/AutopilotControl';
@@ -51,6 +51,14 @@ function AppRoutes() {
           element={
             <PublicOnlyRoute>
               <ForgotPasswordForm />
+            </PublicOnlyRoute>
+          } 
+        />
+        <Route 
+          path="/reset-password" 
+          element={
+            <PublicOnlyRoute>
+              <ResetPasswordForm />
             </PublicOnlyRoute>
           } 
         />

@@ -21,9 +21,10 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
+import secrets
 
 from .jwt_handler import (
     create_token_pair,
@@ -42,7 +43,14 @@ from .dependencies import (
 
 # Database imports - USE REAL POSTGRESQL DATABASE
 from ospra_os.database.connection import get_db
-from ospra_os.database.multi_store_models import User, SubscriptionTier
+from ospra_os.database.multi_store_models import User, SubscriptionTier, PasswordResetToken
+
+# Email service for password reset
+try:
+    from ospra_os.services.email_service import send_password_reset_email
+    EMAIL_SERVICE_AVAILABLE = True
+except ImportError:
+    EMAIL_SERVICE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +108,17 @@ class MessageResponse(BaseModel):
     message: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password request."""
+    token: str
+    password: str = Field(..., min_length=8, description="Minimum 8 characters")
+
+
 # ============================================================================
 # DATABASE HELPER FUNCTIONS - POSTGRESQL
 # ============================================================================
@@ -131,13 +150,16 @@ def _create_user(db: Session, email: str, password_hash: str, name: Optional[str
     
     subscription_tier = tier_map.get(tier.lower(), SubscriptionTier.NEST)
     
+    # Default name to email username if not provided (name is NOT NULL in DB)
+    user_name = name if name else email.split("@")[0]
+    
     user = User(
         email=email.lower(),
         password_hash=password_hash,
-        name=name,
+        name=user_name,
         subscription_tier=subscription_tier,
         created_at=datetime.utcnow(),
-        is_active=True,
+        # Note: is_active column doesn't exist in User model - removed
     )
     
     db.add(user)
@@ -403,6 +425,123 @@ async def get_token_details(
     token = auth_header.replace("Bearer ", "") if auth_header else ""
     
     return get_token_info(token)
+
+
+# ============================================================================
+# PASSWORD RESET ENDPOINTS
+# ============================================================================
+
+@router.post("/forgot-password", response_model=MessageResponse)
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request a password reset email.
+    
+    For security, always returns success even if email doesn't exist.
+    This prevents email enumeration attacks.
+    """
+    # Find user (but don't reveal if they exist)
+    user = _get_user_by_email(db, request.email)
+    
+    if user:
+        # Generate secure token
+        token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        
+        # Delete any existing tokens for this email
+        db.query(PasswordResetToken).filter(
+            PasswordResetToken.email == request.email.lower()
+        ).delete()
+        
+        # Create new token
+        reset_token = PasswordResetToken(
+            token=token,
+            email=request.email.lower(),
+            expires_at=expires_at,
+            used=False
+        )
+        db.add(reset_token)
+        db.commit()
+        
+        # Build reset URL
+        app_url = os.getenv("APP_URL", "https://ospra.io")
+        reset_link = f"{app_url}/reset-password?token={token}"
+        
+        # Send email
+        if EMAIL_SERVICE_AVAILABLE:
+            result = send_password_reset_email(
+                to=user.email,
+                reset_link=reset_link,
+                user_name=user.name
+            )
+            if not result.get("success"):
+                logger.error(f"Failed to send reset email to {user.email}: {result.get('error')}")
+        else:
+            logger.warning(f"Email service not available. Reset link: {reset_link}")
+        
+        logger.info(f"Password reset requested for: {request.email}")
+    else:
+        logger.info(f"Password reset requested for non-existent email: {request.email}")
+    
+    # Always return success to prevent email enumeration
+    return MessageResponse(
+        success=True,
+        message="If an account exists with this email, you will receive a password reset link."
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password using token from email.
+    
+    Token is single-use and expires after 1 hour.
+    """
+    # Find token
+    reset_token = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token == request.token
+    ).first()
+    
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Check if token is valid
+    if reset_token.used:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset link has already been used"
+        )
+    
+    if reset_token.is_expired:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This reset link has expired. Please request a new one."
+        )
+    
+    # Find user
+    user = _get_user_by_email(db, reset_token.email)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Update password
+    user.password_hash = hash_password(request.password)
+    
+    # Mark token as used
+    reset_token.used = True
+    
+    db.commit()
+    
+    logger.info(f"Password reset completed for: {user.email}")
+    
+    return MessageResponse(
+        success=True,
+        message="Password successfully reset. You can now login with your new password."
+    )
 
 
 # ============================================================================

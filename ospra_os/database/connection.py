@@ -16,6 +16,7 @@ Usage:
 """
 
 import os
+import sys
 from functools import lru_cache
 from typing import Generator
 from contextlib import contextmanager
@@ -26,6 +27,15 @@ from sqlalchemy.orm import sessionmaker, Session
 # Get database URL from environment (PostgreSQL required for production)
 # Note: This is read at import time but validated at runtime in get_engine()
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Check if we're in test mode
+def is_test_mode() -> bool:
+    """Detect if running in test environment."""
+    return (
+        "pytest" in sys.modules or
+        os.getenv("TESTING") == "true" or
+        os.getenv("ENV") == "test"
+    )
 
 
 def get_pool_args() -> dict:
@@ -51,6 +61,10 @@ def get_engine(database_url: str = None):
     """
     url = database_url or DATABASE_URL
 
+    # In test mode, use SQLite in-memory database if no DATABASE_URL provided
+    if not url and is_test_mode():
+        url = "sqlite:///:memory:"
+
     # Validate DATABASE_URL is set (only checked at runtime, not import time)
     if not url:
         raise ValueError(
@@ -70,8 +84,18 @@ def get_engine(database_url: str = None):
         if driver_end > 0:
             url = "postgresql://" + url[driver_end + 3:]
 
-    # Verify it's a PostgreSQL URL
+    # Verify it's a PostgreSQL URL (allow SQLite in test mode)
     if not url.startswith("postgresql://"):
+        # Allow SQLite in test environments
+        if is_test_mode() and url.startswith("sqlite:///"):
+            # SQLite doesn't need connection pooling
+            engine = create_engine(
+                url,
+                echo=os.getenv("SQL_ECHO", "false").lower() == "true",
+                connect_args={"check_same_thread": False}
+            )
+            return engine
+
         raise ValueError(
             f"Invalid database URL. PostgreSQL required, got: {url[:20]}... "
             "Expected format: postgresql://user:pass@host:5432/dbname"

@@ -18,6 +18,9 @@ aiohttp>=3.9.1
 httpx>=0.26.0
 requests>=2.31.0
 
+# Email
+resend>=0.7.0
+
 # AI APIs
 anthropic>=0.18.0
 openai>=1.10.0
