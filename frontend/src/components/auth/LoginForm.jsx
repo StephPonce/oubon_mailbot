@@ -3,9 +3,10 @@
  * =====================================
  * 
  * Liquid glass aesthetic login form.
+ * Updated: Added forgot password link and remember me checkbox
  * 
  * @author OspraOS
- * @date December 2024
+ * @date December 2024 (Updated January 2026)
  */
 
 import React, { useState } from 'react';
@@ -15,6 +16,7 @@ import { useAuth } from '../../hooks/useAuth';
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -31,7 +33,7 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       navigate(from, { replace: true });
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
@@ -99,6 +101,26 @@ export function LoginForm() {
               />
             </div>
 
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-white/20 bg-white/5 text-purple-500 focus:ring-purple-500/20 focus:ring-offset-0"
+                />
+                <span className="ml-2 text-sm text-white/60">Remember me</span>
+              </label>
+              
+              <Link 
+                to="/forgot-password" 
+                className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             {/* Submit button */}
             <button
               type="submit"
@@ -132,7 +154,7 @@ export function LoginForm() {
 
         {/* Footer */}
         <p className="text-center text-white/40 text-sm mt-6">
-          Powered by Oi • Ospra Intelligence
+          Ospra Intelligence V5 • Product Discovery Engine
         </p>
       </div>
     </div>

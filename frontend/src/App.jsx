@@ -6,7 +6,7 @@
  * Includes DashboardProvider for universal Oi context.
  * 
  * @author OspraOS
- * @date December 2024
+ * @date December 2024 (Updated January 2026 - Added forgot password)
  */
 
 import React from 'react';
@@ -14,7 +14,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { SidebarProvider } from './hooks/useSidebar';
 import { DashboardProvider } from './hooks/useDashboardContext';
-import { LoginForm, RegisterForm, ProtectedRoute, PublicOnlyRoute } from './components/auth';
+import { LoginForm, RegisterForm, ForgotPasswordForm, ProtectedRoute, PublicOnlyRoute } from './components/auth';
 import Dashboard from './components/Dashboard';
 import ProductDiscovery from './components/ProductDiscovery';
 import AutopilotControl from './components/AutopilotControl';
@@ -43,6 +43,14 @@ function AppRoutes() {
           element={
             <PublicOnlyRoute>
               <RegisterForm />
+            </PublicOnlyRoute>
+          } 
+        />
+        <Route 
+          path="/forgot-password" 
+          element={
+            <PublicOnlyRoute>
+              <ForgotPasswordForm />
             </PublicOnlyRoute>
           } 
         />
