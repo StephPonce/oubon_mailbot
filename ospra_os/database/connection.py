@@ -155,7 +155,7 @@ def get_session_context(database_url: str = None) -> Generator[Session, None, No
         session.close()
 
 
-def get_db(database_url: str = None) -> Generator[Session, None, None]:
+def get_db() -> Generator[Session, None, None]:
     """
     FastAPI dependency for database sessions.
     
@@ -164,7 +164,7 @@ def get_db(database_url: str = None) -> Generator[Session, None, None]:
         def endpoint(db: Session = Depends(get_db)):
             pass
     """
-    session = get_session(database_url)
+    session = get_session()
     try:
         yield session
     finally:
