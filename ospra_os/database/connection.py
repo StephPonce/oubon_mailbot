@@ -65,12 +65,10 @@ def get_engine(database_url: str = None):
     if not url and is_test_mode():
         url = "sqlite:///:memory:"
 
-    # Validate DATABASE_URL is set (only checked at runtime, not import time)
+    # In local development (no DATABASE_URL set), use SQLite file database
     if not url:
-        raise ValueError(
-            "DATABASE_URL environment variable is required for PostgreSQL connection. "
-            "Set it to your PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/dbname)"
-        )
+        print("[INFO] DATABASE_URL not set - using SQLite for local development")
+        url = "sqlite:///./data/ospra_local.db"
 
     # Handle different PostgreSQL URL formats
     if url.startswith("postgres://"):
@@ -84,10 +82,10 @@ def get_engine(database_url: str = None):
         if driver_end > 0:
             url = "postgresql://" + url[driver_end + 3:]
 
-    # Verify it's a PostgreSQL URL (allow SQLite in test mode)
+    # Verify it's a PostgreSQL URL (allow SQLite in test mode or local dev)
     if not url.startswith("postgresql://"):
-        # Allow SQLite in test environments
-        if is_test_mode() and url.startswith("sqlite:///"):
+        # Allow SQLite in test environments OR local development (when DATABASE_URL not set)
+        if (is_test_mode() or DATABASE_URL is None) and url.startswith("sqlite:///"):
             # SQLite doesn't need connection pooling
             engine = create_engine(
                 url,
