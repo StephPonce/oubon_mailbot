@@ -215,6 +215,22 @@ def check_database_connection(database_url: str = None) -> dict:
         }
 
 
+# ============================================================================
+# MODULE-LEVEL EXPORTS
+# ============================================================================
+# Create module-level engine and SessionLocal for backward compatibility
+# These are used by scripts and modules that need to:
+# 1. Create tables: Base.metadata.create_all(bind=engine)
+# 2. Create sessions: db = SessionLocal()
+
+engine = get_engine()
+SessionLocal = get_session_factory()
+
+
+# ============================================================================
+# BACKWARDS COMPATIBILITY ALIASES
+# ============================================================================
+
 # Backwards compatibility - alias for existing code
 def get_multi_store_session(database_url: str = None) -> Session:
     """Backwards compatible alias for get_session."""
