@@ -807,7 +807,7 @@ app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
 @app.get("/health")
 def health_check_immediate():
     """Immediate health check that responds before full initialization."""
-    return {"status": "ok", "service": "Ospra Intelligence Platform"}
+    return {"status": "ok", "service": "Ospra Intelligence Platform", "version": "2026-01-11"}
 
 @app.get("/health/celery")
 def celery_health():
