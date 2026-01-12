@@ -20,6 +20,7 @@ from .connection import (
     get_db,
     init_database,
     check_database_connection,
+    SessionLocal,  # Module-level SessionLocal for backward compatibility
 )
 
 # Base and Enums
@@ -143,6 +144,7 @@ __all__ = [
     "get_db",
     "init_database",
     "check_database_connection",
+    "SessionLocal",  # Module-level SessionLocal for backward compatibility
 
     # Base
     "Base",
