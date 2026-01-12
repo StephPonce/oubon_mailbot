@@ -135,7 +135,7 @@ async def health():
     
     return {
         "status": "ok",
-        "version": "2025-11-30",
+        "version": "2026-01-12",
         "database": db_type,
         "apify": "configured" if apify_configured else "not_configured"
     }
