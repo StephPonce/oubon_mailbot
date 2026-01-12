@@ -58,6 +58,11 @@ from .user_models import (
     UserEmailAccount,
 )
 
+# Password Reset (from multi_store_models until refactored)
+from .multi_store_models import (
+    PasswordResetToken,
+)
+
 # Store Models
 from .store_models import (
     Store,
@@ -161,6 +166,7 @@ __all__ = [
     "UserProductRecommendation",
     "UserSettings",
     "UserEmailAccount",
+    "PasswordResetToken",
 
     # Store Models
     "Store",
