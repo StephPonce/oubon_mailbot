@@ -5,7 +5,7 @@ Initialize email-related database tables.
 This script ensures the user_email_accounts and emails tables are created.
 """
 
-from ospra_os.database.multi_store_models import Base, User, UserEmailAccount, Email, init_multi_store_db, get_multi_store_session
+from ospra_os.database import Base, User, UserEmailAccount, Email, init_multi_store_db, get_multi_store_session
 from sqlalchemy import inspect
 
 def main():

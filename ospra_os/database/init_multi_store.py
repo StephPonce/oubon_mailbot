@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Base,
     User,
     Store,

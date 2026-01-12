@@ -13,7 +13,7 @@ import random
 import hashlib
 from enum import Enum
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     ABTest, ABTestVariant, ABTestEvent, ABTestAssignment
 )
 

@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, inspect
-from ospra_os.database.multi_store_models import Base
+from ospra_os.database import Base
 from ospra_os.database.whitelabel_models import (
     WhiteLabelPartner,
     WhiteLabelBranding,

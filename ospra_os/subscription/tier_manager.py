@@ -157,7 +157,7 @@ class TierManager:
         if not self.async_session:
             return 'nest'
         
-        from ospra_os.database.multi_store_models import UserSettings
+        from ospra_os.database import UserSettings
         
         async with self.async_session() as session:
             stmt = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -193,7 +193,7 @@ class TierManager:
         if not self.async_session:
             return {"success": False, "error": "Database not configured"}
         
-        from ospra_os.database.multi_store_models import UserSettings
+        from ospra_os.database import UserSettings
         
         async with self.async_session() as session:
             stmt = select(UserSettings).where(UserSettings.user_id == user_id)
@@ -235,7 +235,7 @@ class TierManager:
                 return {"allowed": True, "tier": tier}
             
             # Check current store count
-            from ospra_os.database.multi_store_models import Store
+            from ospra_os.database import Store
             
             if self.async_session:
                 async with self.async_session() as session:

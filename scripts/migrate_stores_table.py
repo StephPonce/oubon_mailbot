@@ -39,7 +39,7 @@ def migrate():
         
         # Import and create tables
         try:
-            from ospra_os.database.multi_store_models import Base
+            from ospra_os.database import Base
             from sqlalchemy import create_engine
             
             engine = create_engine("sqlite:///ospra_os.db")

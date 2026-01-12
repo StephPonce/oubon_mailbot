@@ -19,7 +19,7 @@ from typing import Optional, List, Dict
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     get_multi_store_session,
     RankingHistory
 )

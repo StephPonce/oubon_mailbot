@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     UserSettings, User
 )
 from ospra_os.database.action_models import Action, AIActionStatus, AIActionType

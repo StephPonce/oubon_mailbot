@@ -113,7 +113,7 @@ async def process_new_order(order_data: dict):
             # Record learning event for this sale
             try:
                 from datetime import datetime
-                from ospra_os.database.multi_store_models import SessionLocal
+                from ospra_os.database import SessionLocal
                 from ospra_os.learning.hybrid_learning_engine import LearningEvent
 
                 # Extract product metadata

@@ -29,7 +29,7 @@ print("1. INITIALIZING UNIFIED CONTEXT SYSTEM")
 print("-" * 80)
 
 try:
-    from ospra_os.database.multi_store_models import SessionLocal
+    from ospra_os.database import SessionLocal
     from ospra_os.intelligence.unified_context import get_unified_context_builder
     print("[SUCCESS] Unified context system imported")
 except Exception as e:

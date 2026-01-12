@@ -24,7 +24,7 @@ from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Product, Store, AdCampaign, Platform, ProductStatus
 )
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from .ab_test_engine import ABTestEngine, TestType
-from ospra_os.database.multi_store_models import ABTest, ABTestVariant
+from ospra_os.database import ABTest, ABTestVariant
 
 
 class AdTestManager:
@@ -240,7 +240,7 @@ class AdTestManager:
         self.engine.record_impression(test_id, variant_id, visitor_id, metadata)
 
         # Record click event
-        from ospra_os.database.multi_store_models import ABTestEvent, ABTestVariant
+        from ospra_os.database import ABTestEvent, ABTestVariant
         from sqlalchemy import select
 
         event = ABTestEvent(

@@ -12,7 +12,7 @@ from sqlalchemy import func, desc
 import logging
 import json
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     User, Store, Product, ProductDeployment,
     Platform, ProductStatus, SubscriptionTier,
     get_multi_store_session

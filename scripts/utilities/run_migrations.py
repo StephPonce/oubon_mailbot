@@ -8,7 +8,7 @@ This script creates all required tables for the Complete Anti-AutoDS System:
 - All other required tables
 """
 from sqlalchemy import create_engine, inspect
-from ospra_os.database.multi_store_models import Base
+from ospra_os.database import Base
 from ospra_os.core.settings import get_settings
 
 

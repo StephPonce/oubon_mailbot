@@ -16,7 +16,7 @@ import logging
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     AIUsage,
     AIProvider as AIProviderEnum,
     TaskType,

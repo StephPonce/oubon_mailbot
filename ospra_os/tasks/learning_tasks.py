@@ -162,7 +162,7 @@ def record_action_outcome(
 
     try:
         # TODO: Store action outcome
-        # from ospra_os.database.multi_store_models import ActionOutcome
+        # from ospra_os.database import ActionOutcome
         #
         # outcome_record = ActionOutcome(
         #     action_id=action_id,

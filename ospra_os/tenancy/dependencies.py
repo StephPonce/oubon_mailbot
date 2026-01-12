@@ -16,7 +16,7 @@ from ospra_os.tenancy.context import (
 )
 from ospra_os.tenancy.queries import TenantScopedSession, get_tenant_session
 from ospra_os.database.connection import get_db
-from ospra_os.database.multi_store_models import Store, User
+from ospra_os.database import Store, User
 
 
 # ==================== BASIC TENANT DEPENDENCIES ====================

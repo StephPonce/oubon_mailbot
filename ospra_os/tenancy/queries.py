@@ -11,7 +11,7 @@ from sqlalchemy.exc import NoResultFound
 from fastapi import HTTPException, status
 
 from ospra_os.tenancy.context import get_current_tenant, require_tenant, TenantContext
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     User,
     Store,
     Product,

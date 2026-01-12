@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
-from ospra_os.database.multi_store_models import Product, ProductSaturation, Base
+from ospra_os.database import Product, ProductSaturation, Base
 from datetime import datetime
 import requests
 

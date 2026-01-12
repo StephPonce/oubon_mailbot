@@ -10,7 +10,7 @@ from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     EmailAutomationRule, EmailTemplate, EmailLabel,
     TriggerType, ActionType, get_multi_store_session
 )

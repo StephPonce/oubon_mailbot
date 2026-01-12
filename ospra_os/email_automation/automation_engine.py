@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Email,
     EmailAutomationRule,
     EmailTemplate,

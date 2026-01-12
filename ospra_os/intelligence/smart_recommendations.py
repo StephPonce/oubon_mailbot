@@ -14,7 +14,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import logging
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     User, UserSettings, ProductSaturation, UserProductRecommendation
 )
 from ospra_os.intelligence.saturation_tracker import SaturationTracker

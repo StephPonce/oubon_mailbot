@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 
-from ospra_os.database.multi_store_models import get_multi_store_session
+from ospra_os.database import get_multi_store_session
 from .ab_test_engine import ABTestEngine, TestType, TestStatus
 from .price_test_manager import PriceTestManager
 from .content_test_manager import ContentTestManager

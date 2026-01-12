@@ -23,7 +23,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import httpx
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     UserEmailAccount, Email, get_multi_store_session
 )
 from ospra_os.email_automation.oauth.gmail_oauth import GmailOAuthHandler

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
 import logging
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Product, ProductIntelligence, ProductSaturation, Base
 )
 

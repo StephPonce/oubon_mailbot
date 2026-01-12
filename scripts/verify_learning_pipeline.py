@@ -22,7 +22,7 @@ import httpx
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ospra_os.database.multi_store_models import SessionLocal, engine as db_engine
+from ospra_os.database import SessionLocal, engine as db_engine
 from ospra_os.learning.hybrid_learning_engine import (
     LearningEvent,
     GlobalLearningWeights,

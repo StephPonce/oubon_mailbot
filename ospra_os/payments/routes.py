@@ -16,7 +16,7 @@ from ospra_os.payments.lemonsqueezy import (
     get_checkout_url_for_tier,
     LEMONSQUEEZY_WEBHOOK_SECRET,
 )
-from ospra_os.database.multi_store_models import SessionLocal, User
+from ospra_os.database import SessionLocal, User
 
 import logging
 

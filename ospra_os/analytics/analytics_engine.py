@@ -11,7 +11,7 @@ import logging
 from functools import lru_cache
 from collections import defaultdict
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     Store, Product, ProductDeployment, User,
     get_multi_store_session
 )

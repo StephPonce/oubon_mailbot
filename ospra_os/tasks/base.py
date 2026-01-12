@@ -15,7 +15,7 @@ from celery import Task
 from sqlalchemy.orm import Session
 
 from ospra_os.database.connection import get_session_factory
-from ospra_os.database.multi_store_models import User, Store
+from ospra_os.database import User, Store
 
 # Multi-Tenant Support (GROK #14)
 from ospra_os.tenancy.context import TenantContext, tenant_scope

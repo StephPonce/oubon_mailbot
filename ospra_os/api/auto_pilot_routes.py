@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     User, UserSettings, AutoPilotLog, get_db
 )
 from ospra_os.database.action_models import Action

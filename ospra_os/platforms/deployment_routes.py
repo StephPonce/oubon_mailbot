@@ -219,7 +219,7 @@ async def deploy_product(
     if len([p for p, r in results.items() if r.get("success", False)]) > 0:
         try:
             from datetime import datetime
-            from ospra_os.database.multi_store_models import SessionLocal
+            from ospra_os.database import SessionLocal
             from ospra_os.learning.hybrid_learning_engine import LearningEvent
 
             # Extract product metadata

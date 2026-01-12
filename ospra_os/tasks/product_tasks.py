@@ -14,7 +14,7 @@ from typing import Dict, Any, List
 
 from ospra_os.celery_app import celery_app
 from ospra_os.tasks.base import UserTask
-from ospra_os.database.multi_store_models import Product
+from ospra_os.database import Product
 
 logger = logging.getLogger(__name__)
 

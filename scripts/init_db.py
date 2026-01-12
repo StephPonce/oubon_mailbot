@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 load_dotenv(project_root / ".env")
 
 from sqlalchemy import create_engine, inspect
-from ospra_os.database.multi_store_models import Base, PasswordResetToken, User
+from ospra_os.database import Base, PasswordResetToken, User
 
 def init_database():
     """Initialize database and create all tables"""

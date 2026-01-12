@@ -71,7 +71,7 @@ def _get_user_context(db: Session, user_id: int) -> Dict[str, Any]:
     - today_orders: Number of orders today
     - auto_pilot: Whether auto-pilot is enabled
     """
-    from ospra_os.database.multi_store_models import (
+    from ospra_os.database import (
         Action,
         AIActionStatus,
         UserSettings

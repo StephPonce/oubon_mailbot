@@ -55,7 +55,7 @@ class HealthMonitor:
     async def _check_database(self) -> Dict:
         """Check database connectivity"""
         try:
-            from ospra_os.database.multi_store_models import get_multi_store_session
+            from ospra_os.database import get_multi_store_session
             from sqlalchemy import text
             session = get_multi_store_session(self.database_url)
             session.execute(text("SELECT 1"))
@@ -85,7 +85,7 @@ class HealthMonitor:
     async def _check_platforms(self) -> Dict:
         """Check platform adapter status"""
         # Count stores by platform
-        from ospra_os.database.multi_store_models import Store, get_multi_store_session
+        from ospra_os.database import Store, get_multi_store_session
         session = get_multi_store_session(self.database_url)
 
         stores = session.query(Store).all()

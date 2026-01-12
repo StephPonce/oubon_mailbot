@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Text
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import Base
+from ospra_os.database import Base
 from ospra_os.tenancy.context import get_current_tenant, TenantContext
 
 

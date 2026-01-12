@@ -9,7 +9,7 @@ import httpx
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from ospra_os.database.multi_store_models import Store, Product
+from ospra_os.database import Store, Product
 
 
 class ShopifyABTestIntegration:

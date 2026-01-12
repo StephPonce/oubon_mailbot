@@ -10,7 +10,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 import logging
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     get_multi_store_session,
     ABTest,
     ABTestVariant

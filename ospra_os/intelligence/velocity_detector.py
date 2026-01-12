@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 import logging
 
-from ospra_os.database.multi_store_models import (
+from ospra_os.database import (
     ProductVelocity,
     ProductSaturation
 )

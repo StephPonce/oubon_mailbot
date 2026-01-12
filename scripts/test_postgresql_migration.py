@@ -225,7 +225,7 @@ def test_crud_operations():
 
     try:
         from ospra_os.database.connection import get_session_context
-        from ospra_os.database.multi_store_models import Store
+        from ospra_os.database import Store
         from sqlalchemy import text
 
         # Test basic query

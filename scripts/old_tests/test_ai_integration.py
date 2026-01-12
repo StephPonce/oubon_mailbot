@@ -183,7 +183,7 @@ print("-" * 80)
 
 try:
     from ospra_os.intelligence.unified_context import get_unified_context_builder
-    from ospra_os.database.multi_store_models import SessionLocal
+    from ospra_os.database import SessionLocal
 
     db = SessionLocal()
     context_builder = get_unified_context_builder(db)
