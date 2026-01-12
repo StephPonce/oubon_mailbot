@@ -4,7 +4,7 @@ from datetime import datetime
 from ospra_os.email_automation.smart_reply import SmartReplySystem
 from ospra_os.email_automation.gmail_client import GmailClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
-from ospra_os.database.multi_store_models import EmailFollowup, get_followup_session
+from ospra_os.database import EmailFollowup, get_followup_session
 from ospra_os.analytics.email_analytics import Analytics
 import base64
 import re

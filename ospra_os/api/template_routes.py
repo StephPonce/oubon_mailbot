@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from ospra_os.database.connection import get_db
 from ospra_os.services.template_service import TemplateService
 from ospra_os.auth.jwt_auth import get_current_user
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 from ospra_os.api.schemas import (
     TemplateResponse,
     TemplateBrowseResponse,

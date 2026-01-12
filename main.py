@@ -80,7 +80,7 @@ async def startup_event():
 
     # Initialize Ospra OS databases (usage tracking, learning, etc.)
     try:
-        from ospra_os.database.multi_store_models import init_db as init_ospra_db
+        from ospra_os.database.connection import init_database as init_ospra_db
         init_ospra_db()
         print("[SUCCESS] Ospra OS database tables initialized")
     except Exception as e:

@@ -21,7 +21,8 @@ from ospra_os.core.tiers import (
     compare_tiers,
     get_upgrade_path,
 )
-from ospra_os.database.multi_store_models import SessionLocal, User
+from ospra_os.database import User
+from ospra_os.database.connection import SessionLocal
 
 router = APIRouter(prefix="/api/tiers", tags=["Tiers"])
 

@@ -1,7 +1,7 @@
 """Velocity Analyzer - Track product momentum"""
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from ospra_os.database.multi_store_models import ProductSnapshot, ProductIntelligence
+from ospra_os.database import ProductSnapshot, ProductIntelligence
 
 class VelocityAnalyzer:
     def __init__(self, db_session: Session):

@@ -222,7 +222,7 @@ class AutomationEngine:
 
                 if template_id:
                     # Get template
-                    from ospra_os.database.multi_store_models import EmailTemplate
+                    from ospra_os.database import EmailTemplate
                     template = session.query(EmailTemplate).filter(
                         EmailTemplate.id == template_id,
                         EmailTemplate.user_id == email.user_id

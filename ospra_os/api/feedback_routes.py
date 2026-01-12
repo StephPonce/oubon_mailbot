@@ -24,7 +24,7 @@ from fastapi import APIRouter, HTTPException, Depends, status, Query
 from pydantic import BaseModel
 
 from ospra_os.auth.jwt_auth import get_current_user
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 from ospra_os.database import get_session, Store, Product
 from sqlalchemy.orm import Session
 

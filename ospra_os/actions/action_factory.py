@@ -101,7 +101,7 @@ class ActionFactory:
             action_type_str = action.action_type.value if hasattr(action.action_type, 'value') else str(action.action_type)
 
             # Log the decision
-            from ospra_os.database.multi_store_models import AutoPilotLog
+            from ospra_os.database import AutoPilotLog
             log = AutoPilotLog(
                 user_id=self.user_id,
                 action_id=action.id,

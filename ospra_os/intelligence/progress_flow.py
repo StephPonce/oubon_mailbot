@@ -25,7 +25,7 @@ from enum import Enum
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
-from ospra_os.database.multi_store_models import Product, ProductStatus
+from ospra_os.database import Product, ProductStatus
 
 logger = logging.getLogger(__name__)
 

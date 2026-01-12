@@ -13,7 +13,7 @@ import io
 import logging
 
 from ospra_os.analytics.analytics_engine import AnalyticsEngine
-from ospra_os.database.multi_store_models import get_multi_store_session
+from ospra_os.database import get_multi_store_session
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 logger = logging.getLogger(__name__)

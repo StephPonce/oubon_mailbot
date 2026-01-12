@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from ospra_os.advertising.scheduler import AdScheduler
-from ospra_os.database.multi_store_models import AdCampaign, get_multi_store_session
+from ospra_os.database import AdCampaign, get_multi_store_session
 from ospra_os.core.settings import get_settings
 
 # Create router

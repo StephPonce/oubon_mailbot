@@ -22,7 +22,7 @@ from ospra_os.core.tiers import (
     get_tier_limit,
     log_tier_access,
 )
-from ospra_os.database.multi_store_models import SessionLocal, User
+from ospra_os.database import SessionLocal, User
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
-from ospra_os.database.multi_store_models import Base
+from ospra_os.database import Base
 
 
 class AmazonMarketplace(str, enum.Enum):

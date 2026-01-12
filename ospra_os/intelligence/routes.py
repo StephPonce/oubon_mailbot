@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from ospra_os.database.multi_store_models import get_multi_store_session
+from ospra_os.database import get_multi_store_session
 from ospra_os.intelligence.competitor_engine import CompetitorIntelligenceEngine
 from ospra_os.intelligence.price_tracker import PriceTracker
 from ospra_os.intelligence.market_share_estimator import MarketShareEstimator

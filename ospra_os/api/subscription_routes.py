@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from ospra_os.auth.jwt_auth import get_current_user, get_db, user_to_dict
-from ospra_os.database.multi_store_models import User, SubscriptionTier
+from ospra_os.database import User, SubscriptionTier
 
 
 router = APIRouter(prefix="/api/subscription", tags=["Subscription"])

@@ -23,7 +23,7 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime, timedelta
 
-from ospra_os.database.multi_store_models import get_db, User
+from ospra_os.database import get_db, User
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.voice.voice_processor import VoiceProcessor, TextToSpeech
 

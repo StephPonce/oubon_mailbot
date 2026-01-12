@@ -16,7 +16,7 @@ import uuid
 import json
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import Product, Store, AdCampaign
+from ospra_os.database import Product, Store, AdCampaign
 
 
 class ActionType(str, Enum):
@@ -155,7 +155,7 @@ class AIAction:
             return {"success": False, "error": "Product not found"}
 
         # Update product status to active
-        from ospra_os.database.multi_store_models import ProductStatus
+        from ospra_os.database import ProductStatus
         product.status = ProductStatus.ACTIVE
         product.deployed_at = datetime.utcnow()
 

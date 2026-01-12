@@ -212,7 +212,7 @@ async def upgrade_user_tier(user_id: int, tier: str, db_session=None):
     Upgrade user's subscription tier after successful payment.
     """
     from ospra_os.database.connection import get_session
-    from ospra_os.database.multi_store_models import User, SubscriptionTier
+    from ospra_os.database import User, SubscriptionTier
     from datetime import datetime
     
     tier_map = {

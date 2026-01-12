@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from typing import List, Dict, Any
 
-from ospra_os.database.multi_store_models import SessionLocal, User
+from ospra_os.database import SessionLocal, User
 from ospra_os.learning.hybrid_learning_engine import (
     LearningEvent,
     GlobalLearningWeights,

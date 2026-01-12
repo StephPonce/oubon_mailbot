@@ -99,7 +99,7 @@ class TierSystem:
         if not self.db:
             return Tier.STARTER
         
-        from ospra_os.database.multi_store_models import User
+        from ospra_os.database import User
         
         user = self.db.query(User).filter(User.id == user_id).first()
         if not user:

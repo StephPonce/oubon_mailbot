@@ -28,7 +28,7 @@ from enum import Enum
 import logging
 
 # Import base from existing models
-from ospra_os.database.multi_store_models import Base, engine, SessionLocal
+from ospra_os.database import Base, engine, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -524,7 +524,7 @@ class TierUsageEnforcer:
     
     def get_user_tier(self, user_id: int) -> str:
         """Get user's subscription tier"""
-        from ospra_os.database.multi_store_models import User
+        from ospra_os.database import User
         
         user = self.session.query(User).filter(User.id == user_id).first()
         if not user:

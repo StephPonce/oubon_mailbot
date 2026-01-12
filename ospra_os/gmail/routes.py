@@ -96,7 +96,7 @@ async def callback(request: Request):
         try:
             from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
-            from ospra_os.database.multi_store_models import User, UserEmailAccount, get_multi_store_session
+            from ospra_os.database import User, UserEmailAccount, get_multi_store_session
             from ospra_os.email_automation.oauth.gmail_oauth import GmailOAuthHandler
 
             # Get user's email address from Gmail API

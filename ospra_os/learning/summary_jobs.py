@@ -13,7 +13,7 @@ from typing import List
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from ospra_os.database.multi_store_models import SessionLocal
+from ospra_os.database import SessionLocal
 from ospra_os.learning.summary_generator import generate_daily_summaries
 from ospra_os.learning.summary_models import (
     LearningSummary,

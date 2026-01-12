@@ -7,7 +7,7 @@ Creates tables for:
 - UserProductRecommendation (track user-product relationships)
 """
 from sqlalchemy import create_engine, inspect
-from ospra_os.database.multi_store_models import Base, ProductVelocity, ProductSaturation, UserProductRecommendation
+from ospra_os.database import Base, ProductVelocity, ProductSaturation, UserProductRecommendation
 from ospra_os.core.settings import get_settings
 
 

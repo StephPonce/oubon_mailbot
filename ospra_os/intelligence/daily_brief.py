@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc
 
 from ospra_os.database.action_models import Action, AIActionStatus, AIActionType
-from ospra_os.database.multi_store_models import Store, Product
+from ospra_os.database import Store, Product
 from anthropic import Anthropic
 from ospra_os.core.settings import get_settings
 

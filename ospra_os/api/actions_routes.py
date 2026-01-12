@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import get_db
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 from ospra_os.database.action_models import (
     Action,
     ActionLog,

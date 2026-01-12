@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 from ospra_os.auth.dependencies import require_tier
 from ospra_os.auth.jwt_handler import TokenPayload
 
-from ospra_os.database.multi_store_models import get_db
+from ospra_os.database import get_db
 from ospra_os.intelligence.unified_context import get_unified_context_builder
 from ospra_os.intelligence.briefing_engine import get_briefing_engine
 from ospra_os.intelligence.grade_reasoning import get_grade_reasoning_engine

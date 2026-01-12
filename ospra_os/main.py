@@ -5810,7 +5810,7 @@ async def get_ranking_movers(
     try:
         from datetime import datetime, timedelta
         from ospra_os.intelligence.ranking_engine import RankingEngine
-        from ospra_os.database.multi_store_models import get_multi_store_session
+        from ospra_os.database import get_multi_store_session
 
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
@@ -5850,7 +5850,7 @@ async def get_product_ranking_details(
     try:
         from datetime import datetime, timedelta
         from ospra_os.intelligence.ranking_engine import RankingEngine
-        from ospra_os.database.multi_store_models import get_multi_store_session
+        from ospra_os.database import get_multi_store_session
 
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
@@ -5893,7 +5893,7 @@ async def get_product_rank_history(
     """
     try:
         from datetime import datetime, timedelta
-        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+        from ospra_os.database import get_multi_store_session, RankingHistory
 
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
@@ -5954,7 +5954,7 @@ async def get_new_entries(
     """
     try:
         from datetime import datetime, timedelta
-        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+        from ospra_os.database import get_multi_store_session, RankingHistory
         from sqlalchemy import and_
 
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
@@ -6010,7 +6010,7 @@ async def get_fallen_products(
     """
     try:
         from datetime import datetime, timedelta
-        from ospra_os.database.multi_store_models import get_multi_store_session, RankingHistory
+        from ospra_os.database import get_multi_store_session, RankingHistory
 
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)

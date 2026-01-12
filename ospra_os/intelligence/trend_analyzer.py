@@ -472,7 +472,7 @@ Your role is to surface what matters, recommend actions, and help the CEO make i
             if user_id:
                 try:
                     from ospra_os.learning.context_builder import build_claude_context
-                    from ospra_os.database.multi_store_models import SessionLocal
+                    from ospra_os.database import SessionLocal
 
                     db = SessionLocal()
                     try:

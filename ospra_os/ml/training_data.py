@@ -105,7 +105,7 @@ class TrainingDataCollector:
 
         try:
             # Import here to avoid circular dependencies
-            from ospra_os.database.multi_store_models import ProductHistory, StoreProduct
+            from ospra_os.database import ProductHistory, StoreProduct
 
             # Query high-performing products
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
@@ -267,7 +267,7 @@ Format as JSON.
         examples = []
 
         try:
-            from ospra_os.database.multi_store_models import StoreProduct
+            from ospra_os.database import StoreProduct
 
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
 
@@ -360,7 +360,7 @@ Write 2-3 compelling paragraphs.
         examples = []
 
         try:
-            from ospra_os.database.multi_store_models import StoreProduct, ProductHistory
+            from ospra_os.database import StoreProduct, ProductHistory
 
             cutoff_date = datetime.utcnow() - timedelta(days=days_back)
 

@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, List, Any, Optional
 from pydantic import BaseModel
 
-from ospra_os.database.multi_store_models import get_db
+from ospra_os.database import get_db
 from ospra_os.intelligence.ai_actions import (
     get_action_manager,
     AIActionManager,
@@ -244,7 +244,7 @@ async def propose_actions_from_analysis(
                 campaign_name = match.group(1)
 
                 # Find campaign in database
-                from ospra_os.database.multi_store_models import AdCampaign
+                from ospra_os.database import AdCampaign
                 campaign = db.query(AdCampaign).filter(
                     AdCampaign.campaign_name == campaign_name
                 ).first()

@@ -11,7 +11,7 @@ from datetime import datetime
 
 from ospra_os.email_automation.email_sync import EmailSyncService
 from ospra_os.email_automation.email_action_executor import EmailActionExecutor
-from ospra_os.database.multi_store_models import Email, UserEmailAccount, get_multi_store_session
+from ospra_os.database import Email, UserEmailAccount, get_multi_store_session
 
 
 router = APIRouter(prefix="/api/emails", tags=["Email Sync"])

@@ -43,7 +43,7 @@ from .dependencies import (
 
 # Database imports - USE REAL POSTGRESQL DATABASE
 from ospra_os.database.connection import get_db
-from ospra_os.database.multi_store_models import User, SubscriptionTier, PasswordResetToken
+from ospra_os.database import User, SubscriptionTier, PasswordResetToken
 
 # Email service for password reset
 try:

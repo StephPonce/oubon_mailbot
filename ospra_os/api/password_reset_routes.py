@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import secrets
 import uuid
 
-from ospra_os.database.multi_store_models import User, PasswordResetToken, get_db
+from ospra_os.database import User, PasswordResetToken, get_db
 from ospra_os.auth.jwt_auth import hash_password, get_user_by_email, verify_password
 from ospra_os.services.email_service import send_password_reset_email
 

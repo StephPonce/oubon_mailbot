@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ospra_os.federated.service import FederatedLearningService
-from ospra_os.database.multi_store_models import get_db
+from ospra_os.database import get_db
 
 logger = logging.getLogger(__name__)
 

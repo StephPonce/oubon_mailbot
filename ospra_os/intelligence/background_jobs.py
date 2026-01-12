@@ -299,7 +299,7 @@ class IntelligenceScheduler:
         try:
             import asyncio
             from ospra_os.intelligence.competitor_engine import CompetitorIntelligenceEngine
-            from ospra_os.database.multi_store_models import get_multi_store_session
+            from ospra_os.database import get_multi_store_session
 
             async def run_monitoring():
                 async with get_multi_store_session() as session:

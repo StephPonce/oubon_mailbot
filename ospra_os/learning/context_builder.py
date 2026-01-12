@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
-from ospra_os.database.multi_store_models import SessionLocal
+from ospra_os.database import SessionLocal
 from ospra_os.learning.summary_models import (
     LearningSummary,
     NichePerformance,

@@ -23,7 +23,7 @@ from enum import Enum
 import asyncio
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import Product, Store, AdCampaign, ProductStatus
+from ospra_os.database import Product, Store, AdCampaign, ProductStatus
 from ospra_os.intelligence.autonomous_ai import get_autonomous_ai
 from ospra_os.intelligence.competitive_learning import get_competitive_learning_engine
 from ospra_os.intelligence.ai_actions import get_action_manager, ActionType
@@ -385,7 +385,7 @@ class AutoPilot:
         )
 
         if user_id:
-            from ospra_os.database.multi_store_models import Store
+            from ospra_os.database import Store
             query = query.join(Store).filter(Store.user_id == user_id)
 
         products = query.all()

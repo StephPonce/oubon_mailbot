@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import get_db, SessionLocal
+from ospra_os.database import get_db, SessionLocal
 from ospra_os.intelligence.briefing_engine import get_briefing_engine
 from ospra_os.intelligence.grade_reasoning import get_grade_reasoning_engine
 from ospra_os.intelligence.progress_flow import get_progress_tracker
@@ -53,7 +53,7 @@ class IntelligenceScheduler:
         logger.info("[STATS] Starting product grading job...")
 
         try:
-            from ospra_os.database.multi_store_models import Product
+            from ospra_os.database import Product
 
             grade_engine = get_grade_reasoning_engine(self.db)
 
@@ -85,7 +85,7 @@ class IntelligenceScheduler:
         logger.info("[REFRESH] Updating product progress tracking...")
 
         try:
-            from ospra_os.database.multi_store_models import Product
+            from ospra_os.database import Product
 
             progress_tracker = get_progress_tracker(self.db)
 

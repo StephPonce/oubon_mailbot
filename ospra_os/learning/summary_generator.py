@@ -16,7 +16,7 @@ from typing import Dict, List, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from ospra_os.database.multi_store_models import SessionLocal
+from ospra_os.database import SessionLocal
 from ospra_os.learning.hybrid_learning_engine import LearningEvent
 from ospra_os.learning.summary_models import (
     LearningSummary,

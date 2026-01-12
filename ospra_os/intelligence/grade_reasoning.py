@@ -430,7 +430,7 @@ class GradeReasoningEngine:
 
     async def _get_product_data(self, product_id: int) -> Dict:
         """Fetch product data from database"""
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 

@@ -10,7 +10,8 @@ from fastapi import APIRouter, HTTPException, Depends, status
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
-from ospra_os.database.multi_store_models import SessionLocal, get_db
+from ospra_os.database import get_db
+from ospra_os.database.connection import SessionLocal
 from ospra_os.core.usage_tracking import (
     UsageTracker,
     TierUsageEnforcer,

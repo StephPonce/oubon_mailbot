@@ -34,7 +34,7 @@ from ospra_os.auth.jwt_auth import (
     verify_password,
     hash_password,
 )
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 
 # Try to import email service, but don't fail if it doesn't exist
 try:

@@ -14,7 +14,7 @@ from .gmail_oauth import GmailOAuthHandler
 from .outlook_oauth import OutlookOAuthHandler
 from .icloud_oauth import iCloudOAuthHandler
 from .imap_smtp_handler import IMAPSMTPHandler
-from ospra_os.database.multi_store_models import UserEmailAccount, Email, get_multi_store_session
+from ospra_os.database import UserEmailAccount, Email, get_multi_store_session
 
 
 router = APIRouter(prefix="/api/email-oauth", tags=["Email OAuth"])

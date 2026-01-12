@@ -22,7 +22,7 @@ from sqlalchemy import desc
 import aiohttp
 from bs4 import BeautifulSoup
 
-from ospra_os.database.multi_store_models import Product
+from ospra_os.database import Product
 from ospra_os.intelligence.ai_actions import ActionType, get_action_manager
 
 
@@ -466,7 +466,7 @@ class SupplierMonitor:
         )
 
         if user_id:
-            from ospra_os.database.multi_store_models import Store
+            from ospra_os.database import Store
             query = query.join(Store).filter(Store.user_id == user_id)
 
         products = query.all()

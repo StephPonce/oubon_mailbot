@@ -45,7 +45,7 @@ from ospra_os.auth.jwt_auth import (
     create_user,
     user_to_dict
 )
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 

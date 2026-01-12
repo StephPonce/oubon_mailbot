@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from ospra_os.celery_app import celery_app
 from ospra_os.auth.jwt_auth import get_current_user
-from ospra_os.database.multi_store_models import User
+from ospra_os.database import User
 from ospra_os.api.schemas import (
     TaskStatusResponse,
     ActiveTaskResponse,

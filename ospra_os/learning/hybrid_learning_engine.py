@@ -30,7 +30,7 @@ from enum import Enum
 from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, ForeignKey, Text
 from sqlalchemy.orm import Session
 
-from ospra_os.database.multi_store_models import Base, SessionLocal, engine, User
+from ospra_os.database import Base, SessionLocal, engine, User
 from ospra_os.core.tiers import SubscriptionTier, get_tier_definition
 
 logger = logging.getLogger(__name__)

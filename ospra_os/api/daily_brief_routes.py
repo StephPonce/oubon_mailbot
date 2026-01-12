@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from ospra_os.database.multi_store_models import get_db, User
+from ospra_os.database import get_db, User
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.intelligence.daily_brief import get_daily_brief_generator
 

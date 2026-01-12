@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from ospra_os.auth.jwt_auth import get_current_user, get_db, user_to_dict
-from ospra_os.database.multi_store_models import User, SubscriptionTier, UserSettings
+from ospra_os.database import User, SubscriptionTier, UserSettings
 
 
 router = APIRouter(prefix="/api/user", tags=["User"])

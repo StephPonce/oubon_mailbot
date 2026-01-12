@@ -9,7 +9,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
-from ospra_os.database.multi_store_models import SessionLocal
+from ospra_os.database import SessionLocal
 from ospra_os.learning.hybrid_learning_engine import get_learning_engine
 
 router = APIRouter(prefix="/api/learning", tags=["Learning"])
@@ -383,7 +383,7 @@ async def record_ad_performance(
     - ROAS (Return on Ad Spend): revenue / spend
     """
     from datetime import datetime
-    from ospra_os.database.multi_store_models import SessionLocal
+    from ospra_os.database import SessionLocal
     from ospra_os.learning.hybrid_learning_engine import LearningEvent
 
     db = SessionLocal()

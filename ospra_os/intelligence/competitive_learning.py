@@ -17,7 +17,7 @@ import json
 
 from ospra_os.ai.providers.claude import ClaudeProvider
 from ospra_os.ai.markdown_stripper import strip_markdown
-from ospra_os.database.multi_store_models import Product, ProductStatus, Store
+from ospra_os.database import Product, ProductStatus, Store
 
 
 class LearningPattern:

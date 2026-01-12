@@ -267,7 +267,7 @@ class ActionExecutor:
         """Preview deploying product to store"""
         product_id = params.get("product_id")
 
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -291,7 +291,7 @@ class ActionExecutor:
 
         # Try to load campaign from database if model exists
         try:
-            from ospra_os.database.multi_store_models import AdCampaign
+            from ospra_os.database import AdCampaign
             campaign = self.db.query(AdCampaign).filter(AdCampaign.id == campaign_id).first()
             daily_spend = campaign.budget_spent / 30 if campaign and campaign.budget_spent else 50.0
             campaign_name = campaign.campaign_name if campaign else "Campaign"
@@ -321,7 +321,7 @@ class ActionExecutor:
         """Preview discontinuing product"""
         product_id = params.get("product_id")
 
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -344,7 +344,7 @@ class ActionExecutor:
         product_id = params.get("product_id")
         new_price = params.get("new_price")
 
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -398,7 +398,7 @@ class ActionExecutor:
         """Deploy product to Shopify"""
         product_id = params.get("product_id")
 
-        from ospra_os.database.multi_store_models import Product, ProductStatus
+        from ospra_os.database import Product, ProductStatus
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -440,7 +440,7 @@ class ActionExecutor:
         """Discontinue product"""
         product_id = params.get("product_id")
 
-        from ospra_os.database.multi_store_models import Product, ProductStatus
+        from ospra_os.database import Product, ProductStatus
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -467,7 +467,7 @@ class ActionExecutor:
         product_id = params.get("product_id")
         new_price = params.get("new_price")
 
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product = self.db.query(Product).filter(Product.id == product_id).first()
 
@@ -549,7 +549,7 @@ class ActionExecutor:
 
     async def _undo_deploy_product(self, undo_data: Dict):
         """Undo product deployment"""
-        from ospra_os.database.multi_store_models import Product, ProductStatus
+        from ospra_os.database import Product, ProductStatus
 
         product_id = undo_data.get("product_id")
         product = self.db.query(Product).filter(Product.id == product_id).first()
@@ -568,7 +568,7 @@ class ActionExecutor:
 
     async def _undo_discontinue_product(self, undo_data: Dict):
         """Undo product discontinuation"""
-        from ospra_os.database.multi_store_models import Product, ProductStatus
+        from ospra_os.database import Product, ProductStatus
 
         product_id = undo_data.get("product_id")
         product = self.db.query(Product).filter(Product.id == product_id).first()
@@ -580,7 +580,7 @@ class ActionExecutor:
 
     async def _undo_adjust_price(self, undo_data: Dict):
         """Undo price adjustment"""
-        from ospra_os.database.multi_store_models import Product
+        from ospra_os.database import Product
 
         product_id = undo_data.get("product_id")
         old_price = undo_data.get("old_price")

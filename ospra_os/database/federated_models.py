@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, For
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from ospra_os.database.multi_store_models import Base
+from ospra_os.database import Base
 
 
 class AggregateInsight(Base):
