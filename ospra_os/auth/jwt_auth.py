@@ -20,7 +20,9 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 
-from ospra_os.database.multi_store_models import User, SessionLocal, SubscriptionTier
+# Import from correct modular architecture (NOT legacy multi_store_models!)
+from ospra_os.database import User, SubscriptionTier, get_db as get_db_session
+from ospra_os.database.connection import SessionLocal
 
 
 # ============================================================================
