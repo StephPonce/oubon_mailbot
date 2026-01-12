@@ -76,7 +76,8 @@ class UserCreate(BaseModel):
     """Request body for user registration"""
     email: EmailStr
     password: str
-    name: str
+    name: Optional[str] = None  # Optional - will default to email username
+    tier: Optional[str] = "nest"  # Default tier
 
 
 class UserLogin(BaseModel):
@@ -215,10 +216,13 @@ def create_user(db: Session, user_data: UserCreate) -> User:
             detail="Email already registered"
         )
     
+    # Default name to email username if not provided
+    user_name = user_data.name if user_data.name else user_data.email.split("@")[0]
+    
     # Create user with hashed password
     user = User(
         email=user_data.email,
-        name=user_data.name,
+        name=user_name,
         password_hash=hash_password(user_data.password),
         subscription_tier=SubscriptionTier.NEST,  # Start at free tier
     )
