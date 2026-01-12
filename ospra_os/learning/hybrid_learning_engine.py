@@ -31,111 +31,22 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, JSON, Boolean, 
 from sqlalchemy.orm import Session
 
 from ospra_os.database.connection import SessionLocal, engine
-from ospra_os.database import Base, User
+from ospra_os.database import (
+    Base,
+    User,
+    GlobalLearningWeights,
+    PersonalLearningWeights,
+    AILearningEvent,
+)
 from ospra_os.core.tiers import SubscriptionTier, get_tier_definition
 
 logger = logging.getLogger(__name__)
 
-
 # ============================================================================
-# DATABASE MODELS FOR LEARNING
+# BACKWARDS COMPATIBILITY ALIASES
 # ============================================================================
-
-class GlobalLearningWeights(Base):
-    """Global AI weights learned from ALL users"""
-    __tablename__ = "global_learning_weights"
-    
-    id = Column(Integer, primary_key=True)
-    
-    # Version tracking
-    version = Column(String(20), default="1.0")
-    learning_cycles = Column(Integer, default=0)
-    
-    # Scoring weights (JSON)
-    scoring_weights = Column(JSON, nullable=False)
-    
-    # Niche confidence (JSON)
-    niche_confidence = Column(JSON, nullable=False)
-    
-    # Price point confidence (JSON)
-    price_confidence = Column(JSON, nullable=False)
-    
-    # Trend velocity thresholds (JSON)
-    trend_velocity = Column(JSON, nullable=False)
-    
-    # Accuracy tracking (JSON)
-    accuracy = Column(JSON, nullable=False)
-    
-    # Aggregate stats
-    total_users_contributing = Column(Integer, default=0)
-    total_sales_analyzed = Column(Integer, default=0)
-    total_revenue_analyzed = Column(Float, default=0.0)
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-class PersonalLearningWeights(Base):
-    """Per-user AI weights (Soar+ only)"""
-    __tablename__ = "personal_learning_weights"
-    
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    
-    # Version tracking
-    version = Column(String(20), default="1.0")
-    learning_cycles = Column(Integer, default=0)
-    
-    # Personal adjustments (deltas from global)
-    scoring_adjustments = Column(JSON, default=dict)  # +/- adjustments to global weights
-    niche_adjustments = Column(JSON, default=dict)
-    price_adjustments = Column(JSON, default=dict)
-    
-    # User-specific patterns
-    best_performing_niches = Column(JSON, default=list)
-    optimal_price_range = Column(JSON, default=dict)
-    peak_selling_days = Column(JSON, default=list)  # ["Monday", "Friday"]
-    
-    # Custom weights (Stratosphere only)
-    custom_weights_enabled = Column(Boolean, default=False)
-    custom_weights = Column(JSON, default=dict)
-    
-    # Accuracy for this user
-    predictions_made = Column(Integer, default=0)
-    predictions_correct = Column(Float, default=0)
-    accuracy_rate = Column(Float, default=0.5)
-    
-    # Stats
-    sales_analyzed = Column(Integer, default=0)
-    revenue_analyzed = Column(Float, default=0.0)
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
-class LearningEvent(Base):
-    """Log of learning events for analytics"""
-    __tablename__ = "learning_events"
-    
-    id = Column(Integer, primary_key=True)
-    
-    # Event type
-    event_type = Column(String(50), nullable=False, index=True)  # "global_cycle", "personal_cycle", "weight_adjustment"
-    
-    # Who triggered it
-    user_id = Column(Integer, nullable=True)  # NULL for global events
-    
-    # What happened
-    details = Column(JSON, nullable=False)
-    
-    # Impact
-    accuracy_before = Column(Float)
-    accuracy_after = Column(Float)
-    
-    # Timestamp
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+# Alias AILearningEvent as LearningEvent for backward compatibility with scripts
+LearningEvent = AILearningEvent
 
 
 # ============================================================================
