@@ -28,7 +28,8 @@ from enum import Enum
 import logging
 
 # Import base from existing models
-from ospra_os.database import Base, engine, SessionLocal
+from ospra_os.database.connection import engine, SessionLocal
+from ospra_os.database import Base
 
 logger = logging.getLogger(__name__)
 

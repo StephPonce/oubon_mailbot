@@ -22,7 +22,7 @@ import httpx
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ospra_os.database import SessionLocal, engine as db_engine
+from ospra_os.database.connection import SessionLocal, engine as db_engine
 from ospra_os.learning.hybrid_learning_engine import LearningEvent, Base
 from ospra_os.learning.summary_models import LearningSummary
 from ospra_os.learning.summary_generator import generate_daily_summaries
