@@ -177,11 +177,11 @@ class AuthService {
   /**
    * Register a new user.
    */
-  async register(email, password, tier = 'nest') {
+  async register(name, email, password, tier = 'nest') {
     const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, tier }),
+      body: JSON.stringify({ name, email, password }),
     });
 
     const data = await response.json();

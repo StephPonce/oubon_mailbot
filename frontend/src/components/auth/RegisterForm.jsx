@@ -20,13 +20,14 @@ const TIERS = [
 ];
 
 export function RegisterForm() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedTier, setSelectedTier] = useState('nest');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -35,6 +36,11 @@ export function RegisterForm() {
     setError('');
 
     // Validation
+    if (!name.trim()) {
+      setError('Name is required');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -48,7 +54,7 @@ export function RegisterForm() {
     setLoading(true);
 
     try {
-      await register(email, password, selectedTier);
+      await register(name, email, password, selectedTier);
       navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
@@ -87,6 +93,21 @@ export function RegisterForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Name */}
+            <div>
+              <label className="block text-white/80 text-sm font-medium mb-2">
+                Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                placeholder="Your name"
+              />
+            </div>
+
             {/* Email */}
             <div>
               <label className="block text-white/80 text-sm font-medium mb-2">
