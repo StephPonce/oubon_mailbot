@@ -892,13 +892,18 @@ async def startup_event():
     except Exception as e:
         print(f"[WARNING]  AliExpress OAuth database initialization failed: {e}")
 
-    # Initialize Multi-Store database
+    # Initialize Multi-Store database (CRITICAL: Must use init_database not init_multi_store_db)
+    # init_multi_store_db uses legacy Base that doesn't include User model!
     try:
-        from ospra_os.database import init_multi_store_db
-        init_multi_store_db(settings.database_url)
-        print("[SUCCESS] Multi-Store database initialized")
+        from ospra_os.database import init_database
+        init_database(settings.database_url)
+        print("[SUCCESS] All database tables initialized (including users table)")
     except Exception as e:
-        print(f"[WARNING]  Multi-Store database initialization failed: {e}")
+        print(f"[ERROR] Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        # Don't swallow this error - it's critical
+        raise
 
     # Initialize Ad Schedule database
     try:
