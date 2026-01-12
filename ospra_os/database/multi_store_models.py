@@ -1730,4 +1730,29 @@ def get_db():
 
 def init_db():
     """Initialize database (create all tables)"""
-    Base.metadata.create_all(bind=engine)
+    import os
+    print(f"[DB INIT] Starting database initialization...")
+    print(f"[DB INIT] Engine URL: {str(engine.url).split('@')[-1] if '@' in str(engine.url) else str(engine.url)}")
+    
+    try:
+        # Get all table names before
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        print(f"[DB INIT] Existing tables: {existing_tables}")
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        
+        # Check again
+        inspector = inspect(engine)
+        new_tables = inspector.get_table_names()
+        print(f"[DB INIT] Tables after creation: {new_tables}")
+        print(f"[DB INIT] SUCCESS - {len(new_tables)} tables ready")
+        
+        return True
+    except Exception as e:
+        print(f"[DB INIT] ERROR creating tables: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
