@@ -57,10 +57,6 @@ from .user_models import (
     UserProductRecommendation,
     UserSettings,
     UserEmailAccount,
-)
-
-# Password Reset (from multi_store_models until refactored)
-from .multi_store_models import (
     PasswordResetToken,
 )
 
@@ -122,19 +118,8 @@ from .performance_models import (
     PerformanceOutcome,
 )
 
-# Backwards compatibility - import helper functions from multi_store_models if they still exist there
-try:
-    from .multi_store_models import (
-        init_multi_store_db,
-        get_multi_store_session,
-        get_followup_session,
-        migrate_existing_store,
-        get_user_monthly_ai_usage,
-        get_store_performance,
-    )
-except ImportError:
-    # Helper functions will be defined below for forward compatibility
-    pass
+# Backwards compatibility - these functions are now available from connection.py
+# and email_models.py/init_multi_store.py but kept in __all__ for compatibility
 
 __all__ = [
     # Connection utilities

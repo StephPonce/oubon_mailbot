@@ -213,3 +213,37 @@ class UserEmailAccount(Base):
 
     def __repr__(self):
         return f"<UserEmailAccount(id={self.id}, user_id={self.user_id}, provider='{self.provider}', email='{self.email_address}', primary={self.is_primary})>"
+
+
+# ============================================================================
+# PASSWORD RESET TOKEN MODEL
+# ============================================================================
+
+class PasswordResetToken(Base):
+    """
+    Password reset tokens for secure password recovery.
+
+    Stores tokens in database instead of memory to persist across server restarts.
+    Tokens expire after 1 hour for security.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    token = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    used = Column(Boolean, default=False, nullable=False)  # Track if token was used
+
+    def __repr__(self):
+        return f"<PasswordResetToken(email='{self.email}', expires={self.expires_at}, used={self.used})>"
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if token has expired"""
+        return datetime.utcnow() > self.expires_at
+
+    @property
+    def is_valid(self) -> bool:
+        """Check if token is valid (not expired and not used)"""
+        return not self.is_expired and not self.used
