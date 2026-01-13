@@ -42,13 +42,15 @@ def get_pool_args() -> dict:
     """
     Get PostgreSQL connection pool configuration.
 
-    Returns optimized pool settings for production PostgreSQL usage.
+    Returns optimized pool settings for production PostgreSQL usage
+    with improved transaction error resilience.
     """
     return {
         "pool_size": 5,
         "max_overflow": 10,
-        "pool_pre_ping": True,  # Verify connections before use
-        "pool_recycle": 3600,   # Recycle connections after 1 hour
+        "pool_pre_ping": True,         # Verify connections before use
+        "pool_recycle": 1800,          # Recycle connections after 30 min (reduced from 1 hour)
+        "pool_reset_on_return": "rollback",  # Always rollback on connection return
     }
 
 
@@ -155,16 +157,23 @@ def get_session_context(database_url: str = None) -> Generator[Session, None, No
 
 def get_db() -> Generator[Session, None, None]:
     """
-    FastAPI dependency for database sessions.
-    
+    FastAPI dependency for database sessions with proper error handling.
+
     Usage:
         @app.get("/endpoint")
         def endpoint(db: Session = Depends(get_db)):
             pass
+
+    Ensures proper transaction cleanup to prevent SQLAlchemy f405 errors
+    (stale transactions in connection pool).
     """
     session = get_session()
     try:
         yield session
+    except Exception:
+        # Explicitly rollback on error to prevent stale transactions
+        session.rollback()
+        raise
     finally:
         session.close()
 
