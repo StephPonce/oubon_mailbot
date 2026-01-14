@@ -184,16 +184,69 @@ def init_database(database_url: str = None):
 
     Call this on app startup.
     """
-    from ospra_os.database.base import Base
-
-    engine = get_engine(database_url)
-    Base.metadata.create_all(bind=engine)
-
-    print(f"[SUCCESS] PostgreSQL database initialized")
-    print(f"   URL: {str(engine.url).split('@')[-1]}")  # Hide credentials
-    print(f"   Tables: {len(Base.metadata.tables)}")
-
-    return engine
+    print("[DB INIT] Starting database initialization...")
+    
+    try:
+        from ospra_os.database.base import Base
+        
+        # CRITICAL: Import ALL model files to register them with Base
+        # Models must be imported BEFORE create_all() is called
+        print("[DB INIT] Importing model files...")
+        
+        try:
+            from ospra_os.database import user_models
+            print("[DB INIT]   ✓ user_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ user_models failed: {e}")
+        
+        try:
+            from ospra_os.database import federated_models
+            print("[DB INIT]   ✓ federated_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ federated_models failed: {e}")
+        
+        # Import any other model files
+        try:
+            from ospra_os.database import models
+            print("[DB INIT]   ✓ models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ models: {e}")
+        
+        engine = get_engine(database_url)
+        
+        # Check existing tables
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        print(f"[DB INIT] Existing tables: {len(existing_tables)} - {existing_tables[:5]}...")
+        
+        # Create all tables
+        print(f"[DB INIT] Creating tables from {len(Base.metadata.tables)} registered models...")
+        Base.metadata.create_all(bind=engine)
+        
+        # Verify
+        inspector = inspect(engine)
+        new_tables = inspector.get_table_names()
+        print(f"[DB INIT] Tables after create_all: {len(new_tables)}")
+        
+        # Check for users table specifically
+        if 'users' in new_tables:
+            print("[DB INIT] ✓ 'users' table EXISTS")
+        else:
+            print("[DB INIT] ✗ 'users' table MISSING!")
+            print(f"[DB INIT] Available tables: {new_tables}")
+        
+        print(f"[DB INIT] SUCCESS - Database ready")
+        print(f"[DB INIT]   URL: {str(engine.url).split('@')[-1]}")
+        print(f"[DB INIT]   Tables: {len(new_tables)}")
+        
+        return engine
+        
+    except Exception as e:
+        import traceback
+        print(f"[DB INIT] ERROR: {e}")
+        print(f"[DB INIT] Traceback: {traceback.format_exc()}")
+        raise
 
 
 def check_database_connection(database_url: str = None) -> dict:
