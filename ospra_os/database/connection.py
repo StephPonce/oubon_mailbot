@@ -205,12 +205,23 @@ def init_database(database_url: str = None):
         except Exception as e:
             print(f"[DB INIT]   ✗ federated_models failed: {e}")
         
-        # Import any other model files
         try:
-            from ospra_os.database import models
-            print("[DB INIT]   ✓ models imported")
+            from ospra_os.database import core_models
+            print("[DB INIT]   ✓ core_models imported")
         except Exception as e:
-            print(f"[DB INIT]   ✗ models: {e}")
+            print(f"[DB INIT]   ✗ core_models failed: {e}")
+        
+        try:
+            from ospra_os.database import product_models
+            print("[DB INIT]   ✓ product_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ product_models failed: {e}")
+        
+        try:
+            from ospra_os.database import store_models
+            print("[DB INIT]   ✓ store_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ store_models failed: {e}")
         
         engine = get_engine(database_url)
         
@@ -220,9 +231,30 @@ def init_database(database_url: str = None):
         existing_tables = inspector.get_table_names()
         print(f"[DB INIT] Existing tables: {len(existing_tables)} - {existing_tables[:5]}...")
         
-        # Create all tables
+        # Check if users table exists
+        if 'users' in existing_tables:
+            print("[DB INIT] ✓ 'users' table already exists - skipping create_all")
+            return engine
+        
+        # If tables exist but no users table, we have a partial schema
+        # Try to create missing tables only
         print(f"[DB INIT] Creating tables from {len(Base.metadata.tables)} registered models...")
-        Base.metadata.create_all(bind=engine)
+        
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception as create_error:
+            print(f"[DB INIT] create_all failed: {create_error}")
+            print("[DB INIT] Attempting to drop and recreate all tables...")
+            
+            # Drop all and recreate (nuclear option)
+            try:
+                Base.metadata.drop_all(bind=engine)
+                print("[DB INIT] All tables dropped")
+                Base.metadata.create_all(bind=engine)
+                print("[DB INIT] All tables recreated")
+            except Exception as nuclear_error:
+                print(f"[DB INIT] Nuclear option failed: {nuclear_error}")
+                raise
         
         # Verify
         inspector = inspect(engine)

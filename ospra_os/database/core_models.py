@@ -96,7 +96,7 @@ class Niche(Base):
     description = Column(Text)
 
     # Hierarchy
-    parent_niche_id = Column(String, ForeignKey("niches.niche_id"), nullable=True)
+    parent_niche_id = Column(String, ForeignKey("niches.niche_id", use_alter=True, name="fk_niche_parent"), nullable=True)
 
     # SEO & Keywords
     keywords = Column(JSON)  # List of related search terms
@@ -123,7 +123,7 @@ class NicheSnapshot(Base):
     __tablename__ = "niche_snapshots"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    niche_id = Column(String, ForeignKey("niches.niche_id"), index=True, nullable=False)
+    niche_id = Column(String, ForeignKey("niches.niche_id", use_alter=True, name="fk_snapshot_niche"), index=True, nullable=False)
 
     # Core scores
     health_score = Column(Float, nullable=False)  # 0-100 composite health score
