@@ -178,123 +178,205 @@ def get_db() -> Generator[Session, None, None]:
         session.close()
 
 
+# Critical tables that MUST exist for the app to function
+CRITICAL_TABLES = ['users', 'stores', 'products', 'user_settings']
+
+
+def _import_all_models():
+    """
+    Import all model files to register them with SQLAlchemy Base.
+    
+    This must be called before any create_all() or Alembic migration.
+    """
+    from ospra_os.database.base import Base
+    
+    model_modules = [
+        'user_models',
+        'federated_models', 
+        'core_models',
+        'product_models',
+        'store_models',
+        'testing_models',
+        'email_models',
+        'action_models',
+        'advertising_models',
+        'actions_models',
+        'performance_models',
+        'whitelabel_models',
+        'template_models',
+        'amazon_models',
+        'aliexpress_tokens',
+        'cached_products',
+    ]
+    
+    imported = 0
+    for module_name in model_modules:
+        try:
+            __import__(f'ospra_os.database.{module_name}')
+            imported += 1
+        except ImportError:
+            pass  # Optional module
+        except Exception as e:
+            print(f"[DB INIT]   ✗ {module_name}: {e}")
+    
+    print(f"[DB INIT] Imported {imported} model modules ({len(Base.metadata.tables)} tables registered)")
+    return Base
+
+
+def _run_alembic_migrations():
+    """
+    Run Alembic migrations to upgrade database to latest version.
+    
+    Returns True if successful, False if Alembic unavailable or failed.
+    """
+    try:
+        from alembic.config import Config
+        from alembic import command
+        import os
+        
+        # Find alembic.ini relative to project root
+        project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        alembic_ini = os.path.join(project_root, 'alembic.ini')
+        
+        if not os.path.exists(alembic_ini):
+            print(f"[DB INIT] alembic.ini not found at {alembic_ini}")
+            return False
+        
+        # Check if any migrations exist
+        versions_dir = os.path.join(project_root, 'alembic', 'versions')
+        if not os.path.exists(versions_dir):
+            print("[DB INIT] No alembic/versions directory found")
+            return False
+            
+        migrations = [f for f in os.listdir(versions_dir) if f.endswith('.py') and not f.startswith('__')]
+        if not migrations:
+            print("[DB INIT] No Alembic migrations found - using create_all() fallback")
+            return False
+        
+        print(f"[DB INIT] Running Alembic migrations ({len(migrations)} found)...")
+        
+        alembic_cfg = Config(alembic_ini)
+        command.upgrade(alembic_cfg, "head")
+        
+        print("[DB INIT] ✓ Alembic migrations complete")
+        return True
+        
+    except ImportError:
+        print("[DB INIT] Alembic not installed - using create_all() fallback")
+        return False
+    except Exception as e:
+        print(f"[DB INIT] Alembic migration failed: {e}")
+        return False
+
+
+def verify_database_schema(engine=None) -> dict:
+    """
+    Verify that critical database tables exist.
+    
+    Returns dict with status and any missing tables.
+    Use this for health checks and startup validation.
+    """
+    if engine is None:
+        engine = get_engine()
+    
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    
+    missing = [t for t in CRITICAL_TABLES if t not in existing_tables]
+    
+    return {
+        'status': 'healthy' if not missing else 'degraded',
+        'total_tables': len(existing_tables),
+        'critical_tables': CRITICAL_TABLES,
+        'missing_tables': missing,
+        'all_present': len(missing) == 0
+    }
+
+
 def init_database(database_url: str = None):
     """
-    Initialize PostgreSQL database - create all tables.
-
-    Call this on app startup.
+    Initialize database schema on app startup.
+    
+    Strategy:
+    1. For PostgreSQL: Try Alembic migrations first, fall back to create_all()
+    2. For SQLite: Use create_all() directly (local dev)
+    3. Always verify critical tables exist after initialization
+    
+    Raises RuntimeError if critical tables are missing after init.
     """
     print("[DB INIT] Starting database initialization...")
     
     try:
-        from ospra_os.database.base import Base
+        # Import all models first
+        Base = _import_all_models()
         
-        # CRITICAL: Import ALL model files to register them with Base
-        # Models must be imported BEFORE create_all() is called
-        print("[DB INIT] Importing model files...")
-        
-        try:
-            from ospra_os.database import user_models
-            print("[DB INIT]   ✓ user_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ user_models failed: {e}")
-        
-        try:
-            from ospra_os.database import federated_models
-            print("[DB INIT]   ✓ federated_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ federated_models failed: {e}")
-        
-        try:
-            from ospra_os.database import core_models
-            print("[DB INIT]   ✓ core_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ core_models failed: {e}")
-        
-        try:
-            from ospra_os.database import product_models
-            print("[DB INIT]   ✓ product_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ product_models failed: {e}")
-        
-        try:
-            from ospra_os.database import store_models
-            print("[DB INIT]   ✓ store_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ store_models failed: {e}")
-        
-        try:
-            from ospra_os.database import testing_models
-            print("[DB INIT]   ✓ testing_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ testing_models failed: {e}")
-        
-        try:
-            from ospra_os.database import email_models
-            print("[DB INIT]   ✓ email_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ email_models failed: {e}")
-        
-        try:
-            from ospra_os.database import action_models
-            print("[DB INIT]   ✓ action_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ action_models failed: {e}")
-        
-        try:
-            from ospra_os.database import advertising_models
-            print("[DB INIT]   ✓ advertising_models imported")
-        except Exception as e:
-            print(f"[DB INIT]   ✗ advertising_models failed: {e}")
-        
+        # Get engine
         engine = get_engine(database_url)
+        db_type = 'postgresql' if 'postgresql' in str(engine.url) else 'sqlite'
+        print(f"[DB INIT] Database type: {db_type}")
         
         # Check existing tables
         from sqlalchemy import inspect
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
-        print(f"[DB INIT] Existing tables: {len(existing_tables)} - {existing_tables[:5]}...")
+        print(f"[DB INIT] Existing tables: {len(existing_tables)}")
         
-        # Check if users table exists
-        if 'users' in existing_tables:
-            print("[DB INIT] ✓ 'users' table already exists - skipping create_all")
+        # Check if schema already exists
+        schema_check = verify_database_schema(engine)
+        if schema_check['all_present']:
+            print(f"[DB INIT] ✓ All {len(CRITICAL_TABLES)} critical tables present - schema OK")
             return engine
         
-        # If tables exist but no users table, we have a partial schema
-        # Try to create missing tables only
-        print(f"[DB INIT] Creating tables from {len(Base.metadata.tables)} registered models...")
+        # Schema missing or incomplete - need to create
+        print(f"[DB INIT] Missing tables: {schema_check['missing_tables']}")
         
+        # Try Alembic first (PostgreSQL production)
+        if db_type == 'postgresql':
+            if _run_alembic_migrations():
+                # Verify after Alembic
+                schema_check = verify_database_schema(engine)
+                if schema_check['all_present']:
+                    print("[DB INIT] ✓ Schema ready via Alembic")
+                    return engine
+        
+        # Fall back to create_all() (SQLite or Alembic failed/unavailable)
+        print("[DB INIT] Using SQLAlchemy create_all()...")
         try:
             Base.metadata.create_all(bind=engine)
         except Exception as create_error:
-            print(f"[DB INIT] create_all failed: {create_error}")
-            print("[DB INIT] Attempting to drop and recreate all tables...")
+            print(f"[DB INIT] create_all() failed: {create_error}")
             
-            # Drop all and recreate (nuclear option)
-            try:
-                Base.metadata.drop_all(bind=engine)
-                print("[DB INIT] All tables dropped")
+            # For empty databases, try dropping everything first
+            if len(existing_tables) > 0:
+                print("[DB INIT] Partial schema detected - attempting clean slate...")
+                from sqlalchemy import text
+                with engine.connect() as conn:
+                    for table in existing_tables:
+                        try:
+                            conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
+                        except:
+                            pass
+                    conn.commit()
+                
+                # Retry create_all
                 Base.metadata.create_all(bind=engine)
-                print("[DB INIT] All tables recreated")
-            except Exception as nuclear_error:
-                print(f"[DB INIT] Nuclear option failed: {nuclear_error}")
-                raise
         
-        # Verify
+        # Final verification
         inspector = inspect(engine)
-        new_tables = inspector.get_table_names()
-        print(f"[DB INIT] Tables after create_all: {len(new_tables)}")
+        final_tables = inspector.get_table_names()
+        schema_check = verify_database_schema(engine)
         
-        # Check for users table specifically
-        if 'users' in new_tables:
-            print("[DB INIT] ✓ 'users' table EXISTS")
-        else:
-            print("[DB INIT] ✗ 'users' table MISSING!")
-            print(f"[DB INIT] Available tables: {new_tables}")
+        print(f"[DB INIT] Final table count: {len(final_tables)}")
         
-        print(f"[DB INIT] SUCCESS - Database ready")
-        print(f"[DB INIT]   URL: {str(engine.url).split('@')[-1]}")
-        print(f"[DB INIT]   Tables: {len(new_tables)}")
+        if not schema_check['all_present']:
+            error_msg = f"CRITICAL: Missing tables after init: {schema_check['missing_tables']}"
+            print(f"[DB INIT] ✗ {error_msg}")
+            raise RuntimeError(error_msg)
+        
+        print("[DB INIT] ✓ Database initialization complete")
+        print(f"[DB INIT]   Tables: {len(final_tables)}")
+        print(f"[DB INIT]   Critical tables: All present")
         
         return engine
         

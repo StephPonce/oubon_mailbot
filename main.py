@@ -133,12 +133,45 @@ async def health():
     # Check Apify
     apify_configured = bool(os.getenv('APIFY_API_TOKEN') or os.getenv('OUBONSHOP_APIFY_API_TOKEN'))
     
+    # Check database schema
+    try:
+        from ospra_os.database.connection import verify_database_schema
+        schema_status = verify_database_schema()
+        db_status = schema_status['status']
+    except Exception as e:
+        db_status = f"error: {str(e)[:50]}"
+    
     return {
-        "status": "ok",
-        "version": "2026-01-12",
+        "status": "ok" if db_status == "healthy" else "degraded",
+        "version": "2026-01-14",
         "database": db_type,
+        "database_status": db_status,
         "apify": "configured" if apify_configured else "not_configured"
     }
+
+
+@app.get("/health/database")
+async def database_health():
+    """Detailed database health check"""
+    try:
+        from ospra_os.database.connection import verify_database_schema, check_database_connection
+        
+        # Connection check
+        conn_status = check_database_connection()
+        
+        # Schema check
+        schema_status = verify_database_schema()
+        
+        return {
+            "status": "healthy" if schema_status['all_present'] else "degraded",
+            "connection": conn_status,
+            "schema": schema_status
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
 
 @app.get("/debug/intelligence")
 async def debug_intelligence():
