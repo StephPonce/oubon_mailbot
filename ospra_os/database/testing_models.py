@@ -43,7 +43,7 @@ class ABTest(Base):
     confidence_level = Column(Float, default=0.95, nullable=False)  # 95% confidence
 
     # Winner
-    winner_variant_id = Column(Integer, ForeignKey("ab_test_variants.id"), nullable=True)
+    winner_variant_id = Column(Integer, ForeignKey("ab_test_variants.id", use_alter=True, name="fk_abtest_winner"), nullable=True)
 
     # Additional Data
     test_metadata = Column(JSON, default=dict)  # Additional test configuration

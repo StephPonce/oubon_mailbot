@@ -223,6 +223,30 @@ def init_database(database_url: str = None):
         except Exception as e:
             print(f"[DB INIT]   ✗ store_models failed: {e}")
         
+        try:
+            from ospra_os.database import testing_models
+            print("[DB INIT]   ✓ testing_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ testing_models failed: {e}")
+        
+        try:
+            from ospra_os.database import email_models
+            print("[DB INIT]   ✓ email_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ email_models failed: {e}")
+        
+        try:
+            from ospra_os.database import action_models
+            print("[DB INIT]   ✓ action_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ action_models failed: {e}")
+        
+        try:
+            from ospra_os.database import advertising_models
+            print("[DB INIT]   ✓ advertising_models imported")
+        except Exception as e:
+            print(f"[DB INIT]   ✗ advertising_models failed: {e}")
+        
         engine = get_engine(database_url)
         
         # Check existing tables
