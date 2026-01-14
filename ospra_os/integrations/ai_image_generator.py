@@ -590,24 +590,25 @@ Photorealistic, premium quality product photography."""
             return None
     
     # =========================================================================
-    # MODE 2: IMAGE-TO-IMAGE (Stability AI) - Enhanced Error Handling
+    # MODE 2: IMAGE-TO-IMAGE (Stability AI) - Updated for Latest API
     # =========================================================================
     
-    async def _generate_img2img_stability(
-        self, 
-        product_title: str, 
-        niche: str, 
-        original_image_url: str
-    ) -> Optional[Dict]:
+    async def _generate_img2img_stability(self,  product_title: str, niche: str, original_image_url: str) -> Optional[Dict]:
         """
         Stability AI img2img with detailed error handling.
+        
+        Supports both:
+        - Legacy v1 API (stable-diffusion-xl-1024-v1-0)
+        - New Stable Image API v2beta (if v1 fails)
         """
         logger.info(f"[IMG2IMG] Starting transformation: {product_title[:40]}...")
-        logger.info(f"[IMG2IMG] Using API key: {STABILITY_API_KEY[:20] if STABILITY_API_KEY else 'NOT SET'}...")
         
         if not STABILITY_API_KEY:
             logger.error("[IMG2IMG] ❌ STABILITY_API_KEY not configured!")
+            logger.error("[IMG2IMG]    Get your key at: https://platform.stability.ai/account/keys")
             return None
+        
+        logger.info(f"[IMG2IMG] Using API key: {STABILITY_API_KEY[:15]}...{STABILITY_API_KEY[-4:]}")
         
         # Download original image
         logger.info(f"[IMG2IMG] Downloading source image...")
@@ -617,19 +618,38 @@ Photorealistic, premium quality product photography."""
             logger.error("[IMG2IMG] ❌ Failed to download source image")
             return None
         
-        logger.info(f"[IMG2IMG] Image downloaded, size: {len(image_base64)} base64 chars")
+        # Decode for size check
+        image_bytes = base64.b64decode(image_base64)
+        logger.info(f"[IMG2IMG] Image downloaded: {len(image_bytes):,} bytes")
         
         # Build prompt
         style_prompt = self._build_stability_prompt(product_title, niche)
         logger.info(f"[IMG2IMG] Prompt: {style_prompt[:100]}...")
-
+        
+        # Try v1 API first, then fall back to v2beta
+        result = await self._try_stability_v1_img2img(image_bytes, style_prompt, product_title)
+        
+        if not result:
+            logger.info("[IMG2IMG] v1 API failed, trying v2beta...")
+            result = await self._try_stability_v2_img2img(image_bytes, style_prompt, product_title)
+        
+        return result
+    
+    async def _try_stability_v1_img2img(
+        self,
+        image_bytes: bytes,
+        style_prompt: str,
+        product_title: str
+    ) -> Optional[Dict]:
+        """
+        Try Stability AI v1 API (legacy but still works for many use cases)
+        """
         try:
             async with aiohttp.ClientSession() as session:
-                # Prepare multipart form data
                 form = aiohttp.FormData()
                 form.add_field(
                     'init_image', 
-                    base64.b64decode(image_base64),
+                    image_bytes,
                     filename='image.png',
                     content_type='image/png'
                 )
@@ -644,7 +664,7 @@ Photorealistic, premium quality product photography."""
                 form.add_field('samples', '1')
                 form.add_field('steps', '30')
                 
-                logger.info("[IMG2IMG] Calling Stability AI API...")
+                logger.info("[IMG2IMG] Calling Stability AI v1 API...")
                 
                 async with session.post(
                     "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
@@ -655,52 +675,120 @@ Photorealistic, premium quality product photography."""
                     data=form,
                     timeout=aiohttp.ClientTimeout(total=120)
                 ) as response:
-                    logger.info(f"[IMG2IMG] Response status: {response.status}")
+                    logger.info(f"[IMG2IMG] v1 Response status: {response.status}")
                     
                     if response.status == 200:
                         data = await response.json()
-                        
-                        # Save the generated image locally
-                        result_base64 = data['artifacts'][0]['base64']
-                        image_bytes = base64.b64decode(result_base64)
-                        
-                        safe_title = product_title[:30].replace(' ', '_').replace('/', '_').replace('\\', '_')
-                        filename = f"img2img_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-                        filepath = CACHE_DIR / filename
-                        
-                        with open(filepath, 'wb') as f:
-                            f.write(image_bytes)
-                        
-                        logger.info(f"[IMG2IMG] ✅ Success! Saved to: {filename}")
-                        
-                        return {
-                            "ai_image_url": f"/generated_images/{filename}",
-                            "generated_at": datetime.now().isoformat(),
-                            "source": "stability_img2img",
-                            "note": "Transformed original product image with enhanced styling.",
-                            "prompt_used": style_prompt
-                        }
+                        return await self._save_stability_result(data, product_title, "v1")
                     else:
                         error_text = await response.text()
-                        logger.error(f"[IMG2IMG] ❌ Stability API error {response.status}")
-                        logger.error(f"[IMG2IMG] Error details: {error_text[:500]}")
-                        
-                        # Parse error for specific issues
-                        if "insufficient" in error_text.lower():
-                            logger.error("[IMG2IMG] ❌ Insufficient credits on Stability AI account")
-                        elif "invalid" in error_text.lower() and "key" in error_text.lower():
-                            logger.error("[IMG2IMG] ❌ Invalid API key")
-                        elif "content_moderation" in error_text.lower():
-                            logger.error("[IMG2IMG] ❌ Content moderation blocked the image")
-                        
+                        logger.error(f"[IMG2IMG] v1 API error {response.status}: {error_text[:300]}")
+                        self._log_stability_error(response.status, error_text)
                         return None
                         
         except asyncio.TimeoutError:
-            logger.error("[IMG2IMG] ❌ Request timed out after 120 seconds")
+            logger.error("[IMG2IMG] v1 request timed out after 120 seconds")
             return None
         except Exception as e:
-            logger.error(f"[IMG2IMG] ❌ Exception: {type(e).__name__}: {e}")
+            logger.error(f"[IMG2IMG] v1 exception: {type(e).__name__}: {e}")
             return None
+    
+    async def _try_stability_v2_img2img(
+        self,
+        image_bytes: bytes,
+        style_prompt: str,
+        product_title: str
+    ) -> Optional[Dict]:
+        """
+        Try Stability AI v2beta API (newer, more reliable)
+        Uses the image-to-image/upscale endpoints
+        """
+        try:
+            async with aiohttp.ClientSession() as session:
+                form = aiohttp.FormData()
+                form.add_field(
+                    'image', 
+                    image_bytes,
+                    filename='image.png',
+                    content_type='image/png'
+                )
+                form.add_field('prompt', style_prompt)
+                form.add_field('negative_prompt', 
+                              'blurry, low quality, distorted, watermark, text, logo, cartoon')
+                form.add_field('strength', '0.35')
+                form.add_field('output_format', 'png')
+                
+                logger.info("[IMG2IMG] Calling Stability AI v2beta API...")
+                
+                async with session.post(
+                    "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+                    headers={
+                        "Authorization": f"Bearer {STABILITY_API_KEY}",
+                        "Accept": "image/*"
+                    },
+                    data=form,
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as response:
+                    logger.info(f"[IMG2IMG] v2beta Response status: {response.status}")
+                    
+                    if response.status == 200:
+                        # v2beta returns raw image bytes
+                        result_bytes = await response.read()
+                        return await self._save_stability_bytes(result_bytes, product_title, "v2beta")
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"[IMG2IMG] v2beta API error {response.status}: {error_text[:300]}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"[IMG2IMG] v2beta exception: {type(e).__name__}: {e}")
+            return None
+    
+    async def _save_stability_result(self, data: dict, product_title: str, api_version: str) -> Dict:
+        """Save result from v1 API (returns JSON with base64)"""
+        result_base64 = data['artifacts'][0]['base64']
+        image_bytes = base64.b64decode(result_base64)
+        return await self._save_stability_bytes(image_bytes, product_title, api_version)
+    
+    async def _save_stability_bytes(self, image_bytes: bytes, product_title: str, api_version: str) -> Dict:
+        """Save image bytes to file and return result dict"""
+        safe_title = product_title[:30].replace(' ', '_').replace('/', '_').replace('\\', '_')
+        filename = f"img2img_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        filepath = CACHE_DIR / filename
+        
+        with open(filepath, 'wb') as f:
+            f.write(image_bytes)
+        
+        logger.info(f"[IMG2IMG] ✅ Success ({api_version})! Saved to: {filename}")
+        
+        return {
+            "ai_image_url": f"/generated_images/{filename}",
+            "generated_at": datetime.now().isoformat(),
+            "source": f"stability_img2img_{api_version}",
+            "note": "Transformed original product image with enhanced styling.",
+            "api_version": api_version
+        }
+    
+    def _log_stability_error(self, status_code: int, error_text: str):
+        """Log detailed error information for debugging"""
+        error_lower = error_text.lower()
+        
+        if status_code == 401:
+            logger.error("[IMG2IMG] ❌ Invalid API key - check STABILITY_API_KEY in .env")
+            logger.error("[IMG2IMG]    Get your key at: https://platform.stability.ai/account/keys")
+        elif status_code == 402:
+            logger.error("[IMG2IMG] ❌ Insufficient credits - add credits at:")
+            logger.error("[IMG2IMG]    https://platform.stability.ai/account/credits")
+        elif status_code == 403:
+            logger.error("[IMG2IMG] ❌ Access denied - API key may lack permissions")
+        elif "content_moderation" in error_lower or "nsfw" in error_lower:
+            logger.error("[IMG2IMG] ❌ Content moderation blocked the image")
+        elif "invalid" in error_lower and "image" in error_lower:
+            logger.error("[IMG2IMG] ❌ Invalid image format - must be PNG/JPEG")
+        elif status_code == 429:
+            logger.error("[IMG2IMG] ❌ Rate limited - too many requests")
+        elif status_code >= 500:
+            logger.error(f"[IMG2IMG] ❌ Stability AI server error ({status_code}) - try again later")
     
     # =========================================================================
     # MODE 3: TEXT-ONLY (Enhanced prompts)

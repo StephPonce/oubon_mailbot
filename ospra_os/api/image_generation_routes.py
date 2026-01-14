@@ -22,6 +22,8 @@ from typing import List, Optional, Literal
 import logging
 import time
 import os
+import asyncio
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
@@ -505,7 +507,7 @@ async def debug_image_generation():
         "module_loaded": IMAGE_GENERATOR_AVAILABLE,
         "environment": {
             "OPENAI_API_KEY": f"{openai_key[:20]}..." if openai_key else "NOT SET ❌",
-            "STABILITY_API_KEY": f"{stability_key[:20]}..." if stability_key else "NOT SET ❌",
+            "STABILITY_API_KEY": f"{stability_key[:15]}...{stability_key[-4:]}" if stability_key else "NOT SET ❌",
             "GOOGLE_AI_API_KEY": "Set" if os.getenv('GOOGLE_AI_API_KEY') else "NOT SET"
         },
         "recommendations": []
@@ -520,6 +522,9 @@ async def debug_image_generation():
         debug_info["recommendations"].append(
             "Set STABILITY_API_KEY for img2img mode (best for product accuracy)"
         )
+        debug_info["recommendations"].append(
+            "Get your key at: https://platform.stability.ai/account/keys"
+        )
     
     if IMAGE_GENERATOR_AVAILABLE:
         generator = get_image_generator()
@@ -531,3 +536,135 @@ async def debug_image_generation():
         }
     
     return debug_info
+
+
+@router.post("/test/stability")
+async def test_stability_ai():
+    """
+    Test Stability AI API connection.
+    
+    This will:
+    1. Check if STABILITY_API_KEY is set
+    2. Make a simple API call to verify the key works
+    3. Return detailed status
+    """
+    stability_key = os.getenv('STABILITY_API_KEY')
+    
+    if not stability_key:
+        return {
+            "success": False,
+            "error": "STABILITY_API_KEY not set in environment",
+            "fix": "Add STABILITY_API_KEY to your .env file",
+            "get_key": "https://platform.stability.ai/account/keys"
+        }
+    
+    # Test the API with account balance check
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.stability.ai/v1/user/balance",
+                headers={"Authorization": f"Bearer {stability_key}"},
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    credits = data.get('credits', 0)
+                    
+                    return {
+                        "success": True,
+                        "api_key": f"{stability_key[:15]}...{stability_key[-4:]}",
+                        "credits": credits,
+                        "credits_status": "✅ Has credits" if credits > 0 else "❌ No credits - add at https://platform.stability.ai/account/credits",
+                        "v1_api": "Available",
+                        "v2beta_api": "Available",
+                        "message": "Stability AI connection successful!"
+                    }
+                elif response.status == 401:
+                    return {
+                        "success": False,
+                        "error": "Invalid API key",
+                        "status_code": 401,
+                        "fix": "Check your STABILITY_API_KEY - it may be expired or incorrect",
+                        "get_key": "https://platform.stability.ai/account/keys"
+                    }
+                else:
+                    error_text = await response.text()
+                    return {
+                        "success": False,
+                        "error": f"API returned status {response.status}",
+                        "details": error_text[:200],
+                        "status_code": response.status
+                    }
+                    
+    except asyncio.TimeoutError:
+        return {
+            "success": False,
+            "error": "Connection timeout",
+            "fix": "Stability AI may be experiencing issues - try again later"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__
+        }
+
+
+@router.post("/test/generate")
+async def test_generate_image(
+    test_url: str = "https://ae01.alicdn.com/kf/S1c66c5e8655d4c5c8b7a5e1d3f4e5f6g/Smart-LED-Desk-Lamp.jpg"
+):
+    """
+    Quick test to generate an image with all available modes.
+    
+    Provide a test_url or use the default AliExpress product image.
+    """
+    if not IMAGE_GENERATOR_AVAILABLE:
+        return {"success": False, "error": "Image generator not available"}
+    
+    generator = get_image_generator()
+    
+    results = {
+        "test_image": test_url,
+        "modes_tested": [],
+        "results": {}
+    }
+    
+    # Test each available mode
+    if generator.openai_available:
+        results["modes_tested"].append("text_only")
+        try:
+            result = await generator.generate_product_image(
+                product_title="Smart LED Desk Lamp with Touch Control",
+                niche="smart_home",
+                mode="text_only",
+                force_regenerate=True
+            )
+            results["results"]["text_only"] = {
+                "success": bool(result.get("ai_image_url")),
+                "source": result.get("source"),
+                "url": result.get("ai_image_url")
+            }
+        except Exception as e:
+            results["results"]["text_only"] = {"success": False, "error": str(e)}
+    
+    if generator.stability_available:
+        results["modes_tested"].append("img2img")
+        try:
+            result = await generator.generate_product_image(
+                product_title="Smart LED Desk Lamp with Touch Control",
+                niche="smart_home",
+                original_image_url=test_url,
+                mode="img2img",
+                force_regenerate=True
+            )
+            results["results"]["img2img"] = {
+                "success": bool(result.get("ai_image_url") and result.get("source") != "fallback"),
+                "source": result.get("source"),
+                "api_version": result.get("api_version"),
+                "url": result.get("ai_image_url")
+            }
+        except Exception as e:
+            results["results"]["img2img"] = {"success": False, "error": str(e)}
+    
+    return results
