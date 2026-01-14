@@ -122,9 +122,14 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
         )
     
     # Update last login
-    user.last_login = datetime.utcnow()
-    db.commit()
-    
+    try:
+        user.last_login = datetime.utcnow()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Non-critical error - don't fail login if last_login update fails
+        print(f"[WARNING] Failed to update last_login for user {user.id}: {str(e)}")
+
     # Generate tokens
     return generate_tokens(user)
 
@@ -262,10 +267,19 @@ async def change_password(
         )
 
     # Update password
-    user.password_hash = hash_password(request.new_password)
-    user.updated_at = datetime.utcnow()
-    db.commit()
-    
+    try:
+        user.password_hash = hash_password(request.new_password)
+        user.updated_at = datetime.utcnow()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Log the error for debugging
+        print(f"[ERROR] Failed to change password for user {user.id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to change password. Please try again."
+        )
+
     return {
         "success": True,
         "message": "Password changed successfully"

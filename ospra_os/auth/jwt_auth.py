@@ -228,11 +228,20 @@ def create_user(db: Session, user_data: UserCreate) -> User:
         password_hash=hash_password(user_data.password),
         subscription_tier=SubscriptionTier.NEST,  # Start at free tier
     )
-    
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    
+
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        # Log the error for debugging
+        print(f"[ERROR] Failed to create user {user_data.email}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user account. Please try again."
+        )
+
     return user
 
 
@@ -330,9 +339,14 @@ async def get_current_user(
         )
     
     # Update last login
-    user.last_login = datetime.utcnow()
-    db.commit()
-    
+    try:
+        user.last_login = datetime.utcnow()
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        # Non-critical error - don't fail auth if last_login update fails
+        print(f"[WARNING] Failed to update last_login for user {user.id}: {str(e)}")
+
     return user
 
 

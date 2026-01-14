@@ -52,6 +52,10 @@ services:
       - key: STABILITY_API_KEY
         sync: false
 
+      # JWT Authentication Secret (CRITICAL - set in Render Dashboard)
+      - key: JWT_SECRET_KEY
+        sync: false
+
       # AliExpress Credentials
       - key: ALIEXPRESS_APP_KEY
         sync: false
