@@ -498,10 +498,11 @@ async def compare_all_modes(request: CompareRequest):
 
 @router.get("/debug")
 async def debug_image_generation():
-    """Debug endpoint to check configuration and diagnose issues"""
+    """Debug endpoint to check configuration and diagnose issues - reads env vars at RUNTIME"""
     
-    openai_key = os.getenv('OPENAI_API_KEY')
-    stability_key = os.getenv('STABILITY_API_KEY')
+    # Read env vars at RUNTIME (not cached)
+    openai_key = os.getenv('OPENAI_API_KEY', '')
+    stability_key = os.getenv('STABILITY_API_KEY', '')
     
     debug_info = {
         "module_loaded": IMAGE_GENERATOR_AVAILABLE,

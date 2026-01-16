@@ -28,13 +28,31 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 # ============================================================================
-# CONFIGURATION
+# CONFIGURATION - Use functions to get keys at RUNTIME, not import time
 # ============================================================================
 
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-STABILITY_API_KEY = os.getenv('STABILITY_API_KEY')
-GOOGLE_AI_API_KEY = os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY')
-CLIPDROP_API_KEY = os.getenv('CLIPDROP_API_KEY')
+def get_openai_key() -> str:
+    """Get OpenAI API key at runtime"""
+    return os.getenv('OPENAI_API_KEY', '')
+
+def get_stability_key() -> str:
+    """Get Stability AI API key at runtime"""
+    return os.getenv('STABILITY_API_KEY', '')
+
+def get_google_ai_key() -> str:
+    """Get Google AI API key at runtime"""
+    return os.getenv('GOOGLE_AI_API_KEY') or os.getenv('GEMINI_API_KEY') or ''
+
+def get_clipdrop_key() -> str:
+    """Get ClipDrop API key at runtime"""
+    return os.getenv('CLIPDROP_API_KEY', '')
+
+# Legacy constants for backwards compatibility (will be empty at import time)
+# Use the get_*_key() functions instead for reliable access
+OPENAI_API_KEY = None  # Use get_openai_key()
+STABILITY_API_KEY = None  # Use get_stability_key()
+GOOGLE_AI_API_KEY = None  # Use get_google_ai_key()
+CLIPDROP_API_KEY = None  # Use get_clipdrop_key()
 
 # Cache directory
 CACHE_DIR = Path(__file__).parent.parent.parent / "generated_images"
@@ -138,13 +156,12 @@ class AIImageGenerator:
     - Accepts multiple product images for better context
     - Niche-specific styling prompts
     - Detailed error logging for debugging
+    - Runtime API key loading (not cached at import time)
     """
     
     def __init__(self):
-        self.openai_available = bool(OPENAI_API_KEY)
-        self.stability_available = bool(STABILITY_API_KEY)
-        self.gemini_available = bool(GOOGLE_AI_API_KEY)
-        self.clipdrop_available = bool(CLIPDROP_API_KEY)
+        # Check API keys at RUNTIME, not import time
+        self._refresh_api_status()
         self.cache = {}
         self._load_cache()
         
@@ -155,7 +172,15 @@ class AIImageGenerator:
         logger.info(f"  Gemini: {'✅ Available' if self.gemini_available else '❌ Not configured'}")
         
         if self.stability_available:
-            logger.info(f"  Stability Key: {STABILITY_API_KEY[:20]}...")
+            key = get_stability_key()
+            logger.info(f"  Stability Key: {key[:15]}...{key[-4:]}")
+    
+    def _refresh_api_status(self):
+        """Refresh API availability status (checks env vars at runtime)"""
+        self.openai_available = bool(get_openai_key())
+        self.stability_available = bool(get_stability_key())
+        self.gemini_available = bool(get_google_ai_key())
+        self.clipdrop_available = bool(get_clipdrop_key())
     
     def _load_cache(self):
         """Load image cache from disk"""
@@ -525,7 +550,7 @@ Photorealistic, premium quality product photography."""
                 vision_response = await session.post(
                     "https://api.openai.com/v1/chat/completions",
                     headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Authorization": f"Bearer {get_openai_key()}",
                         "Content-Type": "application/json"
                     },
                     json={
@@ -552,7 +577,7 @@ Photorealistic, premium quality product photography."""
                 dalle_response = await session.post(
                     "https://api.openai.com/v1/images/generations",
                     headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Authorization": f"Bearer {get_openai_key()}",
                         "Content-Type": "application/json"
                     },
                     json={
@@ -603,12 +628,16 @@ Photorealistic, premium quality product photography."""
         """
         logger.info(f"[IMG2IMG] Starting transformation: {product_title[:40]}...")
         
-        if not STABILITY_API_KEY:
+        stability_key = get_stability_key()
+        if not stability_key:
             logger.error("[IMG2IMG] ❌ STABILITY_API_KEY not configured!")
             logger.error("[IMG2IMG]    Get your key at: https://platform.stability.ai/account/keys")
             return None
         
-        logger.info(f"[IMG2IMG] Using API key: {STABILITY_API_KEY[:15]}...{STABILITY_API_KEY[-4:]}")
+        logger.info(f"[IMG2IMG] Using API key: {stability_key[:15]}...{stability_key[-4:]}")
+        
+        # Store for use in sub-methods
+        self._current_stability_key = stability_key
         
         # Download original image
         logger.info(f"[IMG2IMG] Downloading source image...")
@@ -669,7 +698,7 @@ Photorealistic, premium quality product photography."""
                 async with session.post(
                     "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
                     headers={
-                        "Authorization": f"Bearer {STABILITY_API_KEY}",
+                        "Authorization": f"Bearer {get_stability_key()}",
                         "Accept": "application/json"
                     },
                     data=form,
@@ -723,7 +752,7 @@ Photorealistic, premium quality product photography."""
                 async with session.post(
                     "https://api.stability.ai/v2beta/stable-image/generate/sd3",
                     headers={
-                        "Authorization": f"Bearer {STABILITY_API_KEY}",
+                        "Authorization": f"Bearer {get_stability_key()}",
                         "Accept": "image/*"
                     },
                     data=form,
@@ -805,7 +834,7 @@ Photorealistic, premium quality product photography."""
                 async with session.post(
                     "https://api.openai.com/v1/images/generations",
                     headers={
-                        "Authorization": f"Bearer {OPENAI_API_KEY}",
+                        "Authorization": f"Bearer {get_openai_key()}",
                         "Content-Type": "application/json"
                     },
                     json={
@@ -847,7 +876,7 @@ Photorealistic, premium quality product photography."""
                 async with session.post(
                     "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image",
                     headers={
-                        "Authorization": f"Bearer {STABILITY_API_KEY}",
+                        "Authorization": f"Bearer {get_stability_key()}",
                         "Content-Type": "application/json",
                         "Accept": "application/json"
                     },
@@ -954,12 +983,26 @@ Photorealistic, premium quality product photography."""
 
 _image_generator = None
 
-def get_image_generator() -> AIImageGenerator:
-    """Get or create singleton image generator"""
+def get_image_generator(force_refresh: bool = False) -> AIImageGenerator:
+    """
+    Get or create singleton image generator.
+    
+    Args:
+        force_refresh: If True, recreate the generator (useful if env vars changed)
+    """
     global _image_generator
-    if _image_generator is None:
+    if _image_generator is None or force_refresh:
         _image_generator = AIImageGenerator()
+    else:
+        # Always refresh API status to pick up any env var changes
+        _image_generator._refresh_api_status()
     return _image_generator
+
+
+def reset_image_generator():
+    """Reset the singleton (forces recreation on next get_image_generator call)"""
+    global _image_generator
+    _image_generator = None
 
 
 async def generate_product_image(
