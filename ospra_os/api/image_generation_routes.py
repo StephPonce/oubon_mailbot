@@ -611,6 +611,74 @@ async def test_stability_ai():
         }
 
 
+@router.post("/test/download")
+async def test_image_download(image_url: str = "https://cf.cjdropshipping.com/e45906a8-2238-4439-b1a3-2931f50b13c8.jpg"):
+    """
+    Test if we can download an image from a URL.
+    This helps debug why img2img might be failing.
+    """
+    import base64
+    
+    results = {
+        "url": image_url,
+        "steps": []
+    }
+    
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Accept': 'image/*,*/*;q=0.8',
+            'Referer': 'https://www.cjdropshipping.com/'
+        }
+        
+        results["steps"].append(f"Attempting download with headers: {list(headers.keys())}")
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                image_url,
+                timeout=aiohttp.ClientTimeout(total=30),
+                headers=headers,
+                allow_redirects=True
+            ) as response:
+                results["status_code"] = response.status
+                results["content_type"] = response.headers.get('content-type', 'unknown')
+                results["steps"].append(f"Response status: {response.status}")
+                
+                if response.status == 200:
+                    image_bytes = await response.read()
+                    results["image_size_bytes"] = len(image_bytes)
+                    results["steps"].append(f"Downloaded {len(image_bytes):,} bytes")
+                    
+                    if len(image_bytes) > 1000:
+                        # Successfully downloaded
+                        results["success"] = True
+                        results["base64_preview"] = base64.b64encode(image_bytes[:100]).decode()[:50] + "..."
+                        results["message"] = "✅ Image download successful!"
+                    else:
+                        results["success"] = False
+                        results["error"] = "Image too small - likely an error page"
+                        # Show what we got
+                        try:
+                            results["response_text"] = image_bytes.decode('utf-8')[:500]
+                        except:
+                            results["response_text"] = "(binary data)"
+                else:
+                    results["success"] = False
+                    error_text = await response.text()
+                    results["error"] = f"HTTP {response.status}"
+                    results["response_text"] = error_text[:500]
+                    
+    except asyncio.TimeoutError:
+        results["success"] = False
+        results["error"] = "Timeout after 30 seconds"
+    except Exception as e:
+        results["success"] = False
+        results["error"] = str(e)
+        results["error_type"] = type(e).__name__
+    
+    return results
+
+
 @router.post("/test/generate")
 async def test_generate_image(
     test_url: str = "https://ae01.alicdn.com/kf/S1c66c5e8655d4c5c8b7a5e1d3f4e5f6g/Smart-LED-Desk-Lamp.jpg"
@@ -669,3 +737,188 @@ async def test_generate_image(
             results["results"]["img2img"] = {"success": False, "error": str(e)}
     
     return results
+
+
+@router.post("/test/img2img-verbose")
+async def test_img2img_verbose(
+    image_url: str = "https://cf.cjdropshipping.com/e45906a8-2238-4439-b1a3-2931f50b13c8.jpg",
+    product_title: str = "Airtag Wallet Men Smart Wallet"
+):
+    """
+    Verbose test of img2img pipeline - shows each step for debugging.
+    """
+    import base64
+    
+    steps = []
+    result = {"url": image_url, "title": product_title}
+    
+    # Step 1: Check Stability API key
+    stability_key = os.getenv('STABILITY_API_KEY', '')
+    steps.append({
+        "step": 1,
+        "name": "Check API Key",
+        "success": bool(stability_key),
+        "key_preview": f"{stability_key[:10]}...{stability_key[-4:]}" if stability_key else "NOT SET"
+    })
+    
+    if not stability_key:
+        result["steps"] = steps
+        result["error"] = "STABILITY_API_KEY not set"
+        return result
+    
+    # Step 2: Download image
+    steps.append({"step": 2, "name": "Download Image", "status": "starting..."})
+    
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+            'Accept': 'image/*,*/*;q=0.8',
+            'Referer': 'https://www.cjdropshipping.com/'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                image_url,
+                timeout=aiohttp.ClientTimeout(total=30),
+                headers=headers,
+                allow_redirects=True
+            ) as response:
+                steps[-1]["http_status"] = response.status
+                steps[-1]["content_type"] = response.headers.get('content-type', 'unknown')
+                
+                if response.status != 200:
+                    steps[-1]["success"] = False
+                    steps[-1]["error"] = f"HTTP {response.status}"
+                    result["steps"] = steps
+                    result["error"] = "Image download failed"
+                    return result
+                
+                image_bytes = await response.read()
+                steps[-1]["image_size"] = len(image_bytes)
+                
+                if len(image_bytes) < 1000:
+                    steps[-1]["success"] = False
+                    steps[-1]["error"] = "Image too small"
+                    result["steps"] = steps
+                    result["error"] = "Downloaded image too small"
+                    return result
+                
+                steps[-1]["success"] = True
+                steps[-1]["status"] = f"Downloaded {len(image_bytes):,} bytes"
+    
+    except Exception as e:
+        steps[-1]["success"] = False
+        steps[-1]["error"] = str(e)
+        result["steps"] = steps
+        result["error"] = f"Download exception: {e}"
+        return result
+    
+    # Step 3: Call Stability v1 API
+    steps.append({"step": 3, "name": "Stability v1 API", "status": "calling..."})
+    
+    style_prompt = f"""Transform this product photo into a premium e-commerce hero shot.
+Style: modern tech minimalist
+Background: clean white or soft gray gradient
+Keep the exact product shape and details.
+Professional studio quality."""
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            form = aiohttp.FormData()
+            form.add_field('init_image', image_bytes, filename='image.png', content_type='image/png')
+            form.add_field('init_image_mode', 'IMAGE_STRENGTH')
+            form.add_field('image_strength', '0.35')
+            form.add_field('text_prompts[0][text]', style_prompt)
+            form.add_field('text_prompts[0][weight]', '1')
+            form.add_field('cfg_scale', '7')
+            form.add_field('samples', '1')
+            form.add_field('steps', '30')
+            
+            async with session.post(
+                "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
+                headers={
+                    "Authorization": f"Bearer {stability_key}",
+                    "Accept": "application/json"
+                },
+                data=form,
+                timeout=aiohttp.ClientTimeout(total=120)
+            ) as response:
+                steps[-1]["http_status"] = response.status
+                
+                if response.status == 200:
+                    data = await response.json()
+                    steps[-1]["success"] = True
+                    steps[-1]["status"] = "Image generated!"
+                    
+                    # Save the result
+                    result_base64 = data['artifacts'][0]['base64']
+                    result["success"] = True
+                    result["api_version"] = "v1"
+                    result["generated_image_preview"] = result_base64[:100] + "..."
+                    result["steps"] = steps
+                    return result
+                else:
+                    error_text = await response.text()
+                    steps[-1]["success"] = False
+                    steps[-1]["error"] = error_text[:300]
+                    
+                    # Parse error for helpful message
+                    if response.status == 400:
+                        steps[-1]["hint"] = "Bad request - image may be wrong format or too large"
+                    elif response.status == 401:
+                        steps[-1]["hint"] = "Invalid API key"
+                    elif response.status == 402:
+                        steps[-1]["hint"] = "Out of credits"
+                    elif response.status == 403:
+                        steps[-1]["hint"] = "Access denied - check API permissions"
+    
+    except Exception as e:
+        steps[-1]["success"] = False
+        steps[-1]["error"] = str(e)
+        steps[-1]["error_type"] = type(e).__name__
+    
+    # Step 4: Try v2beta API as fallback
+    steps.append({"step": 4, "name": "Stability v2beta API (fallback)", "status": "calling..."})
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            form = aiohttp.FormData()
+            form.add_field('image', image_bytes, filename='image.png', content_type='image/png')
+            form.add_field('prompt', style_prompt)
+            form.add_field('strength', '0.35')
+            form.add_field('output_format', 'png')
+            
+            async with session.post(
+                "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+                headers={
+                    "Authorization": f"Bearer {stability_key}",
+                    "Accept": "image/*"
+                },
+                data=form,
+                timeout=aiohttp.ClientTimeout(total=120)
+            ) as response:
+                steps[-1]["http_status"] = response.status
+                
+                if response.status == 200:
+                    result_bytes = await response.read()
+                    steps[-1]["success"] = True
+                    steps[-1]["status"] = f"Generated {len(result_bytes):,} bytes"
+                    
+                    result["success"] = True
+                    result["api_version"] = "v2beta"
+                    result["generated_size"] = len(result_bytes)
+                    result["steps"] = steps
+                    return result
+                else:
+                    error_text = await response.text()
+                    steps[-1]["success"] = False
+                    steps[-1]["error"] = error_text[:300]
+    
+    except Exception as e:
+        steps[-1]["success"] = False
+        steps[-1]["error"] = str(e)
+    
+    result["steps"] = steps
+    result["success"] = False
+    result["error"] = "Both v1 and v2beta APIs failed"
+    return result
