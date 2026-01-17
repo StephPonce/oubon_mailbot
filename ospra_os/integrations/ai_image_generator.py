@@ -849,18 +849,24 @@ Photorealistic, premium quality product photography."""
         return await self._save_stability_bytes(image_bytes, product_title, api_version)
     
     async def _save_stability_bytes(self, image_bytes: bytes, product_title: str, api_version: str) -> Dict:
-        """Save image bytes to file and return result dict"""
+        """Save image bytes and return result dict with base64 data URL for frontend display"""
         safe_title = product_title[:30].replace(' ', '_').replace('/', '_').replace('\\', '_')
         filename = f"img2img_{safe_title}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
         filepath = CACHE_DIR / filename
         
+        # Save to file for caching
         with open(filepath, 'wb') as f:
             f.write(image_bytes)
+        
+        # Convert to base64 data URL for frontend display
+        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+        data_url = f"data:image/png;base64,{image_base64}"
         
         logger.info(f"[IMG2IMG] ✅ Success ({api_version})! Saved to: {filename}")
         
         return {
-            "ai_image_url": f"/generated_images/{filename}",
+            "ai_image_url": data_url,  # Base64 data URL for frontend
+            "file_path": f"/generated_images/{filename}",  # Local path for reference
             "generated_at": datetime.now().isoformat(),
             "source": f"stability_img2img_{api_version}",
             "note": "Transformed original product image with enhanced styling.",
@@ -973,9 +979,14 @@ Photorealistic, premium quality product photography."""
                         with open(filepath, 'wb') as f:
                             f.write(image_bytes)
                         
+                        # Convert to base64 data URL for frontend display
+                        image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                        data_url = f"data:image/png;base64,{image_base64}"
+                        
                         logger.info(f"[STABILITY-TEXT] ✅ Success: {filename}")
                         return {
-                            "ai_image_url": f"/generated_images/{filename}",
+                            "ai_image_url": data_url,  # Base64 data URL for frontend
+                            "file_path": f"/generated_images/{filename}",  # Local path for reference
                             "generated_at": datetime.now().isoformat(),
                             "source": "stability_text",
                             "note": "Generated from product title only.",

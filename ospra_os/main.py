@@ -6222,3 +6222,12 @@ try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
 except Exception as e:
     print(f"[WARNING]  Static files not mounted: {e}")
+
+# Mount generated images directory for AI-generated product images
+try:
+    generated_images_dir = Path(__file__).parent.parent / "generated_images"
+    generated_images_dir.mkdir(exist_ok=True)  # Create if doesn't exist
+    app.mount("/generated_images", StaticFiles(directory=str(generated_images_dir)), name="generated_images")
+    print(f"[SUCCESS] Generated images mounted at /generated_images")
+except Exception as e:
+    print(f"[WARNING]  Generated images not mounted: {e}")
