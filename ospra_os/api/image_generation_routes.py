@@ -53,13 +53,13 @@ class ImageGenerateRequest(BaseModel):
     additional_image_urls: Optional[List[str]] = None  # NEW: Multiple images
     tags: Optional[List[str]] = []
     force_regenerate: bool = False
-    mode: Literal["text_only", "vision_enhanced", "img2img"] = "vision_enhanced"
+    mode: Literal["text_only", "vision_enhanced", "img2img", "hybrid"] = "vision_enhanced"
 
 
 class BatchImageRequest(BaseModel):
     products: List[dict]  # List of products with title, niche, image_url, additional_images
     max_concurrent: int = 2
-    mode: Literal["text_only", "vision_enhanced", "img2img"] = "vision_enhanced"
+    mode: Literal["text_only", "vision_enhanced", "img2img", "hybrid"] = "vision_enhanced"
 
 
 class CompareRequest(BaseModel):
@@ -121,6 +121,19 @@ async def get_image_service_status():
             "supports_multi_image": False
         })
     
+    # Hybrid mode requires BOTH OpenAI AND Stability
+    if generator.openai_available and generator.stability_available:
+        available_modes.append({
+            "mode": "hybrid",
+            "name": "Hybrid (GPT-4V + Stability AI)",
+            "description": "GPT-4V analyzes multiple images for deep understanding, Stability AI preserves exact product structure",
+            "provider": "GPT-4V + Stability AI",
+            "cost": "~$0.06",
+            "quality": "BEST - Multi-image understanding + exact structure preservation",
+            "recommended_for": "Products with multiple angles available",
+            "supports_multi_image": True
+        })
+    
     # Check API keys explicitly
     openai_key = os.getenv('OPENAI_API_KEY')
     stability_key = os.getenv('STABILITY_API_KEY')
@@ -175,7 +188,16 @@ async def generate_image(request: ImageGenerateRequest):
     
     # Check if requested mode is available
     mode = request.mode
-    if mode == "vision_enhanced" and not generator.openai_available:
+    if mode == "hybrid" and not (generator.openai_available and generator.stability_available):
+        # Hybrid needs both - fall back to best available
+        if generator.stability_available and request.original_image_url:
+            mode = "img2img"
+        elif generator.openai_available:
+            mode = "vision_enhanced" if request.original_image_url else "text_only"
+        else:
+            mode = "text_only"
+        logger.warning(f"Hybrid mode unavailable, falling back to {mode}")
+    elif mode == "vision_enhanced" and not generator.openai_available:
         mode = "img2img" if generator.stability_available else "text_only"
         logger.warning(f"Vision mode unavailable, falling back to {mode}")
     elif mode == "img2img" and not generator.stability_available:
@@ -266,7 +288,7 @@ async def regenerate_product_image(
     niche: str = "smart_home",
     original_image_url: str = None,
     additional_image_urls: List[str] = None,
-    mode: str = "vision_enhanced"
+    mode: Literal["text_only", "vision_enhanced", "img2img", "hybrid"] = "vision_enhanced"
 ):
     """Force regenerate image for a specific product"""
     if not IMAGE_GENERATOR_AVAILABLE:
@@ -350,6 +372,20 @@ async def get_compare_status():
             "supports_multi_image": False
         })
     
+    # Hybrid mode - requires BOTH OpenAI AND Stability
+    if generator.openai_available and generator.stability_available:
+        modes.append({
+            "id": "hybrid",
+            "name": "Hybrid (GPT-4V + Stability AI)",
+            "description": "GPT-4V analyzes multiple images for deep understanding, Stability AI preserves product structure",
+            "requires_original": True,
+            "cost": "$0.06",
+            "speed": "Slower (~12s)",
+            "accuracy": "BEST - Multi-image understanding + exact structure",
+            "supports_multi_image": True,
+            "recommended": True
+        })
+    
     return {
         "available": True,
         "modes": modes,
@@ -394,6 +430,9 @@ async def compare_all_modes(request: CompareRequest):
                 modes_to_test.append("vision_enhanced")
         if generator.stability_available and request.original_image_url:
             modes_to_test.append("img2img")
+        # Hybrid mode requires BOTH OpenAI AND Stability AND an original image
+        if generator.openai_available and generator.stability_available and request.original_image_url:
+            modes_to_test.append("hybrid")
     
     if not modes_to_test:
         raise HTTPException(
@@ -419,7 +458,8 @@ async def compare_all_modes(request: CompareRequest):
     cost_estimates = {
         "text_only": 0.04,
         "vision_enhanced": 0.07,
-        "img2img": 0.03
+        "img2img": 0.03,
+        "hybrid": 0.06
     }
     
     # Generate with each mode
@@ -461,10 +501,16 @@ async def compare_all_modes(request: CompareRequest):
                 "time_seconds": round(time.time() - start_time, 2)
             }
     
-    # Add recommendations
+    # Add recommendations - prioritize hybrid > img2img > vision_enhanced > text_only
     successful_modes = [m for m, r in results["comparisons"].items() if r.get("success")]
     
-    if "img2img" in successful_modes:
+    if "hybrid" in successful_modes:
+        imgs = results["comparisons"]["hybrid"].get("images_analyzed", 0)
+        results["recommendation"] = {
+            "best_match": "hybrid",
+            "reason": f"BEST: GPT-4V analyzed {imgs} image(s) for deep understanding + Stability AI preserved exact structure"
+        }
+    elif "img2img" in successful_modes:
         results["recommendation"] = {
             "best_match": "img2img",
             "reason": "Keeps original product structure while enhancing style"
