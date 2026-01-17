@@ -283,7 +283,7 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
             {showAiImage ? 'AI Image' : 'Original'}
           </button>
           
-          {/* Regenerate Button */}
+          {/* Enhance Button */}
           <button
             onClick={onRegenerateAi}
             disabled={regenerating}
@@ -292,12 +292,12 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
             {regenerating ? (
               <>
                 <Loader2 className="w-3 h-3 animate-spin" />
-                Generating...
+                Enhancing...
               </>
             ) : (
               <>
                 <Wand2 className="w-3 h-3" />
-                {aiImageUrl ? 'Regenerate' : 'Generate AI'}
+                {aiImageUrl ? 'Re-enhance' : 'Enhance'}
               </>
             )}
           </button>
@@ -395,36 +395,38 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
     generateAIAnalysis(); // Auto-generate analysis when panel opens
   }, [product.id]);
   
-  // Generate AI image for this specific product - FIXED
+  // Generate AI image using Stability AI background removal (NEW SYSTEM)
   const generateAiImage = async () => {
     setGeneratingImage(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/images/generate`, {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      
+      // Use the NEW /api/images/enhance endpoint (background removal)
+      const response = await fetch(`${apiBase}/api/images/enhance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_title: product.title,
+          image_url: product.image_url,
           niche: product.niche || 'smart_home',
-          original_image_url: product.image_url,
-          tags: product.tags || [product.niche],
-          force_regenerate: true  // Force new generation
+          background_style: null, // Auto-select based on niche
+          add_shadow: true
         })
       });
       
       const data = await response.json();
       
-      if (data.success && data.ai_image_url) {
-        setCurrentAiImageUrl(data.ai_image_url);
+      if (data.success && data.enhanced_image_url) {
+        setCurrentAiImageUrl(data.enhanced_image_url);
         // Update parent if callback provided
         if (onUpdateProduct) {
-          onUpdateProduct({ ...product, ai_image_url: data.ai_image_url });
+          onUpdateProduct({ ...product, ai_image_url: data.enhanced_image_url });
         }
       } else {
-        alert('Failed to generate AI image. ' + (data.error || 'Check if OPENAI_API_KEY is configured.'));
+        alert('Image enhancement failed. ' + (data.error || 'Check if STABILITY_API_KEY is configured.'));
       }
     } catch (error) {
-      console.error('AI image generation failed:', error);
-      alert('AI image generation failed: ' + (error.message || 'Unknown error'));
+      console.error('Image enhancement failed:', error);
+      alert('Image enhancement failed: ' + (error.message || 'Unknown error'));
     } finally {
       setGeneratingImage(false);
     }

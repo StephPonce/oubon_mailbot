@@ -44,7 +44,7 @@ def get_stability_key() -> str:
     """Get Stability API key at runtime"""
     return os.getenv('STABILITY_API_KEY', '')
 
-# Oubon Shop brand backgrounds
+# Oubon Shop brand backgrounds - MORE DISTINCT STYLES
 BACKGROUND_STYLES = {
     "clean_white": {
         "name": "Clean White",
@@ -55,7 +55,7 @@ BACKGROUND_STYLES = {
     "soft_gray": {
         "name": "Soft Gray",
         "description": "Light gray for subtle contrast",
-        "color": (245, 245, 247),
+        "color": (235, 235, 240),  # More visible gray
         "gradient": None
     },
     "warm_gradient": {
@@ -63,8 +63,8 @@ BACKGROUND_STYLES = {
         "description": "Soft warm gradient - premium feel",
         "color": None,
         "gradient": {
-            "top": (255, 253, 250),
-            "bottom": (250, 245, 240)
+            "top": (255, 250, 245),    # Warmer cream at top
+            "bottom": (245, 235, 225)  # Light tan at bottom
         }
     },
     "cool_gradient": {
@@ -72,8 +72,8 @@ BACKGROUND_STYLES = {
         "description": "Cool subtle gradient - tech/modern feel",
         "color": None,
         "gradient": {
-            "top": (250, 252, 255),
-            "bottom": (240, 245, 250)
+            "top": (240, 248, 255),    # Light blue at top
+            "bottom": (225, 235, 250)  # Slightly deeper blue at bottom
         }
     },
     "lifestyle_shadow": {
@@ -188,8 +188,10 @@ class AIImageEnhancer:
             # Step 3: Determine background style
             if background_style and background_style in BACKGROUND_STYLES:
                 bg_style = background_style
+                logger.info(f"[ENHANCE] Using requested background: {bg_style}")
             else:
                 bg_style = NICHE_BACKGROUNDS.get(niche, NICHE_BACKGROUNDS["default"])
+                logger.info(f"[ENHANCE] Auto-selected background for {niche}: {bg_style}")
             
             # Step 4: Create final image with new background
             logger.info(f"[ENHANCE] Compositing with {bg_style} background...")

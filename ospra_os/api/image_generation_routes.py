@@ -87,6 +87,7 @@ async def enhance_image(request: EnhanceRequest):
     **Time:** ~3-5 seconds
     """
     logger.info(f"[ENHANCE] Request for: {request.image_url[:50]}...")
+    logger.info(f"[ENHANCE] Niche: {request.niche}, Background: {request.background_style or 'auto'}")
     
     result = await enhance_product_image(
         image_url=request.image_url,
@@ -96,7 +97,8 @@ async def enhance_image(request: EnhanceRequest):
     
     if not result["success"]:
         logger.error(f"[ENHANCE] Failed: {result.get('error')}")
-        # Return result anyway (includes error details)
+    else:
+        logger.info(f"[ENHANCE] Success! Background used: {result.get('background_style')}")
     
     return result
 
