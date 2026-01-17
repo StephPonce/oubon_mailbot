@@ -1007,7 +1007,7 @@ export function ProductDiscovery() {
     
     try {
       let niche = filter === 'trending' ? 'smart_home' : filter === 'recommended' ? 'tech' : 'fitness';
-      const response = await api.discoverProducts({ niche, count: 20, includeAiImages: enableAiImages });
+      const response = await api.discoverProducts({ niche, count: 20 });
       const loadedProducts = Array.isArray(response) ? response : (response.products || []);
       const normalizedProducts = loadedProducts.map(p => normalizeProduct(p, niche));
       const mockCount = normalizedProducts.filter(p => p.is_mock).length;
@@ -1015,7 +1015,7 @@ export function ProductDiscovery() {
       setHasMockData(mockCount > 0);
       setHasEstimatedScores(estimatedCount > normalizedProducts.length / 2);
       setProducts(normalizedProducts);
-      trackInteraction('filter', { filter, result_count: normalizedProducts.length, mock_count: mockCount, ai_images: enableAiImages });
+      trackInteraction('filter', { filter, result_count: normalizedProducts.length, mock_count: mockCount });
     } catch (error) {
       console.error('Failed to load products:', error);
       setProducts([]);
