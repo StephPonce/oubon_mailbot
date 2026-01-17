@@ -48,10 +48,22 @@ const MODE_INFO = {
     icon: Camera,
     color: 'green',
     description: 'Transforms original while keeping product structure',
-    pros: ['Best accuracy', 'Keeps exact shape', 'Cheap ($0.03)'],
+    pros: ['Good accuracy', 'Keeps exact shape', 'Cheap ($0.03)'],
     cons: ['Requires Stability API key', 'Medium speed (~5s)'],
-    best_for: 'Best overall choice - keeps product but improves styling',
+    best_for: 'When you have one image and want quick enhancement',
     supports_multi_image: false
+  },
+  hybrid: {
+    name: 'Hybrid',
+    provider: 'GPT-4V + Stability AI',
+    icon: Sparkles,
+    color: 'cyan',
+    description: 'GPT-4V analyzes multiple images for deep understanding, Stability AI preserves exact structure',
+    pros: ['BEST accuracy', 'Multi-image understanding', 'Keeps exact product shape', 'Rich context'],
+    cons: ['Requires both API keys', 'Slowest (~12s)', 'Cost: $0.06'],
+    best_for: 'Premium results - best of both worlds for important products',
+    supports_multi_image: true,
+    recommended: true
   }
 };
 
@@ -74,6 +86,12 @@ const MODE_COLORS = {
     border: 'border-green-500/30',
     text: 'text-green-400',
     badge: 'bg-green-500/20 text-green-300'
+  },
+  hybrid: {
+    bg: 'bg-cyan-500/10',
+    border: 'border-cyan-500/30',
+    text: 'text-cyan-400',
+    badge: 'bg-gradient-to-r from-purple-500/20 to-cyan-500/20 text-cyan-300'
   }
 };
 
@@ -470,7 +488,7 @@ export function AIImageComparison({
       
       {/* Mode Info Cards */}
       {!results && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(MODE_INFO).map(([modeId, info]) => {
             const colors = MODE_COLORS[modeId];
             const Icon = info.icon;
@@ -616,7 +634,7 @@ export function AIImageComparison({
         
         {/* Cost Warning */}
         <p className="text-white/40 text-xs text-center mt-3">
-          Estimated total cost: ~$0.14 (testing all 3 modes) • Images provided: {imageUrls.filter(u => u).length}
+          Estimated total cost: ~$0.20 (testing all 4 modes) • Images provided: {imageUrls.filter(u => u).length}
         </p>
       </div>
       
@@ -647,7 +665,7 @@ export function AIImageComparison({
           </div>
           
           {/* Side-by-Side Comparison */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Original Image */}
             <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
               <div className="p-4 border-b border-white/10">

@@ -975,6 +975,7 @@ export function ProductDiscovery() {
   const [generatingImages, setGeneratingImages] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
   const [comparisonProduct, setComparisonProduct] = useState(null);
+  const [generatingHybrid, setGeneratingHybrid] = useState(false);
 
   useEffect(() => {
     loadProducts();
@@ -1025,6 +1026,63 @@ export function ProductDiscovery() {
     }
   };
   
+  // Quick Hybrid Generate - Best quality single-click generation
+  const generateQuickHybrid = async () => {
+    if (!selectedProduct && products.length === 0) {
+      alert('Select a product or load products first');
+      return;
+    }
+    
+    const targetProduct = selectedProduct || products[0];
+    setGeneratingHybrid(true);
+    
+    try {
+      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiBase}/api/images/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_title: targetProduct.title,
+          niche: targetProduct.niche || 'smart_home',
+          original_image_url: targetProduct.image_url,
+          additional_image_urls: targetProduct.all_images?.slice(1, 3) || [],
+          modes: ['hybrid']
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.comparisons?.hybrid?.success && data.comparisons.hybrid.source !== 'fallback') {
+        const aiImageUrl = data.comparisons.hybrid.ai_image_url;
+        
+        // Update the product with the new AI image
+        const updatedProduct = { ...targetProduct, ai_image_url: aiImageUrl };
+        setProducts(prev => prev.map(p => 
+          p.id === targetProduct.id ? updatedProduct : p
+        ));
+        
+        if (selectedProduct && selectedProduct.id === targetProduct.id) {
+          setSelectedProductState(updatedProduct);
+        }
+        
+        trackInteraction('quick_hybrid_generate', {
+          product_id: targetProduct.id,
+          product_name: targetProduct.title,
+          images_analyzed: data.comparisons.hybrid.images_analyzed || 1,
+          cost: data.total_cost
+        });
+      } else {
+        const errorNote = data.comparisons?.hybrid?.note || 'Hybrid generation failed';
+        alert(`Hybrid generation: ${errorNote}`);
+      }
+    } catch (error) {
+      console.error('Quick hybrid generation failed:', error);
+      alert('Hybrid generation failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setGeneratingHybrid(false);
+    }
+  };
+
   // Generate AI images for current products
   const generateAiImages = async () => {
     if (products.length === 0) return;
@@ -1202,11 +1260,29 @@ export function ProductDiscovery() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={generateQuickHybrid}
+              disabled={generatingHybrid || products.length === 0}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 text-pink-300 text-sm font-medium hover:from-pink-500/30 hover:to-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title="Best quality: GPT-4V analysis + Stability AI structure preservation (~$0.06)"
+            >
+              {generatingHybrid ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  Quick Hybrid
+                </>
+              )}
+            </button>
+            <button
               onClick={() => setShowComparison(true)}
               className="px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 flex items-center gap-2"
             >
               <Beaker className="w-4 h-4" />
-              Compare AI Modes
+              Compare All Modes
             </button>
             <button
               onClick={generateAiImages}
