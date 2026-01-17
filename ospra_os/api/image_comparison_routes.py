@@ -29,6 +29,7 @@ class CompareRequest(BaseModel):
     product_title: str
     niche: str = "smart_home"
     original_image_url: Optional[str] = None
+    additional_image_urls: Optional[List[str]] = None  # NEW: Multiple images for hybrid mode
     modes: Optional[List[str]] = None  # If None, try all available modes
 
 
@@ -65,6 +66,9 @@ async def compare_all_modes(request: CompareRequest):
                 modes_to_test.append("vision_enhanced")
         if generator.stability_available and request.original_image_url:
             modes_to_test.append("img2img")
+        # NEW: Hybrid mode requires BOTH OpenAI and Stability
+        if generator.openai_available and generator.stability_available and request.original_image_url:
+            modes_to_test.append("hybrid")
     
     if not modes_to_test:
         raise HTTPException(
@@ -72,10 +76,19 @@ async def compare_all_modes(request: CompareRequest):
             detail="No image generation modes available. Configure OPENAI_API_KEY or STABILITY_API_KEY."
         )
     
+    # Collect all image URLs
+    all_image_urls = []
+    if request.original_image_url:
+        all_image_urls.append(request.original_image_url)
+    if request.additional_image_urls:
+        all_image_urls.extend(request.additional_image_urls[:2])  # Max 2 additional
+    
     results = {
         "product_title": request.product_title,
         "niche": request.niche,
         "original_image_url": request.original_image_url,
+        "additional_image_urls": request.additional_image_urls,
+        "total_images": len(all_image_urls),
         "modes_tested": modes_to_test,
         "comparisons": {}
     }
@@ -84,7 +97,8 @@ async def compare_all_modes(request: CompareRequest):
     cost_estimates = {
         "text_only": 0.04,
         "vision_enhanced": 0.07,
-        "img2img": 0.03
+        "img2img": 0.03,
+        "hybrid": 0.06  # GPT-4V (~$0.03) + Stability (~$0.03)
     }
     
     # Generate with each mode
@@ -97,6 +111,7 @@ async def compare_all_modes(request: CompareRequest):
                 product_title=request.product_title,
                 niche=request.niche,
                 original_image_url=request.original_image_url,
+                additional_image_urls=request.additional_image_urls,  # Pass all images!
                 force_regenerate=True,  # Always regenerate for comparison
                 mode=mode
             )
@@ -120,10 +135,15 @@ async def compare_all_modes(request: CompareRequest):
                 "time_seconds": round(time.time() - start_time, 2)
             }
     
-    # Add recommendations
+    # Add recommendations (prioritize hybrid > img2img > vision_enhanced > text_only)
     successful_modes = [m for m, r in results["comparisons"].items() if r.get("success")]
     
-    if "img2img" in successful_modes:
+    if "hybrid" in successful_modes:
+        results["recommendation"] = {
+            "best_match": "hybrid",
+            "reason": "🔥 Best of both worlds: Multi-image AI understanding + exact structure preservation"
+        }
+    elif "img2img" in successful_modes:
         results["recommendation"] = {
             "best_match": "img2img",
             "reason": "Keeps original product structure while enhancing style"
@@ -219,6 +239,37 @@ async def get_compare_status():
             "accuracy": "Best match - keeps exact shape",
             "disabled": True,
             "disabled_reason": "STABILITY_API_KEY not configured in environment"
+        })
+    
+    # NEW: Hybrid mode (requires BOTH OpenAI AND Stability)
+    if generator.openai_available and generator.stability_available:
+        modes.append({
+            "id": "hybrid",
+            "name": "🔥 Hybrid (GPT-4V + Stability AI)",
+            "description": "BEST MODE: AI analyzes ALL images → Stability preserves exact product structure",
+            "requires_original": True,
+            "cost": "$0.06",
+            "speed": "Slower (~12s)",
+            "accuracy": "MAXIMUM - multi-image understanding + exact structure",
+            "recommended": True
+        })
+    elif generator.openai_available or generator.stability_available:
+        # Show what's missing for hybrid
+        missing = []
+        if not generator.openai_available:
+            missing.append("OPENAI_API_KEY")
+        if not generator.stability_available:
+            missing.append("STABILITY_API_KEY")
+        modes.append({
+            "id": "hybrid",
+            "name": "🔥 Hybrid (GPT-4V + Stability AI)",
+            "description": f"DISABLED: Requires both {' and '.join(missing)}",
+            "requires_original": True,
+            "cost": "$0.06",
+            "speed": "Slower (~12s)",
+            "accuracy": "MAXIMUM - multi-image understanding + exact structure",
+            "disabled": True,
+            "disabled_reason": f"Missing: {', '.join(missing)}"
         })
     
     return {

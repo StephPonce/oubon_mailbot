@@ -1,17 +1,25 @@
 """
-AI Image Generator for Oubon Shop - V3 with Multi-Image Support
-================================================================
+AI Image Generator for Oubon Shop - V4 with Hybrid Mode
+========================================================
 
-THREE MODES:
+FOUR MODES:
 1. TEXT-TO-IMAGE (DALL-E 3) - Generates new image from title only
 2. VISION-TO-IMAGE (GPT-4V + DALL-E) - Analyzes original(s), generates matching styled image
 3. IMAGE-TO-IMAGE (Stability AI) - Transforms original while keeping product structure
+4. HYBRID (GPT-4V + Stability AI) - Multi-image analysis + structure-preserving transformation
 
-V3 IMPROVEMENTS:
+V4 IMPROVEMENTS:
+- NEW: Hybrid mode combines GPT-4V's multi-image understanding with Stability AI's img2img
 - Multi-image input support (feed multiple product angles)
 - Enhanced prompts with more specific style guidance
 - Better error handling with detailed logging
 - Niche-specific styling
+
+HYBRID MODE FLOW:
+1. GPT-4V analyzes ALL product images (up to 3)
+2. Creates extremely detailed product description
+3. Stability AI transforms primary image using that rich context
+4. Result: Best of both worlds - understanding + structure preservation
 """
 
 import os
@@ -67,7 +75,7 @@ CACHE_DIR = Path(__file__).parent.parent.parent / "generated_images"
 CACHE_DIR.mkdir(exist_ok=True)
 
 # Generation modes
-GenerationMode = Literal["text_only", "vision_enhanced", "img2img"]
+GenerationMode = Literal["text_only", "vision_enhanced", "img2img", "hybrid"]
 
 # ============================================================================
 # NICHE-SPECIFIC PROMPTS - The Secret Sauce
@@ -524,7 +532,13 @@ Photorealistic, premium quality product photography."""
         # Choose generation method
         result = None
         
-        if mode == "img2img" and self.stability_available and original_image_url:
+        # NEW: Hybrid mode - GPT-4V analyzes ALL images, then Stability transforms primary
+        if mode == "hybrid" and self.openai_available and self.stability_available and original_image_url:
+            result = await self._generate_hybrid(
+                product_title, niche, original_image_url, all_image_urls
+            )
+        
+        elif mode == "img2img" and self.stability_available and original_image_url:
             result = await self._generate_img2img_stability(
                 product_title, niche, original_image_url
             )
@@ -675,6 +689,243 @@ Photorealistic, premium quality product photography."""
                     
         except Exception as e:
             logger.error(f"[VISION] Exception: {type(e).__name__}: {e}")
+            return None
+    
+    # =========================================================================
+    # MODE 4: HYBRID (GPT-4V Analysis + Stability AI Transformation)
+    # =========================================================================
+    
+    async def _generate_hybrid(
+        self,
+        product_title: str,
+        niche: str,
+        primary_image_url: str,
+        all_image_urls: List[str]
+    ) -> Optional[Dict]:
+        """
+        HYBRID MODE: The best of both worlds!
+        
+        1. GPT-4V analyzes ALL product images (up to 3)
+        2. Creates extremely detailed product description
+        3. Stability AI uses that rich context to transform the PRIMARY image
+        4. Result: Multi-image understanding + exact product structure preservation
+        
+        Cost: ~$0.05-0.07 (GPT-4V analysis + Stability AI transform)
+        Quality: Maximum - understands product from multiple angles, keeps exact shape
+        """
+        num_images = min(len(all_image_urls), 3)
+        logger.info(f"[HYBRID] Starting multi-image analysis for: {product_title[:40]}...")
+        logger.info(f"[HYBRID] Analyzing {num_images} image(s), transforming primary with Stability AI")
+        
+        # =====================================================================
+        # STEP 1: GPT-4V Multi-Image Analysis
+        # =====================================================================
+        
+        analysis_prompt = f"""You are an expert e-commerce product photographer analyzing product images.
+
+PRODUCT: {product_title}
+CATEGORY: {niche.replace('_', ' ').title()}
+
+I'm showing you {num_images} image(s) of this product. Analyze ALL images and create an EXTREMELY detailed description that covers:
+
+**PRODUCT IDENTITY**
+- Exact product type and function
+- Key selling points/features
+
+**PHYSICAL CHARACTERISTICS** (be VERY specific)
+- Primary colors (exact shades: "matte black", "brushed silver", "warm white")
+- Materials (plastic, metal, fabric, glass, wood - what finish?)
+- Shape and proportions (cylindrical, rectangular, organic curves?)
+- Size impression (compact, medium, large)
+- Surface textures (smooth, textured, matte, glossy, brushed)
+
+**DISTINCTIVE ELEMENTS**
+- Buttons, LEDs, displays, ports, vents
+- Branding placement and style
+- Unique design features
+- Angles that show the product best
+
+**PHOTOGRAPHY NOTES**
+- Which angle is most flattering?
+- What details should be emphasized?
+- What makes this product look premium?
+
+Be EXTREMELY specific and visual - your description will guide the final image transformation."""
+
+        # Build content with text + multiple images
+        content = [{"type": "text", "text": analysis_prompt}]
+        
+        for i, url in enumerate(all_image_urls[:3]):
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": url, "detail": "high"}
+            })
+            logger.info(f"[HYBRID] Added image {i+1}/{num_images} for analysis")
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                # GPT-4V Analysis
+                logger.info("[HYBRID] Calling GPT-4V for multi-image analysis...")
+                
+                vision_response = await session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {get_openai_key()}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "gpt-4o",
+                        "messages": [{"role": "user", "content": content}],
+                        "max_tokens": 1000
+                    },
+                    timeout=aiohttp.ClientTimeout(total=60)
+                )
+                
+                if vision_response.status != 200:
+                    error = await vision_response.text()
+                    logger.error(f"[HYBRID] GPT-4V analysis failed: {vision_response.status}: {error[:300]}")
+                    return None
+                
+                vision_data = await vision_response.json()
+                product_analysis = vision_data["choices"][0]["message"]["content"]
+                logger.info(f"[HYBRID] ✅ Analysis complete ({len(product_analysis)} chars)")
+                
+                # =====================================================================
+                # STEP 2: Build Enhanced Stability AI Prompt
+                # =====================================================================
+                
+                style = get_style_guide(niche)
+                
+                stability_prompt = f"""Transform this product photo into a premium e-commerce hero shot.
+
+**PRODUCT DETAILS** (from AI analysis):
+{product_analysis[:800]}
+
+**BRAND STYLING (Oubon Shop)**:
+Aesthetic: {style['aesthetic']}
+Background: {style['background']}
+Lighting: {style['lighting']}
+Mood: {style['mood']}
+Colors: {style['colors']}
+
+**TRANSFORMATION REQUIREMENTS**:
+- Keep the EXACT product shape, proportions, and details
+- Enhance ONLY the background and lighting
+- Add subtle shadows for depth
+- Make it look like premium studio photography
+- Magazine-quality product shot
+
+{niche.replace('_', ' ').title()} category aesthetic."""
+                
+                logger.info(f"[HYBRID] Built enhanced prompt ({len(stability_prompt)} chars)")
+                
+                # =====================================================================
+                # STEP 3: Download and Transform with Stability AI
+                # =====================================================================
+                
+                logger.info("[HYBRID] Downloading primary image for transformation...")
+                image_base64 = await self._download_image_as_base64(primary_image_url)
+                
+                if not image_base64:
+                    logger.error("[HYBRID] ❌ Failed to download primary image")
+                    return None
+                
+                image_bytes = base64.b64decode(image_base64)
+                logger.info(f"[HYBRID] Primary image: {len(image_bytes):,} bytes")
+                
+                # Resize for SDXL compatibility
+                resized_bytes = self._resize_image_for_sdxl(image_bytes, target_size=1024)
+                
+                # Try v1 API first
+                logger.info("[HYBRID] Calling Stability AI v1 for transformation...")
+                
+                form = aiohttp.FormData()
+                form.add_field(
+                    'init_image', 
+                    resized_bytes,
+                    filename='image.png',
+                    content_type='image/png'
+                )
+                form.add_field('init_image_mode', 'IMAGE_STRENGTH')
+                form.add_field('image_strength', '0.35')  # Keep most of original structure
+                form.add_field('text_prompts[0][text]', stability_prompt)
+                form.add_field('text_prompts[0][weight]', '1')
+                form.add_field('text_prompts[1][text]', 
+                              'blurry, low quality, distorted, watermark, text, logo, cartoon, illustration, drawing')
+                form.add_field('text_prompts[1][weight]', '-1')
+                form.add_field('cfg_scale', '7')
+                form.add_field('samples', '1')
+                form.add_field('steps', '30')
+                
+                async with session.post(
+                    "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/image-to-image",
+                    headers={
+                        "Authorization": f"Bearer {get_stability_key()}",
+                        "Accept": "application/json"
+                    },
+                    data=form,
+                    timeout=aiohttp.ClientTimeout(total=120)
+                ) as stability_response:
+                    
+                    if stability_response.status == 200:
+                        data = await stability_response.json()
+                        result = await self._save_stability_result(data, product_title, "hybrid_v1")
+                        
+                        # Add hybrid-specific metadata
+                        result["source"] = "hybrid_gpt4v_stability"
+                        result["product_analysis"] = product_analysis[:500] + "..."
+                        result["images_analyzed"] = num_images
+                        result["note"] = f"Hybrid mode: GPT-4V analyzed {num_images} image(s), Stability AI preserved structure."
+                        
+                        logger.info(f"[HYBRID] ✅ SUCCESS! Generated hybrid image.")
+                        return result
+                    
+                    else:
+                        error_text = await stability_response.text()
+                        logger.error(f"[HYBRID] Stability v1 failed {stability_response.status}: {error_text[:300]}")
+                        
+                        # Try v2beta as fallback
+                        logger.info("[HYBRID] Trying v2beta fallback...")
+                        
+                        form2 = aiohttp.FormData()
+                        form2.add_field('image', resized_bytes, filename='image.png', content_type='image/png')
+                        form2.add_field('prompt', stability_prompt[:1500])  # v2beta has shorter limit
+                        form2.add_field('negative_prompt', 'blurry, low quality, distorted, watermark, cartoon')
+                        form2.add_field('mode', 'image-to-image')
+                        form2.add_field('strength', '0.35')
+                        form2.add_field('output_format', 'png')
+                        
+                        async with session.post(
+                            "https://api.stability.ai/v2beta/stable-image/generate/core",
+                            headers={
+                                "Authorization": f"Bearer {get_stability_key()}",
+                                "Accept": "image/*"
+                            },
+                            data=form2,
+                            timeout=aiohttp.ClientTimeout(total=120)
+                        ) as v2_response:
+                            
+                            if v2_response.status == 200:
+                                result_bytes = await v2_response.read()
+                                result = await self._save_stability_bytes(result_bytes, product_title, "hybrid_v2beta")
+                                
+                                result["source"] = "hybrid_gpt4v_stability_v2"
+                                result["product_analysis"] = product_analysis[:500] + "..."
+                                result["images_analyzed"] = num_images
+                                result["note"] = f"Hybrid mode (v2beta): GPT-4V analyzed {num_images} image(s), Stability AI preserved structure."
+                                
+                                logger.info(f"[HYBRID] ✅ SUCCESS via v2beta!")
+                                return result
+                            else:
+                                error2 = await v2_response.text()
+                                logger.error(f"[HYBRID] v2beta also failed: {error2[:200]}")
+                                return None
+                
+        except asyncio.TimeoutError:
+            logger.error("[HYBRID] Request timed out")
+            return None
+        except Exception as e:
+            logger.error(f"[HYBRID] Exception: {type(e).__name__}: {e}")
             return None
     
     # =========================================================================
