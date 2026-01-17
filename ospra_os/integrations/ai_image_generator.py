@@ -21,9 +21,17 @@ import json
 import aiohttp
 import asyncio
 import base64
+import io
 from typing import Optional, Dict, List, Literal
 from datetime import datetime
 from pathlib import Path
+
+# Image processing
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +283,61 @@ class AIImageGenerator:
         
         logger.info(f"[MULTI-IMAGE] Successfully downloaded {len(images)}/{len(valid_urls)} images")
         return images
+    
+    def _resize_image_for_sdxl(self, image_bytes: bytes, target_size: int = 1024) -> bytes:
+        """
+        Resize image to SDXL-compatible dimensions.
+        
+        SDXL v1 requires specific sizes: 1024x1024, 1152x896, 1216x832, etc.
+        We'll resize to 1024x1024 (square) for simplicity.
+        """
+        if not PIL_AVAILABLE:
+            logger.warning("[RESIZE] PIL not available, returning original image")
+            return image_bytes
+        
+        try:
+            # Open image from bytes
+            img = Image.open(io.BytesIO(image_bytes))
+            original_size = img.size
+            logger.info(f"[RESIZE] Original size: {original_size[0]}x{original_size[1]}")
+            
+            # Convert to RGB if needed (some PNGs have alpha channel)
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
+            
+            # Resize to target size (maintaining aspect ratio, then center crop)
+            # First, resize so smallest dimension is target_size
+            width, height = img.size
+            if width < height:
+                new_width = target_size
+                new_height = int(height * (target_size / width))
+            else:
+                new_height = target_size
+                new_width = int(width * (target_size / height))
+            
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Center crop to exact target_size x target_size
+            left = (new_width - target_size) // 2
+            top = (new_height - target_size) // 2
+            right = left + target_size
+            bottom = top + target_size
+            img = img.crop((left, top, right, bottom))
+            
+            logger.info(f"[RESIZE] Resized to: {img.size[0]}x{img.size[1]}")
+            
+            # Convert back to bytes (PNG format for quality)
+            output = io.BytesIO()
+            img.save(output, format='PNG', quality=95)
+            output.seek(0)
+            resized_bytes = output.read()
+            
+            logger.info(f"[RESIZE] Output size: {len(resized_bytes):,} bytes")
+            return resized_bytes
+            
+        except Exception as e:
+            logger.error(f"[RESIZE] Failed: {e}, returning original")
+            return image_bytes
     
     # =========================================================================
     # ENHANCED PROMPT BUILDERS
@@ -651,16 +714,20 @@ Photorealistic, premium quality product photography."""
         image_bytes = base64.b64decode(image_base64)
         logger.info(f"[IMG2IMG] Image downloaded: {len(image_bytes):,} bytes")
         
+        # CRITICAL: Resize image to SDXL-compatible dimensions (1024x1024)
+        logger.info("[IMG2IMG] Resizing image for SDXL compatibility...")
+        resized_image_bytes = self._resize_image_for_sdxl(image_bytes, target_size=1024)
+        
         # Build prompt
         style_prompt = self._build_stability_prompt(product_title, niche)
         logger.info(f"[IMG2IMG] Prompt: {style_prompt[:100]}...")
         
         # Try v1 API first, then fall back to v2beta
-        result = await self._try_stability_v1_img2img(image_bytes, style_prompt, product_title)
+        result = await self._try_stability_v1_img2img(resized_image_bytes, style_prompt, product_title)
         
         if not result:
             logger.info("[IMG2IMG] v1 API failed, trying v2beta...")
-            result = await self._try_stability_v2_img2img(image_bytes, style_prompt, product_title)
+            result = await self._try_stability_v2_img2img(resized_image_bytes, style_prompt, product_title)
         
         return result
     
@@ -729,8 +796,8 @@ Photorealistic, premium quality product photography."""
         product_title: str
     ) -> Optional[Dict]:
         """
-        Try Stability AI v2beta API (newer, more reliable)
-        Uses the image-to-image/upscale endpoints
+        Try Stability AI v2beta API with correct image-to-image mode.
+        Uses the stable-image/generate/core endpoint with mode=image-to-image.
         """
         try:
             async with aiohttp.ClientSession() as session:
@@ -744,13 +811,15 @@ Photorealistic, premium quality product photography."""
                 form.add_field('prompt', style_prompt)
                 form.add_field('negative_prompt', 
                               'blurry, low quality, distorted, watermark, text, logo, cartoon')
+                form.add_field('mode', 'image-to-image')  # CRITICAL: Must set mode!
                 form.add_field('strength', '0.35')
                 form.add_field('output_format', 'png')
                 
-                logger.info("[IMG2IMG] Calling Stability AI v2beta API...")
+                logger.info("[IMG2IMG] Calling Stability AI v2beta API (core endpoint)...")
                 
+                # Use the 'core' endpoint which supports image-to-image mode
                 async with session.post(
-                    "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+                    "https://api.stability.ai/v2beta/stable-image/generate/core",
                     headers={
                         "Authorization": f"Bearer {get_stability_key()}",
                         "Accept": "image/*"

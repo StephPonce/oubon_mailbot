@@ -748,6 +748,8 @@ async def test_img2img_verbose(
     Verbose test of img2img pipeline - shows each step for debugging.
     """
     import base64
+    from PIL import Image
+    import io
     
     steps = []
     result = {"url": image_url, "title": product_title}
@@ -813,6 +815,44 @@ async def test_img2img_verbose(
         result["error"] = f"Download exception: {e}"
         return result
     
+    # Step 2.5: Resize image for SDXL
+    steps.append({"step": 2.5, "name": "Resize for SDXL", "status": "resizing..."})
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        steps[-1]["original_size"] = f"{img.size[0]}x{img.size[1]}"
+        
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        
+        # Resize to 1024x1024
+        width, height = img.size
+        target = 1024
+        if width < height:
+            new_width = target
+            new_height = int(height * (target / width))
+        else:
+            new_height = target
+            new_width = int(width * (target / height))
+        
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        left = (new_width - target) // 2
+        top = (new_height - target) // 2
+        img = img.crop((left, top, left + target, top + target))
+        
+        output = io.BytesIO()
+        img.save(output, format='PNG', quality=95)
+        output.seek(0)
+        image_bytes = output.read()
+        
+        steps[-1]["success"] = True
+        steps[-1]["new_size"] = "1024x1024"
+        steps[-1]["new_bytes"] = len(image_bytes)
+    except Exception as e:
+        steps[-1]["success"] = False
+        steps[-1]["error"] = str(e)
+        # Continue with original bytes
+    
     # Step 3: Call Stability v1 API
     steps.append({"step": 3, "name": "Stability v1 API", "status": "calling..."})
     
@@ -877,19 +917,20 @@ Professional studio quality."""
         steps[-1]["error"] = str(e)
         steps[-1]["error_type"] = type(e).__name__
     
-    # Step 4: Try v2beta API as fallback
-    steps.append({"step": 4, "name": "Stability v2beta API (fallback)", "status": "calling..."})
+    # Step 4: Try v2beta API as fallback (with mode=image-to-image)
+    steps.append({"step": 4, "name": "Stability v2beta API (core, img2img)", "status": "calling..."})
     
     try:
         async with aiohttp.ClientSession() as session:
             form = aiohttp.FormData()
             form.add_field('image', image_bytes, filename='image.png', content_type='image/png')
             form.add_field('prompt', style_prompt)
+            form.add_field('mode', 'image-to-image')  # CRITICAL!
             form.add_field('strength', '0.35')
             form.add_field('output_format', 'png')
             
             async with session.post(
-                "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+                "https://api.stability.ai/v2beta/stable-image/generate/core",
                 headers={
                     "Authorization": f"Bearer {stability_key}",
                     "Accept": "image/*"
