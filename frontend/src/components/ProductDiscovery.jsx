@@ -17,7 +17,7 @@ import {
   ArrowRight, Eye, AlertTriangle, RefreshCw, X, ExternalLink, Brain,
   ShoppingCart, Copy, Check, ChevronRight, Star, Link2, Database, 
   Zap, Target, Sparkles, DollarSign, Camera, Wand2, MessageSquare,
-  ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft, Beaker
+  ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
@@ -971,11 +971,9 @@ export function ProductDiscovery() {
   const [selectedProduct, setSelectedProductState] = useState(null);
   const [hasMockData, setHasMockData] = useState(false);
   const [hasEstimatedScores, setHasEstimatedScores] = useState(false);
-  const [enableAiImages, setEnableAiImages] = useState(false);
   const [generatingImages, setGeneratingImages] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
-  const [comparisonProduct, setComparisonProduct] = useState(null);
-  const [generatingHybrid, setGeneratingHybrid] = useState(false);
+  const [showEnhancer, setShowEnhancer] = useState(false);
+  const [enhancerProduct, setEnhancerProduct] = useState(null);
 
   useEffect(() => {
     loadProducts();
@@ -1026,64 +1024,60 @@ export function ProductDiscovery() {
     }
   };
   
-  // Quick Hybrid Generate - Best quality single-click generation
-  const generateQuickHybrid = async () => {
-    if (!selectedProduct && products.length === 0) {
-      alert('Select a product or load products first');
-      return;
-    }
-    
-    const targetProduct = selectedProduct || products[0];
-    setGeneratingHybrid(true);
+  // Enhance images using background removal
+  const enhanceProductImages = async () => {
+    if (products.length === 0) return;
+    setGeneratingImages(true);
     
     try {
       const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/images/compare`, {
+      
+      // Prepare batch request
+      const imagesToEnhance = products.slice(0, 5).map(p => ({
+        url: p.image_url,
+        id: p.id,
+        title: p.title,
+        niche: p.niche || 'smart_home'
+      }));
+      
+      const response = await fetch(`${apiBase}/api/images/enhance/batch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          product_title: targetProduct.title,
-          niche: targetProduct.niche || 'smart_home',
-          original_image_url: targetProduct.image_url,
-          additional_image_urls: targetProduct.all_images?.slice(1, 3) || [],
-          modes: ['hybrid']
+          images: imagesToEnhance,
+          niche: 'smart_home',
+          max_concurrent: 3
         })
       });
       
       const data = await response.json();
       
-      if (data.comparisons?.hybrid?.success && data.comparisons.hybrid.source !== 'fallback') {
-        const aiImageUrl = data.comparisons.hybrid.ai_image_url;
-        
-        // Update the product with the new AI image
-        const updatedProduct = { ...targetProduct, ai_image_url: aiImageUrl };
-        setProducts(prev => prev.map(p => 
-          p.id === targetProduct.id ? updatedProduct : p
-        ));
-        
-        if (selectedProduct && selectedProduct.id === targetProduct.id) {
-          setSelectedProductState(updatedProduct);
-        }
-        
-        trackInteraction('quick_hybrid_generate', {
-          product_id: targetProduct.id,
-          product_name: targetProduct.title,
-          images_analyzed: data.comparisons.hybrid.images_analyzed || 1,
-          cost: data.total_cost
+      if (data.results) {
+        // Update products with enhanced images
+        const updatedProducts = products.map(p => {
+          const result = data.results.find(r => r.id === p.id);
+          if (result?.success && result.enhanced_image_url) {
+            return { ...p, ai_image_url: result.enhanced_image_url };
+          }
+          return p;
         });
-      } else {
-        const errorNote = data.comparisons?.hybrid?.note || 'Hybrid generation failed';
-        alert(`Hybrid generation: ${errorNote}`);
+        
+        setProducts(updatedProducts);
+        trackInteraction('enhance_images', {
+          total: data.total,
+          successful: data.successful,
+          cost: data.estimated_cost
+        });
       }
     } catch (error) {
-      console.error('Quick hybrid generation failed:', error);
-      alert('Hybrid generation failed: ' + (error.message || 'Unknown error'));
+      console.error('Image enhancement failed:', error);
+      alert('Enhancement failed: ' + (error.message || 'Unknown error'));
     } finally {
-      setGeneratingHybrid(false);
+      setGeneratingImages(false);
     }
   };
 
-  // Generate AI images for current products
+  // Legacy: Generate AI images for current products (kept for compatibility)
   const generateAiImages = async () => {
     if (products.length === 0) return;
     setGeneratingImages(true);
@@ -1244,60 +1238,34 @@ export function ProductDiscovery() {
           </div>
         </div>
         
-        {/* AI Image Generation Controls */}
+        {/* Image Enhancement Controls */}
         <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={enableAiImages}
-                onChange={(e) => setEnableAiImages(e.target.checked)}
-                className="w-4 h-4 rounded bg-white/10 border-white/20 text-purple-500 focus:ring-purple-500"
-              />
-              <span className="text-white/70 text-sm">Auto-generate AI images on discovery</span>
-            </label>
-            <span className="text-white/40 text-xs">(~$0.04/image)</span>
+            <span className="text-white/50 text-sm">Product images can be enhanced with clean backgrounds</span>
+            <span className="text-white/40 text-xs">(~$0.06/image)</span>
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={generateQuickHybrid}
-              disabled={generatingHybrid || products.length === 0}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 text-pink-300 text-sm font-medium hover:from-pink-500/30 hover:to-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              title="Best quality: GPT-4V analysis + Stability AI structure preservation (~$0.06)"
-            >
-              {generatingHybrid ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4" />
-                  Quick Hybrid
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => setShowComparison(true)}
+              onClick={() => setShowEnhancer(true)}
               className="px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 flex items-center gap-2"
             >
-              <Beaker className="w-4 h-4" />
-              Compare All Modes
+              <Wand2 className="w-4 h-4" />
+              Enhance Single Image
             </button>
             <button
-              onClick={generateAiImages}
+              onClick={enhanceProductImages}
               disabled={generatingImages || products.length === 0}
               className="px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 text-sm font-medium hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {generatingImages ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating...
+                  Enhancing...
                 </>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Generate AI Images
+                  Enhance All (Top 5)
                 </>
               )}
             </button>
@@ -1349,21 +1317,34 @@ export function ProductDiscovery() {
             ));
             setSelectedProductState(updatedProduct);
           }}
-          onCompare={(product) => {
-            setComparisonProduct(product);
-            setShowComparison(true);
+          onEnhance={(product) => {
+            setEnhancerProduct(product);
+            setShowEnhancer(true);
           }}
         />
       )}
 
-      {/* AI Image Comparison Modal */}
-      {showComparison && (
+      {/* Image Enhancer Modal */}
+      {showEnhancer && (
         <AIImageComparison
-          product={comparisonProduct || selectedProduct}
+          product={enhancerProduct || selectedProduct}
           isModal={true}
           onClose={() => {
-            setShowComparison(false);
-            setComparisonProduct(null);
+            setShowEnhancer(false);
+            setEnhancerProduct(null);
+          }}
+          onImageEnhanced={(enhancedUrl) => {
+            // Update product with enhanced image
+            const targetProduct = enhancerProduct || selectedProduct;
+            if (targetProduct) {
+              const updatedProduct = { ...targetProduct, ai_image_url: enhancedUrl };
+              setProducts(prev => prev.map(p => 
+                p.id === targetProduct.id ? updatedProduct : p
+              ));
+              if (selectedProduct?.id === targetProduct.id) {
+                setSelectedProductState(updatedProduct);
+              }
+            }
           }}
         />
       )}
