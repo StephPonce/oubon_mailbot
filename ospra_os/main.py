@@ -491,6 +491,16 @@ except Exception as e:
     learning_router = None
     _HAS_LEARNING = False
 
+# Fulfillment System router (Auto-fulfillment, tracking, supplier integration)
+try:
+    from ospra_os.api.fulfillment_routes import router as fulfillment_router  # type: ignore
+    _HAS_FULFILLMENT = True
+    print("[SUCCESS] Fulfillment System router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  Fulfillment System router not loaded: {e}")
+    fulfillment_router = None
+    _HAS_FULFILLMENT = False
+
 # Oi AI Assistant router (The Brain of Ospra Intelligence)
 try:
     from ospra_os.api.oi_routes import router as oi_router  # type: ignore
@@ -1320,6 +1330,10 @@ if _HAS_INTELLIGENCE_CORE and intelligence_core_router:
 
 if _HAS_LEARNING and learning_router:
     app.include_router(learning_router)  # exposes /api/learning/*
+
+# Fulfillment System (Auto-fulfillment, tracking, supplier integration)
+if _HAS_FULFILLMENT and fulfillment_router:
+    app.include_router(fulfillment_router)  # exposes /api/fulfillment/*
 
 # Oi AI Assistant (The Brain of Ospra Intelligence)
 if _HAS_OI and oi_router:

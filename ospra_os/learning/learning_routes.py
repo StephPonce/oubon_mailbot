@@ -580,3 +580,187 @@ async def trigger_all_users_analysis():
             detail=f"All users analysis failed: {str(e)}"
         )
 
+
+# ==================== LEARNING STATUS & SCHEDULER ====================
+
+@router.get("/status")
+async def get_learning_status():
+    """
+    Get comprehensive self-learning system status.
+    
+    Shows:
+    - Whether learning is active
+    - How many cycles have run
+    - Recent learning events
+    - Accuracy metrics
+    - Scheduler status
+    """
+    try:
+        # Try to get full status from scheduler
+        from ospra_os.learning.learning_scheduler import get_learning_status as get_status
+        return await get_status()
+    except ImportError as ie:
+        # Scheduler module not available
+        pass
+    except Exception as e:
+        # Log but continue to fallback
+        import logging
+        logging.warning(f"Scheduler status failed: {e}")
+    
+    # Fallback: Try to get basic status from database
+    db = None
+    try:
+        db = SessionLocal()
+        engine = get_learning_engine(db)
+        weights = engine.get_global_weights()
+        
+        return {
+            "status": "active" if weights.get("learning_cycles", 0) > 0 else "pending_data",
+            "learning_cycles": weights.get("learning_cycles", 0),
+            "total_sales_analyzed": weights.get("total_sales_analyzed", 0),
+            "accuracy": weights.get("accuracy", {}),
+            "last_updated": weights.get("last_updated"),
+            "scheduler_running": False,
+            "note": "Using fallback status (scheduler not running)"
+        }
+    except Exception as e:
+        # Database not available or tables don't exist
+        return {
+            "status": "not_initialized",
+            "learning_cycles": 0,
+            "total_sales_analyzed": 0,
+            "accuracy": {},
+            "error": str(e),
+            "fix": "Run database migrations or initialize learning tables"
+        }
+    finally:
+        if db:
+            db.close()
+
+
+@router.post("/trigger-now")
+async def trigger_learning_now():
+    """
+    Manually trigger a learning cycle immediately.
+    
+    Useful for testing or after importing sales data.
+    """
+    try:
+        from ospra_os.learning.learning_scheduler import run_daily_learning_cycle
+        
+        await run_daily_learning_cycle()
+        
+        return {
+            "success": True,
+            "message": "Learning cycle completed",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Learning scheduler module not available"
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Learning trigger failed: {str(e)}"
+        )
+
+
+@router.get("/events")
+async def get_recent_learning_events(limit: int = 50):
+    """
+    Get recent learning events (sales, cancellations, etc.)
+    
+    Useful for debugging and verifying webhooks are recording.
+    """
+    db = None
+    try:
+        from ospra_os.database import AILearningEvent
+        
+        db = SessionLocal()
+        events = db.query(AILearningEvent).order_by(
+            AILearningEvent.timestamp.desc()
+        ).limit(limit).all()
+        
+        return {
+            "count": len(events),
+            "events": [
+                {
+                    "id": e.id,
+                    "event_type": e.event_type,
+                    "product_id": e.product_id,
+                    "details": e.details,
+                    "timestamp": e.timestamp.isoformat() if e.timestamp else None
+                }
+                for e in events
+            ]
+        }
+    except Exception as e:
+        return {
+            "count": 0,
+            "events": [],
+            "error": str(e),
+            "note": "AILearningEvent table may not exist. Run migrations."
+        }
+    finally:
+        if db:
+            db.close()
+
+
+@router.post("/simulate-sale")
+async def simulate_sale(
+    product_id: str,
+    product_name: str,
+    price: float,
+    niche: str = "smart_home"
+):
+    """
+    Simulate a sale for testing the learning pipeline.
+    
+    Creates a learning event as if a sale happened.
+    Use this to test that learning is working before real sales.
+    """
+    db = None
+    try:
+        from ospra_os.database import AILearningEvent
+        
+        db = SessionLocal()
+        event = AILearningEvent(
+            user_id=1,
+            event_type="sale",
+            product_id=product_id,
+            details={
+                "product_name": product_name,
+                "niche": niche,
+                "price": price,
+                "price_point": "under_20" if price < 20 else "20_to_50" if price < 50 else "50_to_100" if price < 100 else "over_100",
+                "quantity": 1,
+                "revenue": price,
+                "source": "simulation",
+                "sale_timestamp": datetime.utcnow().isoformat()
+            },
+            timestamp=datetime.utcnow()
+        )
+        db.add(event)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": f"Simulated sale recorded for {product_name}",
+            "event_id": event.id,
+            "note": "Run /api/learning/trigger-now to process this sale"
+        }
+    except Exception as e:
+        if db:
+            db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to simulate sale: {str(e)}"
+        )
+    finally:
+        if db:
+            db.close()
+

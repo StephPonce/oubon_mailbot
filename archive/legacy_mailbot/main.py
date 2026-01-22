@@ -121,6 +121,16 @@ async def startup_event():
     except Exception as e:
         print(f"[WARNING]  Auto-Discovery scheduler failed: {e}")
 
+    # Start Self-Learning scheduler (daily learning cycles)
+    try:
+        from ospra_os.learning.learning_scheduler import start_learning_scheduler
+        start_learning_scheduler()
+        print("[SUCCESS] Self-Learning scheduler started")
+        print("    📊 Daily learning: 3:00 AM")
+        print("    📦 Tracking sync: Every 6 hours")
+    except Exception as e:
+        print(f"[WARNING]  Learning scheduler failed: {e}")
+
 @app.get("/health")
 async def health():
     """Health check with system status"""
@@ -1534,6 +1544,22 @@ try:
     print("[SUCCESS] Product Analysis routes loaded (/api/products/analysis/*)")
 except Exception as e:
     print(f"[WARNING]  Product Analysis routes not loaded: {e}")
+
+# --- SHOPIFY WEBHOOKS (ORDER FULFILLMENT + LEARNING) ---
+try:
+    from ospra_os.webhooks.shopify_webhooks import router as shopify_webhook_router
+    app.include_router(shopify_webhook_router)
+    print("[SUCCESS] Shopify Webhook routes loaded (/webhooks/shopify/*)")
+except Exception as e:
+    print(f"[WARNING]  Shopify Webhook routes not loaded: {e}")
+
+# --- AUTO-FULFILLMENT ROUTES ---
+try:
+    from ospra_os.fulfillment.routes import router as fulfillment_router
+    app.include_router(fulfillment_router)
+    print("[SUCCESS] Auto-Fulfillment routes loaded (/api/fulfillment/*)")
+except Exception as e:
+    print(f"[WARNING]  Fulfillment routes not loaded: {e}")
 
 print("\n" + "="*60)
 print(" OSPRA INTELLIGENCE - ALL SYSTEMS ONLINE")

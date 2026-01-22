@@ -171,44 +171,48 @@ class AILearningEvent(Base):
     Individual learning events derived from outcomes.
     These feed into the AI model weight adjustments.
 
-    Example: If AI predicted 85% confidence and product succeeded,
-    we create a positive learning event validating the factors
-    that led to that high confidence score.
+    Updated: Hybrid Learning Architecture
+    - Simplified event structure for webhook integration
+    - Supports sale, cancellation, and ad_performance events
+    - Compatible with Shopify webhook data
     """
     __tablename__ = "ai_learning_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Made nullable for global events
     outcome_id = Column(Integer, ForeignKey("recommendation_outcomes.id"), nullable=True)
 
-    # Event type
-    event_type = Column(String(50), nullable=False)  # product_success, product_failure, price_optimal, etc.
+    # Event type (sale, cancellation, ad_performance, product_success, product_failure)
+    event_type = Column(String(50), nullable=False)
+    
+    # Product reference (for sales events from Shopify)
+    product_id = Column(String(100), nullable=True)  # Shopify product ID as string
+    
+    # Event details (flexible JSON for different event types)
+    details = Column(JSON, default=dict)  # {product_name, niche, price, price_point, quantity, revenue, ...}
 
-    # Context at time of event
-    context = Column(JSON, nullable=False)           # All relevant factors
-
-    # What we learned
-    lesson_type = Column(String(50), nullable=False) # positive_signal, negative_signal, neutral
+    # Legacy fields (kept for backwards compatibility)
+    context = Column(JSON, nullable=True)           # All relevant factors
+    lesson_type = Column(String(50), nullable=True) # positive_signal, negative_signal, neutral
     lesson_strength = Column(Float, default=1.0)     # How strongly to weight this lesson
-
-    # Specific learnings
     factors_validated = Column(JSON, default=list)   # Factors that proved correct
     factors_invalidated = Column(JSON, default=list) # Factors that proved wrong
-
-    # Weight adjustments applied
     weight_adjustments = Column(JSON, default=dict)  # {factor: adjustment}
 
     # Processing
     processed = Column(Boolean, default=False)
     processed_at = Column(DateTime, nullable=True)
 
-    # Timestamp
-    created_at = Column(DateTime, default=datetime.utcnow)
+    # Timestamp (primary timestamp for queries)
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)  # Alias for backwards compat
 
     __table_args__ = (
         Index('idx_learning_user', 'user_id'),
         Index('idx_learning_type', 'event_type'),
         Index('idx_learning_processed', 'processed'),
+        Index('idx_learning_product', 'product_id'),
+        Index('idx_learning_timestamp', 'timestamp'),
     )
 
 
@@ -306,13 +310,45 @@ class GlobalLearningWeights(Base):
     """
     Global AI model weights learned from all users.
     These are the baseline weights before personalization.
+    
+    Updated: Hybrid Learning Architecture
+    - Supports both category-based weights and global aggregates
+    - Tracks learning cycles, accuracy, and contribution metrics
     """
     __tablename__ = "global_learning_weights"
 
     id = Column(Integer, primary_key=True, index=True)
-    category = Column(String(50), nullable=False, unique=True)  # confidence, pricing, etc.
-    weights = Column(JSON, nullable=False)  # {factor: weight}
-    version = Column(Integer, default=1)
+    
+    # Legacy field (kept for backwards compatibility)
+    category = Column(String(50), nullable=True)  # confidence, pricing, etc.
+    weights = Column(JSON, nullable=True)  # Legacy: {factor: weight}
+    
+    # Hybrid Learning Fields
+    version = Column(String(20), default="1.0")  # Model version
+    learning_cycles = Column(Integer, default=0)  # Total learning cycles run
+    
+    # Scoring weights
+    scoring_weights = Column(JSON, default=dict)  # {google_trends_weight: 0.25, ...}
+    
+    # Confidence scores by niche
+    niche_confidence = Column(JSON, default=dict)  # {smart_home: 0.7, fitness: 0.5, ...}
+    
+    # Confidence scores by price point
+    price_confidence = Column(JSON, default=dict)  # {under_20: 0.6, 20_to_50: 0.7, ...}
+    
+    # Trend velocity settings
+    trend_velocity = Column(JSON, default=dict)  # {early_spike_threshold: 50, ...}
+    
+    # Accuracy tracking
+    accuracy = Column(JSON, default=dict)  # {predictions_made: 0, predictions_correct: 0, accuracy_rate: 0.5}
+    
+    # Contribution metrics
+    total_users_contributing = Column(Integer, default=0)
+    total_sales_analyzed = Column(Integer, default=0)
+    total_revenue_analyzed = Column(Float, default=0.0)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
@@ -324,17 +360,52 @@ class PersonalLearningWeights(Base):
     """
     User-specific AI model weights.
     These personalize the AI based on what works for THIS specific user.
+    
+    Updated: Hybrid Learning Architecture
+    - Supports personal adjustments relative to global weights
+    - Tracks user-specific patterns (best niches, optimal prices, peak days)
+    - Stratosphere tier: Custom weight overrides
     """
     __tablename__ = "personal_learning_weights"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    category = Column(String(50), nullable=False)  # confidence, pricing, etc.
-    weights = Column(JSON, nullable=False)  # {factor: weight}
-    version = Column(Integer, default=1)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    
+    # Legacy fields (kept for backwards compatibility)
+    category = Column(String(50), nullable=True)  # confidence, pricing, etc.
+    weights = Column(JSON, nullable=True)  # Legacy: {factor: weight}
+    
+    # Hybrid Learning Fields
+    version = Column(String(20), default="1.0")
+    learning_cycles = Column(Integer, default=0)
+    
+    # Personal adjustments (deltas from global weights)
+    scoring_adjustments = Column(JSON, default=dict)  # {factor: +/- adjustment}
+    niche_adjustments = Column(JSON, default=dict)    # {niche: +/- adjustment}
+    price_adjustments = Column(JSON, default=dict)    # {price_point: +/- adjustment}
+    
+    # Discovered patterns
+    best_performing_niches = Column(JSON, default=list)  # ["smart_home", "fitness", ...]
+    optimal_price_range = Column(JSON, default=dict)     # {bucket: "20_to_50", min: 20, max: 50}
+    peak_selling_days = Column(JSON, default=list)       # ["Saturday", "Sunday"]
+    
+    # Accuracy tracking
+    predictions_made = Column(Integer, default=0)
+    predictions_correct = Column(Integer, default=0)
+    accuracy_rate = Column(Float, default=0.5)
+    
+    # Stats
+    sales_analyzed = Column(Integer, default=0)
+    revenue_analyzed = Column(Float, default=0.0)
+    
+    # Stratosphere tier: Custom weights
+    custom_weights_enabled = Column(Boolean, default=False)
+    custom_weights = Column(JSON, default=dict)  # {factor: custom_weight}
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        UniqueConstraint('user_id', 'category', name='uq_user_category'),
         Index('idx_personal_weights_user', 'user_id'),
     )
