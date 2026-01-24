@@ -2,8 +2,10 @@
 OSPRA INTELLIGENCE - Waitlist API Routes
 ========================================
 Endpoints for Stratosphere waitlist management
+
+SECURITY: Admin endpoints require authentication.
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import logging
@@ -14,6 +16,9 @@ from .stratosphere_waitlist import (
     get_waitlist_confirmation_email,
     WaitlistSource
 )
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
+from ospra_os.security.safe_errors import safe_error_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/waitlist", tags=["waitlist"])
@@ -60,7 +65,7 @@ async def join_stratosphere_waitlist(
         
     except Exception as e:
         logger.error(f"[ERROR] Waitlist signup error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return safe_error_response(e, "Failed to join waitlist")
 
 
 @router.post("/check")
@@ -100,12 +105,11 @@ async def get_waitlist_stats():
 # ==================== ADMIN ENDPOINTS ====================
 
 @router.get("/admin/entries")
-async def list_waitlist_entries():
+async def list_waitlist_entries(current_user: User = Depends(get_current_user)):
     """
-    Admin: Get all waitlist entries
+    Admin: Get all waitlist entries.
+    Requires authentication.
     """
-    # TODO: Add admin authentication
-    
     entries = waitlist.get_all_entries()
     stats = waitlist.get_stats()
     
@@ -133,12 +137,11 @@ async def list_waitlist_entries():
 
 
 @router.get("/admin/founding-members")
-async def list_founding_members():
+async def list_founding_members(current_user: User = Depends(get_current_user)):
     """
-    Admin: Get just the founding members (first 50)
+    Admin: Get just the founding members (first 50).
+    Requires authentication.
     """
-    # TODO: Add admin authentication
-    
     founders = waitlist.get_founding_members()
     
     return {

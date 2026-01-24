@@ -59,6 +59,13 @@ WEBHOOKS = [
     ("fulfillments/update", "fulfillments/update"),
 ]
 
+# GDPR Webhooks (configured in Partner Dashboard, not Shopify Admin)
+GDPR_WEBHOOKS = [
+    ("customers/data_request", "gdpr/customers/data_request"),
+    ("customers/redact", "gdpr/customers/redact"),
+    ("shop/redact", "gdpr/shop/redact"),
+]
+
 # Sample payloads for different webhook types
 SAMPLE_PAYLOADS = {
     "orders/create": {
@@ -218,6 +225,7 @@ def test_health(base_url: str) -> bool:
 def main():
     # Determine which server to test
     use_production = "--production" in sys.argv or "-p" in sys.argv
+    include_gdpr = "--gdpr" in sys.argv or "-g" in sys.argv
     base_url = PROD_BASE if use_production else LOCAL_BASE
     
     print("=" * 70)
@@ -225,6 +233,8 @@ def main():
     print("=" * 70)
     print(f"Target: {base_url}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if include_gdpr:
+        print("Mode: Including GDPR endpoints")
     print("=" * 70)
     print()
     
@@ -239,6 +249,11 @@ def main():
         print()
         # Continue anyway to show which endpoints would fail
     
+    # Combine webhook lists
+    webhooks_to_test = WEBHOOKS.copy()
+    if include_gdpr:
+        webhooks_to_test.extend(GDPR_WEBHOOKS)
+    
     # Test each webhook
     print("🔔 Testing webhook endpoints...\n")
     
@@ -246,7 +261,7 @@ def main():
     passed = 0
     failed = 0
     
-    for topic, path in WEBHOOKS:
+    for topic, path in webhooks_to_test:
         result = test_webhook(base_url, topic, path)
         results.append(result)
         
@@ -265,7 +280,7 @@ def main():
     print("=" * 70)
     print("📊 SUMMARY")
     print("=" * 70)
-    print(f"   Total:  {len(WEBHOOKS)}")
+    print(f"   Total:  {len(webhooks_to_test)}")
     print(f"   Passed: {passed} ✅")
     print(f"   Failed: {failed} ❌")
     print()
@@ -288,6 +303,8 @@ def main():
         print("1. Test with real Shopify webhooks using 'Send test notification'")
         print("2. In Shopify Admin → Settings → Notifications → Webhooks")
         print("3. Click the webhook → 'Send test notification'")
+        if not include_gdpr:
+            print("4. Run with --gdpr flag to also test GDPR endpoints")
     
     print()
     

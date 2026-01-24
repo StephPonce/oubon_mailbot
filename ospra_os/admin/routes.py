@@ -1,8 +1,13 @@
-"""Admin Dashboard Routes - Unified view of all Ospra OS data."""
+"""Admin Dashboard Routes - Unified view of all Ospra OS data.
+
+SECURITY: All admin routes require authentication.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from ospra_os.core.settings import Settings, get_settings
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from typing import Dict, Any
 import asyncio
 
@@ -88,7 +93,10 @@ async def get_reddit_sentiment(settings: Settings) -> Dict[str, Any]:
 
 
 @router.get("/dashboard/data")
-async def get_dashboard_data(settings: Settings = Depends(get_settings)):
+async def get_dashboard_data(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)  # Require authentication
+):
     """
     Aggregate all dashboard data in one API call.
 
@@ -132,7 +140,7 @@ async def get_dashboard_data(settings: Settings = Depends(get_settings)):
 
 
 @router.get("/dashboard/v2", response_class=HTMLResponse)
-async def dashboard_v2():
+async def dashboard_v2(current_user: User = Depends(get_current_user)):
     """New comprehensive Ospra OS Dashboard with 5 tabs."""
     from pathlib import Path
     dashboard_path = Path(__file__).parent.parent.parent / "static" / "ospra_dashboard.html"
@@ -143,7 +151,7 @@ async def dashboard_v2():
 
 
 @router.get("/dashboard", response_class=HTMLResponse)
-async def dashboard_page():
+async def dashboard_page(current_user: User = Depends(get_current_user)):
     """
     Unified Ospra OS Dashboard.
 

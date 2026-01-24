@@ -801,6 +801,12 @@ from ospra_os.middleware.tier_enforcement import TierEnforcementMiddleware
 app.add_middleware(TierEnforcementMiddleware)
 print("[SUCCESS] ✓ Tier enforcement middleware active (Phase 1 Security)")
 
+# Debug Endpoint Protection (CRITICAL SECURITY)
+# Blocks /debug/* routes in production to prevent information leakage
+from ospra_os.security.debug_protection import DebugEndpointProtectionMiddleware
+app.add_middleware(DebugEndpointProtectionMiddleware)
+print("[SUCCESS] ✓ Debug endpoint protection active (blocks /debug/* in production)")
+
 # Mount static files for product images (only if directory exists)
 import os
 from pathlib import Path

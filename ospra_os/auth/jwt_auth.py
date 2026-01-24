@@ -29,8 +29,31 @@ from ospra_os.database.connection import SessionLocal
 # CONFIGURATION
 # ============================================================================
 
-# Secret key for JWT signing (use env var in production!)
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ospra-dev-secret-change-in-production-abc123xyz789")
+# Secret key for JWT signing - REQUIRED in production
+_jwt_secret = os.getenv("JWT_SECRET_KEY")
+if not _jwt_secret:
+    import warnings
+    warnings.warn(
+        "JWT_SECRET_KEY environment variable not set! "
+        "Using insecure default for development only. "
+        "Set JWT_SECRET_KEY in production!",
+        RuntimeWarning
+    )
+    # Only allow default in development - check for common production indicators
+    _is_production = (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
+        os.getenv("RENDER", "") == "true" or  # Render.com deployment
+        os.getenv("RAILWAY_ENVIRONMENT", "") != "" or  # Railway deployment
+        os.getenv("VERCEL", "") == "1"  # Vercel deployment
+    )
+    if _is_production:
+        raise RuntimeError(
+            "CRITICAL: JWT_SECRET_KEY must be set in production! "
+            "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+    _jwt_secret = "ospra-dev-secret-DO-NOT-USE-IN-PRODUCTION"
+
+SECRET_KEY = _jwt_secret
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = 30

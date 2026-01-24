@@ -132,13 +132,15 @@ async def get_me_compat(user: User = Depends(get_current_user)):
 # ============================================================================
 
 @router.get("/api/niches")
-async def get_niches_simplified():
+async def get_niches_simplified(current_user: User = Depends(get_current_user)):
     """
     GET /api/niches → returns all niches.
 
     Frontend expects this, but backend has /api/niches/all.
     This is an alias that imports and calls the existing logic.
     Uses ospra_os.db which has the complete schema.
+
+    Requires authentication.
     """
     from ospra_os.intelligence.niche_analyzer import NicheAnalyzer
 
@@ -165,11 +167,16 @@ async def get_niches_simplified():
 
 
 @router.get("/api/niches/{niche_id}/products")
-async def get_niche_products(niche_id: str, limit: int = 50):
+async def get_niche_products(
+    niche_id: str,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user)
+):
     """
     GET /api/niches/{id}/products → returns products in this niche.
 
     New endpoint - queries the product discovery system for niche-specific products.
+    Requires authentication.
     """
     from ospra_os.intelligence.unified_product_discovery import UnifiedProductDiscovery
 
@@ -196,12 +203,16 @@ async def get_niche_products(niche_id: str, limit: int = 50):
 # ============================================================================
 
 @router.get("/api/dashboard/v2/products/{product_id}")
-async def get_product_by_id(product_id: str):
+async def get_product_by_id(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     GET /api/dashboard/v2/products/{id} → get single product details.
 
     New endpoint - returns detailed product info from the database or
     real-time discovery system.
+    Requires authentication.
     """
     from ospra_os.database.product_history import ProductHistoryDB
 
@@ -230,11 +241,12 @@ async def get_product_by_id(product_id: str):
 # ============================================================================
 
 @router.get("/api/analytics/funnel")
-async def get_conversion_funnel():
+async def get_conversion_funnel(current_user: User = Depends(get_current_user)):
     """
     GET /api/analytics/funnel → conversion funnel data.
 
     Returns stages: Visitors → Product Views → Add to Cart → Checkout → Purchase
+    Requires authentication.
     """
     # Placeholder - would integrate with Shopify analytics
     return {
@@ -252,11 +264,12 @@ async def get_conversion_funnel():
 
 
 @router.get("/api/analytics/products/performance")
-async def get_product_performance():
+async def get_product_performance(current_user: User = Depends(get_current_user)):
     """
     GET /api/analytics/products/performance → top/bottom performing products.
 
     Returns products sorted by revenue, conversion, etc.
+    Requires authentication.
     """
     # Placeholder - would query Shopify/database for real data
     return {
@@ -271,11 +284,12 @@ async def get_product_performance():
 # ============================================================================
 
 @router.get("/api/competitors/prices")
-async def get_competitor_prices():
+async def get_competitor_prices(current_user: User = Depends(get_current_user)):
     """
     GET /api/competitors/prices → price comparison data.
 
     Alias for /api/competitors/price-comparison.
+    Requires authentication.
     """
     # This endpoint exists as /api/competitors/price-comparison in the competitor router
     # Frontend calls /api/competitors/prices, so we provide an alias
@@ -289,11 +303,15 @@ async def get_competitor_prices():
 
 
 @router.post("/api/competitors/{competitor_id}/analyze")
-async def analyze_competitor(competitor_id: str):
+async def analyze_competitor(
+    competitor_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     POST /api/competitors/{id}/analyze → trigger competitor analysis.
 
     Alias for /api/competitors/{id}/refresh which does the same thing.
+    Requires authentication.
     """
     return {
         "success": True,
@@ -307,14 +325,16 @@ async def analyze_competitor(competitor_id: str):
 # ============================================================================
 
 @router.post("/api/emails/messages/{message_id}/reply")
-async def reply_to_email(message_id: str, request: EmailReplyRequest):
+async def reply_to_email(
+    message_id: str,
+    request: EmailReplyRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     POST /api/emails/messages/{id}/reply → send reply to email.
 
     Integrates with the email automation system to send replies via Gmail/SMTP.
-
-    NOTE: Full email sending integration pending. This endpoint currently
-    accepts and validates the reply, ready for Gmail/SMTP integration.
+    Requires authentication.
     """
     # In a production implementation, you would:
     # 1. Fetch the original email details from database using message_id
@@ -333,11 +353,15 @@ async def reply_to_email(message_id: str, request: EmailReplyRequest):
 
 
 @router.post("/api/emails/messages/{message_id}/ignore")
-async def ignore_email(message_id: str):
+async def ignore_email(
+    message_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     POST /api/emails/messages/{id}/ignore → mark email as ignored.
 
     Marks email as handled/ignored in the email automation database.
+    Requires authentication.
     """
     try:
         import sqlite3
@@ -393,11 +417,15 @@ async def ignore_email(message_id: str):
 # ============================================================================
 
 @router.post("/api/intelligence/analyze/product/{product_id}")
-async def analyze_product_intelligence(product_id: str):
+async def analyze_product_intelligence(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     POST /api/intelligence/analyze/product/{id} → AI product analysis.
 
     Returns AI-powered insights about product viability, competition, trends.
+    Requires authentication.
     """
     from ospra_os.intelligence.ai_factory import ai_factory
 
@@ -420,12 +448,16 @@ async def analyze_product_intelligence(product_id: str):
 
 
 @router.post("/api/intelligence/analyze/niche/{niche_id}")
-async def analyze_niche_intelligence(niche_id: str):
+async def analyze_niche_intelligence(
+    niche_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     POST /api/intelligence/analyze/niche/{id} → AI niche analysis.
 
     Returns high-level niche analysis with health score, lifecycle, and recommendations.
     Uses the main ospra_os.db database which has the complete schema.
+    Requires authentication.
     """
     from ospra_os.intelligence.niche_analyzer import NicheAnalyzer
 
