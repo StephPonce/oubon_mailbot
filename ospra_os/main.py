@@ -314,12 +314,15 @@ except Exception as e:
     shopify_webhooks_router = None
     _HAS_SHOPIFY_WEBHOOKS = False
 
-# Shopify OAuth router
-# TODO: Implement Shopify OAuth router at ospra_os/platforms/shopify/oauth.py
-# For now, disabled as the module doesn't exist yet
-_HAS_SHOPIFY_OAUTH = False
-shopify_oauth_router = None
-print("[WARNING]  Shopify OAuth router not implemented yet")
+# Shopify OAuth router (SaaS Multi-Store OAuth Flow)
+try:
+    from ospra_os.api.shopify_oauth_routes import router as shopify_oauth_router  # type: ignore
+    _HAS_SHOPIFY_OAUTH = True
+    print("[SUCCESS] Shopify OAuth router loaded successfully")
+except Exception as e:
+    print(f"[WARNING]  Shopify OAuth router not loaded: {e}")
+    shopify_oauth_router = None
+    _HAS_SHOPIFY_OAUTH = False
 
 # Shopify Deployment router (AI-Enhanced Shopify Integration)
 try:
@@ -6176,59 +6179,9 @@ async def trends_websocket(websocket: WebSocket):
 
 
 # 
-# SHOPIFY WEBHOOKS
-# 
-
-@app.post("/webhooks/shopify/orders/create")
-async def shopify_order_webhook(request: Request):
-    """
-    Shopify order creation webhook
-    Auto-fulfills orders via AliExpress
-
-    This endpoint receives notifications when a new order is placed
-    and automatically places the order on AliExpress for dropshipping.
-    """
-    try:
-        # Use the existing shopify_webhooks module
-        from ospra_os.webhooks.shopify_webhooks import process_new_order
-
-        order_data = await request.json()
-        result = await process_new_order(order_data)
-
-        return {'received': True, 'result': result}
-
-    except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
-        import traceback
-        traceback.print_exc()
-        return {'received': False, 'error': str(e)}
-
-
-@app.post("/webhooks/shopify/orders/cancelled")
-async def shopify_order_cancelled_webhook(request: Request):
-    """
-    Shopify order cancellation webhook
-    Cancels corresponding AliExpress order
-
-    TODO: Implement AliExpress order cancellation logic
-    """
-    try:
-        order_data = await request.json()
-        order_id = order_data.get('id')
-
-        print(f"[PACKAGE] Order cancelled webhook received for order #{order_id}")
-        # TODO: Implement AliExpress order cancellation via API
-        # For now, just log and acknowledge receipt
-
-        return {
-            'received': True,
-            'order_id': order_id,
-            'message': 'Webhook received, cancellation logic not yet implemented'
-        }
-
-    except Exception as e:
-        print(f"[ERROR] Webhook error: {e}")
-        return {'received': False, 'error': str(e)}
+# SHOPIFY WEBHOOKS - Now handled by shopify_webhooks_router
+# Legacy manual endpoints removed - all 24 webhooks are in ospra_os/webhooks/shopify_webhooks.py
+#
 
 
 # Mount static files (must be last)
