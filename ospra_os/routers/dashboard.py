@@ -4,6 +4,9 @@ Dashboard Routes for Ospra OS
 
 Main dashboard endpoints for the frontend application.
 
+SECURITY: All endpoints require JWT authentication.
+User ID is extracted from verified JWT tokens, not query parameters.
+
 Endpoints:
 - GET /api/dashboard/overview - Dashboard summary stats
 - GET /api/dashboard/products - Product performance data
@@ -15,11 +18,14 @@ Author: OspraOS
 """
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from ospra_os.routers import RouterRegistry
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +37,11 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 # =============================================================================
 
 @router.get("/overview")
-async def dashboard_overview():
+async def dashboard_overview(current_user: User = Depends(get_current_user)):
     """
     Get dashboard overview with key metrics.
+
+    SECURITY: Requires JWT authentication.
 
     Returns summary statistics for:
     - Active products
@@ -46,44 +54,62 @@ async def dashboard_overview():
     return {
         "status": "ok",
         "message": "Dashboard overview endpoint - implementation in main.py",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "user_id": current_user.id
     }
 
 
 @router.get("/products")
-async def dashboard_products():
-    """Get product performance data for dashboard."""
+async def dashboard_products(current_user: User = Depends(get_current_user)):
+    """
+    Get product performance data for dashboard.
+
+    SECURITY: Requires JWT authentication.
+    """
     return {
         "status": "ok",
         "message": "Dashboard products endpoint - implementation in main.py",
-        "products": []
+        "products": [],
+        "user_id": current_user.id
     }
 
 
 @router.get("/emails")
-async def dashboard_emails():
-    """Get email automation statistics."""
+async def dashboard_emails(current_user: User = Depends(get_current_user)):
+    """
+    Get email automation statistics.
+
+    SECURITY: Requires JWT authentication.
+    """
     return {
         "status": "ok",
         "message": "Dashboard emails endpoint - implementation in main.py",
-        "stats": {}
+        "stats": {},
+        "user_id": current_user.id
     }
 
 
 @router.get("/shopify")
-async def dashboard_shopify():
-    """Get Shopify store metrics."""
+async def dashboard_shopify(current_user: User = Depends(get_current_user)):
+    """
+    Get Shopify store metrics.
+
+    SECURITY: Requires JWT authentication.
+    """
     return {
         "status": "ok",
         "message": "Dashboard shopify endpoint - implementation in main.py",
-        "metrics": {}
+        "metrics": {},
+        "user_id": current_user.id
     }
 
 
 @router.get("/api-status")
-async def dashboard_api_status():
+async def dashboard_api_status(current_user: User = Depends(get_current_user)):
     """
     Get external API connection status.
+
+    SECURITY: Requires JWT authentication.
 
     Checks connectivity to:
     - AI providers
@@ -91,11 +117,10 @@ async def dashboard_api_status():
     - AliExpress
     - Payment providers
     """
-    import os
-
     status = {
         "timestamp": datetime.utcnow().isoformat(),
-        "services": {}
+        "services": {},
+        "user_id": current_user.id
     }
 
     # Check AI providers

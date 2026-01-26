@@ -4,6 +4,9 @@ AI Provider Routes for Ospra OS
 
 Endpoints for managing and testing AI providers.
 
+SECURITY: All endpoints require JWT authentication.
+User ID is extracted from verified JWT tokens, not query parameters.
+
 Endpoints:
 - GET /api/ai/providers - List configured AI providers
 - POST /api/ai/test/{provider} - Test a specific provider
@@ -14,9 +17,11 @@ Author: OspraOS
 import logging
 import os
 from typing import Dict, Any, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from ospra_os.routers import RouterRegistry
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +33,11 @@ router = APIRouter(prefix="/api/ai", tags=["AI Providers"])
 # =============================================================================
 
 @router.get("/providers")
-async def list_ai_providers():
+async def list_ai_providers(current_user: User = Depends(get_current_user)):
     """
     List all configured AI providers and their status.
+
+    SECURITY: Requires JWT authentication.
 
     Returns:
         List of providers with configuration status and capabilities
@@ -123,14 +130,20 @@ async def list_ai_providers():
     return {
         "providers": providers,
         "configured_count": configured_count,
-        "total_count": len(providers)
+        "total_count": len(providers),
+        "user_id": current_user.id
     }
 
 
 @router.post("/test/{provider}")
-async def test_ai_provider(provider: str):
+async def test_ai_provider(
+    provider: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Test connectivity and basic functionality of an AI provider.
+
+    SECURITY: Requires JWT authentication.
 
     Args:
         provider: Provider ID (anthropic, openai, google, xai, groq)
@@ -208,7 +221,8 @@ async def test_ai_provider(provider: str):
             "success": True,
             "provider": provider,
             "response_time_ms": round(elapsed_time * 1000, 2),
-            "sample_output": output[:200]
+            "sample_output": output[:200],
+            "user_id": current_user.id
         }
 
     except Exception as e:
