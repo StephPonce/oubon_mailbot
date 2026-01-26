@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 # PHASE 1 SECURITY: Auth dependencies for tier-based access control
 from ospra_os.auth.dependencies import require_tier
 from ospra_os.auth.jwt_handler import TokenPayload
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 from ospra_os.database import get_db
 from ospra_os.intelligence.unified_context import get_unified_context_builder
@@ -51,7 +53,7 @@ class ActionPreviewRequest(BaseModel):
 class ActionExecuteRequest(BaseModel):
     action_type: str
     params: dict
-    user_id: int
+    # SECURITY: user_id removed - extracted from JWT token instead
 
 
 class TierUpgradeRequest(BaseModel):
@@ -82,7 +84,6 @@ class BannerGenerateRequest(BaseModel):
 
 @router.get("/briefing/morning")
 async def get_morning_briefing(
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
@@ -91,14 +92,16 @@ async def get_morning_briefing(
     Generate morning AI briefing (Soar/Stratosphere tier required).
 
     Security: Authentication and tier validation happen BEFORE expensive AI operations.
+    SECURITY: user_id extracted from JWT token, NOT from query params.
     """
+    # SECURITY: Use authenticated user's ID, not query param
+    user_id = current_user.user_id
     engine = get_briefing_engine(db)
     return await engine.generate_morning_briefing(user_id, store_id)
 
 
 @router.get("/briefing/on-demand")
 async def get_on_demand_briefing(
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
     focus: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -108,7 +111,10 @@ async def get_on_demand_briefing(
     Generate on-demand AI briefing (Soar/Stratosphere tier required).
 
     Security: Authentication and tier validation happen BEFORE expensive AI operations.
+    SECURITY: user_id extracted from JWT token, NOT from query params.
     """
+    # SECURITY: Use authenticated user's ID, not query param
+    user_id = current_user.user_id
     engine = get_briefing_engine(db)
     return {
         "briefing_text": await engine.generate_on_demand_briefing(user_id, store_id, focus),
@@ -123,21 +129,25 @@ async def get_on_demand_briefing(
 
 @router.get("/context/full")
 async def get_full_context(
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
     force_refresh: bool = Query(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     builder = get_unified_context_builder(db)
     return await builder.build_full_context(user_id, store_id, force_refresh)
 
 
 @router.get("/context/summary")
 async def get_context_summary(
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     builder = get_unified_context_builder(db)
     context = await builder.build_full_context(user_id, store_id)
     return context.get("summary", {})
@@ -145,10 +155,12 @@ async def get_context_summary(
 
 @router.post("/context/invalidate")
 async def invalidate_context_cache(
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     builder = get_unified_context_builder(db)
     builder.invalidate_cache(user_id, store_id)
     return {"success": True, "message": "Cache invalidated"}
@@ -202,11 +214,13 @@ async def advance_product_stage(
 @router.get("/progress/by-stage/{stage}")
 async def get_products_by_stage(
     stage: str,
-    user_id: Optional[int] = Query(None),
     store_id: Optional[int] = Query(None),
     limit: int = Query(50, le=200),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     tracker = get_progress_tracker(db)
     stage_enum = LifecycleStage(stage)
     return await tracker.get_products_by_stage(stage_enum, user_id, store_id, limit)
@@ -217,17 +231,21 @@ async def get_products_by_stage(
 # ============================================================================
 
 @router.get("/tier/info")
-async def get_tier_info(user_id: int = Query(...), db: Session = Depends(get_db)):
+async def get_tier_info(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     tier_system = get_tier_system(db)
     return await tier_system.get_tier_info(user_id)
 
 
 @router.get("/tier/check-feature")
 async def check_feature_access(
-    user_id: int = Query(...),
     feature: str = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     tier_system = get_tier_system(db)
     has_access = await tier_system.check_feature_access(user_id, feature)
     return {"user_id": user_id, "feature": feature, "has_access": has_access}
@@ -235,11 +253,13 @@ async def check_feature_access(
 
 @router.get("/tier/check-limit")
 async def check_usage_limit(
-    user_id: int = Query(...),
     limit_type: str = Query(...),
     current_usage: int = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
+    """SECURITY: user_id extracted from JWT token, NOT from query params."""
+    user_id = current_user.id
     tier_system = get_tier_system(db)
     return await tier_system.check_limit(user_id, limit_type, current_usage)
 

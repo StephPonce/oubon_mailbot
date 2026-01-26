@@ -21,7 +21,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 
 # Import from correct modular architecture (NOT legacy multi_store_models!)
-from ospra_os.database import User, SubscriptionTier, get_db as get_db_session
+from ospra_os.database import User, SubscriptionTier, get_db
 from ospra_os.database.connection import SessionLocal
 
 
@@ -201,13 +201,7 @@ def decode_token(token: str) -> dict:
 # DATABASE HELPERS
 # ============================================================================
 
-def get_db():
-    """Get database session"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# NOTE: get_db() is imported from ospra_os.database (consolidated implementation)
 
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:

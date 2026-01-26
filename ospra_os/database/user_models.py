@@ -73,8 +73,8 @@ class UserProductRecommendation(Base):
     __tablename__ = "user_product_recommendations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    product_saturation_id = Column(Integer, ForeignKey('product_saturation.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False, index=True)
+    product_saturation_id = Column(Integer, ForeignKey('product_saturation.id', ondelete="CASCADE"), nullable=False, index=True)
 
     # Recommendation details
     recommended_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -113,7 +113,7 @@ class UserSettings(Base):
     __tablename__ = "user_settings"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
 
     # AI Preferences
     preferred_ai_provider = Column(SQLEnum(AIProvider), default=AIProvider.CLAUDE)
@@ -185,7 +185,7 @@ class UserEmailAccount(Base):
     __tablename__ = "user_email_accounts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete="CASCADE"), nullable=False, index=True)
 
     # Provider & Account Info
     provider = Column(String(50), nullable=False)  # 'gmail', 'outlook', 'yahoo'

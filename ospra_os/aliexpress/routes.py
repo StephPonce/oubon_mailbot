@@ -1,9 +1,12 @@
 """AliExpress OAuth routes for authentication."""
+import os
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
 from ospra_os.core.settings import Settings, get_settings
 from ospra_os.aliexpress.oauth import AliExpressOAuth
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 import time
 
 router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
@@ -292,7 +295,7 @@ async def oauth_callback(
 
 
 @router.get("/auth/status")
-async def check_auth_status():
+async def check_auth_status(current_user: User = Depends(get_current_user)):
     """
     Check if AliExpress is connected and token is valid.
 
@@ -337,7 +340,7 @@ async def check_auth_status():
 
 
 @router.get("/auth/token")
-async def get_access_token():
+async def get_access_token(current_user: User = Depends(get_current_user)):
     """
     Get the current access token (for internal use by AliExpress connector).
 
@@ -355,7 +358,10 @@ async def get_access_token():
 
 
 @router.post("/auth/disconnect")
-async def disconnect_aliexpress(oauth: AliExpressOAuth = Depends(get_oauth_client)):
+async def disconnect_aliexpress(
+    current_user: User = Depends(get_current_user),
+    oauth: AliExpressOAuth = Depends(get_oauth_client)
+):
     """
     Disconnect AliExpress by invalidating stored tokens.
     """
@@ -384,8 +390,14 @@ async def disconnect_aliexpress(oauth: AliExpressOAuth = Depends(get_oauth_clien
 
 
 @router.get("/debug/config")
-async def debug_config(settings: Settings = Depends(get_settings)):
+async def debug_config(
+    current_user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings)
+):
     """Debug endpoint to check AliExpress configuration."""
+    is_production = os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+    if is_production:
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         return {
             "app_key_set": settings.ALIEXPRESS_API_KEY is not None,
@@ -406,8 +418,14 @@ async def debug_config(settings: Settings = Depends(get_settings)):
 
 
 @router.get("/debug/auth-url")
-async def debug_auth_url(oauth: AliExpressOAuth = Depends(get_oauth_client)):
+async def debug_auth_url(
+    current_user: User = Depends(get_current_user),
+    oauth: AliExpressOAuth = Depends(get_oauth_client)
+):
     """Debug endpoint to see the OAuth URL without redirecting."""
+    is_production = os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+    if is_production:
+        raise HTTPException(status_code=404, detail="Not found")
     try:
         from urllib.parse import urlparse, parse_qs
 

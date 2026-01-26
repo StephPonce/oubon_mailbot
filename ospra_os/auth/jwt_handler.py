@@ -8,7 +8,9 @@ Features:
 - JWT access tokens (15 min expiry)
 - Refresh tokens (7 day expiry)
 - Token blacklisting for logout
-- Secure password hashing (bcrypt)
+- Secure password hashing (passlib/bcrypt)
+
+STANDARDIZED: Uses python-jose and passlib for consistency with jwt_auth.py
 
 Author: Ospra OS
 Date: December 2024
@@ -21,24 +23,27 @@ from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 import logging
 
-# JWT handling
+# JWT handling - standardized on python-jose (same as jwt_auth.py)
 try:
-    import jwt
-    from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+    from jose import jwt, JWTError
+    from jose.exceptions import ExpiredSignatureError
     HAS_JWT = True
 except ImportError:
     jwt = None
+    JWTError = Exception
+    ExpiredSignatureError = Exception
     HAS_JWT = False
-    print("[WARNING]  PyJWT not installed. Run: pip install PyJWT")
+    print("[WARNING]  python-jose not installed. Run: pip install python-jose[cryptography]")
 
-# Password hashing
+# Password hashing - standardized on passlib (same as jwt_auth.py)
 try:
-    import bcrypt
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
     HAS_BCRYPT = True
 except ImportError:
-    bcrypt = None
+    pwd_context = None
     HAS_BCRYPT = False
-    print("[WARNING]  bcrypt not installed. Run: pip install bcrypt")
+    print("[WARNING]  passlib not installed. Run: pip install passlib[bcrypt]")
 
 logger = logging.getLogger(__name__)
 
@@ -47,22 +52,46 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ============================================================================
 
-# Get secret key from environment or generate one
-# IMPORTANT: In production, always set JWT_SECRET_KEY environment variable!
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", secrets.token_hex(32))
+def _get_jwt_secret() -> str:
+    """Get JWT secret key, requiring it in production."""
+    secret = os.getenv("JWT_SECRET_KEY")
+
+    if secret:
+        return secret
+
+    # Check if we're in production
+    is_production = (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
+        os.getenv("RENDER", "") == "true" or
+        os.getenv("RAILWAY_ENVIRONMENT", "") != "" or
+        os.getenv("VERCEL", "") == "1"
+    )
+
+    if is_production:
+        raise RuntimeError(
+            "CRITICAL: JWT_SECRET_KEY must be set in production! "
+            "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+
+    # Development only - warn and use insecure default
+    import warnings
+    warnings.warn(
+        "JWT_SECRET_KEY not set! Using insecure default for development only. "
+        "Tokens will be invalidated on server restart.",
+        RuntimeWarning
+    )
+    logger.warning(
+        "[WARNING]  JWT_SECRET_KEY not set! Using insecure default. "
+        "Set JWT_SECRET_KEY in .env for production."
+    )
+    return "ospra-dev-jwt-handler-DO-NOT-USE-IN-PRODUCTION"
+
+JWT_SECRET_KEY = _get_jwt_secret()
 JWT_ALGORITHM = "HS256"
 
 # Token expiry times
 ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived for security
 REFRESH_TOKEN_EXPIRE_DAYS = 7    # Longer-lived for convenience
-
-# Warn if using auto-generated secret
-if not os.getenv("JWT_SECRET_KEY"):
-    logger.warning(
-        "[WARNING]  JWT_SECRET_KEY not set! Using auto-generated key. "
-        "Tokens will be invalidated on server restart. "
-        "Set JWT_SECRET_KEY in .env for production."
-    )
 
 
 # ============================================================================
@@ -123,48 +152,41 @@ def clear_blacklist() -> None:
 
 
 # ============================================================================
-# PASSWORD HASHING
+# PASSWORD HASHING (Standardized on passlib - same as jwt_auth.py)
 # ============================================================================
 
 def hash_password(password: str) -> str:
     """
-    Hash a password using bcrypt.
-    
+    Hash a password using bcrypt via passlib.
+
     Args:
         password: Plain text password
-        
+
     Returns:
         Hashed password string
     """
-    if not HAS_BCRYPT:
-        raise RuntimeError("bcrypt not installed")
-    
-    # Generate salt and hash
-    salt = bcrypt.gensalt(rounds=12)  # 12 rounds = good security/speed balance
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    
-    return hashed.decode('utf-8')
+    if not HAS_BCRYPT or pwd_context is None:
+        raise RuntimeError("passlib not installed")
+
+    return pwd_context.hash(password)
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """
     Verify a password against its hash.
-    
+
     Args:
         password: Plain text password to check
         hashed: Stored password hash
-        
+
     Returns:
         True if password matches
     """
-    if not HAS_BCRYPT:
-        raise RuntimeError("bcrypt not installed")
-    
+    if not HAS_BCRYPT or pwd_context is None:
+        raise RuntimeError("passlib not installed")
+
     try:
-        return bcrypt.checkpw(
-            password.encode('utf-8'),
-            hashed.encode('utf-8')
-        )
+        return pwd_context.verify(password, hashed)
     except Exception as e:
         logger.error(f"Password verification error: {e}")
         return False
@@ -182,18 +204,18 @@ def create_access_token(
 ) -> str:
     """
     Create a JWT access token.
-    
+
     Args:
         user_id: User's database ID
         email: User's email
         tier: Subscription tier (nest/flight/soar/stratosphere)
         expires_delta: Custom expiration time
-        
+
     Returns:
         JWT access token string
     """
     if not HAS_JWT:
-        raise RuntimeError("PyJWT not installed")
+        raise RuntimeError("python-jose not installed")
     
     # Set expiration
     if expires_delta:
@@ -230,19 +252,19 @@ def create_refresh_token(
 ) -> str:
     """
     Create a JWT refresh token.
-    
+
     Refresh tokens are longer-lived and used to obtain new access tokens.
-    
+
     Args:
         user_id: User's database ID
         email: User's email
         expires_delta: Custom expiration time
-        
+
     Returns:
         JWT refresh token string
     """
     if not HAS_JWT:
-        raise RuntimeError("PyJWT not installed")
+        raise RuntimeError("python-jose not installed")
     
     # Set expiration (longer than access token)
     if expires_delta:
@@ -305,30 +327,30 @@ def create_token_pair(
 def decode_token(token: str) -> Optional[TokenPayload]:
     """
     Decode and validate a JWT token.
-    
+
     Args:
         token: JWT token string
-        
+
     Returns:
         TokenPayload if valid, None if invalid
     """
     if not HAS_JWT:
-        raise RuntimeError("PyJWT not installed")
-    
+        raise RuntimeError("python-jose not installed")
+
     try:
-        # Decode token
+        # Decode token using python-jose
         payload = jwt.decode(
             token,
             JWT_SECRET_KEY,
             algorithms=[JWT_ALGORITHM]
         )
-        
+
         # Check if blacklisted
         jti = payload.get("jti", "")
         if is_token_blacklisted(jti):
             logger.warning(f"Attempted use of blacklisted token: {jti[:8]}...")
             return None
-        
+
         # Build TokenPayload
         return TokenPayload(
             user_id=int(payload.get("sub", 0)),
@@ -339,15 +361,15 @@ def decode_token(token: str) -> Optional[TokenPayload]:
             exp=datetime.fromtimestamp(payload.get("exp", 0), tz=timezone.utc),
             iat=datetime.fromtimestamp(payload.get("iat", 0), tz=timezone.utc),
         )
-        
+
     except ExpiredSignatureError:
         logger.debug("Token expired")
         return None
-        
-    except InvalidTokenError as e:
+
+    except JWTError as e:
         logger.warning(f"Invalid token: {e}")
         return None
-        
+
     except Exception as e:
         logger.error(f"Token decode error: {e}")
         return None

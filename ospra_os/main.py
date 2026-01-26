@@ -745,6 +745,12 @@ if _HAS_OBSERVABILITY:
 
     logger.info("[SUCCESS] Observability initialized successfully")
 
+# Security Headers Middleware (CRITICAL SECURITY)
+# Adds X-Frame-Options, X-Content-Type-Options, HSTS, CSP, etc.
+from ospra_os.middleware.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware, enable_hsts=True)
+print("[SUCCESS] ✓ Security headers middleware active (XSS, Clickjacking, HSTS protection)")
+
 #
 # CORS middleware - Restricted to ospra.io + localhost for dev (PHASE 1 SECURITY)
 #
@@ -806,6 +812,12 @@ print("[SUCCESS] ✓ Tier enforcement middleware active (Phase 1 Security)")
 from ospra_os.security.debug_protection import DebugEndpointProtectionMiddleware
 app.add_middleware(DebugEndpointProtectionMiddleware)
 print("[SUCCESS] ✓ Debug endpoint protection active (blocks /debug/* in production)")
+
+# Request Tracing Middleware (OBSERVABILITY)
+# Adds unique request IDs for tracking and debugging
+from ospra_os.observability.request_tracing import RequestTracingMiddleware
+app.add_middleware(RequestTracingMiddleware)
+print("[SUCCESS] ✓ Request tracing middleware active (X-Request-ID headers)")
 
 # Mount static files for product images (only if directory exists)
 import os
@@ -884,6 +896,17 @@ async def startup_event():
 
     startup_start = time.time()
     print(f"[START] Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    # Validate environment variables
+    try:
+        from ospra_os.core.env_validator import validate_environment
+        env_result = validate_environment(fail_fast=False, require_ai_provider=True)
+        if env_result["errors"]:
+            print(f"[WARNING] Environment validation found {len(env_result['errors'])} error(s)")
+        if env_result["warnings"]:
+            print(f"[INFO] Environment validation found {len(env_result['warnings'])} warning(s)")
+    except Exception as e:
+        print(f"[WARNING] Environment validation failed: {e}")
 
     settings = get_settings()
 
@@ -6180,8 +6203,8 @@ async def trends_websocket(websocket: WebSocket):
         logger.error(f"WebSocket fatal error: {e}")
         try:
             await websocket.close()
-        except:
-            pass
+        except Exception:
+            pass  # Already disconnected or failed to close
 
 
 # 

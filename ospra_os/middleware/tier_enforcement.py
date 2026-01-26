@@ -4,6 +4,9 @@ TIER ENFORCEMENT MIDDLEWARE
 Enforces subscription tier limits and feature access.
 Uses unified tier definitions from ospra_os.core.tiers
 Uses persistent usage tracking from ospra_os.core.usage_tracking
+
+SECURITY: User ID is ONLY extracted from verified JWT tokens.
+Never trust user_id from query parameters or headers.
 """
 
 import logging
@@ -12,6 +15,9 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from typing import Dict, Optional
 from datetime import datetime
+
+from jose import jwt, JWTError
+import os
 
 from ospra_os.core.tiers import (
     SubscriptionTier,
@@ -216,35 +222,56 @@ class TierEnforcementMiddleware(BaseHTTPMiddleware):
             logger.error(f"Failed to record usage: {e}")
 
     async def _extract_user_id(self, request: Request) -> Optional[int]:
-        """Extract user ID from request"""
-        # Try query parameters
-        user_id = request.query_params.get('user_id')
-        if user_id:
-            try:
-                return int(user_id)
-            except ValueError:
-                pass
+        """
+        Extract user ID from request.
 
-        # Try headers
-        user_id = request.headers.get('X-User-ID')
-        if user_id:
-            try:
-                return int(user_id)
-            except ValueError:
-                pass
+        SECURITY: ONLY extracts user_id from verified JWT tokens.
+        Never trusts query parameters or headers for user identification.
+        This prevents user impersonation attacks.
+        """
+        # Get JWT secret - same as jwt_auth.py
+        jwt_secret = os.getenv("JWT_SECRET_KEY")
+        if not jwt_secret:
+            # Check for production
+            is_production = (
+                os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
+                os.getenv("RENDER", "") == "true" or
+                os.getenv("RAILWAY_ENVIRONMENT", "") != "" or
+                os.getenv("VERCEL", "") == "1"
+            )
+            if is_production:
+                logger.error("JWT_SECRET_KEY not set in production!")
+                return None
+            jwt_secret = "ospra-dev-secret-DO-NOT-USE-IN-PRODUCTION"
 
-        # Try JWT token from Authorization header
+        # ONLY extract user_id from verified JWT token
         auth_header = request.headers.get('Authorization')
         if auth_header and auth_header.startswith('Bearer '):
             try:
-                # TODO: Decode JWT and extract user_id
-                # token = auth_header.replace('Bearer ', '')
-                # payload = decode_jwt(token)
-                # return payload.get('user_id')
-                pass
-            except Exception:
-                pass
+                token = auth_header.replace('Bearer ', '')
+                payload = jwt.decode(token, jwt_secret, algorithms=["HS256"])
 
+                # Verify it's an access token
+                if payload.get("type") != "access":
+                    logger.warning("Non-access token used for tier enforcement")
+                    return None
+
+                # Extract user_id from 'sub' claim
+                user_id_str = payload.get('sub')
+                if user_id_str:
+                    return int(user_id_str)
+
+            except JWTError as e:
+                logger.debug(f"JWT decode failed in tier enforcement: {e}")
+                return None
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Invalid user_id in JWT: {e}")
+                return None
+            except Exception as e:
+                logger.error(f"Unexpected error decoding JWT: {e}")
+                return None
+
+        # No valid JWT token - return None (don't trust query params or headers!)
         return None
 
     async def _get_user_tier(self, user_id: int) -> SubscriptionTier:

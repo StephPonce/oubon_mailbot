@@ -15,10 +15,9 @@ from fastapi.responses import HTMLResponse
 router = APIRouter(prefix="/api/aliexpress", tags=["aliexpress"])
 
 # AliExpress Dropshipping API credentials (from .env)
-# Dropshipping: 520918 / idjX6tOzHx6urVsSylVzEcHZKwBN4YhN
-# Affiliate: 522382 / 9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL
-ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "520918")
-ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
+# SECURITY: Secrets must be provided via environment variables - no defaults
+ALIEXPRESS_APP_KEY = os.getenv("ALIEXPRESS_APP_KEY", "")
+ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "")
 # Token endpoint - AliExpress REST API structure
 # NOTE: Both endpoints tested, both fail:
 #   - https://oauth.aliexpress.com/token → "appkey not exists" error

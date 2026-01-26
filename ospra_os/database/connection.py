@@ -355,8 +355,8 @@ def init_database(database_url: str = None):
                     for table in existing_tables:
                         try:
                             conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
-                        except:
-                            pass
+                        except Exception as e:
+                            logger.warning(f"Failed to drop table {table}: {e}")
                     conn.commit()
                 
                 # Retry create_all
@@ -382,8 +382,11 @@ def init_database(database_url: str = None):
         
     except Exception as e:
         import traceback
-        print(f"[DB INIT] ERROR: {e}")
-        print(f"[DB INIT] Traceback: {traceback.format_exc()}")
+        import logging
+        db_logger = logging.getLogger(__name__)
+        # Log full traceback to logger (not stdout) for debugging
+        db_logger.error(f"[DB INIT] ERROR: {e}\nTraceback: {traceback.format_exc()}")
+        print(f"[DB INIT] ERROR: Database initialization failed. Check logs for details.")
         raise
 
 

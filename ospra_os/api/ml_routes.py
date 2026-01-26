@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 
 from ospra_os.database.db import get_db
 from ospra_os.ml import ai_client, ModelTier
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from ospra_os.ml.training_data import TrainingDataCollector
 from ospra_os.ml.fine_tuning import FineTuningPipeline, FineTuningConfig
 
@@ -103,7 +105,7 @@ class AdCopyRequest(BaseModel):
 # ============================================================================
 
 @router.get("/cost-report")
-async def get_cost_report():
+async def get_cost_report(current_user: User = Depends(get_current_user)):
     """
     Get AI cost analysis and savings report.
 
@@ -125,7 +127,7 @@ async def get_cost_report():
 
 
 @router.post("/reset-stats")
-async def reset_cost_stats():
+async def reset_cost_stats(current_user: User = Depends(get_current_user)):
     """
     Reset usage statistics.
 
@@ -150,7 +152,10 @@ async def reset_cost_stats():
 # ============================================================================
 
 @router.post("/generate", response_model=GenerateResponse)
-async def generate_ai_response(request: GenerateRequest):
+async def generate_ai_response(
+    request: GenerateRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Generate AI response with automatic model routing.
 
@@ -194,7 +199,10 @@ async def generate_ai_response(request: GenerateRequest):
 # ============================================================================
 
 @router.post("/score-product")
-async def score_product(request: ProductScoreRequest):
+async def score_product(
+    request: ProductScoreRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Score a product's e-commerce potential.
 
@@ -221,7 +229,10 @@ async def score_product(request: ProductScoreRequest):
 
 
 @router.post("/generate-email-response")
-async def generate_email_response(request: EmailResponseRequest):
+async def generate_email_response(
+    request: EmailResponseRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Generate email response to customer inquiry.
 
@@ -246,7 +257,10 @@ async def generate_email_response(request: EmailResponseRequest):
 
 
 @router.post("/generate-ad-copy")
-async def generate_ad_copy(request: AdCopyRequest):
+async def generate_ad_copy(
+    request: AdCopyRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Generate ad copy for a product.
 
@@ -279,7 +293,8 @@ async def generate_ad_copy(request: AdCopyRequest):
 async def collect_training_data(
     request: CollectTrainingDataRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Collect training data from operational database.
@@ -337,7 +352,8 @@ async def collect_training_data(
 async def start_fine_tuning(
     task_type: str,
     request: FineTuneRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
 ):
     """
     Start fine-tuning job for a task type.
@@ -403,7 +419,10 @@ async def start_fine_tuning(
 
 
 @router.get("/training-status/{task_type}")
-async def get_training_status(task_type: str):
+async def get_training_status(
+    task_type: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Get status of fine-tuning job.
 
@@ -431,7 +450,7 @@ async def get_training_status(task_type: str):
 # ============================================================================
 
 @router.get("/models")
-async def list_available_models():
+async def list_available_models(current_user: User = Depends(get_current_user)):
     """
     List all available AI models.
 
@@ -477,7 +496,7 @@ async def list_available_models():
 
 
 @router.get("/task-complexity")
-async def get_task_complexity_mapping():
+async def get_task_complexity_mapping(current_user: User = Depends(get_current_user)):
     """
     Get mapping of task types to complexity levels.
 

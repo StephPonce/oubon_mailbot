@@ -284,9 +284,11 @@ class OiMemorySystem:
                 }
                 for item in (res.data or [])
             ]
-        except:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to get trending niches: {e}")
             return []
-    
+
     async def _get_best_practices(self, topic: str = None) -> List[Dict]:
         """Get e-commerce best practices"""
         # Static best practices (could be moved to DB)
@@ -335,9 +337,11 @@ class OiMemorySystem:
                 }
                 for item in (res.data or [])
             ]
-        except:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to get market insights: {e}")
             return []
-    
+
     async def contribute_to_universal(self, insight_type: str, data: Dict, user_id: str) -> bool:
         """
         Contribute anonymized data to universal knowledge.

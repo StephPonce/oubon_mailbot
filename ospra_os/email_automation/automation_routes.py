@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 
 from ospra_os.database import (
     EmailAutomationRule, EmailTemplate, EmailLabel,
-    TriggerType, ActionType, get_multi_store_session
+    TriggerType, ActionType, get_multi_store_session, User
 )
+from ospra_os.auth.jwt_auth import get_current_user
 
 router = APIRouter(prefix="/api/email-automation", tags=["Email Automation"])
 
@@ -76,14 +77,15 @@ class LabelUpdate(BaseModel):
 
 @router.get("/rules")
 def get_automation_rules(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
-    Get all automation rules for a user.
+    Get all automation rules for the authenticated user.
 
-    GET /api/email-automation/rules?user_id=1
+    GET /api/email-automation/rules
     """
+    user_id = current_user.id
     try:
         rules = session.query(EmailAutomationRule)\
             .filter(EmailAutomationRule.user_id == user_id)\
@@ -120,15 +122,16 @@ def get_automation_rules(
 @router.post("/rules")
 def create_automation_rule(
     rule_data: RuleCreate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Create a new automation rule.
 
-    POST /api/email-automation/rules?user_id=1
+    POST /api/email-automation/rules
     Body: {"name": "VIP Auto-Label", "trigger_type": "sender", ...}
     """
+    user_id = current_user.id
     try:
         # Validate enum values
         try:
@@ -176,15 +179,16 @@ def create_automation_rule(
 def update_automation_rule(
     rule_id: int,
     rule_data: RuleUpdate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Update an existing automation rule.
 
-    PUT /api/email-automation/rules/5?user_id=1
+    PUT /api/email-automation/rules/5
     Body: {"name": "Updated Rule Name", "priority": 50}
     """
+    user_id = current_user.id
     try:
         rule = session.query(EmailAutomationRule)\
             .filter(EmailAutomationRule.id == rule_id)\
@@ -234,14 +238,15 @@ def update_automation_rule(
 @router.delete("/rules/{rule_id}")
 def delete_automation_rule(
     rule_id: int,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Delete an automation rule.
 
-    DELETE /api/email-automation/rules/5?user_id=1
+    DELETE /api/email-automation/rules/5
     """
+    user_id = current_user.id
     try:
         rule = session.query(EmailAutomationRule)\
             .filter(EmailAutomationRule.id == rule_id)\
@@ -272,14 +277,15 @@ def delete_automation_rule(
 
 @router.get("/templates")
 def get_email_templates(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
-    Get all email templates for a user.
+    Get all email templates for the authenticated user.
 
-    GET /api/email-automation/templates?user_id=1
+    GET /api/email-automation/templates
     """
+    user_id = current_user.id
     try:
         templates = session.query(EmailTemplate)\
             .filter(EmailTemplate.user_id == user_id)\
@@ -313,15 +319,16 @@ def get_email_templates(
 @router.post("/templates")
 def create_email_template(
     template_data: TemplateCreate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Create a new email template.
 
-    POST /api/email-automation/templates?user_id=1
+    POST /api/email-automation/templates
     Body: {"name": "Order Status", "subject": "...", "body": "...", "variables": ["order_id"]}
     """
+    user_id = current_user.id
     try:
         new_template = EmailTemplate(
             user_id=user_id,
@@ -356,15 +363,16 @@ def create_email_template(
 def update_email_template(
     template_id: int,
     template_data: TemplateUpdate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Update an existing email template.
 
-    PUT /api/email-automation/templates/5?user_id=1
+    PUT /api/email-automation/templates/5
     Body: {"subject": "Updated Subject", "body": "Updated body text"}
     """
+    user_id = current_user.id
     try:
         template = session.query(EmailTemplate)\
             .filter(EmailTemplate.id == template_id)\
@@ -405,14 +413,15 @@ def update_email_template(
 @router.delete("/templates/{template_id}")
 def delete_email_template(
     template_id: int,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Delete an email template.
 
-    DELETE /api/email-automation/templates/5?user_id=1
+    DELETE /api/email-automation/templates/5
     """
+    user_id = current_user.id
     try:
         template = session.query(EmailTemplate)\
             .filter(EmailTemplate.id == template_id)\
@@ -443,14 +452,15 @@ def delete_email_template(
 
 @router.get("/labels")
 def get_email_labels(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
-    Get all custom labels for a user.
+    Get all custom labels for the authenticated user.
 
-    GET /api/email-automation/labels?user_id=1
+    GET /api/email-automation/labels
     """
+    user_id = current_user.id
     try:
         labels = session.query(EmailLabel)\
             .filter(EmailLabel.user_id == user_id)\
@@ -480,15 +490,16 @@ def get_email_labels(
 @router.post("/labels")
 def create_email_label(
     label_data: LabelCreate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Create a new custom label.
 
-    POST /api/email-automation/labels?user_id=1
+    POST /api/email-automation/labels
     Body: {"name": "VIP", "color": "#FF5733"}
     """
+    user_id = current_user.id
     try:
         # Check if label with this name already exists for user
         existing = session.query(EmailLabel)\
@@ -530,15 +541,16 @@ def create_email_label(
 def update_email_label(
     label_id: int,
     label_data: LabelUpdate,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Update an existing custom label.
 
-    PUT /api/email-automation/labels/5?user_id=1
+    PUT /api/email-automation/labels/5
     Body: {"name": "Important", "color": "#FF0000"}
     """
+    user_id = current_user.id
     try:
         label = session.query(EmailLabel)\
             .filter(EmailLabel.id == label_id)\
@@ -585,14 +597,15 @@ def update_email_label(
 @router.delete("/labels/{label_id}")
 def delete_email_label(
     label_id: int,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_multi_store_session)
 ):
     """
     Delete a custom label.
 
-    DELETE /api/email-automation/labels/5?user_id=1
+    DELETE /api/email-automation/labels/5
     """
+    user_id = current_user.id
     try:
         label = session.query(EmailLabel)\
             .filter(EmailLabel.id == label_id)\
@@ -623,11 +636,11 @@ def delete_email_label(
 
 @router.post("/process")
 async def process_automation_rules(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     limit: int = Query(50, ge=1, le=200, description="Max emails to process")
 ):
     """
-    Manually trigger automation rule processing for a user's emails.
+    Manually trigger automation rule processing for the authenticated user's emails.
 
     This will process recent emails against all active automation rules
     and execute matching actions.
@@ -635,11 +648,12 @@ async def process_automation_rules(
     Normally this would be triggered automatically after email sync,
     but this endpoint allows manual triggering for testing or on-demand processing.
 
-    POST /api/email-automation/process?user_id=1&limit=50
+    POST /api/email-automation/process?limit=50
 
     Returns:
         Processing statistics and results
     """
+    user_id = current_user.id
     try:
         from ospra_os.email_automation.automation_engine import AutomationEngine
 

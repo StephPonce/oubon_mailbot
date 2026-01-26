@@ -3,6 +3,8 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from ospra_os.core.settings import Settings, get_settings
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from ospra_os.email_automation.email_processor import EmailProcessor
 from ospra_os.email_automation.gmail_client import GmailClient
 from ospra_os.analytics.email_analytics import Analytics
@@ -53,6 +55,7 @@ async def process_inbox(
     request: ProcessInboxRequest,
     background_tasks: BackgroundTasks,
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Process inbox with intelligent auto-replies.
@@ -130,6 +133,7 @@ async def process_emails_background(settings: Settings):
 async def send_email(
     request: SendEmailRequest,
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),
 ):
     """Send a simple email via Gmail."""
     try:
@@ -147,7 +151,10 @@ async def send_email(
 
 
 @router.post("/gmail/watch/start")
-async def start_gmail_watch(settings: Settings = Depends(get_settings)):
+async def start_gmail_watch(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
+):
     """
     Start Gmail push notifications via Pub/Sub.
 
@@ -179,7 +186,10 @@ async def start_gmail_watch(settings: Settings = Depends(get_settings)):
 
 
 @router.post("/gmail/watch/stop")
-async def stop_gmail_watch(settings: Settings = Depends(get_settings)):
+async def stop_gmail_watch(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
+):
     """Stop Gmail push notifications."""
     try:
         gmail_client = GmailClient(settings)
@@ -193,7 +203,10 @@ async def stop_gmail_watch(settings: Settings = Depends(get_settings)):
 
 
 @router.get("/gmail/watch/status", response_model=WatchStatusResponse)
-async def get_gmail_watch_status(settings: Settings = Depends(get_settings)):
+async def get_gmail_watch_status(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
+):
     """Get current Gmail watch status."""
     try:
         gmail_client = GmailClient(settings)
@@ -208,7 +221,8 @@ async def get_gmail_watch_status(settings: Settings = Depends(get_settings)):
                 history_id=profile.get("historyId"),
             )
 
-        except:
+        except Exception:
+            # Gmail API returns error if no watch is active - this is expected
             return WatchStatusResponse(active=False)
 
     except Exception as e:
@@ -220,7 +234,10 @@ async def get_gmail_watch_status(settings: Settings = Depends(get_settings)):
 # ============================================================================
 
 @router.get("/stats/today")
-async def get_today_stats(settings: Settings = Depends(get_settings)):
+async def get_today_stats(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
+):
     """Get today's email processing statistics."""
     try:
         analytics = Analytics(settings.DATABASE_PATH)
@@ -233,7 +250,10 @@ async def get_today_stats(settings: Settings = Depends(get_settings)):
 
 
 @router.get("/stats/weekly")
-async def get_weekly_stats(settings: Settings = Depends(get_settings)):
+async def get_weekly_stats(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
+):
     """Get last 7 days of email processing statistics."""
     try:
         analytics = Analytics(settings.DATABASE_PATH)
@@ -249,6 +269,7 @@ async def get_weekly_stats(settings: Settings = Depends(get_settings)):
 async def get_top_labels(
     days: int = 7,
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
 ):
     """Get most common email categories."""
     try:
@@ -265,6 +286,7 @@ async def get_top_labels(
 async def get_ai_costs(
     days: int = 30,
     settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user)
 ):
     """Get AI usage cost breakdown."""
     try:

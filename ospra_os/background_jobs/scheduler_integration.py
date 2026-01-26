@@ -22,6 +22,7 @@ from fastapi import FastAPI
 
 from ospra_os.background_jobs.auto_discovery import AutoDiscoveryJob
 from ospra_os.background_jobs.daily_ranking_job import DailyRankingJob
+from ospra_os.background_jobs.token_refresh_job import TokenRefreshJob
 from ospra_os.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 # Global scheduler instances
 _auto_discovery_job: Optional[AutoDiscoveryJob] = None
 _daily_ranking_job: Optional[DailyRankingJob] = None
+_token_refresh_job: Optional[TokenRefreshJob] = None
 
 
 async def setup_background_jobs(app: FastAPI):
@@ -90,6 +92,21 @@ async def setup_background_jobs(app: FastAPI):
         # Store in app state
         app.state.daily_ranking_job = _daily_ranking_job
 
+        # === Setup Token Refresh Job ===
+        logger.info("Setting up token refresh job...")
+
+        global _token_refresh_job
+        _token_refresh_job = TokenRefreshJob(database_url=database_url)
+
+        # Get token refresh schedule settings (default every 6 hours)
+        token_refresh_interval = getattr(settings, 'TOKEN_REFRESH_INTERVAL_HOURS', 6)
+
+        # Schedule the token refresh job
+        _token_refresh_job.schedule_refresh(interval_hours=token_refresh_interval)
+
+        # Store in app state
+        app.state.token_refresh_job = _token_refresh_job
+
         logger.info("[SUCCESS] Background jobs setup complete")
 
     except Exception as e:
@@ -105,7 +122,7 @@ async def shutdown_background_jobs(app: FastAPI):
     Args:
         app: FastAPI application instance
     """
-    global _auto_discovery_job, _daily_ranking_job
+    global _auto_discovery_job, _daily_ranking_job, _token_refresh_job
 
     try:
         logger.info("Shutting down background jobs...")
@@ -129,6 +146,16 @@ async def shutdown_background_jobs(app: FastAPI):
                 _daily_ranking_job.scheduler.shutdown(wait=True)
 
             _daily_ranking_job = None
+
+        if _token_refresh_job:
+            # Unschedule token refresh job
+            _token_refresh_job.unschedule_refresh()
+
+            # Shutdown scheduler
+            if _token_refresh_job.scheduler.running:
+                _token_refresh_job.scheduler.shutdown(wait=True)
+
+            _token_refresh_job = None
 
         logger.info("[SUCCESS] Background jobs shutdown complete")
 
@@ -154,6 +181,16 @@ def get_daily_ranking_job() -> Optional[DailyRankingJob]:
         DailyRankingJob instance or None if not initialized
     """
     return _daily_ranking_job
+
+
+def get_token_refresh_job() -> Optional[TokenRefreshJob]:
+    """
+    Get the global token refresh job instance.
+
+    Returns:
+        TokenRefreshJob instance or None if not initialized
+    """
+    return _token_refresh_job
 
 
 # FastAPI integration example

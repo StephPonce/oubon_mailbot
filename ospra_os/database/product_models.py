@@ -96,6 +96,12 @@ class Product(Base):
     store = relationship("Store", back_populates="products")
     deployments = relationship("ProductDeployment", back_populates="product", cascade="all, delete-orphan")
 
+    # Composite indexes for frequently queried combinations
+    __table_args__ = (
+        Index('ix_products_store_status', 'store_id', 'status'),
+        Index('ix_products_store_conversion', 'store_id', 'conversion_rate'),
+    )
+
     def __repr__(self):
         return f"<Product(id={self.id}, name='{self.product_name[:30]}...', status='{self.status}')>"
 

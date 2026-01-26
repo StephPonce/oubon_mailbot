@@ -55,10 +55,10 @@ class AutoDeployJob:
             return result
 
         except Exception as e:
-            logger.error(f"[ERROR] Auto-deploy job failed: {e}")
+            # Log full error details server-side only (not to stdout)
             import traceback
-            traceback.print_exc()
-            return {"success": False, "error": str(e)}
+            logger.error(f"[ERROR] Auto-deploy job failed: {e}\n{traceback.format_exc()}")
+            return {"success": False, "error": "Auto-deploy job failed"}
 
     def start(self):
         """Start the scheduler"""

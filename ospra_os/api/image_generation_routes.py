@@ -9,11 +9,13 @@ Endpoints:
 - POST /api/images/enhance/batch - Enhance multiple images
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict
 import logging
 
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from ospra_os.integrations.ai_image_generator import (
     get_image_enhancer,
     enhance_product_image,
@@ -70,7 +72,10 @@ async def get_status():
 
 
 @router.post("/enhance")
-async def enhance_image(request: EnhanceRequest):
+async def enhance_image(
+    request: EnhanceRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Enhance a single product image.
     
@@ -104,7 +109,10 @@ async def enhance_image(request: EnhanceRequest):
 
 
 @router.post("/enhance/batch")
-async def enhance_batch(request: BatchEnhanceRequest):
+async def enhance_batch(
+    request: BatchEnhanceRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Enhance multiple product images in parallel.
     
@@ -175,12 +183,15 @@ async def list_backgrounds():
 # ============================================================================
 
 @router.post("/generate")
-async def legacy_generate(request: EnhanceRequest):
+async def legacy_generate(
+    request: EnhanceRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     DEPRECATED: Use /enhance instead.
     This redirects to the new enhance endpoint for backwards compatibility.
     """
-    return await enhance_image(request)
+    return await enhance_image(request, current_user)
 
 
 @router.post("/compare")

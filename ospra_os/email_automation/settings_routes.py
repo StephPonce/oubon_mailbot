@@ -3,13 +3,19 @@ Email Settings API Routes
 
 Simple endpoint for storing and retrieving user email settings/preferences.
 Settings are persisted to a JSON file to survive server restarts.
+
+SECURITY: All endpoints require JWT authentication. User ID is extracted
+from the verified token, NOT from query parameters.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import Dict, Any
 import json
 from pathlib import Path
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 router = APIRouter(tags=["Email Settings"])
 
@@ -57,15 +63,15 @@ class EmailSettingsRequest(BaseModel):
 
 
 @router.get("/api/email-settings")
-def get_email_settings(user_id: int = Query(..., description="User ID")):
+def get_email_settings(current_user: User = Depends(get_current_user)):
     """
-    Get email settings for a user.
+    Get email settings for the authenticated user.
 
     Returns default settings if none exist yet.
 
-    Example:
-        GET /api/email-settings?user_id=1
+    SECURITY: User ID is extracted from JWT token, not query params.
     """
+    user_id = current_user.id
     # Default settings
     default_settings = {
         # Auto-sync settings
@@ -109,21 +115,22 @@ def get_email_settings(user_id: int = Query(..., description="User ID")):
 @router.post("/api/email-settings")
 def save_email_settings(
     request: EmailSettingsRequest,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
-    Save email settings for a user.
+    Save email settings for the authenticated user.
 
-    Example:
-        POST /api/email-settings?user_id=1
-        Body: {
-            "settings": {
-                "auto_sync_enabled": true,
-                "sync_interval_minutes": 15,
-                ...
-            }
+    SECURITY: User ID is extracted from JWT token, not query params.
+
+    Body: {
+        "settings": {
+            "auto_sync_enabled": true,
+            "sync_interval_minutes": 15,
+            ...
         }
+    }
     """
+    user_id = current_user.id
     try:
         # Store settings in memory
         _settings_store[user_id] = request.settings
@@ -141,13 +148,13 @@ def save_email_settings(
 
 
 @router.delete("/api/email-settings")
-def reset_email_settings(user_id: int = Query(..., description="User ID")):
+def reset_email_settings(current_user: User = Depends(get_current_user)):
     """
-    Reset email settings to defaults for a user.
+    Reset email settings to defaults for the authenticated user.
 
-    Example:
-        DELETE /api/email-settings?user_id=1
+    SECURITY: User ID is extracted from JWT token, not query params.
     """
+    user_id = current_user.id
     try:
         # Remove user settings (will fall back to defaults on next GET)
         if user_id in _settings_store:

@@ -14,9 +14,12 @@ Date: December 2024
 import logging
 import asyncio
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +103,13 @@ async def health_check():
 
 
 @router.post("/discover")
-async def discover_trends(request: TrendDiscoveryRequest):
+async def discover_trends(
+    request: TrendDiscoveryRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Discover trending product opportunities.
-    
+
     Uses trend-first approach:
     1. Find rising trends on Google/Twitter/TikTok
     2. Match trends to supplier products
@@ -186,7 +192,10 @@ async def discover_trends(request: TrendDiscoveryRequest):
 
 
 @router.post("/analyze")
-async def analyze_product(request: ProductAnalysisRequest):
+async def analyze_product(
+    request: ProductAnalysisRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Get AI analysis of a product.
     """
@@ -250,7 +259,8 @@ async def analyze_product(request: ProductAnalysisRequest):
 @router.get("/trending")
 async def get_trending_now(
     category: str = Query(default="all", description="Category filter"),
-    limit: int = Query(default=10, ge=1, le=50)
+    limit: int = Query(default=10, ge=1, le=50),
+    current_user: User = Depends(get_current_user)
 ):
     """Get currently trending products."""
     try:
@@ -285,7 +295,10 @@ async def get_trending_now(
 
 
 @router.post("/generate-image")
-async def generate_product_image(request: ImageGenerationRequest):
+async def generate_product_image(
+    request: ImageGenerationRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Generate AI product images using DALL-E."""
     try:
         from ospra_os.media.ai_image_generator import AIImageGenerator
@@ -367,7 +380,8 @@ async def get_data_sources():
 async def get_product_rankings(
     timeframe: str = Query(default="7d", description="7d, 30d, all"),
     category: str = Query(default="all"),
-    limit: int = Query(default=20, ge=1, le=100)
+    limit: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
 ):
     """Get ranked products by OSPRA score."""
     return {

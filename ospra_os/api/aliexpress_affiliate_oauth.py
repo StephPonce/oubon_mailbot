@@ -15,9 +15,9 @@ from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/api/aliexpress-affiliate", tags=["aliexpress-affiliate"])
 
-# AliExpress Affiliate API credentials (from .env)
-ALIEXPRESS_AFFILIATE_APP_KEY = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
-ALIEXPRESS_AFFILIATE_APP_SECRET = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
+# AliExpress Affiliate API credentials (from .env) - SECURITY: No default secrets
+ALIEXPRESS_AFFILIATE_APP_KEY = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "")
+ALIEXPRESS_AFFILIATE_APP_SECRET = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "")
 # Token endpoint - AliExpress REST API structure
 # NOTE: Both endpoints tested, both fail:
 #   - https://oauth.aliexpress.com/token → "appkey not exists" error

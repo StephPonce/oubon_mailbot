@@ -15,10 +15,12 @@ Endpoints:
 import uuid
 import logging
 from typing import Dict, List, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field, HttpUrl
 
 from ospra_os.services.product_deployer import ProductDeployer
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database.user_models import User
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +149,10 @@ class JobStatusResponse(BaseModel):
 # ============================================================================
 
 @router.post("/prepare", response_model=PrepareResponse)
-async def prepare_product(request: PrepareProductRequest):
+async def prepare_product(
+    request: PrepareProductRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Prepare product for deployment WITHOUT deploying
 
@@ -158,21 +163,7 @@ async def prepare_product(request: PrepareProductRequest):
 
     **Processing time:** ~15-20 seconds
 
-    **Example:**
-    ```json
-    {
-        "product": {
-            "title": "Smart LED Bulb WiFi RGB...",
-            "category": "Smart Lighting",
-            "price": 12.99,
-            "features": ["WiFi", "RGB colors"],
-            "images": ["https://ae01.alicdn.com/..."]
-        },
-        "niche": "smart_home",
-        "auto_enhance_images": true,
-        "auto_generate_content": true
-    }
-    ```
+    **Requires authentication.**
     """
     try:
         logger.info(f"[PACKAGE] Preparing product: {request.product.title[:50]}")
@@ -198,7 +189,10 @@ async def prepare_product(request: PrepareProductRequest):
 
 
 @router.post("/product", response_model=DeployResponse)
-async def deploy_product(request: DeployProductRequest):
+async def deploy_product(
+    request: DeployProductRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Deploy single product to Shopify with full AI pipeline
 
@@ -213,10 +207,7 @@ async def deploy_product(request: DeployProductRequest):
 
     **Processing time:** ~20-30 seconds
 
-    **Example:**
-    ```json
-    {
-        "product": {
+    **Requires authentication.**
             "title": "Smart LED Bulb WiFi RGB...",
             "category": "Smart Lighting",
             "price": 12.99,
@@ -271,7 +262,11 @@ async def deploy_product(request: DeployProductRequest):
 
 
 @router.post("/bulk", response_model=BulkDeployResponse)
-async def bulk_deploy(request: BulkDeployRequest, background_tasks: BackgroundTasks):
+async def bulk_deploy(
+    request: BulkDeployRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     """
     Deploy multiple products to Shopify
 
@@ -279,41 +274,7 @@ async def bulk_deploy(request: BulkDeployRequest, background_tasks: BackgroundTa
 
     **Cost:** ~$0.02-0.06 per product
 
-    **Processing time:**
-    - Sync mode: ~20-30 seconds per product
-    - Async mode: Returns immediately with job_id
-
-    **Async Mode:**
-    Set `async_mode: true` to run in background. Returns job_id
-    immediately. Use `/api/deploy/status/{job_id}` to check progress.
-
-    **Example:**
-    ```json
-    {
-        "products": [
-            {
-                "title": "Smart LED Bulb...",
-                "category": "Smart Lighting",
-                "price": 12.99,
-                "features": ["WiFi", "RGB"],
-                "images": ["https://..."]
-            },
-            {
-                "title": "Smart Plug...",
-                "category": "Smart Home",
-                "price": 8.99,
-                "features": ["WiFi", "Alexa"],
-                "images": ["https://..."]
-            }
-        ],
-        "niche": "smart_home",
-        "options": {
-            "enhance_images": true,
-            "generate_content": true
-        },
-        "async_mode": false
-    }
-    ```
+    **Requires authentication.**
     """
     try:
         logger.info(f"[PACKAGE] Bulk deploy: {len(request.products)} products")

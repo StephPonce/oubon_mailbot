@@ -52,10 +52,14 @@ class VoiceProcessor:
             from ospra_os.integrations.claude_client import ClaudeClient
             self.claude = ClaudeClient()
             self.claude_available = True
-        except:
+        except ImportError:
             self.claude = None
             self.claude_available = False
             print("[WARNING]  Claude client not available. Using basic command interpretation.")
+        except Exception as e:
+            self.claude = None
+            self.claude_available = False
+            print(f"[WARNING]  Claude client initialization failed: {e}. Using basic command interpretation.")
 
         # Command patterns for quick matching (before hitting Claude)
         self.quick_patterns = {

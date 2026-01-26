@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy import (
     Column, Integer, String, Float, Text, DateTime,
-    ForeignKey, JSON, Boolean, Enum as SQLEnum
+    ForeignKey, JSON, Boolean, Enum as SQLEnum, Index
 )
 from sqlalchemy.orm import relationship
 from .base import Base
@@ -97,6 +97,12 @@ class Action(Base):
     user = relationship("User", back_populates="actions")
     store = relationship("Store", back_populates="actions")
     logs = relationship("ActionLog", back_populates="action", cascade="all, delete-orphan")
+
+    # Composite indexes for frequently queried combinations
+    __table_args__ = (
+        Index('ix_actions_store_status', 'store_id', 'status'),
+        Index('ix_actions_user_status', 'user_id', 'status'),
+    )
 
     def __repr__(self):
         return f"<Action(id={self.id}, type={self.action_type}, status={self.status}, confidence={self.confidence})>"

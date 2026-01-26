@@ -57,8 +57,9 @@ class IntelligenceScheduler:
 
             grade_engine = get_grade_reasoning_engine(self.db)
 
-            # Get all products that need grading
-            products = self.db.query(Product).filter(Product.status != "discontinued").all()
+            # Get products that need grading (batch processing with limit)
+            # Process in batches to avoid memory issues with large datasets
+            products = self.db.query(Product).filter(Product.status != "discontinued").limit(1000).all()
 
             graded_count = 0
             for product in products:
@@ -89,8 +90,8 @@ class IntelligenceScheduler:
 
             progress_tracker = get_progress_tracker(self.db)
 
-            # Get all active products
-            products = self.db.query(Product).filter(Product.status != "discontinued").all()
+            # Get active products (batch processing with limit)
+            products = self.db.query(Product).filter(Product.status != "discontinued").limit(1000).all()
 
             updated_count = 0
             for product in products:

@@ -4,6 +4,8 @@ OSPRA INTELLIGENCE - LemonSqueezy Payment Integration
 
 Handles payment processing via LemonSqueezy.
 Tier definitions imported from ospra_os.core.tiers (single source of truth).
+
+CRITICAL: Webhook handlers MUST update the database to sync subscription state.
 """
 import os
 import hmac
@@ -25,6 +27,126 @@ from ospra_os.core.tiers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ==================== DATABASE UPDATE FUNCTIONS ====================
+
+async def update_user_subscription(
+    user_id: str,
+    tier: str,
+    subscription_id: str,
+    customer_id: str
+) -> bool:
+    """
+    Update user's subscription in the database.
+
+    CRITICAL: This must be called when payment succeeds to sync tier.
+    """
+    try:
+        from ospra_os.database.connection import get_db_session
+        from ospra_os.database.user_models import User
+
+        async with get_db_session() as db:
+            user = db.query(User).filter(User.id == int(user_id)).first()
+
+            if not user:
+                logger.error(f"[PAYMENT] User {user_id} not found for subscription update")
+                return False
+
+            # Map tier string to enum
+            tier_map = {
+                "nest": SubscriptionTier.NEST,
+                "flight": SubscriptionTier.FLIGHT,
+                "soar": SubscriptionTier.SOAR,
+                "stratosphere": SubscriptionTier.STRATOSPHERE,
+            }
+            new_tier = tier_map.get(tier.lower(), SubscriptionTier.NEST)
+
+            # Update user subscription
+            old_tier = user.subscription_tier
+            user.subscription_tier = new_tier
+            user.lemonsqueezy_subscription_id = subscription_id
+            user.lemonsqueezy_customer_id = customer_id
+            user.subscription_updated_at = datetime.utcnow()
+
+            db.commit()
+
+            logger.info(
+                f"[PAYMENT] Updated user {user_id} subscription: "
+                f"{old_tier} -> {new_tier} (sub_id: {subscription_id})"
+            )
+            return True
+
+    except Exception as e:
+        logger.error(f"[PAYMENT] Failed to update user subscription: {e}")
+        return False
+
+
+async def downgrade_user_to_nest(subscription_id: str) -> bool:
+    """
+    Downgrade user to free tier when subscription expires/cancels.
+    """
+    try:
+        from ospra_os.database.connection import get_db_session
+        from ospra_os.database.user_models import User
+
+        async with get_db_session() as db:
+            user = db.query(User).filter(
+                User.lemonsqueezy_subscription_id == subscription_id
+            ).first()
+
+            if not user:
+                logger.warning(f"[PAYMENT] No user found with subscription {subscription_id}")
+                return False
+
+            old_tier = user.subscription_tier
+            user.subscription_tier = SubscriptionTier.NEST
+            user.subscription_updated_at = datetime.utcnow()
+
+            db.commit()
+
+            logger.info(
+                f"[PAYMENT] Downgraded user {user.id} to NEST: "
+                f"was {old_tier} (sub_id: {subscription_id})"
+            )
+            return True
+
+    except Exception as e:
+        logger.error(f"[PAYMENT] Failed to downgrade user: {e}")
+        return False
+
+
+async def notify_payment_failed(subscription_id: str, customer_id: str) -> bool:
+    """
+    Send notification when payment fails.
+    """
+    try:
+        from ospra_os.database.connection import get_db_session
+        from ospra_os.database.user_models import User
+
+        async with get_db_session() as db:
+            user = db.query(User).filter(
+                User.lemonsqueezy_subscription_id == subscription_id
+            ).first()
+
+            if not user:
+                logger.warning(f"[PAYMENT] No user found with subscription {subscription_id}")
+                return False
+
+            # Log the payment failure
+            logger.warning(
+                f"[PAYMENT] Payment failed for user {user.id} ({user.email}), "
+                f"subscription {subscription_id}"
+            )
+
+            # TODO: Send email notification via Resend
+            # For now, just log it
+
+            return True
+
+    except Exception as e:
+        logger.error(f"[PAYMENT] Failed to process payment failure notification: {e}")
+        return False
 
 
 # ==================== CONFIGURATION ====================
@@ -377,7 +499,7 @@ async def handle_webhook_event(event: Dict) -> Dict:
         tier = custom_data.get("tier", "flight")
         subscription_id = event.get("data", {}).get("id")
         customer_id = data.get("customer_id")
-        
+
         result.update({
             "action": "activate_subscription",
             "user_id": user_id,
@@ -385,44 +507,77 @@ async def handle_webhook_event(event: Dict) -> Dict:
             "subscription_id": subscription_id,
             "customer_id": customer_id
         })
-        
-        # TODO: Update user in database
-        # await update_user_subscription(user_id, tier, subscription_id, customer_id)
-        
+
+        # CRITICAL: Update user subscription in database
+        if user_id:
+            success = await update_user_subscription(user_id, tier, subscription_id, customer_id)
+            result["database_updated"] = success
+            if not success:
+                logger.error(f"[PAYMENT] CRITICAL: Failed to update database for user {user_id}")
+        else:
+            logger.error("[PAYMENT] CRITICAL: No user_id in webhook custom_data")
+            result["database_updated"] = False
+
     elif event_name == "subscription_updated":
         subscription_id = event.get("data", {}).get("id")
         variant_id = str(data.get("variant_id"))
         tier = get_tier_from_variant(variant_id)
-        
+
         result.update({
             "action": "update_tier",
             "subscription_id": subscription_id,
             "tier": tier.value
         })
-        
+
+        # Update tier in database when subscription changes
+        # Find user by subscription_id and update their tier
+        try:
+            from ospra_os.database.connection import get_db_session
+            from ospra_os.database.user_models import User
+
+            async with get_db_session() as db:
+                user = db.query(User).filter(
+                    User.lemonsqueezy_subscription_id == subscription_id
+                ).first()
+                if user:
+                    user.subscription_tier = tier
+                    user.subscription_updated_at = datetime.utcnow()
+                    db.commit()
+                    result["database_updated"] = True
+                    logger.info(f"[PAYMENT] Updated user {user.id} tier to {tier.value}")
+                else:
+                    result["database_updated"] = False
+                    logger.warning(f"[PAYMENT] No user found for subscription {subscription_id}")
+        except Exception as e:
+            logger.error(f"[PAYMENT] Failed to update tier: {e}")
+            result["database_updated"] = False
+
     elif event_name in ["subscription_cancelled", "subscription_expired"]:
         subscription_id = event.get("data", {}).get("id")
-        
+
         result.update({
             "action": "downgrade_to_nest",
             "subscription_id": subscription_id,
             "tier": SubscriptionTier.NEST.value
         })
-        
-        # TODO: Downgrade user to Nest (free)
-        
+
+        # Downgrade user to free tier
+        success = await downgrade_user_to_nest(subscription_id)
+        result["database_updated"] = success
+
     elif event_name == "subscription_payment_failed":
         subscription_id = event.get("data", {}).get("id")
         customer_id = data.get("customer_id")
-        
+
         result.update({
             "action": "payment_failed",
             "subscription_id": subscription_id,
             "customer_id": customer_id
         })
-        
-        # TODO: Send payment failed notification
-        
+
+        # Send payment failed notification
+        await notify_payment_failed(subscription_id, customer_id)
+
     else:
         result["handled"] = False
     

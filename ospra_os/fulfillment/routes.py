@@ -9,8 +9,10 @@ Endpoints for auto-fulfillment management:
 - Check fulfillment status
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import logging
@@ -52,7 +54,7 @@ class FulfillmentSettings(BaseModel):
 # ============================================================================
 
 @router.get("/status")
-async def fulfillment_status():
+async def fulfillment_status(current_user: User = Depends(get_current_user)):
     """
     Get fulfillment system status.
     
@@ -85,7 +87,7 @@ async def fulfillment_status():
 
 
 @router.get("/queue")
-async def get_fulfillment_queue():
+async def get_fulfillment_queue(current_user: User = Depends(get_current_user)):
     """
     Get all pending fulfillment orders.
     
@@ -113,7 +115,7 @@ async def get_fulfillment_queue():
 
 
 @router.get("/queue/stats")
-async def get_queue_stats():
+async def get_queue_stats(current_user: User = Depends(get_current_user)):
     """
     Get fulfillment queue statistics.
     """
@@ -165,7 +167,7 @@ async def get_queue_stats():
 # ============================================================================
 
 @router.post("/tracking/add")
-async def add_tracking_number(request: AddTrackingRequest):
+async def add_tracking_number(request: AddTrackingRequest, current_user: User = Depends(get_current_user)):
     """
     Add tracking number to a Shopify order.
     
@@ -190,7 +192,7 @@ async def add_tracking_number(request: AddTrackingRequest):
 
 
 @router.post("/mark-fulfilled")
-async def mark_order_fulfilled(request: MarkFulfilledRequest):
+async def mark_order_fulfilled(request: MarkFulfilledRequest, current_user: User = Depends(get_current_user)):
     """
     Mark a manual fulfillment order as completed.
     
@@ -218,7 +220,7 @@ async def mark_order_fulfilled(request: MarkFulfilledRequest):
 # ============================================================================
 
 @router.get("/tracking/check/{supplier}/{order_id}")
-async def check_supplier_tracking(supplier: str, order_id: str):
+async def check_supplier_tracking(supplier: str, order_id: str, current_user: User = Depends(get_current_user)):
     """
     Check tracking status from a supplier.
     
@@ -258,7 +260,7 @@ async def check_supplier_tracking(supplier: str, order_id: str):
 # ============================================================================
 
 @router.post("/sync-tracking")
-async def sync_all_tracking():
+async def sync_all_tracking(current_user: User = Depends(get_current_user)):
     """
     Sync tracking numbers from all suppliers.
     
@@ -333,7 +335,7 @@ async def sync_all_tracking():
 # ============================================================================
 
 @router.get("/settings")
-async def get_fulfillment_settings():
+async def get_fulfillment_settings(current_user: User = Depends(get_current_user)):
     """Get current fulfillment automation settings"""
     import os
     import json
@@ -358,7 +360,7 @@ async def get_fulfillment_settings():
 
 
 @router.post("/settings")
-async def update_fulfillment_settings(settings: FulfillmentSettings):
+async def update_fulfillment_settings(settings: FulfillmentSettings, current_user: User = Depends(get_current_user)):
     """Update fulfillment automation settings"""
     import os
     import json

@@ -1,12 +1,14 @@
 """
 Inventory API Routes - FastAPI endpoints for inventory forecasting
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 import random
 import logging
 
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 from ospra_os.inventory.forecasting_engine import InventoryForecastingEngine
 from ospra_os.inventory.shopify_sync import get_shopify_sync
 from ospra_os.inventory.email_alerts import get_email_alerts
@@ -67,7 +69,8 @@ async def health_check():
 async def get_all_inventory(
     status: Optional[str] = Query(None, description="Filter by status: HEALTHY, LOW, CRITICAL, OUT_OF_STOCK"),
     sort_by: Optional[str] = Query("days_of_stock", description="Sort field"),
-    limit: Optional[int] = Query(100, description="Max results")
+    limit: Optional[int] = Query(100, description="Max results"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get all products with inventory forecasts
@@ -139,7 +142,7 @@ restock_orders = []
 
 
 @router.post("/restock-orders")
-async def create_restock_order(order: dict):
+async def create_restock_order(order: dict, current_user: User = Depends(get_current_user)):
     """
     Create a new restock order
 
@@ -187,7 +190,8 @@ async def create_restock_order(order: dict):
 @router.get("/restock-orders")
 async def get_restock_orders(
     status: Optional[str] = Query(None, description="Filter by status"),
-    limit: Optional[int] = Query(50, description="Max results")
+    limit: Optional[int] = Query(50, description="Max results"),
+    current_user: User = Depends(get_current_user)
 ):
     """Get all restock orders"""
     try:
@@ -215,7 +219,7 @@ async def get_restock_orders(
 
 
 @router.get("/restock-orders/{order_id}")
-async def get_restock_order(order_id: str):
+async def get_restock_order(order_id: str, current_user: User = Depends(get_current_user)):
     """Get a specific restock order by ID"""
     try:
         order = next((o for o in restock_orders if o.get('order_id') == order_id), None)
@@ -236,7 +240,7 @@ async def get_restock_order(order_id: str):
 
 
 @router.get("/{product_id}")
-async def get_product_forecast(product_id: str):
+async def get_product_forecast(product_id: str, current_user: User = Depends(get_current_user)):
     """
     Get detailed inventory forecast for a specific product
 
@@ -287,7 +291,7 @@ async def get_product_forecast(product_id: str):
 
 
 @router.get("/health/summary")
-async def get_inventory_health_summary():
+async def get_inventory_health_summary(current_user: User = Depends(get_current_user)):
     """
     Get overall inventory health summary
 
@@ -334,7 +338,7 @@ async def get_inventory_health_summary():
 
 
 @router.get("/alerts/restock")
-async def get_restock_alerts(urgency: Optional[str] = Query(None)):
+async def get_restock_alerts(urgency: Optional[str] = Query(None), current_user: User = Depends(get_current_user)):
     """
     Get products that need restocking
 
@@ -390,7 +394,7 @@ async def get_restock_alerts(urgency: Optional[str] = Query(None)):
 
 
 @router.get("/alerts/stockout")
-async def get_stockout_alerts():
+async def get_stockout_alerts(current_user: User = Depends(get_current_user)):
     """Get products at high risk of stockout"""
     try:
         products = generate_mock_product_data()
@@ -437,7 +441,7 @@ async def get_stockout_alerts():
 
 
 @router.post("/alerts/check-and-send")
-async def check_and_send_alerts():
+async def check_and_send_alerts(current_user: User = Depends(get_current_user)):
     """
     Check all products and send email alerts for critical ones
 
@@ -487,7 +491,7 @@ async def check_and_send_alerts():
 
 
 @router.post("/alerts/send-test")
-async def send_test_alert():
+async def send_test_alert(current_user: User = Depends(get_current_user)):
     """
     Send a test alert email with sample data
 
@@ -536,7 +540,7 @@ async def send_test_alert():
 
 
 @router.get("/shopify/test-connection")
-async def test_shopify_connection():
+async def test_shopify_connection(current_user: User = Depends(get_current_user)):
     """Test Shopify connection"""
     try:
         if not shopify_sync.is_available():
@@ -553,7 +557,7 @@ async def test_shopify_connection():
 
 
 @router.post("/shopify/sync")
-async def sync_from_shopify():
+async def sync_from_shopify(current_user: User = Depends(get_current_user)):
     """Sync inventory from Shopify"""
     try:
         if not shopify_sync.is_available():
@@ -601,7 +605,7 @@ async def sync_from_shopify():
 
 
 @router.get("/shopify/products")
-async def get_shopify_inventory():
+async def get_shopify_inventory(current_user: User = Depends(get_current_user)):
     """Get inventory with real Shopify data"""
     try:
         if not shopify_sync.is_available():
@@ -656,7 +660,7 @@ async def get_shopify_inventory():
 # ============================================================================
 
 @router.post("/history/snapshot")
-async def save_forecast_snapshots():
+async def save_forecast_snapshots(current_user: User = Depends(get_current_user)):
     """
     Save current forecast snapshots for all products
 
@@ -713,7 +717,8 @@ async def save_forecast_snapshots():
 
 @router.get("/history/recent")
 async def get_recent_snapshots(
-    hours: int = Query(24, ge=1, le=168, description="Hours to look back")
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get all recent forecast snapshots across all products
@@ -739,7 +744,8 @@ async def get_recent_snapshots(
 
 @router.delete("/history/cleanup")
 async def cleanup_old_snapshots(
-    days: int = Query(90, ge=30, le=365, description="Keep snapshots newer than this many days")
+    days: int = Query(90, ge=30, le=365, description="Keep snapshots newer than this many days"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Cleanup old historical snapshots
@@ -766,7 +772,8 @@ async def cleanup_old_snapshots(
 @router.get("/history/{product_id}/trends")
 async def get_product_trends(
     product_id: str,
-    days: int = Query(30, ge=1, le=365, description="Number of days to analyze")
+    days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get trend analysis for a product
@@ -795,7 +802,8 @@ async def get_product_trends(
 @router.get("/history/{product_id}")
 async def get_product_history(
     product_id: str,
-    days: int = Query(30, ge=1, le=365, description="Number of days of history")
+    days: int = Query(30, ge=1, le=365, description="Number of days of history"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get historical forecast snapshots for a specific product
@@ -833,7 +841,7 @@ async def get_product_history(
 # ============================================================================
 
 @router.post("/bulk/reorder")
-async def bulk_reorder_products(request: dict):
+async def bulk_reorder_products(request: dict, current_user: User = Depends(get_current_user)):
     """
     Create restock orders for multiple products at once
 
@@ -899,7 +907,7 @@ async def bulk_reorder_products(request: dict):
 
 
 @router.post("/bulk/export")
-async def bulk_export_products(request: dict):
+async def bulk_export_products(request: dict, current_user: User = Depends(get_current_user)):
     """
     Export selected products to CSV
 
@@ -998,7 +1006,7 @@ async def bulk_export_products(request: dict):
 
 
 @router.post("/bulk/alerts")
-async def bulk_configure_alerts(request: dict):
+async def bulk_configure_alerts(request: dict, current_user: User = Depends(get_current_user)):
     """
     Configure email alerts for multiple products
 

@@ -19,6 +19,9 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
 
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
+
 load_dotenv()
 
 router = APIRouter(prefix="/api/shopify", tags=["Shopify"])
@@ -151,7 +154,7 @@ def normalize_domain(domain: str) -> str:
 # ============================================================================
 
 @router.get("/stores")
-async def list_stores():
+async def list_stores(current_user: User = Depends(get_current_user)):
     """List connected stores."""
     stores = []
     
@@ -170,7 +173,10 @@ async def list_stores():
 
 
 @router.post("/connect")
-async def connect_store(request: ConnectStoreRequest):
+async def connect_store(
+    request: ConnectStoreRequest,
+    current_user: User = Depends(get_current_user)
+):
     """Initiate OAuth flow to connect a store."""
     shop_domain = request.shop_domain.strip()
     shop_normalized = normalize_domain(shop_domain)
@@ -273,7 +279,10 @@ async def oauth_callback(
 
 
 @router.delete("/stores/{store_id}")
-async def disconnect_store(store_id: str):
+async def disconnect_store(
+    store_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """Disconnect a store."""
     if store_id in _connected_stores:
         del _connected_stores[store_id]
@@ -283,7 +292,10 @@ async def disconnect_store(store_id: str):
 
 
 @router.get("/stores/{store_id}/stats")
-async def get_store_stats(store_id: str):
+async def get_store_stats(
+    store_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """Get store statistics."""
     if store_id not in _connected_stores:
         raise HTTPException(status_code=404, detail="Store not found")
@@ -337,7 +349,11 @@ async def get_store_stats(store_id: str):
 
 
 @router.get("/stores/{store_id}/products")
-async def get_products(store_id: str, limit: int = Query(50, ge=1, le=250)):
+async def get_products(
+    store_id: str,
+    limit: int = Query(50, ge=1, le=250),
+    current_user: User = Depends(get_current_user)
+):
     """Get products from store."""
     if store_id not in _connected_stores:
         raise HTTPException(status_code=404, detail="Store not found")
@@ -367,7 +383,11 @@ async def get_products(store_id: str, limit: int = Query(50, ge=1, le=250)):
 
 
 @router.get("/stores/{store_id}/orders")
-async def get_orders(store_id: str, limit: int = Query(50, ge=1, le=250)):
+async def get_orders(
+    store_id: str,
+    limit: int = Query(50, ge=1, le=250),
+    current_user: User = Depends(get_current_user)
+):
     """Get orders from store."""
     if store_id not in _connected_stores:
         raise HTTPException(status_code=404, detail="Store not found")

@@ -3,8 +3,10 @@
 Complete API with REAL cross-source intelligence
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional, List, Dict
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 import logging
 from datetime import datetime
 
@@ -117,7 +119,8 @@ async def get_products(
     max_velocity: Optional[int] = Query(None, ge=0, le=100),
     sort_by: Optional[str] = Query("score", description="Sort by: score, profit, trend, newest"),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc, desc"),
-    per_page: int = Query(50, ge=1, le=100)
+    per_page: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get products from DATABASE with Ospra Intelligence scores
@@ -204,7 +207,7 @@ async def get_products(
 
 
 @router.post("/products/{product_id}/analyze")
-async def analyze_product(product_id: str, request_body: dict = {}):
+async def analyze_product(product_id: str, request_body: dict = {}, current_user: User = Depends(get_current_user)):
     """
     Analyze a product using REAL Claude AI - from DATABASE or provided data
 
@@ -260,19 +263,18 @@ async def analyze_product(product_id: str, request_body: dict = {}):
 
 
 @router.post("/claude/chat")
-async def claude_chat(request: dict):
+async def claude_chat(request: dict, current_user: User = Depends(get_current_user)):
     """Chat with Claude AI"""
-    
+
     if not claude_analyzer:
         raise HTTPException(
             status_code=503,
             detail="Claude chat unavailable"
         )
-    
+
     try:
         message = request.get("message")
         context = request.get("context")
-        user_id = request.get("user_id", 1)
 
         if not message:
             raise HTTPException(
@@ -280,7 +282,7 @@ async def claude_chat(request: dict):
                 detail="Message is required"
             )
 
-        response = claude_analyzer.chat_response(message, context, user_id=user_id)
+        response = claude_analyzer.chat_response(message, context, user_id=current_user.id)
         
         return {
             "response": response,
@@ -298,13 +300,13 @@ async def claude_chat(request: dict):
 
 
 @router.get("/overview")
-async def get_overview():
+async def get_overview(current_user: User = Depends(get_current_user)):
     """Get dashboard overview (alias for analytics/summary)"""
-    return await get_analytics_summary()
+    return await get_analytics_summary(current_user=current_user)
 
 
 @router.get("/niches")
-async def get_niches():
+async def get_niches(current_user: User = Depends(get_current_user)):
     """Get available niches with intelligence data"""
     return {
         "niches": [
@@ -323,7 +325,7 @@ async def get_niches():
 
 
 @router.get("/analytics/summary")
-async def get_analytics_summary():
+async def get_analytics_summary(current_user: User = Depends(get_current_user)):
     """Get dashboard analytics summary"""
     
     try:
@@ -359,7 +361,7 @@ async def get_analytics_summary():
 
 
 @router.get("/analytics/business")
-async def get_business_analytics():
+async def get_business_analytics(current_user: User = Depends(get_current_user)):
     """Get business analytics including orders, revenue, and conversions"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -378,7 +380,7 @@ async def get_business_analytics():
 
 
 @router.get("/analytics")
-async def get_analytics():
+async def get_analytics(current_user: User = Depends(get_current_user)):
     """Get analytics metrics"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -397,7 +399,7 @@ async def get_analytics():
 
 
 @router.get("/products/{product_id}/deployment-status")
-async def get_deployment_status(product_id: str):
+async def get_deployment_status(product_id: str, current_user: User = Depends(get_current_user)):
     """Check if product is deployed to Shopify"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -419,7 +421,7 @@ async def get_deployment_status(product_id: str):
 
 
 @router.post("/products/{product_id}/deploy-to-shopify")
-async def deploy_to_shopify(product_id: str):
+async def deploy_to_shopify(product_id: str, current_user: User = Depends(get_current_user)):
     """Deploy product to Shopify store"""
 
     if not shopify_client:
@@ -486,7 +488,7 @@ async def deploy_to_shopify(product_id: str):
 
 
 @router.get("/shopify/status")
-async def shopify_status():
+async def shopify_status(current_user: User = Depends(get_current_user)):
     """Check Shopify integration status"""
 
     if not shopify_client:
@@ -508,7 +510,7 @@ async def shopify_status():
 
 
 @router.get("/deployments")
-async def get_deployments():
+async def get_deployments(current_user: User = Depends(get_current_user)):
     """Get all deployed products"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -526,7 +528,7 @@ async def get_deployments():
 
 
 @router.get("/notifications")
-async def get_notifications(unread_only: bool = False, limit: int = 50):
+async def get_notifications(unread_only: bool = False, limit: int = 50, current_user: User = Depends(get_current_user)):
     """Get notifications"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -547,7 +549,7 @@ async def get_notifications(unread_only: bool = False, limit: int = 50):
 
 
 @router.post("/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: int):
+async def mark_notification_read(notification_id: int, current_user: User = Depends(get_current_user)):
     """Mark notification as read"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -565,7 +567,7 @@ async def mark_notification_read(notification_id: int):
 
 
 @router.get("/orders")
-async def get_orders(limit: int = 50):
+async def get_orders(limit: int = 50, current_user: User = Depends(get_current_user)):
     """Get all orders"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -587,7 +589,7 @@ async def get_orders(limit: int = 50):
 # ==========================================
 
 @router.get("/intelligence/patterns")
-async def get_product_patterns(days: int = 30):
+async def get_product_patterns(days: int = 30, current_user: User = Depends(get_current_user)):
     """Analyze product performance patterns using AI"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -611,7 +613,7 @@ async def get_product_patterns(days: int = 30):
 
 
 @router.get("/intelligence/drop-candidates")
-async def get_drop_candidates(min_views: int = 100, days: int = 30):
+async def get_drop_candidates(min_views: int = 100, days: int = 30, current_user: User = Depends(get_current_user)):
     """Identify products that should be dropped based on AI analysis"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -635,7 +637,7 @@ async def get_drop_candidates(min_views: int = 100, days: int = 30):
 
 
 @router.post("/intelligence/predict")
-async def predict_product_performance(product: Dict):
+async def predict_product_performance(product: Dict, current_user: User = Depends(get_current_user)):
     """Predict how a product will perform using AI"""
 
     from ospra_os.database.product_history import ProductHistoryDB
@@ -664,7 +666,8 @@ async def predict_product_performance(product: Dict):
 @router.get("/live-products")
 async def get_live_products_endpoint(
     niche: str = Query("smart_home", description="Product niche"),
-    limit: int = Query(20, ge=1, le=100, description="Max products to return")
+    limit: int = Query(20, ge=1, le=100, description="Max products to return"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get LIVE trending products using Ospra Intelligence V5

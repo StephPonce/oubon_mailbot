@@ -45,3 +45,5 @@ Thumbs.db
 *.log
 logs/
 .aider*
+.claude/settings.local.json
+.claude/settings.local.json

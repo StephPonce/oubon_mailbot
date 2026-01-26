@@ -4,7 +4,7 @@ Email Sync API Routes
 FastAPI endpoints for syncing and fetching emails from connected accounts.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -12,6 +12,8 @@ from datetime import datetime
 from ospra_os.email_automation.email_sync import EmailSyncService
 from ospra_os.email_automation.email_action_executor import EmailActionExecutor
 from ospra_os.database import Email, UserEmailAccount, get_multi_store_session
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 
 router = APIRouter(prefix="/api/emails", tags=["Email Sync"])
@@ -77,7 +79,7 @@ class SyncResponse(BaseModel):
 
 @router.post("/sync")
 async def sync_emails(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     account_id: Optional[int] = Query(None, description="Specific account ID to sync (optional)"),
     max_emails: int = Query(500, ge=1, le=5000, description="Max emails to fetch per account"),
     days_back: int = Query(365, ge=1, le=3650, description="How many days back to fetch (default: 1 year, max: 10 years)")
@@ -95,6 +97,7 @@ async def sync_emails(
     Returns:
         Sync results for each account
     """
+    user_id = current_user.id
     sync_service = EmailSyncService()
     session = get_multi_store_session()
 
@@ -149,7 +152,7 @@ async def sync_emails(
 
 @router.get("/list", response_model=List[EmailResponse])
 async def list_emails(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     account_id: Optional[int] = Query(None, description="Filter by account ID"),
     label: Optional[str] = Query(None, description="Filter by label (e.g., INBOX, SENT, TRASH)"),
     limit: int = Query(50, ge=1, le=200, description="Number of emails to return"),
@@ -170,6 +173,7 @@ async def list_emails(
         By default, groups conversation threads (like Gmail) to show only the
         most recent email from each thread.
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -252,7 +256,7 @@ async def list_emails(
 @router.get("/{email_id}", response_model=EmailDetailResponse)
 async def get_email_details(
     email_id: int,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get detailed email information including body.
@@ -263,6 +267,7 @@ async def get_email_details(
     Returns:
         Full email details including body content
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -310,7 +315,7 @@ async def get_email_details(
 
 @router.get("/stats/summary")
 async def get_email_stats(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     group_threads: bool = Query(True, description="Count threads instead of individual emails")
 ):
     """
@@ -324,6 +329,7 @@ async def get_email_stats(
         By default, counts unique conversation threads (like Gmail)
         instead of individual emails.
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -408,7 +414,7 @@ async def get_email_stats(
 @router.post("/{email_id}/mark-read")
 async def mark_email_read(
     email_id: int,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     is_read: bool = Query(True, description="Mark as read (true) or unread (false)")
 ):
     """
@@ -423,6 +429,7 @@ async def mark_email_read(
     Returns:
         Success message with sync status
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -475,7 +482,7 @@ async def mark_email_read(
 @router.post("/{email_id}/star")
 async def star_email(
     email_id: int,
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     is_starred: bool = Query(True, description="Star (true) or unstar (false)")
 ):
     """
@@ -490,6 +497,7 @@ async def star_email(
     Returns:
         Success message with sync status
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -542,7 +550,7 @@ async def star_email(
 @router.delete("/{email_id}")
 async def delete_email(
     email_id: int,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Delete an email.
@@ -556,6 +564,7 @@ async def delete_email(
     Returns:
         Success message with sync status
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -607,7 +616,7 @@ async def delete_email(
 @router.post("/{email_id}/archive")
 async def archive_email(
     email_id: int,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Archive an email.
@@ -621,6 +630,7 @@ async def archive_email(
     Returns:
         Success message with sync status
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -684,7 +694,7 @@ class LabelRequest(BaseModel):
 async def apply_label_to_email(
     email_id: int,
     label_data: LabelRequest,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Apply a label/category to an email.
@@ -699,6 +709,7 @@ async def apply_label_to_email(
     Returns:
         Success message with sync status
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -772,7 +783,7 @@ class ComposeRequest(BaseModel):
 @router.post("/send")
 async def send_composed_email(
     compose_data: ComposeRequest,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Send a new composed email.
@@ -791,6 +802,7 @@ async def send_composed_email(
     Returns:
         Success message
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -855,7 +867,7 @@ async def send_composed_email(
 async def reply_to_email(
     email_id: int,
     reply_data: ReplyRequest,
-    user_id: int = Query(..., description="User ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Send a reply to an email.
@@ -867,6 +879,7 @@ async def reply_to_email(
     Returns:
         Success message
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:

@@ -115,9 +115,11 @@ def initialize_database(database_url: str) -> bool:
         return True
 
     except Exception as e:
-        print_error(f"Database initialization failed: {e}")
         import traceback
-        traceback.print_exc()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Database initialization failed: {e}\n{traceback.format_exc()}")
+        print_error(f"Database initialization failed: {e}")
         return False
 
 
@@ -291,9 +293,11 @@ def migrate_existing_store(database_url: str, auto_confirm: bool = False) -> boo
             session.close()
 
     except Exception as e:
-        print_error(f"Migration failed: {e}")
         import traceback
-        traceback.print_exc()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Migration failed: {e}\n{traceback.format_exc()}")
+        print_error(f"Migration failed: {e}")
         return False
 
 
@@ -400,9 +404,11 @@ def show_status(database_url: str) -> bool:
             session.close()
 
     except Exception as e:
-        print_error(f"Status check failed: {e}")
         import traceback
-        traceback.print_exc()
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Status check failed: {e}\n{traceback.format_exc()}")
+        print_error(f"Status check failed: {e}")
         return False
 
 

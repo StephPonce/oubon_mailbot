@@ -187,7 +187,11 @@ class AccountLockout:
                 import redis
                 self._redis = redis.from_url(redis_url)
                 logger.info("[SUCCESS] Redis connected for account lockout")
-            except:
+            except ImportError:
+                logger.warning("Redis package not installed, using in-memory lockout tracking")
+                self._redis = None
+            except Exception as e:
+                logger.warning(f"Failed to connect to Redis for account lockout: {e}")
                 self._redis = None
     
     def record_failed_attempt(self, identifier: str) -> int:

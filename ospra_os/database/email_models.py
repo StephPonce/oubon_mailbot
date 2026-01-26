@@ -16,7 +16,7 @@ from .base import (
     AIProvider, TaskType, TriggerType, ActionType, LifecycleStage,
     EntryTiming, RiskLevel
 )
-from .connection import get_engine
+from .connection import get_engine, get_db  # Use consolidated get_db
 
 
 class Email(Base):
@@ -424,22 +424,7 @@ engine = get_engine()
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-
-def get_db():
-    """
-    Database session dependency for FastAPI.
-
-    Usage in FastAPI routes:
-        @router.get("/endpoint")
-        def endpoint(db: Session = Depends(get_db)):
-            # Use db session here
-            pass
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# NOTE: get_db() is imported from ospra_os.database.connection (consolidated implementation)
 
 
 def init_db():

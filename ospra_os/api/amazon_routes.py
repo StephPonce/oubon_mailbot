@@ -32,6 +32,8 @@ from sqlalchemy.orm import Session
 
 from ospra_os.database.db import get_db
 from ospra_os.services.amazon_service import AmazonService
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 import logging
 
@@ -99,7 +101,7 @@ class SyncOrdersRequest(BaseModel):
 
 @router.get("/accounts")
 async def get_accounts(
-    user_id: int = Query(..., description="User ID"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -108,6 +110,7 @@ async def get_accounts(
     Returns list of connected Amazon Seller Central accounts.
     """
     try:
+        user_id = current_user.id
         service = AmazonService(db)
         accounts = service.get_accounts(user_id)
 

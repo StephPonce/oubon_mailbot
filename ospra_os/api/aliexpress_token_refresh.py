@@ -18,14 +18,14 @@ class AliExpressTokenRefresher:
     """Handles automatic token refresh for AliExpress APIs"""
 
     def __init__(self):
-        # Dropshipping API
-        self.dropship_app_key = os.getenv("ALIEXPRESS_APP_KEY", "520918")
-        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
+        # Dropshipping API - SECURITY: No default secrets
+        self.dropship_app_key = os.getenv("ALIEXPRESS_APP_KEY", "")
+        self.dropship_app_secret = os.getenv("ALIEXPRESS_APP_SECRET", "")
         self.dropship_tokens_file = Path(".secrets/aliexpress_tokens.json")
 
-        # Affiliate API
-        self.affiliate_app_key = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "522382")
-        self.affiliate_app_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
+        # Affiliate API - SECURITY: No default secrets
+        self.affiliate_app_key = os.getenv("ALIEXPRESS_AFFILIATE_APP_KEY", "")
+        self.affiliate_app_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "")
         self.affiliate_tokens_file = Path(".secrets/aliexpress_affiliate_tokens.json")
 
         # Token refresh endpoint

@@ -16,11 +16,17 @@ from ospra_os.background_jobs.auto_discovery import (
     AutoDiscoveryError,
     start_auto_discovery_scheduler
 )
+from ospra_os.background_jobs.token_refresh_job import (
+    TokenRefreshJob,
+    start_token_refresh_scheduler
+)
 
 __all__ = [
     "AutoDiscoveryJob",
     "AutoDiscoveryError",
-    "start_auto_discovery_scheduler"
+    "start_auto_discovery_scheduler",
+    "TokenRefreshJob",
+    "start_token_refresh_scheduler"
 ]
 
 __version__ = "1.0.0"

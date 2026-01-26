@@ -31,7 +31,12 @@ class EmailActionExecutor:
     """
 
     def __init__(self):
-        self.encryption_key = os.getenv('EMAIL_OAUTH_ENCRYPTION_KEY', 'lnl1Oc0BEMhbMN3CRvlz2K2sW7Xkz3gjc_6K5PL3nCc=')
+        self.encryption_key = os.getenv('EMAIL_OAUTH_ENCRYPTION_KEY')
+        if not self.encryption_key:
+            raise RuntimeError(
+                "CRITICAL: EMAIL_OAUTH_ENCRYPTION_KEY environment variable is required. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            )
         self.cipher = Fernet(self.encryption_key.encode())
 
     def _decrypt_credentials(self, encrypted_creds: str) -> Dict:

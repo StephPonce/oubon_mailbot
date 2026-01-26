@@ -1,6 +1,9 @@
 """
 Analytics API Routes
 FastAPI endpoints for revenue, profit, and performance analytics
+
+SECURITY: All endpoints require JWT authentication. User ID is extracted
+from the verified token, NOT from query parameters.
 """
 
 from fastapi import APIRouter, Query, HTTPException, Depends
@@ -13,7 +16,8 @@ import io
 import logging
 
 from ospra_os.analytics.analytics_engine import AnalyticsEngine
-from ospra_os.database import get_multi_store_session
+from ospra_os.database import get_multi_store_session, User
+from ospra_os.auth.jwt_auth import get_current_user
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
 logger = logging.getLogger(__name__)
@@ -57,11 +61,13 @@ class StoreComparisonResponse(BaseModel):
 async def get_analytics_overview(
     date_range: str = Query("last_30_days", description="Time range for analytics"),
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
-    user_id: int = Query(1, description="User ID"),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get complete analytics overview with all KPIs
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Date Range Options**:
     - `today` - Today only
@@ -77,6 +83,7 @@ async def get_analytics_overview(
     - Ad spend metrics (total, ROI, ROAS, CPA)
     """
     try:
+        user_id = current_user.id  # SECURITY: Use authenticated user's ID
         engine = AnalyticsEngine(session)
         kpis = engine.calculate_kpis(date_range, store_id, user_id)
 
@@ -96,11 +103,13 @@ async def get_revenue_over_time(
     date_range: str = Query("last_30_days"),
     granularity: str = Query("day", description="day, week, or month"),
     store_id: Optional[int] = Query(None),
-    user_id: int = Query(1),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get revenue time series data for charts
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Granularity Options**:
     - `day` - Daily breakdown
@@ -110,6 +119,7 @@ async def get_revenue_over_time(
     **Returns**: Array of {date, revenue, orders} for charting
     """
     try:
+        user_id = current_user.id  # SECURITY: Use authenticated user's ID
         engine = AnalyticsEngine(session)
         data = engine.get_revenue_over_time(date_range, granularity, store_id, user_id)
 
@@ -127,11 +137,13 @@ async def get_revenue_over_time(
 async def get_profit_breakdown(
     date_range: str = Query("last_30_days"),
     store_id: Optional[int] = Query(None),
-    user_id: int = Query(1),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get profit and cost breakdown
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Returns**:
     - Total profit
@@ -139,6 +151,7 @@ async def get_profit_breakdown(
     - Cost breakdown (product costs, ad spend, platform fees)
     """
     try:
+        user_id = current_user.id  # SECURITY: Use authenticated user's ID
         engine = AnalyticsEngine(session)
         return engine.get_profit_metrics(date_range, store_id, user_id)
     except Exception as e:
@@ -150,13 +163,15 @@ async def get_profit_breakdown(
 async def get_product_performance(
     date_range: str = Query("last_30_days"),
     store_id: Optional[int] = Query(None),
-    user_id: int = Query(1),
     sort_by: str = Query("revenue", description="revenue, orders, conversion, profit_margin"),
     limit: int = Query(20, le=100),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Get top performing products
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Sort Options**:
     - `revenue` - Sort by total revenue
@@ -167,6 +182,7 @@ async def get_product_performance(
     **Returns**: List of products with performance metrics
     """
     try:
+        user_id = current_user.id  # SECURITY: Use authenticated user's ID
         engine = AnalyticsEngine(session)
         products = engine.get_product_performance(
             date_range, store_id, user_id, limit, sort_by
@@ -184,11 +200,13 @@ async def get_product_performance(
 @router.get("/stores", response_model=StoreComparisonResponse)
 async def get_store_comparison(
     date_range: str = Query("last_30_days"),
-    user_id: int = Query(1),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Compare performance across all stores
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Returns**: List of stores with:
     - Revenue, orders, conversion rate
@@ -196,6 +214,7 @@ async def get_store_comparison(
     - Rank position and change
     """
     try:
+        user_id = current_user.id  # SECURITY: Use authenticated user's ID
         engine = AnalyticsEngine(session)
         stores = engine.get_store_comparison(date_range, user_id)
 
@@ -212,11 +231,13 @@ async def export_analytics(
     format: str = Query("csv", description="csv or pdf"),
     date_range: str = Query("last_30_days"),
     store_id: Optional[int] = Query(None),
-    user_id: int = Query(1),
-    session: Session = Depends(get_multi_store_session)
+    session: Session = Depends(get_multi_store_session),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Export analytics data
+
+    SECURITY: user_id extracted from JWT token, NOT from query params.
 
     **Formats**:
     - `csv` - CSV file download
@@ -224,6 +245,7 @@ async def export_analytics(
 
     **Returns**: Downloadable file
     """
+    user_id = current_user.id  # SECURITY: Use authenticated user's ID
     if format == "csv":
         return await export_csv(date_range, store_id, user_id, session)
     elif format == "pdf":

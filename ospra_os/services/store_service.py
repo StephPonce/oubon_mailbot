@@ -9,8 +9,8 @@ Example: "Yoga mats convert at 4.2% in Fitness First (Store A),
 """
 
 from typing import List, Dict, Optional, Any
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, desc, and_
 from datetime import datetime, timedelta
 
 from ospra_os.database import (
@@ -53,26 +53,41 @@ class StoreService:
             - total_revenue, monthly_revenue
             - total_products
             - last_sync
+
+        OPTIMIZED: Uses subqueries to avoid N+1 query pattern
         """
-        stores = self.db.query(Store).filter(Store.user_id == user_id).all()
+        # Subquery for product counts
+        product_count_subq = self.db.query(
+            Product.store_id,
+            func.count(Product.id).label('product_count')
+        ).group_by(Product.store_id).subquery()
+
+        # Subquery for pending action counts
+        pending_actions_subq = self.db.query(
+            Action.store_id,
+            func.count(Action.id).label('pending_count')
+        ).filter(Action.status == "pending")\
+            .group_by(Action.store_id).subquery()
+
+        # Main query with left joins to subqueries
+        stores_with_counts = self.db.query(
+            Store,
+            func.coalesce(product_count_subq.c.product_count, 0).label('product_count'),
+            func.coalesce(pending_actions_subq.c.pending_count, 0).label('pending_count')
+        ).outerjoin(
+            product_count_subq, Store.id == product_count_subq.c.store_id
+        ).outerjoin(
+            pending_actions_subq, Store.id == pending_actions_subq.c.store_id
+        ).filter(Store.user_id == user_id).all()
 
         store_data = []
-        for store in stores:
-            # Count products
-            product_count = self.db.query(func.count(Product.id))\
-                .filter(Product.store_id == store.id)\
-                .scalar() or 0
+        stores_to_update = []
 
-            # Count pending actions
-            pending_actions = self.db.query(func.count(Action.id))\
-                .filter(Action.store_id == store.id)\
-                .filter(Action.status == "pending")\
-                .scalar() or 0
-
-            # Update pending_actions_count if different
+        for store, product_count, pending_actions in stores_with_counts:
+            # Track stores that need pending_actions_count update
             if store.pending_actions_count != pending_actions:
                 store.pending_actions_count = pending_actions
-                self.db.commit()
+                stores_to_update.append(store)
 
             store_data.append({
                 "id": store.id,
@@ -81,7 +96,7 @@ class StoreService:
                 "platform": store.platform.value,
                 "status": store.status.value,
                 "niche": store.niche,
-                "pending_actions_count": store.pending_actions_count,
+                "pending_actions_count": pending_actions,
                 "total_revenue": store.total_revenue,
                 "monthly_revenue": store.monthly_revenue,
                 "total_orders": store.total_orders,
@@ -91,6 +106,10 @@ class StoreService:
                 "sync_error": store.sync_error,
                 "created_at": store.created_at.isoformat(),
             })
+
+        # Batch commit updates if any
+        if stores_to_update:
+            self.db.commit()
 
         return store_data
 
@@ -368,6 +387,8 @@ class StoreService:
 
         Returns:
             List of insights from other stores
+
+        OPTIMIZED: Uses JOIN to avoid N+1 query pattern for source stores
         """
         # Verify store ownership
         store = self.db.query(Store)\
@@ -378,26 +399,31 @@ class StoreService:
         if not store:
             return []
 
-        # Get pending learnings for this store
-        learnings = self.db.query(CrossStoreLearning)\
-            .filter(CrossStoreLearning.target_store_id == store_id)\
-            .filter(CrossStoreLearning.status == "pending")\
-            .order_by(desc(CrossStoreLearning.confidence_score))\
-            .limit(limit)\
-            .all()
+        # Create alias for source store to join with learnings
+        SourceStore = Store
+
+        # Get learnings with source store in a single query using join
+        learnings_with_source = self.db.query(
+            CrossStoreLearning,
+            SourceStore.store_name.label('source_store_name'),
+            SourceStore.niche.label('source_store_niche')
+        ).join(
+            SourceStore, CrossStoreLearning.source_store_id == SourceStore.id
+        ).filter(
+            CrossStoreLearning.target_store_id == store_id
+        ).filter(
+            CrossStoreLearning.status == "pending"
+        ).order_by(
+            desc(CrossStoreLearning.confidence_score)
+        ).limit(limit).all()
 
         insights = []
-        for learning in learnings:
-            # Get source store name
-            source_store = self.db.query(Store)\
-                .filter(Store.id == learning.source_store_id)\
-                .first()
-
+        for learning, source_store_name, source_store_niche in learnings_with_source:
             insights.append({
                 "id": learning.id,
                 "learning_type": learning.learning_type,
-                "source_store_name": source_store.store_name if source_store else "Unknown",
-                "source_store_niche": source_store.niche if source_store else None,
+                "source_store_name": source_store_name or "Unknown",
+                "source_store_niche": source_store_niche,
                 "product_name": learning.product_name,
                 "product_category": learning.product_category,
                 "source_conversion_rate": learning.source_conversion_rate,

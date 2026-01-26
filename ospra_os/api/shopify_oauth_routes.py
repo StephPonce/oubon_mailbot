@@ -29,6 +29,8 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from urllib.parse import urlencode, parse_qs
 from pydantic import BaseModel
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -200,16 +202,17 @@ async def initiate_oauth(request: OAuthInitRequest):
 @router.get("/authorize")
 async def authorize_redirect(
     shop: str = Query(..., description="Shop domain (e.g., mystore.myshopify.com)"),
-    user_id: Optional[int] = Query(None, description="Ospra user ID")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Alternative: Direct redirect to Shopify authorization.
-    
+
     Usage:
         GET /api/shopify/oauth/authorize?shop=mystore
-    
+
     This will redirect the browser directly to Shopify's authorization page.
     """
+    user_id = current_user.id
     try:
         api_key, _ = get_shopify_credentials()
     except ValueError as e:
@@ -437,15 +440,16 @@ async def oauth_callback(
 @router.get("/status")
 async def get_oauth_status(
     shop: Optional[str] = Query(None, description="Shop domain to check"),
-    user_id: Optional[int] = Query(None, description="User ID to check stores for")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Check OAuth connection status.
-    
+
     Can check:
     - Specific shop: ?shop=mystore.myshopify.com
-    - All stores for user: ?user_id=123
+    - All stores for user: uses authenticated user
     """
+    user_id = current_user.id
     if shop:
         # Check specific shop
         store = await get_store_by_domain(shop)
@@ -473,23 +477,24 @@ async def get_oauth_status(
 @router.post("/disconnect")
 async def disconnect_store(
     shop: str = Query(..., description="Shop domain to disconnect"),
-    user_id: Optional[int] = Query(None, description="User ID for verification")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Disconnect a Shopify store.
-    
+
     This:
     1. Marks store as inactive
     2. Revokes webhooks (optional)
     3. Does NOT delete data (for GDPR we wait for shop/redact webhook)
     """
+    user_id = current_user.id
     store = await get_store_by_domain(shop)
-    
+
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    
-    # Verify ownership if user_id provided
-    if user_id and store.get("user_id") != user_id:
+
+    # Verify ownership - user must own the store
+    if store.get("user_id") != user_id:
         raise HTTPException(status_code=403, detail="Not your store")
     
     # Mark store as inactive

@@ -21,43 +21,10 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+# Import consolidated is_production from env_validator
+from ospra_os.core.env_validator import is_production
+
 logger = logging.getLogger(__name__)
-
-
-def is_production() -> bool:
-    """
-    Detect if running in production environment.
-
-    Checks multiple indicators:
-    - ENVIRONMENT env var
-    - Cloud platform detection (Render, Railway, Vercel, Heroku)
-    - DEBUG flag
-    """
-    env = os.getenv("ENVIRONMENT", "development").lower()
-
-    # Explicit environment setting
-    if env in ("production", "prod"):
-        return True
-
-    # Cloud platform detection
-    if os.getenv("RENDER", "") == "true":
-        return True
-    if os.getenv("RAILWAY_ENVIRONMENT", ""):
-        return True
-    if os.getenv("VERCEL", "") == "1":
-        return True
-    if os.getenv("HEROKU", "") == "1":
-        return True
-    if os.getenv("AWS_LAMBDA_FUNCTION_NAME", ""):
-        return True
-    if os.getenv("GOOGLE_CLOUD_PROJECT", ""):
-        return True
-
-    # Debug mode explicitly disabled
-    if os.getenv("DEBUG", "true").lower() == "false":
-        return True
-
-    return False
 
 
 def debug_endpoints_enabled() -> bool:

@@ -10,7 +10,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 
-from ospra_os.database import get_multi_store_session
+from ospra_os.database import get_db  # Use consolidated get_db
 from .ab_test_engine import ABTestEngine, TestType, TestStatus
 from .price_test_manager import PriceTestManager
 from .content_test_manager import ContentTestManager
@@ -124,13 +124,7 @@ class EndTestRequest(BaseModel):
 # DEPENDENCY INJECTION
 # ============================================================================
 
-def get_db():
-    """Get database session"""
-    db = get_multi_store_session()
-    try:
-        yield db
-    finally:
-        db.close()
+# NOTE: get_db() is imported from ospra_os.database (consolidated implementation)
 
 
 def get_ab_engine(db: Session = Depends(get_db)) -> ABTestEngine:

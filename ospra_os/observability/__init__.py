@@ -4,6 +4,18 @@ Provides centralized observability for OspraOS platform.
 """
 
 from .logger import get_logger, setup_logging, LogContext
+from .request_tracing import (
+    RequestTracingMiddleware,
+    get_request_id,
+    get_request_context,
+    TracingLogger,
+    trace_function,
+)
+from .logging_config import (
+    setup_logging as setup_structured_logging,
+    StructuredLogger,
+    log_performance,
+)
 from .error_tracking import (
     setup_sentry,
     capture_exception,
@@ -25,6 +37,16 @@ __all__ = [
     "get_logger",
     "setup_logging",
     "LogContext",
+    "setup_structured_logging",
+    "StructuredLogger",
+    "log_performance",
+
+    # Request Tracing
+    "RequestTracingMiddleware",
+    "get_request_id",
+    "get_request_context",
+    "TracingLogger",
+    "trace_function",
 
     # Error Tracking
     "setup_sentry",

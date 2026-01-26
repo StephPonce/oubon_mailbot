@@ -26,6 +26,8 @@ from ospra_os.security.webhook_verification import (
     webhook_rate_limit,
     get_webhook_status,
 )
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +39,13 @@ router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 # =============================================================================
 
 @router.get("/status")
-async def webhook_configuration_status():
+async def webhook_configuration_status(current_user: User = Depends(get_current_user)):
     """
     Get webhook configuration status.
-    
+
     Shows which providers have secrets configured.
-    
-    [WARNING] This endpoint is public for debugging.
+
+    Requires authentication.
     """
     return get_webhook_status()
 

@@ -550,7 +550,8 @@ class HealthMonitor:
                 "disk_used_percent": psutil.disk_usage('/').percent,
                 "active_connections": len(psutil.net_connections())
             }
-        except:
+        except (OSError, psutil.Error) as e:
+            logger.warning(f"Failed to get system resources: {e}")
             return {
                 "memory_used_percent": 0,
                 "cpu_used_percent": 0,

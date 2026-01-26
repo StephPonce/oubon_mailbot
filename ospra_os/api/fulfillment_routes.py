@@ -11,13 +11,16 @@ Auto-fulfillment system endpoints:
 Author: Ospra Intelligence
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import logging
 import os
 import json
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -72,23 +75,18 @@ def get_settings_file_path():
 
 
 def load_fulfillment_queue() -> List[Dict]:
-    """Load fulfillment queue from JSON"""
+    """Load fulfillment queue from JSON with file locking"""
+    from ospra_os.utils.safe_json import safe_read_json
     queue_file = get_queue_file_path()
-    if os.path.exists(queue_file):
-        try:
-            with open(queue_file, 'r') as f:
-                return json.load(f)
-        except:
-            pass
-    return []
+    return safe_read_json(queue_file, default=[])
 
 
 def save_fulfillment_queue(queue: List[Dict]):
-    """Save fulfillment queue to JSON"""
+    """Save fulfillment queue to JSON with file locking"""
+    from ospra_os.utils.safe_json import safe_write_json
     queue_file = get_queue_file_path()
-    os.makedirs(os.path.dirname(queue_file), exist_ok=True)
-    with open(queue_file, 'w') as f:
-        json.dump(queue, f, indent=2, default=str)
+    if not safe_write_json(queue_file, queue):
+        raise IOError(f"Failed to save fulfillment queue to {queue_file}")
 
 
 # ============================================================================
@@ -128,10 +126,10 @@ async def fulfillment_status():
 
 
 @router.get("/queue")
-async def get_fulfillment_queue():
+async def get_fulfillment_queue(current_user: User = Depends(get_current_user)):
     """
     Get all pending fulfillment orders.
-    
+
     Returns orders that need manual fulfillment or are awaiting tracking.
     """
     try:
@@ -158,7 +156,7 @@ async def get_fulfillment_queue():
 
 
 @router.get("/queue/stats")
-async def get_queue_stats():
+async def get_queue_stats(current_user: User = Depends(get_current_user)):
     """
     Get fulfillment queue statistics.
     """
@@ -213,10 +211,13 @@ async def get_queue_stats():
 # ============================================================================
 
 @router.post("/tracking/add")
-async def add_tracking_number(request: AddTrackingRequest):
+async def add_tracking_number(
+    request: AddTrackingRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Add tracking number to a Shopify order.
-    
+
     Creates fulfillment in Shopify and notifies customer.
     """
     try:
@@ -261,10 +262,13 @@ async def add_tracking_number(request: AddTrackingRequest):
 
 
 @router.post("/mark-fulfilled")
-async def mark_order_fulfilled(request: MarkFulfilledRequest):
+async def mark_order_fulfilled(
+    request: MarkFulfilledRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Mark a manual fulfillment order as completed.
-    
+
     Updates local queue and optionally syncs to Shopify.
     """
     try:
@@ -301,10 +305,14 @@ async def mark_order_fulfilled(request: MarkFulfilledRequest):
 # ============================================================================
 
 @router.get("/tracking/check/{supplier}/{order_id}")
-async def check_supplier_tracking(supplier: str, order_id: str):
+async def check_supplier_tracking(
+    supplier: str,
+    order_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Check tracking status from a supplier.
-    
+
     Supported suppliers:
     - cj: CJ Dropshipping order ID
     """
@@ -345,10 +353,10 @@ async def check_supplier_tracking(supplier: str, order_id: str):
 # ============================================================================
 
 @router.post("/sync-tracking")
-async def sync_all_tracking():
+async def sync_all_tracking(current_user: User = Depends(get_current_user)):
     """
     Sync tracking numbers from all suppliers.
-    
+
     Checks CJ Dropshipping orders for tracking updates.
     """
     try:
@@ -423,7 +431,7 @@ async def sync_all_tracking():
 # ============================================================================
 
 @router.get("/settings")
-async def get_fulfillment_settings():
+async def get_fulfillment_settings(current_user: User = Depends(get_current_user)):
     """Get current fulfillment automation settings"""
     settings_file = get_settings_file_path()
     
@@ -434,18 +442,15 @@ async def get_fulfillment_settings():
         "fallback_to_manual": True
     }
     
-    if os.path.exists(settings_file):
-        try:
-            with open(settings_file, 'r') as f:
-                return json.load(f)
-        except:
-            pass
-    
-    return default_settings
+    from ospra_os.utils.safe_json import safe_read_json
+    return safe_read_json(settings_file, default=default_settings)
 
 
 @router.post("/settings")
-async def update_fulfillment_settings(settings: FulfillmentSettings):
+async def update_fulfillment_settings(
+    settings: FulfillmentSettings,
+    current_user: User = Depends(get_current_user)
+):
     """Update fulfillment automation settings"""
     settings_file = get_settings_file_path()
     
@@ -471,11 +476,12 @@ async def add_to_queue(
     product_name: str,
     supplier_url: str,
     quantity: int = 1,
-    shipping_address: Optional[str] = None
+    shipping_address: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
 ):
     """
     Manually add an order to the fulfillment queue.
-    
+
     Useful for testing or manual order processing.
     """
     try:
@@ -507,7 +513,10 @@ async def add_to_queue(
 
 
 @router.delete("/queue/{shopify_order_id}")
-async def remove_from_queue(shopify_order_id: str):
+async def remove_from_queue(
+    shopify_order_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Remove an order from the fulfillment queue.
     """

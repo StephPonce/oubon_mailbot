@@ -298,37 +298,46 @@ async def get_action_stats(
 
     Returns counts of actions by status and average confidence.
     """
-    actions = db.query(Action).filter(Action.user_id == current_user.id).all()
+    # Use aggregation instead of loading all records into memory
+    from sqlalchemy import func
 
+    # Get counts by status using SQL aggregation
+    status_counts = db.query(
+        Action.status,
+        func.count(Action.id)
+    ).filter(
+        Action.user_id == current_user.id
+    ).group_by(Action.status).all()
+
+    # Get average confidence
+    avg_confidence = db.query(
+        func.avg(Action.confidence)
+    ).filter(
+        Action.user_id == current_user.id
+    ).scalar() or 0.0
+
+    # Build stats from aggregation results (efficient - no loading all records)
     stats = {
         "pending": 0,
         "approved": 0,
         "executed": 0,
         "skipped": 0,
         "failed": 0,
-        "avg_confidence": 0.0
+        "avg_confidence": float(avg_confidence)
     }
 
-    if not actions:
-        return ActionStatsResponse(**stats)
-
-    # Count by status
-    for action in actions:
-        if action.status == AIActionStatus.PENDING:
-            stats["pending"] += 1
-        elif action.status == AIActionStatus.APPROVED:
-            stats["approved"] += 1
-        elif action.status == AIActionStatus.EXECUTED:
-            stats["executed"] += 1
-        elif action.status == AIActionStatus.SKIPPED:
-            stats["skipped"] += 1
-        elif action.status == AIActionStatus.FAILED:
-            stats["failed"] += 1
-
-    # Calculate average confidence of pending actions
-    pending_actions = [a for a in actions if a.status == AIActionStatus.PENDING]
-    if pending_actions:
-        stats["avg_confidence"] = sum(a.confidence for a in pending_actions) / len(pending_actions)
+    # Map status enum values to stats keys
+    for status, count in status_counts:
+        if status == AIActionStatus.PENDING:
+            stats["pending"] = count
+        elif status == AIActionStatus.APPROVED:
+            stats["approved"] = count
+        elif status == AIActionStatus.EXECUTED:
+            stats["executed"] = count
+        elif status == AIActionStatus.SKIPPED:
+            stats["skipped"] = count
+        elif status == AIActionStatus.FAILED:
+            stats["failed"] = count
 
     return ActionStatsResponse(**stats)
 

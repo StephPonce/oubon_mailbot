@@ -4,6 +4,9 @@ WooCommerce Integration - Universal OAuth
 
 No app registration needed. Works with ANY WooCommerce store.
 Users authorize directly on their own WordPress site.
+
+SECURITY: All user-specific endpoints require JWT authentication.
+User ID is extracted from verified JWT tokens, not query parameters.
 """
 
 import os
@@ -19,6 +22,9 @@ from dotenv import load_dotenv
 import httpx
 import base64
 
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
+
 load_dotenv()
 
 router = APIRouter(prefix="/api/woocommerce", tags=["WooCommerce"])
@@ -32,10 +38,12 @@ APP_URL = os.getenv("APP_URL", "http://localhost:5173")
 CALLBACK_URL = os.getenv("WOOCOMMERCE_CALLBACK_URL", "http://localhost:8001/api/woocommerce/oauth/callback")
 
 # OAuth state storage (use Redis in production)
+# Maps state token -> {user_id, store_url, created_at}
 _oauth_states: Dict[str, Dict[str, Any]] = {}
 
 # Connected stores (use database in production)
-_connected_stores: Dict[str, Dict[str, Any]] = {}
+# Maps user_id -> {store_id -> store_data}
+_connected_stores: Dict[int, Dict[str, Dict[str, Any]]] = {}
 
 # ============================================================================
 # MODELS
@@ -177,11 +185,17 @@ def get_full_url(url: str) -> str:
 # ============================================================================
 
 @router.get("/stores")
-async def list_stores():
-    """List connected WooCommerce stores."""
+async def list_stores(current_user: User = Depends(get_current_user)):
+    """
+    List connected WooCommerce stores for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    """
+    user_id = current_user.id
     stores = []
-    
-    for store_id, store_data in _connected_stores.items():
+
+    user_stores = _connected_stores.get(user_id, {})
+    for store_id, store_data in user_stores.items():
         stores.append({
             "id": store_id,
             "store_name": store_data.get("store_name", store_id),
@@ -191,36 +205,46 @@ async def list_stores():
             "platform": "woocommerce",
             "connected_at": store_data.get("connected_at"),
         })
-    
+
     return {"success": True, "stores": stores, "count": len(stores)}
 
 
 @router.post("/connect")
-async def connect_store(request: ConnectStoreRequest):
-    """Initiate WooCommerce OAuth flow."""
+async def connect_store(
+    request: ConnectStoreRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Initiate WooCommerce OAuth flow for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token and stored with OAuth state.
+    """
+    user_id = current_user.id
     store_url = request.store_url.strip()
     full_url = get_full_url(store_url)
-    
+
     # Generate unique state
     state = secrets.token_urlsafe(32)
-    
+
+    # Store user_id with the OAuth state for callback verification
     _oauth_states[state] = {
+        "user_id": user_id,
         "store_url": full_url,
         "created_at": datetime.utcnow().isoformat(),
     }
-    
+
     # WooCommerce OAuth endpoint
     # Docs: https://woocommerce.github.io/woocommerce-rest-api-docs/#authentication
     auth_params = {
         "app_name": APP_NAME,
         "scope": "read_write",  # read, write, or read_write
-        "user_id": state,  # We use state as user_id for simplicity
+        "user_id": state,  # We use state as user_id for simplicity (WC requires this param)
         "return_url": f"{APP_URL}?wc_connected=true",
         "callback_url": CALLBACK_URL,
     }
-    
+
     auth_url = f"{full_url}/wc-auth/v1/authorize?{urlencode(auth_params)}"
-    
+
     return {
         "success": True,
         "oauth_required": True,
@@ -234,46 +258,59 @@ async def oauth_callback(request: Request):
     """
     WooCommerce OAuth callback.
     WooCommerce POSTs the credentials to this endpoint.
+
+    NOTE: This is a server-to-server callback from WooCommerce.
+    User authentication is verified via the state token that was
+    created during the /connect call (which required auth).
     """
     try:
         body = await request.json()
     except:
         body = {}
-    
-    # WooCommerce sends: user_id (our state), consumer_key, consumer_secret
-    user_id = body.get("user_id")  # This is our state
+
+    # WooCommerce sends: user_id (our state token), consumer_key, consumer_secret
+    state_token = body.get("user_id")  # This is our state token
     consumer_key = body.get("consumer_key")
     consumer_secret = body.get("consumer_secret")
-    
-    if not all([user_id, consumer_key, consumer_secret]):
+
+    if not all([state_token, consumer_key, consumer_secret]):
         return {"success": False, "error": "Missing credentials"}
-    
-    # Verify state
-    if user_id not in _oauth_states:
+
+    # Verify state and get associated user_id
+    if state_token not in _oauth_states:
         return {"success": False, "error": "Invalid or expired state"}
-    
-    state_data = _oauth_states.pop(user_id)
+
+    state_data = _oauth_states.pop(state_token)
     store_url = state_data.get("store_url")
-    
+    user_id = state_data.get("user_id")  # The actual user ID from when /connect was called
+
+    if not user_id:
+        return {"success": False, "error": "Invalid state data - missing user"}
+
     # Test the connection and get store info
     try:
         client = WooCommerceClient(store_url, consumer_key, consumer_secret)
         store_info = await client.get_store_info()
-        
+
         store_name = store_info.get("environment", {}).get("site_url", store_url)
         # Clean up store name
         store_name = store_name.replace("https://", "").replace("http://", "").rstrip("/")
-        
+
         currency = store_info.get("settings", {}).get("currency", "USD")
-        
+
     except Exception as e:
         # Still save, but with limited info
         store_name = normalize_store_url(store_url)
         currency = "USD"
-    
-    # Store the connection
+
+    # Store the connection for the authenticated user
     store_id = normalize_store_url(store_url)
-    _connected_stores[store_id] = {
+
+    # Initialize user's store dict if needed
+    if user_id not in _connected_stores:
+        _connected_stores[user_id] = {}
+
+    _connected_stores[user_id][store_id] = {
         "store_name": store_name,
         "store_url": store_url,
         "consumer_key": consumer_key,
@@ -281,20 +318,26 @@ async def oauth_callback(request: Request):
         "currency": currency,
         "connected_at": datetime.utcnow().isoformat(),
     }
-    
+
     return {"success": True, "message": "Store connected successfully"}
 
 
 @router.get("/oauth/callback")
 async def oauth_callback_get(
     success: str = Query(None),
-    user_id: str = Query(None),
+    # NOTE: WooCommerce sends back 'user_id' which is actually our state token.
+    # We rename it to avoid confusion - this is NOT our internal user ID.
+    state_token: str = Query(None, alias="user_id"),
 ):
     """
     Handle GET callback (some WooCommerce versions redirect with GET).
+
+    NOTE: This endpoint just handles the redirect back to the frontend.
+    The actual credential exchange happens via POST to /oauth/callback.
+    The 'user_id' param from WooCommerce is our state token, not a user ID.
     """
     frontend_url = APP_URL
-    
+
     if success == "1" or success == "true":
         return RedirectResponse(url=f"{frontend_url}?wc_connected=true")
     else:
@@ -302,28 +345,49 @@ async def oauth_callback_get(
 
 
 @router.delete("/stores/{store_id:path}")
-async def disconnect_store(store_id: str):
-    """Disconnect a WooCommerce store."""
+async def disconnect_store(
+    store_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Disconnect a WooCommerce store for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    Users can only disconnect their own stores.
+    """
+    user_id = current_user.id
+
     # URL decode the store_id
     store_id = store_id.replace("%2F", "/").replace("%3A", ":")
     normalized = normalize_store_url(store_id)
-    
-    if normalized in _connected_stores:
-        del _connected_stores[normalized]
+
+    user_stores = _connected_stores.get(user_id, {})
+    if normalized in user_stores:
+        del _connected_stores[user_id][normalized]
         return {"success": True, "message": "Store disconnected"}
-    
+
     raise HTTPException(status_code=404, detail="Store not found")
 
 
 @router.get("/stores/{store_id:path}/stats")
-async def get_store_stats(store_id: str):
-    """Get WooCommerce store statistics."""
+async def get_store_stats(
+    store_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get WooCommerce store statistics for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    Users can only access their own stores.
+    """
+    user_id = current_user.id
     normalized = normalize_store_url(store_id)
-    
-    if normalized not in _connected_stores:
+
+    user_stores = _connected_stores.get(user_id, {})
+    if normalized not in user_stores:
         raise HTTPException(status_code=404, detail="Store not found")
-    
-    store = _connected_stores[normalized]
+
+    store = user_stores[normalized]
     client = WooCommerceClient(
         store["store_url"],
         store["consumer_key"],
@@ -380,14 +444,26 @@ async def get_store_stats(store_id: str):
 
 
 @router.get("/stores/{store_id:path}/products")
-async def get_products(store_id: str, per_page: int = Query(50, ge=1, le=100), page: int = Query(1, ge=1)):
-    """Get products from WooCommerce store."""
+async def get_products(
+    store_id: str,
+    per_page: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get products from WooCommerce store for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    Users can only access their own stores.
+    """
+    user_id = current_user.id
     normalized = normalize_store_url(store_id)
-    
-    if normalized not in _connected_stores:
+
+    user_stores = _connected_stores.get(user_id, {})
+    if normalized not in user_stores:
         raise HTTPException(status_code=404, detail="Store not found")
-    
-    store = _connected_stores[normalized]
+
+    store = user_stores[normalized]
     client = WooCommerceClient(
         store["store_url"],
         store["consumer_key"],
@@ -420,14 +496,26 @@ async def get_products(store_id: str, per_page: int = Query(50, ge=1, le=100), p
 
 
 @router.get("/stores/{store_id:path}/orders")
-async def get_orders(store_id: str, per_page: int = Query(50, ge=1, le=100), page: int = Query(1, ge=1)):
-    """Get orders from WooCommerce store."""
+async def get_orders(
+    store_id: str,
+    per_page: int = Query(50, ge=1, le=100),
+    page: int = Query(1, ge=1),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get orders from WooCommerce store for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    Users can only access their own stores.
+    """
+    user_id = current_user.id
     normalized = normalize_store_url(store_id)
-    
-    if normalized not in _connected_stores:
+
+    user_stores = _connected_stores.get(user_id, {})
+    if normalized not in user_stores:
         raise HTTPException(status_code=404, detail="Store not found")
-    
-    store = _connected_stores[normalized]
+
+    store = user_stores[normalized]
     client = WooCommerceClient(
         store["store_url"],
         store["consumer_key"],
@@ -459,14 +547,25 @@ async def get_orders(store_id: str, per_page: int = Query(50, ge=1, le=100), pag
 
 
 @router.post("/stores/{store_id:path}/products")
-async def create_product(store_id: str, request: Request):
-    """Create a product in WooCommerce store."""
+async def create_product(
+    store_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a product in WooCommerce store for the authenticated user.
+
+    SECURITY: User ID is extracted from JWT token, not query params.
+    Users can only create products in their own stores.
+    """
+    user_id = current_user.id
     normalized = normalize_store_url(store_id)
-    
-    if normalized not in _connected_stores:
+
+    user_stores = _connected_stores.get(user_id, {})
+    if normalized not in user_stores:
         raise HTTPException(status_code=404, detail="Store not found")
-    
-    store = _connected_stores[normalized]
+
+    store = user_stores[normalized]
     client = WooCommerceClient(
         store["store_url"],
         store["consumer_key"],

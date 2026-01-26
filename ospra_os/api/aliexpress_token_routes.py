@@ -80,24 +80,21 @@ async def get_token_status():
 
 @router.get("/debug/env")
 async def debug_environment():
-    """DEBUG: Check environment variable configuration"""
+    """
+    DEBUG: Check environment variable configuration.
+
+    SECURITY: This endpoint only reports whether secrets exist, NOT their values.
+    Blocked in production by DebugEndpointProtectionMiddleware.
+    """
     import os
 
-    dropship_secret = os.getenv("ALIEXPRESS_APP_SECRET") or os.getenv("OUBONSHOP_ALIEXPRESS_APP_SECRET", "idjX6tOzHx6urVsSylVzEcHZKwBN4YhN")
-    affiliate_secret = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "9Kkt2Mn5icXLV7fShLfT38OarpjXqtrL")
-
+    # SECURITY: Never expose actual secret values - only existence check
     return JSONResponse({
         "env_vars": {
-            "ALIEXPRESS_APP_SECRET_exists": bool(os.getenv("ALIEXPRESS_APP_SECRET")),
-            "OUBONSHOP_ALIEXPRESS_APP_SECRET_exists": bool(os.getenv("OUBONSHOP_ALIEXPRESS_APP_SECRET")),
-            "ALIEXPRESS_AFFILIATE_APP_SECRET_exists": bool(os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET")),
+            "ALIEXPRESS_APP_SECRET_configured": bool(os.getenv("ALIEXPRESS_APP_SECRET")),
+            "ALIEXPRESS_AFFILIATE_APP_SECRET_configured": bool(os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET")),
         },
-        "computed_secrets": {
-            "dropship_secret_preview": dropship_secret[:20] + "..." if dropship_secret else "MISSING",
-            "affiliate_secret_preview": affiliate_secret[:20] + "..." if affiliate_secret else "MISSING",
-            "dropship_matches_expected": dropship_secret.startswith("idjX6tOzHx6urVsSylVz") if dropship_secret else False,
-            "affiliate_matches_expected": affiliate_secret.startswith("9Kkt2Mn5icXLV7fShLfT") if affiliate_secret else False,
-        }
+        "message": "Use environment variables to configure secrets. Never hardcode them."
     })
 
 

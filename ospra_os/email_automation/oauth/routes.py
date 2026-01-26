@@ -5,10 +5,13 @@ FastAPI endpoints for multi-provider email OAuth flow and account management.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel
 import secrets
 from datetime import datetime
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 from .gmail_oauth import GmailOAuthHandler
 from .outlook_oauth import OutlookOAuthHandler
@@ -103,7 +106,7 @@ def get_oauth_handler(provider: str):
 @router.get("/{provider}/connect", response_model=OAuthUrlResponse)
 async def connect_email_provider(
     provider: str,
-    user_id: int = Query(..., description="User ID connecting email account")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Start OAuth flow for email provider.
@@ -116,6 +119,7 @@ async def connect_email_provider(
     Returns:
         Authorization URL and state parameter for OAuth flow
     """
+    user_id = current_user.id
     handler = get_oauth_handler(provider)
 
     # Generate CSRF state token
@@ -146,7 +150,7 @@ async def connect_email_provider(
 async def connect_imap_smtp_provider(
     provider: str,
     credentials: IMAPSMTPCredentials,
-    user_id: int = Query(..., description="User ID connecting email account")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Connect IMAP/SMTP email provider (iCloud, Yahoo, Zoho, custom).
@@ -164,6 +168,7 @@ async def connect_imap_smtp_provider(
     Returns:
         Success message and email account details
     """
+    user_id = current_user.id
     handler = IMAPSMTPHandler()
 
     # Get preset configuration if using preset
@@ -359,7 +364,7 @@ async def email_oauth_callback(
 
 @router.get("/accounts", response_model=List[EmailAccountResponse])
 async def get_user_email_accounts(
-    user_id: int = Query(..., description="User ID to fetch accounts for")
+    current_user: User = Depends(get_current_user)
 ):
     """
     List all email accounts for a user.
@@ -370,6 +375,7 @@ async def get_user_email_accounts(
     Returns:
         List of connected email accounts
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -398,7 +404,7 @@ async def get_user_email_accounts(
 @router.delete("/accounts/{account_id}")
 async def delete_email_account(
     account_id: int,
-    user_id: int = Query(..., description="User ID (for authorization)")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Permanently delete an email account.
@@ -409,6 +415,7 @@ async def delete_email_account(
     Returns:
         Success confirmation
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
@@ -454,7 +461,7 @@ async def delete_email_account(
 @router.post("/accounts/{account_id}/set-primary")
 async def set_primary_email(
     account_id: int,
-    user_id: int = Query(..., description="User ID (for authorization)")
+    current_user: User = Depends(get_current_user)
 ):
     """
     Set an email account as primary.
@@ -465,6 +472,7 @@ async def set_primary_email(
     Returns:
         Success confirmation
     """
+    user_id = current_user.id
     session = get_multi_store_session()
 
     try:
