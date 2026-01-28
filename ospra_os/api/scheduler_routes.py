@@ -3,6 +3,9 @@ SCHEDULER STATUS API ROUTES
 ===========================
 
 Endpoints for checking scheduler status and running jobs manually.
+
+SECURITY: All endpoints require JWT authentication.
+User ID is extracted from the authenticated user, not request parameters.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -12,6 +15,8 @@ from pydantic import BaseModel
 
 from ospra_os.core.tiers import SubscriptionTier
 from ospra_os.middleware.rate_limiter import check_discovery_rate_limit, record_discovery
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 
 router = APIRouter(prefix="/api/scheduler", tags=["Scheduler"])
@@ -34,14 +39,16 @@ class SchedulerStatusResponse(BaseModel):
 
 
 @router.get("/status", response_model=SchedulerStatusResponse)
-async def get_scheduler_status():
+async def get_scheduler_status(current_user: User = Depends(get_current_user)):
     """
     Get status of all scheduled background jobs.
-    
+
     Shows:
     - Which jobs are scheduled
     - When they'll next run
     - Whether scheduler is running
+
+    SECURITY: Requires JWT authentication.
     """
     jobs = []
     running = False
@@ -112,27 +119,28 @@ async def get_scheduler_status():
 
 @router.post("/run/discovery")
 async def run_discovery_now(
-    user_id: int = 1,
-    tier: str = "stratosphere",
+    current_user: User = Depends(get_current_user),
     on_demand: bool = True
 ):
     """
     Manually trigger product discovery.
-    
+
     Respects tier rate limits unless on_demand=True (Stratosphere only).
+
+    SECURITY: Requires JWT authentication.
+    User ID and tier are extracted from authenticated user.
     """
-    try:
-        tier_enum = SubscriptionTier(tier.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid tier: {tier}")
-    
+    # SECURITY: Get user_id and tier from authenticated user, not request params
+    user_id = current_user.id
+    tier_enum = current_user.subscription_tier
+
     # Check rate limit
     rate_check = await check_discovery_rate_limit(
         user_id=user_id,
         tier=tier_enum,
         on_demand=on_demand
     )
-    
+
     if not rate_check["allowed"]:
         raise HTTPException(
             status_code=429,
@@ -142,40 +150,42 @@ async def run_discovery_now(
                 "upgrade_message": rate_check.get("upgrade_message")
             }
         )
-    
+
     # Run discovery
     try:
         from ospra_os.background_jobs.scheduler_integration import get_auto_discovery_job
         discovery_job = get_auto_discovery_job()
-        
+
         if not discovery_job:
             raise HTTPException(
                 status_code=503,
                 detail="Discovery scheduler not initialized"
             )
-        
-        # Run for user
+
+        # Run for authenticated user
         result = await discovery_job.run_discovery_for_user(user_id=user_id)
-        
+
         # Record the request
         record_discovery(user_id)
-        
+
         return {
             "success": True,
             "result": result,
             "triggered_at": datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail="Scheduler operation failed. Please try again.")
 
 
 @router.post("/run/grading")
-async def run_product_grading():
+async def run_product_grading(current_user: User = Depends(get_current_user)):
     """
     Manually trigger product grading.
-    
+
     Updates AI scores for all products.
+
+    SECURITY: Requires JWT authentication.
     """
     try:
         from ospra_os.background_jobs.intelligence_scheduler import get_intelligence_scheduler
@@ -200,41 +210,47 @@ async def run_product_grading():
 
 
 @router.post("/run/briefing")
-async def run_morning_briefing(user_id: int = 1):
+async def run_morning_briefing(current_user: User = Depends(get_current_user)):
     """
     Manually trigger morning briefing generation.
-    
-    Creates AI briefing for specified user.
+
+    Creates AI briefing for authenticated user.
+
+    SECURITY: Requires JWT authentication.
+    User ID is extracted from authenticated user.
     """
     try:
         from ospra_os.background_jobs.intelligence_scheduler import get_intelligence_scheduler
         scheduler = get_intelligence_scheduler()
-        
+
         if not scheduler:
             raise HTTPException(
                 status_code=503,
                 detail="Intelligence scheduler not initialized"
             )
-        
+
+        # SECURITY: Use authenticated user's ID
         await scheduler.generate_morning_briefings()
-        
+
         return {
             "success": True,
             "message": "Morning briefing generated",
-            "user_id": user_id,
+            "user_id": current_user.id,
             "triggered_at": datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail="Scheduler operation failed. Please try again.")
 
 
 @router.get("/config")
-async def get_scheduler_config():
+async def get_scheduler_config(current_user: User = Depends(get_current_user)):
     """
     Get scheduler configuration.
-    
+
     Shows what jobs run and when.
+
+    SECURITY: Requires JWT authentication.
     """
     return {
         "intelligence_jobs": {

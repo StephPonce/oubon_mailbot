@@ -3,9 +3,11 @@ SMART CACHE API ROUTES
 ======================
 
 Endpoints for managing and monitoring the smart sentiment cache.
+
+SECURITY: All endpoints require JWT authentication.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -13,6 +15,8 @@ from ospra_os.intelligence.smart_sentiment_cache import (
     get_sentiment_cache,
     get_cached_or_fetch_sentiment
 )
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 router = APIRouter(prefix="/api/cache", tags=["Smart Cache"])
 
@@ -26,10 +30,10 @@ class RefreshRequest(BaseModel):
 
 
 @router.get("/sentiment/stats")
-async def get_cache_stats():
+async def get_cache_stats(current_user: User = Depends(get_current_user)):
     """
     Get sentiment cache statistics.
-    
+
     Returns:
     - Hit/miss counts
     - Hit rate percentage
@@ -38,7 +42,7 @@ async def get_cache_stats():
     """
     cache = get_sentiment_cache()
     stats = cache.get_stats()
-    
+
     return {
         "success": True,
         "stats": stats
@@ -46,15 +50,18 @@ async def get_cache_stats():
 
 
 @router.get("/sentiment/{product_id}")
-async def get_cached_sentiment(product_id: str):
+async def get_cached_sentiment(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Get cached sentiment for a product (if available).
-    
+
     Returns cached data or null if not in cache.
     """
     cache = get_sentiment_cache()
     cached = cache.get(product_id)
-    
+
     if cached:
         return {
             "success": True,
@@ -70,10 +77,13 @@ async def get_cached_sentiment(product_id: str):
 
 
 @router.post("/sentiment/should-refresh")
-async def check_should_refresh(request: RefreshRequest):
+async def check_should_refresh(
+    request: RefreshRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Check if sentiment cache should be refreshed for a product.
-    
+
     Takes into account:
     - Cache expiry
     - Velocity changes
@@ -81,7 +91,7 @@ async def check_should_refresh(request: RefreshRequest):
     - Manual refresh cooldown
     """
     cache = get_sentiment_cache()
-    
+
     should_refresh, reason = cache.should_refresh(
         product_id=request.product_id,
         current_velocity=request.current_velocity,
@@ -89,7 +99,7 @@ async def check_should_refresh(request: RefreshRequest):
         manual=request.manual,
         sources=request.sources
     )
-    
+
     return {
         "success": True,
         "should_refresh": should_refresh,
@@ -98,13 +108,16 @@ async def check_should_refresh(request: RefreshRequest):
 
 
 @router.delete("/sentiment/{product_id}")
-async def invalidate_cached_sentiment(product_id: str):
+async def invalidate_cached_sentiment(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Invalidate (delete) cached sentiment for a product.
     """
     cache = get_sentiment_cache()
     cache.invalidate(product_id)
-    
+
     return {
         "success": True,
         "message": f"Cache invalidated for {product_id}"
@@ -112,15 +125,15 @@ async def invalidate_cached_sentiment(product_id: str):
 
 
 @router.delete("/sentiment")
-async def clear_all_cache():
+async def clear_all_cache(current_user: User = Depends(get_current_user)):
     """
     Clear the entire sentiment cache.
-    
+
     [WARNING] Use with caution - forces re-fetch of all sentiment data.
     """
     cache = get_sentiment_cache()
     cache.invalidate_all()
-    
+
     return {
         "success": True,
         "message": "All sentiment cache cleared"
@@ -128,15 +141,15 @@ async def clear_all_cache():
 
 
 @router.get("/sentiment/all")
-async def get_all_cached():
+async def get_all_cached(current_user: User = Depends(get_current_user)):
     """
     Get all cached items (for debugging).
-    
+
     Returns list of all cached sentiments with metadata.
     """
     cache = get_sentiment_cache()
     items = cache.get_all_cached()
-    
+
     return {
         "success": True,
         "count": len(items),

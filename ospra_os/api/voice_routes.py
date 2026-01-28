@@ -14,8 +14,13 @@ Features:
 - Command interpretation via Claude AI
 - Text-to-speech responses
 - User context integration (revenue, orders, pending actions)
+
+SECURITY:
+- All endpoints require JWT authentication
+- File uploads validated for size, format, and content type
 """
 
+import logging
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -27,7 +32,130 @@ from ospra_os.database import get_db, User
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.voice.voice_processor import VoiceProcessor, TextToSpeech
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/voice", tags=["voice"])
+
+# ============================================================
+# Security Constants for File Upload Validation
+# ============================================================
+
+# Maximum file size: 25MB (Whisper API limit)
+MAX_AUDIO_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
+
+# Allowed audio formats with their MIME types
+ALLOWED_AUDIO_FORMATS = {
+    "webm": ["audio/webm", "video/webm"],
+    "mp3": ["audio/mpeg", "audio/mp3"],
+    "wav": ["audio/wav", "audio/x-wav", "audio/wave"],
+    "m4a": ["audio/m4a", "audio/x-m4a", "audio/mp4"],
+    "ogg": ["audio/ogg", "application/ogg"],
+}
+
+# Magic bytes for audio format detection
+AUDIO_MAGIC_BYTES = {
+    "mp3": [b"\xff\xfb", b"\xff\xfa", b"\xff\xf3", b"\x49\x44\x33"],  # MP3 frame sync + ID3 tag
+    "wav": [b"RIFF"],
+    "ogg": [b"OggS"],
+    "webm": [b"\x1a\x45\xdf\xa3"],  # EBML header
+    "m4a": [b"\x00\x00\x00", b"ftyp"],  # ftyp box (may have variable offset)
+}
+
+
+async def validate_audio_upload(audio: UploadFile) -> tuple[bytes, str]:
+    """
+    Validate uploaded audio file for security.
+
+    Checks:
+    1. File size within limits
+    2. File extension is allowed
+    3. MIME type matches expected format
+    4. Basic magic byte verification
+
+    Returns:
+        (audio_data, file_extension)
+
+    Raises:
+        HTTPException if validation fails
+    """
+    # Extract file extension
+    filename = audio.filename or "audio.webm"
+    file_ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "webm"
+
+    # Check file extension is allowed
+    if file_ext not in ALLOWED_AUDIO_FORMATS:
+        logger.warning(f"[SECURITY] Rejected audio upload with invalid extension: {file_ext}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported audio format: {file_ext}. Allowed formats: {', '.join(ALLOWED_AUDIO_FORMATS.keys())}"
+        )
+
+    # Validate MIME type if provided
+    if audio.content_type:
+        expected_mimes = ALLOWED_AUDIO_FORMATS[file_ext]
+        # Allow application/octet-stream as browsers sometimes send this
+        if audio.content_type not in expected_mimes and audio.content_type != "application/octet-stream":
+            logger.warning(
+                f"[SECURITY] MIME type mismatch: got {audio.content_type}, "
+                f"expected one of {expected_mimes} for .{file_ext}"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Content type {audio.content_type} does not match file extension .{file_ext}"
+            )
+
+    # Read file data with size limit check
+    audio_data = b""
+    chunk_size = 1024 * 1024  # Read 1MB at a time
+
+    try:
+        while True:
+            chunk = await audio.read(chunk_size)
+            if not chunk:
+                break
+            audio_data += chunk
+
+            # Check size limit during read to fail fast
+            if len(audio_data) > MAX_AUDIO_FILE_SIZE:
+                logger.warning(f"[SECURITY] Rejected oversized audio upload: >{MAX_AUDIO_FILE_SIZE} bytes")
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Audio file too large. Maximum size: {MAX_AUDIO_FILE_SIZE // (1024*1024)}MB"
+                )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[SECURITY] Error reading uploaded file: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to read uploaded file"
+        )
+
+    # Check for empty file
+    if len(audio_data) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audio file is empty"
+        )
+
+    # Basic magic byte verification (non-blocking warning)
+    # Some formats have variable headers, so we just log suspicious files
+    magic_patterns = AUDIO_MAGIC_BYTES.get(file_ext, [])
+    if magic_patterns:
+        header = audio_data[:12]  # Check first 12 bytes
+        matches_any = any(
+            header.startswith(pattern) or pattern in header[:12]
+            for pattern in magic_patterns
+        )
+        if not matches_any and file_ext not in ["m4a"]:  # m4a has variable offset
+            logger.warning(
+                f"[SECURITY] Audio file header doesn't match expected format .{file_ext}. "
+                f"Header bytes: {header[:8].hex()}"
+            )
+            # Don't reject - let Whisper API handle format validation
+            # This is just a warning for monitoring
+
+    return audio_data, file_ext
 
 # ============================================================
 # Request/Response Models
@@ -112,7 +240,7 @@ def _get_user_context(db: Session, user_id: int) -> Dict[str, Any]:
 
 @router.post("/transcribe", response_model=TranscribeResponse)
 async def transcribe_audio(
-    audio: UploadFile = File(..., description="Audio file to transcribe (webm, mp3, wav, m4a)"),
+    audio: UploadFile = File(..., description="Audio file to transcribe (webm, mp3, wav, m4a, ogg). Max 25MB."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -120,29 +248,16 @@ async def transcribe_audio(
     Transcribe audio to text using Whisper API
 
     Accepts audio formats: webm, mp3, wav, m4a, ogg
+    Maximum file size: 25MB
     Returns the transcribed text without processing as a command.
+
+    SECURITY: File uploads are validated for size, format, and MIME type.
     """
     start_time = datetime.utcnow()
 
-    # Validate file format
-    allowed_formats = ["webm", "mp3", "wav", "m4a", "ogg"]
-    file_ext = audio.filename.split(".")[-1].lower() if "." in audio.filename else "webm"
-
-    if file_ext not in allowed_formats:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported audio format: {file_ext}. Allowed: {', '.join(allowed_formats)}"
-        )
-
     try:
-        # Read audio data
-        audio_data = await audio.read()
-
-        if len(audio_data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Audio file is empty"
-            )
+        # SECURITY: Validate uploaded file (size, format, MIME type, magic bytes)
+        audio_data, file_ext = await validate_audio_upload(audio)
 
         # Transcribe
         processor = VoiceProcessor()
@@ -155,12 +270,15 @@ async def transcribe_audio(
             duration_ms=duration_ms
         )
 
+    except HTTPException:
+        raise
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Voice processor initialization failed. Please try again."
         )
     except Exception as e:
+        logger.error(f"Transcription error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Transcription failed. Please try again."
@@ -168,7 +286,7 @@ async def transcribe_audio(
 
 @router.post("/command", response_model=CommandResponse)
 async def process_voice_command(
-    audio: UploadFile = File(..., description="Audio file with voice command"),
+    audio: UploadFile = File(..., description="Audio file with voice command (webm, mp3, wav, m4a, ogg). Max 25MB."),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -181,34 +299,22 @@ async def process_voice_command(
     3. Execute command (query data, navigate, change settings)
     4. Return response with action to take
 
+    Maximum file size: 25MB
+
     Supported commands:
     - "What's my revenue today?"
     - "Show pending actions"
     - "Enable auto-pilot"
     - "Approve all high-confidence actions"
     - "Go to dashboard"
+
+    SECURITY: File uploads are validated for size, format, and MIME type.
     """
     start_time = datetime.utcnow()
 
-    # Validate file format
-    allowed_formats = ["webm", "mp3", "wav", "m4a", "ogg"]
-    file_ext = audio.filename.split(".")[-1].lower() if "." in audio.filename else "webm"
-
-    if file_ext not in allowed_formats:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported audio format: {file_ext}"
-        )
-
     try:
-        # Read audio data
-        audio_data = await audio.read()
-
-        if len(audio_data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Audio file is empty"
-            )
+        # SECURITY: Validate uploaded file (size, format, MIME type, magic bytes)
+        audio_data, file_ext = await validate_audio_upload(audio)
 
         # Transcribe
         processor = VoiceProcessor()
@@ -232,12 +338,15 @@ async def process_voice_command(
             duration_ms=duration_ms
         )
 
+    except HTTPException:
+        raise
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Voice processor initialization failed. Please try again."
         )
     except Exception as e:
+        logger.error(f"Command processing error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Command processing failed. Please try again."

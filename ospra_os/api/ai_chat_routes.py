@@ -6,13 +6,19 @@ Provides unified AI chat endpoints:
 - POST /api/claude/chat
 
 Both route to the Claude AI chat response system with learning context.
+
+SECURITY: All endpoints require JWT authentication.
+User ID is extracted from the authenticated user, not request body.
 """
 
 import logging
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, List, Any
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +32,7 @@ class ChatRequest(BaseModel):
     message: str
     context: Optional[Dict[str, Any]] = None
     dashboard_context: Optional[Dict[str, Any]] = None  # Alternative name
-    user_id: int = 1
+    # SECURITY: user_id removed - extracted from JWT token instead
     conversation_history: Optional[List[Dict[str, str]]] = None
 
 
@@ -41,7 +47,10 @@ class ChatResponse(BaseModel):
 # ============================================
 
 @router.post("/ai/chat", response_model=ChatResponse)
-async def ai_chat(request: ChatRequest):
+async def ai_chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     AI Chat endpoint using Claude
 
@@ -51,7 +60,6 @@ async def ai_chat(request: ChatRequest):
         {
             "message": "What products should I sell?",
             "context": {...},  # Optional business context
-            "user_id": 1,
             "conversation_history": [...]  # Optional previous messages
         }
 
@@ -76,11 +84,14 @@ async def ai_chat(request: ChatRequest):
                 detail="Claude AI is not available. Please check ANTHROPIC_API_KEY is set."
             )
 
+        # SECURITY: Use authenticated user's ID instead of request body
+        user_id = current_user.id
+
         # Build learning context (provides unlimited historical knowledge)
         learning_context = None
         try:
             learning_context = build_claude_context(
-                user_id=request.user_id,
+                user_id=user_id,
                 user_query=request.message
             )
         except Exception as e:
@@ -94,7 +105,7 @@ async def ai_chat(request: ChatRequest):
         response = analyzer.chat_response(
             message=request.message,
             context=context_data,
-            user_id=request.user_id
+            user_id=user_id
         )
 
         return ChatResponse(
@@ -114,7 +125,10 @@ async def ai_chat(request: ChatRequest):
 
 
 @router.post("/claude/chat", response_model=ChatResponse)
-async def claude_chat(request: ChatRequest):
+async def claude_chat(
+    request: ChatRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Claude Chat endpoint (alias for /api/ai/chat)
 
@@ -123,4 +137,4 @@ async def claude_chat(request: ChatRequest):
     This endpoint exists for backward compatibility with frontend code
     that calls /api/claude/chat. It routes to the same logic as /api/ai/chat.
     """
-    return await ai_chat(request)
+    return await ai_chat(request, current_user)

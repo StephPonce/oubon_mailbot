@@ -215,17 +215,21 @@ class CustomRateLimitMiddleware(BaseHTTPMiddleware):
         return any(path.startswith(pattern) for pattern in skip_patterns)
 
     def _extract_tier(self, request: Request) -> str:
-        """Extract user tier from request state or headers."""
-        # Try request state (set by auth middleware)
-        if hasattr(request.state, "tier"):
+        """Extract user tier from request state (set by auth middleware).
+
+        SECURITY: Tier MUST come from authenticated request state only.
+        Never trust client-provided tier headers as they can be spoofed.
+        """
+        # SECURITY: Only trust tier from authenticated request state
+        # This is set by the JWT auth middleware after validating the token
+        if hasattr(request.state, "tier") and request.state.tier:
             return request.state.tier.lower()
 
-        # Try header (for testing)
-        tier_header = request.headers.get("X-User-Tier")
-        if tier_header:
-            return tier_header.lower()
+        # SECURITY NOTE: Previously allowed X-User-Tier header for "testing"
+        # This was a critical security vulnerability allowing tier spoofing.
+        # Removed to prevent attackers from bypassing rate limits.
 
-        # Default to free tier
+        # Default to most restrictive tier for unauthenticated requests
         return "nest"
 
     def _determine_resource_type(self, request: Request) -> str:
