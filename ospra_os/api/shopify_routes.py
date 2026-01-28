@@ -10,6 +10,7 @@ import secrets
 import hashlib
 import hmac
 import re
+import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 from urllib.parse import urlencode, quote
@@ -18,6 +19,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import httpx
+
+logger = logging.getLogger(__name__)
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
@@ -345,7 +348,8 @@ async def get_store_stats(
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get store analytics: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve store analytics")
 
 
 @router.get("/stores/{store_id}/products")
@@ -379,7 +383,8 @@ async def get_products(
             "count": len(products),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get products: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve products")
 
 
 @router.get("/stores/{store_id}/orders")
@@ -416,7 +421,8 @@ async def get_orders(
             "count": len(orders),
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get orders: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve orders")
 
 
 # GDPR Webhooks

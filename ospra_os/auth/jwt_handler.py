@@ -128,27 +128,51 @@ class TokenPair:
 
 
 # ============================================================================
-# TOKEN BLACKLIST (In-Memory - Use Redis in Production)
+# TOKEN BLACKLIST (Redis with In-Memory Fallback)
 # ============================================================================
 
-# Set of revoked token JTIs
-_token_blacklist: set = set()
+# Import persistent token blacklist from security module
+try:
+    from ospra_os.security.production_security import get_token_blacklist, TokenBlacklist
+    _persistent_blacklist = get_token_blacklist()
+    logger.info(
+        f"[SUCCESS] Token blacklist initialized "
+        f"(persistent={_persistent_blacklist.is_persistent})"
+    )
+except ImportError as e:
+    logger.warning(f"[WARNING] Could not import TokenBlacklist: {e}")
+    _persistent_blacklist = None
 
 
 def blacklist_token(jti: str) -> None:
-    """Add token to blacklist (for logout)."""
-    _token_blacklist.add(jti)
+    """Add token to blacklist (for logout).
+
+    Uses Redis if available, falls back to in-memory.
+    """
+    if _persistent_blacklist:
+        _persistent_blacklist.add(jti)
+    else:
+        # Fallback to module-level set if import failed
+        _fallback_blacklist.add(jti)
     logger.info(f"Token blacklisted: {jti[:8]}...")
 
 
 def is_token_blacklisted(jti: str) -> bool:
     """Check if token is blacklisted."""
-    return jti in _token_blacklist
+    if _persistent_blacklist:
+        return _persistent_blacklist.is_blacklisted(jti)
+    return jti in _fallback_blacklist
 
 
 def clear_blacklist() -> None:
-    """Clear all blacklisted tokens (for testing)."""
-    _token_blacklist.clear()
+    """Clear all blacklisted tokens (for testing only)."""
+    if _persistent_blacklist:
+        _persistent_blacklist.clear()
+    _fallback_blacklist.clear()
+
+
+# Emergency fallback if security module fails to load
+_fallback_blacklist: set = set()
 
 
 # ============================================================================

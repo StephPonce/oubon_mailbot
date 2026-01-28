@@ -140,58 +140,74 @@ class OAuthStatusResponse(BaseModel):
 # OAUTH FLOW ENDPOINTS
 # ============================================================================
 
+class OAuthInitRequestSecure(BaseModel):
+    """Request to start OAuth flow (secure version - no user_id)."""
+    shop_domain: str  # e.g., "mystore" or "mystore.myshopify.com"
+
+
 @router.post("/initiate")
-async def initiate_oauth(request: OAuthInitRequest):
+async def initiate_oauth(
+    request: OAuthInitRequestSecure,
+    current_user: User = Depends(get_current_user)
+):
     """
     Step 1: Initiate OAuth flow.
-    
+
+    SECURITY: Requires JWT authentication. User ID is extracted from the token,
+    not from the request body (prevents user impersonation attacks).
+
     Returns the Shopify authorization URL to redirect the user to.
-    
+
     Usage:
         POST /api/shopify/oauth/initiate
+        Authorization: Bearer <token>
         {"shop_domain": "mystore"}
-    
+
     Response:
         {"authorization_url": "https://mystore.myshopify.com/admin/oauth/authorize?..."}
     """
+    # SECURITY: User ID comes from verified JWT token, not request body
+    user_id = current_user.id
+
     try:
         api_key, _ = get_shopify_credentials()
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        logger.error(f"Shopify credentials error: {e}")
+        raise HTTPException(status_code=500, detail="Shopify configuration error. Please contact support.")
+
     # Normalize shop domain
     shop_domain = request.shop_domain.strip().lower()
     if not shop_domain.endswith(".myshopify.com"):
         shop_domain = f"{shop_domain}.myshopify.com"
-    
+
     # Validate shop domain format
     if not shop_domain.replace(".myshopify.com", "").replace("-", "").replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="Invalid shop domain format")
-    
+
     # Generate secure nonce for CSRF protection
     nonce = secrets.token_urlsafe(32)
-    
-    # Store nonce with metadata
+
+    # Store nonce with metadata - user_id from JWT token
     _oauth_states[nonce] = {
         "shop": shop_domain,
-        "user_id": request.user_id,
+        "user_id": user_id,
         "created_at": datetime.utcnow().isoformat(),
     }
-    
+
     # Build authorization URL
     redirect_uri = get_oauth_redirect_uri()
-    
+
     params = {
         "client_id": api_key,
         "scope": ",".join(SHOPIFY_SCOPES),
         "redirect_uri": redirect_uri,
         "state": nonce,
     }
-    
+
     authorization_url = f"https://{shop_domain}/admin/oauth/authorize?{urlencode(params)}"
-    
-    logger.info(f"🔐 OAuth initiated for {shop_domain}")
-    
+
+    logger.info(f"🔐 OAuth initiated for {shop_domain} by user {user_id}")
+
     return {
         "authorization_url": authorization_url,
         "shop_domain": shop_domain,
@@ -216,7 +232,8 @@ async def authorize_redirect(
     try:
         api_key, _ = get_shopify_credentials()
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Shopify credentials error: {e}")
+        raise HTTPException(status_code=500, detail="Shopify configuration error. Please contact support.")
     
     # Normalize shop domain
     shop_domain = shop.strip().lower()
@@ -508,49 +525,60 @@ async def disconnect_store(
 
 
 @router.post("/reconnect")
-async def reconnect_store(request: OAuthInitRequest):
+async def reconnect_store(
+    request: OAuthInitRequestSecure,
+    current_user: User = Depends(get_current_user)
+):
     """
     Reconnect a previously disconnected store.
-    
+
+    SECURITY: Requires JWT authentication.
     Initiates new OAuth flow but preserves existing data.
     """
-    return await initiate_oauth(request)
+    return await initiate_oauth(request, current_user)
 
 
 @router.post("/sync-webhooks")
 async def sync_webhooks(
     shop: str = Query(..., description="Shop domain"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Manually sync/re-register webhooks for a store.
-    
+
+    SECURITY: Requires JWT authentication and store ownership verification.
     Useful if webhooks got out of sync or new ones were added.
     """
+    user_id = current_user.id
     store = await get_store_by_domain(shop)
-    
+
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
-    
+
+    # SECURITY: Verify the user owns this store
+    if store.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to manage this store")
+
     access_token = store.get("access_token")
     if not access_token:
         raise HTTPException(status_code=400, detail="Store not properly connected")
-    
+
     try:
         from ospra_os.webhooks.webhook_registry import sync_store_webhooks
-        
+
         result = await sync_store_webhooks(
             shop_domain=shop,
             access_token=access_token,
         )
-        
+
         return {
             "success": True,
             "result": result,
         }
-        
+
     except Exception as e:
-        logger.error(f"Webhook sync failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Webhook sync failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to sync webhooks. Please try again later.")
 
 
 # ============================================================================
@@ -768,10 +796,15 @@ async def deactivate_store(shop_domain: str) -> bool:
 @router.get("/install")
 async def install_app(
     shop: str = Query(..., description="Shop domain from Shopify"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     App installation endpoint for Shopify App Store.
-    
+
+    SECURITY: Requires JWT authentication.
+    NOTE: If using Shopify App Store public listing, you may need a separate
+    unauthenticated flow. For embedded/private apps, JWT auth is required.
+
     Shopify sends users here when they click "Install" in the app store.
     """
-    return await authorize_redirect(shop=shop)
+    return await authorize_redirect(shop=shop, current_user=current_user)

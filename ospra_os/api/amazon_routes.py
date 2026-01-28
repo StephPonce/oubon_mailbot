@@ -47,8 +47,10 @@ router = APIRouter(prefix="/api/amazon", tags=["Amazon FBA"])
 # ============================================================================
 
 class ConnectAccountRequest(BaseModel):
-    """Request to connect Amazon account"""
-    user_id: int = Field(..., description="User ID")
+    """Request to connect Amazon account.
+
+    SECURITY: user_id removed - extracted from JWT token instead.
+    """
     seller_id: str = Field(..., description="Amazon Seller ID")
     marketplace_id: str = Field(default="ATVPDKIKX0DER", description="Marketplace ID")
     account_name: Optional[str] = Field(None, description="Account nickname")
@@ -141,10 +143,13 @@ async def get_accounts(
 @router.post("/accounts")
 async def connect_account(
     request: ConnectAccountRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Connect Amazon Seller Central account.
+
+    SECURITY: Requires JWT authentication. User ID extracted from token.
 
     Requires:
     - LWA OAuth credentials (client_id, client_secret, refresh_token)
@@ -154,10 +159,11 @@ async def connect_account(
     Tests connection before saving.
     """
     try:
+        user_id = current_user.id
         service = AmazonService(db)
 
         account = service.connect_account(
-            user_id=request.user_id,
+            user_id=user_id,
             seller_id=request.seller_id,
             marketplace_id=request.marketplace_id,
             lwa_client_id=request.lwa_client_id,
@@ -183,10 +189,10 @@ async def connect_account(
         }
 
     except Exception as e:
-        logger.error(f"Error connecting account: {e}")
+        logger.error(f"Error connecting account: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Failed to connect Amazon account"
         )
 
 

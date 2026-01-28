@@ -2,22 +2,27 @@
 Password Reset API Routes
 ==========================
 
+SECURITY: Rate limited to prevent email bombing and brute force attacks.
+
 Endpoints:
-- POST /api/auth/forgot-password - Request password reset email
-- POST /api/auth/reset-password - Reset password with token
+- POST /api/auth/forgot-password - Request password reset email (3/hour)
+- POST /api/auth/reset-password - Reset password with token (5/hour)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
 import secrets
 import uuid
+import logging
 
 from ospra_os.database import User, PasswordResetToken, get_db
 from ospra_os.auth.jwt_auth import hash_password, get_user_by_email, verify_password
 from ospra_os.services.email_service import send_password_reset_email
+from ospra_os.security.rate_limiting import limiter
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["Password Reset"])
 
@@ -116,12 +121,19 @@ def invalidate_reset_token(token: str, db: Session):
 # ============================================================================
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
+@limiter.limit("3/hour")  # SECURITY: Prevent email bombing
 async def forgot_password(
+    http_request: Request,  # Required for rate limiting
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db)
 ):
     """
     Request a password reset email.
+
+    SECURITY: Rate limited to 3 requests per hour per IP to prevent:
+    - Email bombing attacks
+    - Email enumeration attempts
+    - Spam/abuse of email service
 
     Sends a reset link to the user's email if the account exists.
     Always returns success to prevent email enumeration.
@@ -193,12 +205,18 @@ async def verify_reset_token_endpoint(
 # ============================================================================
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/hour")  # SECURITY: Prevent brute force token guessing
 async def reset_password(
+    http_request: Request,  # Required for rate limiting
     request: ResetPasswordRequest,
     db: Session = Depends(get_db)
 ):
     """
     Reset password using valid token.
+
+    SECURITY: Rate limited to 5 requests per hour per IP to prevent:
+    - Brute force token guessing
+    - Credential stuffing attacks
 
     Args:
         request: Token and new password

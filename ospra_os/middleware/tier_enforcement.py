@@ -189,9 +189,17 @@ class TierEnforcementMiddleware(BaseHTTPMiddleware):
                     db.close()
 
         except Exception as e:
-            logger.error(f"Tier enforcement error: {e}")
-            # On error, allow request to proceed (fail open)
-            return await call_next(request)
+            logger.error(f"Tier enforcement error: {e}", exc_info=True)
+            # SECURITY: Fail CLOSED - deny access if we can't verify tier
+            # This prevents bypassing tier limits if database is down
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "error": "Service temporarily unavailable",
+                    "message": "Unable to verify subscription tier. Please try again.",
+                    "retry_after": 30,
+                }
+            )
 
         # Proceed with request
         response = await call_next(request)

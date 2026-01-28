@@ -49,6 +49,9 @@ from ospra_os.tenancy import get_tenant_db, get_tenant
 from ospra_os.tenancy.queries import TenantScopedSession
 from ospra_os.tenancy.context import TenantContext
 
+# Import database session for non-tenant-scoped operations
+from ospra_os.database import SessionLocal
+
 
 router = APIRouter(prefix="/api/aliexpress/products", tags=["aliexpress-products"])
 
@@ -1064,11 +1067,37 @@ async def hybrid_product_discovery(
         db.close()
 
 
+# ==================== DEBUG ENDPOINTS (ADMIN ONLY) ====================
+# These endpoints expose sensitive information and should only be accessible
+# to administrators for debugging purposes.
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
+
+
+def _is_admin(user: User) -> bool:
+    """Check if user has admin privileges (STRATOSPHERE tier or explicit admin flag)."""
+    user_tier = user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier)
+    return user_tier.lower() == "stratosphere" or getattr(user, 'is_admin', False)
+
+
 @router.get("/debug/raw-response")
-async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
+async def debug_raw_response(
+    page_size: int = Query(3, ge=1, le=10),
+    current_user: User = Depends(get_current_user)
+):
     """
     DEBUG: Get raw AliExpress API response to see structure
+
+    SECURITY: Admin-only endpoint. Requires STRATOSPHERE tier or admin privileges.
     """
+    # SECURITY: Admin-only access
+    if not _is_admin(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This debug endpoint is restricted."
+        )
+
     import aiohttp
     import time
 
@@ -1101,28 +1130,41 @@ async def debug_raw_response(page_size: int = Query(3, ge=1, le=10)):
     async with aiohttp.ClientSession() as session:
         async with session.get(api.api_url, params=params, timeout=15) as response:
             data = await response.json()
+            # SECURITY: Don't expose full token, only confirmation it exists
             return {
                 "raw_response": data,
-                "token_preview": tokens["access_token"][:20] + "...",
-                "signature_preview": params["sign"][:40] + "..."
+                "token_status": "valid" if tokens.get("access_token") else "missing",
+                "requested_by": current_user.email
             }
 
 
 @router.get("/test/order-create-check")
-async def test_order_create_capability():
+async def test_order_create_capability(
+    current_user: User = Depends(get_current_user)
+):
     """
     [TEST] TEST: Check if ds.order.create API is accessible
+
+    SECURITY: Admin-only endpoint. Requires STRATOSPHERE tier or admin privileges.
 
     This tests whether we have permission to create orders via Dropshipping API.
     DOES NOT place a real order - uses invalid data to check API access.
     """
+    # SECURITY: Admin-only access
+    if not _is_admin(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This test endpoint is restricted."
+        )
+
     # Load tokens
     tokens = api.load_tokens(api.dropship_tokens_file)
     if not tokens or not tokens.get("access_token"):
         return {
             "success": False,
             "error": "Dropshipping API not authorized",
-            "verdict": "Cannot test - no authorization"
+            "verdict": "Cannot test - no authorization",
+            "requested_by": current_user.email
         }
 
     # Build minimal test request with intentionally invalid data
@@ -1161,7 +1203,8 @@ async def test_order_create_capability():
                             "error_message": error_msg,
                             "verdict": "[SUCCESS] API IS ACCESSIBLE - Just needs valid order data",
                             "capability": "AUTO_ORDERING_POSSIBLE",
-                            "note": "Got validation error (expected). This means the API endpoint works and we can place orders with correct data."
+                            "note": "Got validation error (expected). This means the API endpoint works and we can place orders with correct data.",
+                            "requested_by": current_user.email
                         }
                     elif "permission" in error_msg.lower() or "authorize" in error_msg.lower():
                         return {
@@ -1171,7 +1214,8 @@ async def test_order_create_capability():
                             "error_message": error_msg,
                             "verdict": "[ERROR] NO PERMISSION - Requires additional authorization",
                             "capability": "AFFILIATE_LINK_ONLY",
-                            "note": "Order API requires seller/store setup or additional permissions"
+                            "note": "Order API requires seller/store setup or additional permissions",
+                            "requested_by": current_user.email
                         }
                     else:
                         return {
@@ -1180,7 +1224,8 @@ async def test_order_create_capability():
                             "error_code": error_code,
                             "error_message": error_msg,
                             "verdict": "[QUESTION] UNCLEAR - Unexpected error",
-                            "capability": "UNKNOWN"
+                            "capability": "UNKNOWN",
+                            "requested_by": current_user.email
                         }
                 else:
                     return {
@@ -1188,7 +1233,8 @@ async def test_order_create_capability():
                         "api_accessible": True,
                         "verdict": "[WARNING] UNEXPECTED SUCCESS - Test data should have failed",
                         "capability": "NEEDS_FURTHER_TESTING",
-                        "response": data
+                        "response": data,
+                        "requested_by": current_user.email
                     }
 
     except Exception as e:
@@ -1196,18 +1242,31 @@ async def test_order_create_capability():
             "success": False,
             "error": str(e),
             "verdict": "[ERROR] TEST FAILED",
-            "capability": "ERROR"
+            "capability": "ERROR",
+            "requested_by": current_user.email
         }
 
 
 @router.get("/test/enrichment/{product_id}")
-async def test_dropship_enrichment(product_id: str):
+async def test_dropship_enrichment(
+    product_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     [TEST] TEST: Get full raw response from ds.product.get
+
+    SECURITY: Admin-only endpoint. Requires STRATOSPHERE tier or admin privileges.
 
     Shows ALL fields available from Dropshipping API for enrichment analysis.
     This helps us see what stock/inventory/shipping data is available.
     """
+    # SECURITY: Admin-only access
+    if not _is_admin(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required. This test endpoint is restricted."
+        )
+
     # Load tokens
     tokens = api.load_tokens(api.dropship_tokens_file)
     if not tokens or not tokens.get("access_token"):
@@ -1240,7 +1299,8 @@ async def test_dropship_enrichment(product_id: str):
                 return {
                     "error": data["error_response"]["msg"],
                     "code": data["error_response"].get("code"),
-                    "full_error": data["error_response"]
+                    "full_error": data["error_response"],
+                    "requested_by": current_user.email
                 }
 
             # Extract and analyze response
@@ -1287,5 +1347,6 @@ async def test_dropship_enrichment(product_id: str):
                 "product_id": product_id,
                 "enrichment_analysis": enrichment_analysis,
                 "full_response": result,
-                "response_keys": list(result.keys()) if result else []
+                "response_keys": list(result.keys()) if result else [],
+                "requested_by": current_user.email
             }

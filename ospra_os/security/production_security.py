@@ -60,6 +60,203 @@ class SecurityConfig:
     SUSPICIOUS_IP_THRESHOLD = 50  # requests per minute
     GEO_BLOCK_COUNTRIES = []  # Add country codes to block
 
+    # Token blacklist TTL (must be >= longest token lifetime)
+    TOKEN_BLACKLIST_TTL = 60 * 60 * 24 * 8  # 8 days (refresh token is 7 days)
+
+
+# =============================================================================
+# TOKEN BLACKLIST (Redis with In-Memory Fallback)
+# =============================================================================
+
+class TokenBlacklist:
+    """
+    Token blacklist for logout/revocation with Redis persistence.
+
+    CRITICAL: In production, Redis MUST be configured to prevent tokens
+    from being valid after logout (in-memory is lost on restart).
+
+    Features:
+    - Redis persistence (survives restarts)
+    - In-memory fallback for development
+    - Automatic TTL expiration
+    - Thread-safe operations
+    """
+
+    _instance = None
+
+    def __new__(cls):
+        """Singleton pattern for shared blacklist."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
+    def __init__(self):
+        if self._initialized:
+            return
+
+        self._memory_blacklist: Dict[str, float] = {}  # jti -> expiry timestamp
+        self._redis = None
+        self._redis_available = False
+        self._try_redis_connection()
+        self._initialized = True
+
+    def _try_redis_connection(self):
+        """Try to connect to Redis."""
+        redis_url = os.getenv("REDIS_URL")
+        if redis_url:
+            try:
+                import redis
+                self._redis = redis.from_url(redis_url, decode_responses=True)
+                self._redis.ping()
+                self._redis_available = True
+                logger.info("[SUCCESS] Redis connected for token blacklist")
+            except Exception as e:
+                logger.warning(f"[WARNING] Redis unavailable for token blacklist: {e}")
+                self._warn_no_redis()
+        else:
+            self._warn_no_redis()
+
+    def _warn_no_redis(self):
+        """Warn about missing Redis in production."""
+        is_production = (
+            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
+            os.getenv("RENDER", "") == "true" or
+            os.getenv("RAILWAY_ENVIRONMENT", "") != ""
+        )
+        if is_production:
+            logger.error(
+                "[CRITICAL] Redis not available for token blacklist in production! "
+                "Tokens will remain valid after logout until server restart. "
+                "Set REDIS_URL environment variable."
+            )
+        else:
+            logger.warning(
+                "[WARNING] Token blacklist using in-memory storage. "
+                "Logged-out tokens will be valid after restart. "
+                "Configure REDIS_URL for production."
+            )
+
+    def add(self, jti: str, ttl_seconds: int = None) -> bool:
+        """
+        Add a token to the blacklist.
+
+        Args:
+            jti: Token's unique identifier
+            ttl_seconds: Time-to-live (defaults to SecurityConfig.TOKEN_BLACKLIST_TTL)
+
+        Returns:
+            True if successfully added
+        """
+        if not jti:
+            return False
+
+        ttl = ttl_seconds or SecurityConfig.TOKEN_BLACKLIST_TTL
+
+        # Try Redis first
+        if self._redis_available:
+            try:
+                key = f"token_blacklist:{jti}"
+                self._redis.setex(key, ttl, "1")
+                logger.debug(f"Token blacklisted in Redis: {jti[:8]}...")
+                return True
+            except Exception as e:
+                logger.error(f"Redis blacklist error: {e}")
+                # Fall through to memory
+
+        # In-memory fallback
+        expiry = time.time() + ttl
+        self._memory_blacklist[jti] = expiry
+        logger.debug(f"Token blacklisted in memory: {jti[:8]}...")
+
+        # Cleanup old entries (lazy)
+        self._cleanup_memory()
+
+        return True
+
+    def is_blacklisted(self, jti: str) -> bool:
+        """
+        Check if a token is blacklisted.
+
+        Args:
+            jti: Token's unique identifier
+
+        Returns:
+            True if token is blacklisted
+        """
+        if not jti:
+            return False
+
+        # Check Redis first
+        if self._redis_available:
+            try:
+                key = f"token_blacklist:{jti}"
+                return self._redis.exists(key) > 0
+            except Exception as e:
+                logger.error(f"Redis blacklist check error: {e}")
+                # Fall through to memory
+
+        # Check in-memory
+        if jti in self._memory_blacklist:
+            if self._memory_blacklist[jti] > time.time():
+                return True
+            else:
+                # Expired, remove it
+                del self._memory_blacklist[jti]
+
+        return False
+
+    def remove(self, jti: str) -> bool:
+        """Remove a token from the blacklist (for testing)."""
+        if self._redis_available:
+            try:
+                key = f"token_blacklist:{jti}"
+                self._redis.delete(key)
+            except Exception:
+                pass
+
+        if jti in self._memory_blacklist:
+            del self._memory_blacklist[jti]
+
+        return True
+
+    def clear(self) -> None:
+        """Clear all blacklisted tokens (for testing only)."""
+        if self._redis_available:
+            try:
+                # Get all blacklist keys and delete
+                keys = self._redis.keys("token_blacklist:*")
+                if keys:
+                    self._redis.delete(*keys)
+            except Exception:
+                pass
+
+        self._memory_blacklist.clear()
+        logger.warning("Token blacklist cleared")
+
+    def _cleanup_memory(self) -> None:
+        """Remove expired entries from in-memory blacklist."""
+        now = time.time()
+        expired = [jti for jti, exp in self._memory_blacklist.items() if exp <= now]
+        for jti in expired:
+            del self._memory_blacklist[jti]
+
+    @property
+    def is_persistent(self) -> bool:
+        """Check if blacklist has persistent storage."""
+        return self._redis_available
+
+
+# Singleton instance
+_token_blacklist = None
+
+def get_token_blacklist() -> TokenBlacklist:
+    """Get the singleton token blacklist instance."""
+    global _token_blacklist
+    if _token_blacklist is None:
+        _token_blacklist = TokenBlacklist()
+    return _token_blacklist
+
 
 # =============================================================================
 # RATE LIMITER (In-Memory with Redis Support)

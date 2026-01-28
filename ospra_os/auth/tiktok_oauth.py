@@ -51,7 +51,7 @@ async def start_tiktok_oauth():
 
     except Exception as e:
         logger.error(f"TikTok OAuth start failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="TikTok operation failed. Please try again later.")
 
 
 @router.get("/callback")
@@ -104,7 +104,7 @@ async def tiktok_oauth_callback(
 
     except Exception as e:
         logger.error(f"TikTok OAuth callback failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="TikTok operation failed. Please try again later.")
 
 
 @router.get("/status")
@@ -133,7 +133,7 @@ async def tiktok_status():
         logger.error(f"TikTok status check failed: {e}")
         return {
             "configured": False,
-            "error": str(e)
+            "error": "Failed to check TikTok status"
         }
 
 
@@ -167,4 +167,4 @@ async def test_tiktok_search():
 
     except Exception as e:
         logger.error(f"TikTok test search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="TikTok operation failed. Please try again later.")
