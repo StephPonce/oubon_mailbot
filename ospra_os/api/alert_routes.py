@@ -183,7 +183,7 @@ async def execute_alert_action(
         
     except Exception as e:
         logger.error(f"Failed to execute alert action: {e}")
-        raise HTTPException(status_code=500, detail=f"Action failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Alert action failed. Please try again.")
 
 
 @router.get("/preferences")

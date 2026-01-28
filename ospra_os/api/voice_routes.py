@@ -158,12 +158,12 @@ async def transcribe_audio(
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Voice processor initialization failed: {str(e)}"
+            detail="Voice processor initialization failed. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Transcription failed: {str(e)}"
+            detail="Transcription failed. Please try again."
         )
 
 @router.post("/command", response_model=CommandResponse)
@@ -235,12 +235,12 @@ async def process_voice_command(
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Voice processor initialization failed: {str(e)}"
+            detail="Voice processor initialization failed. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Command processing failed: {str(e)}"
+            detail="Command processing failed. Please try again."
         )
 
 @router.post("/command/text", response_model=CommandResponse)
@@ -288,12 +288,12 @@ async def process_text_command(
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Voice processor initialization failed: {str(e)}"
+            detail="Voice processor initialization failed. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Command processing failed: {str(e)}"
+            detail="Command processing failed. Please try again."
         )
 
 @router.post("/speak")
@@ -329,12 +329,12 @@ async def generate_speech(
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"TTS initialization failed: {str(e)}"
+            detail="TTS initialization failed. Please try again."
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Speech generation failed: {str(e)}"
+            detail="Speech generation failed. Please try again."
         )
 
 @router.get("/health")

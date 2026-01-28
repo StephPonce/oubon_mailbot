@@ -232,7 +232,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to fetch hot products: {str(e)}"
+                detail="Failed to fetch hot products. Please try again."
             )
 
     async def get_bestsellers(self, page_size: int = 20) -> dict:
@@ -305,7 +305,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to fetch bestsellers: {str(e)}"
+                detail="Failed to fetch bestsellers. Please try again."
             )
 
     async def affiliate_product_query(
@@ -400,7 +400,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to query products: {str(e)}"
+                detail="Failed to query products. Please try again."
             )
 
     async def hybrid_product_discovery(
@@ -559,7 +559,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to fetch product details: {str(e)}"
+                detail="Failed to fetch product details. Please try again."
             )
 
     async def get_feed_names(self) -> dict:
@@ -627,7 +627,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to get feed names: {str(e)}"
+                detail="Failed to get feed names. Please try again."
             )
 
     async def search_products(
@@ -714,7 +714,7 @@ class AliExpressProductAPI:
         except Exception as e:
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to search products: {str(e)}"
+                detail="Failed to search products. Please try again."
             )
 
 
@@ -1238,9 +1238,10 @@ async def test_order_create_capability(
                     }
 
     except Exception as e:
+        logger.error(f"Test failed: {e}")
         return {
             "success": False,
-            "error": str(e),
+            "error": "Test failed. Please try again.",
             "verdict": "[ERROR] TEST FAILED",
             "capability": "ERROR",
             "requested_by": current_user.email

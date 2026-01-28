@@ -278,7 +278,8 @@ async def oauth_callback(
         error_msg = f"Shopify+error+{e.response.status_code}"
         return RedirectResponse(url=f"{frontend_url}?error={error_msg}")
     except Exception as e:
-        return RedirectResponse(url=f"{frontend_url}?error={quote(str(e))}")
+        logger.error(f"OAuth callback error: {e}")
+        return RedirectResponse(url=f"{frontend_url}?error=connection_failed")
 
 
 @router.delete("/stores/{store_id}")

@@ -132,7 +132,7 @@ async def enable_auto_deploy():
         }
     except Exception as e:
         logger.error(f"Failed to enable auto-deploy: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.post("/disable")
@@ -163,7 +163,7 @@ async def disable_auto_deploy():
         }
     except Exception as e:
         logger.error(f"Failed to disable auto-deploy: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.get("/status", response_model=StatusResponse)
@@ -207,7 +207,7 @@ async def get_auto_deploy_status():
         )
     except Exception as e:
         logger.error(f"Failed to get status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.put("/criteria")
@@ -262,7 +262,7 @@ async def update_criteria(criteria: CriteriaUpdate):
         raise
     except Exception as e:
         logger.error(f"Failed to update criteria: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.get("/history", response_model=List[DeploymentHistoryItem])
@@ -303,7 +303,7 @@ async def get_deployment_history(limit: int = 50):
         return [DeploymentHistoryItem(**item) for item in history]
     except Exception as e:
         logger.error(f"Failed to get history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.post("/run-now", response_model=RunNowResponse)
@@ -371,7 +371,7 @@ async def run_deployment_now(background_tasks: BackgroundTasks):
 
     except Exception as e:
         logger.error(f"Manual deployment failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Auto-deploy operation failed. Please try again.")
 
 
 @router.get("/health")
@@ -407,7 +407,8 @@ async def auto_deploy_health():
             }
         }
     except Exception as e:
+        logger.error(f"Health check failed: {e}")
         return {
             "status": "unhealthy",
-            "error": str(e)
+            "error": "Service unavailable"
         }

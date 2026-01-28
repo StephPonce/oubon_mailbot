@@ -44,13 +44,23 @@ def get_pool_args() -> dict:
 
     Returns optimized pool settings for production PostgreSQL usage
     with improved transaction error resilience.
+
+    Pool sizing based on expected concurrent users:
+    - pool_size: Base connections always maintained (warm pool)
+    - max_overflow: Additional connections allowed under load
+    - Total max connections = pool_size + max_overflow
+
+    For a SaaS platform with async operations:
+    - 20 base + 30 overflow = 50 max connections
+    - Handles 100+ concurrent users with proper async patterns
     """
     return {
-        "pool_size": 5,
-        "max_overflow": 10,
+        "pool_size": int(os.getenv("DB_POOL_SIZE", "20")),  # Configurable via env
+        "max_overflow": int(os.getenv("DB_POOL_OVERFLOW", "30")),  # Configurable
         "pool_pre_ping": True,         # Verify connections before use
-        "pool_recycle": 1800,          # Recycle connections after 30 min (reduced from 1 hour)
+        "pool_recycle": 1800,          # Recycle connections after 30 min
         "pool_reset_on_return": "rollback",  # Always rollback on connection return
+        "pool_timeout": 30,            # Wait up to 30 seconds for a connection
     }
 
 

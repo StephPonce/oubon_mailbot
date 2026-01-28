@@ -167,7 +167,7 @@ async def run_discovery_now(
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Scheduler operation failed. Please try again.")
 
 
 @router.post("/run/grading")
@@ -196,7 +196,7 @@ async def run_product_grading():
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Scheduler operation failed. Please try again.")
 
 
 @router.post("/run/briefing")
@@ -226,7 +226,7 @@ async def run_morning_briefing(user_id: int = 1):
         }
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Scheduler operation failed. Please try again.")
 
 
 @router.get("/config")

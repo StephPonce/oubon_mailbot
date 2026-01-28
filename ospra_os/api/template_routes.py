@@ -224,7 +224,7 @@ def create_template(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 
@@ -271,7 +271,7 @@ def update_template(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 
@@ -304,7 +304,7 @@ def submit_for_review(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 
@@ -340,7 +340,7 @@ def use_template(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 
@@ -375,7 +375,7 @@ def purchase_template(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 
@@ -412,7 +412,7 @@ def add_review(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Template operation failed. Please try again."
         )
 
 

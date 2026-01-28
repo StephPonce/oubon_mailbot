@@ -184,11 +184,11 @@ async def create_store(
             action="store.create",
             resource_type="Store",
             request=request,
-            error_message=str(e)
+            error_message="Store creation failed"
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="Store operation failed. Please try again."
         )
 
 

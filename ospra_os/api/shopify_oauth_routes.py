@@ -31,6 +31,13 @@ from urllib.parse import urlencode, parse_qs
 from pydantic import BaseModel
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.security.security_audit import (
+    log_oauth_completed,
+    log_credential_stored,
+    log_security_event,
+    SecurityEventType,
+    SecuritySeverity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -642,14 +649,24 @@ async def save_store_credentials(
                 existing.currency = currency
                 existing.last_sync = datetime.utcnow()
                 existing.sync_error = None
-                
+
                 if user_id and not existing.user_id:
                     existing.user_id = user_id
-                
+
                 db.commit()
                 logger.info(f"Updated existing store: {store_name}")
+
+                # SECURITY AUDIT: Log credential storage
+                log_credential_stored(
+                    user_id=user_id or existing.user_id,
+                    credential_type="shopify_oauth",
+                    store_id=existing.id,
+                    store_name=store_name,
+                    db=db,
+                )
+
                 return existing.id
-            
+
             else:
                 # Create new store
                 new_store = Store(
@@ -667,8 +684,18 @@ async def save_store_credentials(
                 db.add(new_store)
                 db.commit()
                 db.refresh(new_store)
-                
+
                 logger.info(f"Created new store: {store_name} (ID: {new_store.id})")
+
+                # SECURITY AUDIT: Log OAuth completion and credential storage
+                log_oauth_completed(
+                    user_id=user_id or 1,
+                    provider="shopify",
+                    store_id=new_store.id,
+                    store_name=store_name,
+                    db=db,
+                )
+
                 return new_store.id
                 
         finally:

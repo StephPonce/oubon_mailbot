@@ -243,9 +243,10 @@ async def execute_action(action: Action, db: Session) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error(f"Action execution error: {e}")
         return {
             "success": False,
-            "error": f"Execution error: {str(e)}"
+            "error": "Action execution failed. Please try again."
         }
 
 

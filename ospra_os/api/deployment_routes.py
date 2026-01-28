@@ -185,7 +185,7 @@ async def prepare_product(
 
     except Exception as e:
         logger.error(f"Preparation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Deployment operation failed. Please try again.")
 
 
 @router.post("/product", response_model=DeployResponse)
@@ -258,7 +258,7 @@ async def deploy_product(
 
     except Exception as e:
         logger.error(f"Deployment failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Deployment operation failed. Please try again.")
 
 
 @router.post("/bulk", response_model=BulkDeployResponse)
@@ -310,9 +310,10 @@ async def bulk_deploy(
                     })
 
                 except Exception as e:
+                    logger.error(f"Bulk deployment {job_id} failed: {e}")
                     deployment_jobs[job_id].update({
                         "status": "failed",
-                        "error": str(e)
+                        "error": "Deployment failed. Please try again."
                     })
 
             background_tasks.add_task(run_bulk_deployment)
@@ -343,7 +344,7 @@ async def bulk_deploy(
 
     except Exception as e:
         logger.error(f"Bulk deployment failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Deployment operation failed. Please try again.")
 
 
 @router.post("/preview", response_model=PreviewResponse)
@@ -384,7 +385,7 @@ async def preview_deployment(request: PreviewRequest):
 
     except Exception as e:
         logger.error(f"Preview failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Deployment operation failed. Please try again.")
 
 
 @router.get("/status/{job_id}", response_model=JobStatusResponse)

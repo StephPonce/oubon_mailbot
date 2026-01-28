@@ -21,6 +21,13 @@ from ospra_os.database import User, PasswordResetToken, get_db
 from ospra_os.auth.jwt_auth import hash_password, get_user_by_email, verify_password
 from ospra_os.services.email_service import send_password_reset_email
 from ospra_os.security.rate_limiting import limiter
+from ospra_os.security.security_audit import (
+    log_password_reset_requested,
+    log_password_changed,
+    log_security_event,
+    SecurityEventType,
+    SecuritySeverity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,27 +55,49 @@ class VerifyTokenRequest(BaseModel):
 
 
 # ============================================================================
-# DATABASE TOKEN STORAGE
+# DATABASE TOKEN STORAGE (Hashed for Security)
 # ============================================================================
-# Tokens are now stored in database to persist across server restarts
+# SECURITY: Tokens are hashed before storage so that if the database is
+# compromised, attackers cannot use the tokens to reset passwords.
+
+import hashlib
+
+
+def _hash_token(token: str) -> str:
+    """
+    Hash a reset token for secure storage.
+
+    Uses SHA-256 which is fast enough for token validation but secure
+    enough that tokens cannot be reversed from the hash.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
 
 def create_reset_token(email: str, db: Session) -> str:
     """
-    Generate a secure reset token and store it in database.
+    Generate a secure reset token and store its HASH in database.
+
+    SECURITY: Only the hash is stored. The plain token is returned to the
+    user and sent via email. Even if the database is compromised, the
+    attacker cannot determine the original tokens.
 
     Args:
         email: User's email address
         db: Database session
 
     Returns:
-        str: Reset token (UUID format)
+        str: Reset token (plain - this is sent to user via email)
     """
-    # Generate secure random token
-    token = str(uuid.uuid4())
+    # Generate secure random token (this is what the user receives)
+    plain_token = secrets.token_urlsafe(32)  # More secure than UUID
+
+    # Hash the token before storing
+    token_hash = _hash_token(plain_token)
 
     # Create database record with 1 hour expiration
+    # Store the HASH, not the plain token
     reset_token = PasswordResetToken(
-        token=token,
+        token=token_hash,  # SECURITY: Hashed token stored
         email=email,
         expires_at=datetime.utcnow() + timedelta(hours=1)
     )
@@ -76,39 +105,54 @@ def create_reset_token(email: str, db: Session) -> str:
     db.add(reset_token)
     db.commit()
 
-    return token
+    logger.info(f"Password reset token created for {email[:3]}***")
+
+    # Return the plain token (this goes in the email)
+    return plain_token
 
 
 def validate_reset_token(token: str, db: Session) -> str | None:
     """
     Validate reset token and return email if valid.
 
+    SECURITY: The incoming token is hashed and compared against the
+    stored hash. This prevents timing attacks and ensures tokens
+    cannot be extracted from the database.
+
     Args:
-        token: Reset token to validate
+        token: Reset token to validate (plain token from email link)
         db: Database session
 
     Returns:
         str | None: Email if token is valid, None otherwise
     """
-    # Query database for token
+    # Hash the incoming token to compare with stored hash
+    token_hash = _hash_token(token)
+
+    # Query database for the hashed token
     reset_token = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token == token
+        PasswordResetToken.token == token_hash
     ).first()
 
     if not reset_token:
+        logger.debug("Reset token not found")
         return None
 
     # Check if token is valid (not expired and not used)
     if not reset_token.is_valid:
+        logger.debug("Reset token expired or already used")
         return None
 
     return reset_token.email
 
 
 def invalidate_reset_token(token: str, db: Session):
-    """Mark token as used after successful password reset"""
+    """Mark token as used after successful password reset."""
+    # Hash the token to find it in the database
+    token_hash = _hash_token(token)
+
     reset_token = db.query(PasswordResetToken).filter(
-        PasswordResetToken.token == token
+        PasswordResetToken.token == token_hash
     ).first()
 
     if reset_token:
@@ -162,7 +206,15 @@ async def forgot_password(
 
         if not email_result.get("success"):
             # Log error but don't reveal to user
-            print(f"Failed to send password reset email: {email_result.get('error')}")
+            logger.error(f"Failed to send password reset email to {email[:3]}***")
+
+        # SECURITY AUDIT: Log password reset request
+        log_password_reset_requested(
+            email=email,
+            user_id=user.id,
+            request=http_request,
+            db=db,
+        )
 
     # Always return success to prevent email enumeration
     return {
@@ -265,6 +317,15 @@ async def reset_password(
 
     # Invalidate token (mark as used in database)
     invalidate_reset_token(request.token, db)
+
+    # SECURITY AUDIT: Log successful password change
+    log_password_changed(
+        user_id=user.id,
+        user_email=email,
+        via_reset=True,
+        request=http_request,
+        db=db,
+    )
 
     return {
         "success": True,

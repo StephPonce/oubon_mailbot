@@ -150,7 +150,7 @@ async def get_fulfillment_queue(current_user: User = Depends(get_current_user)):
         logger.error(f"Failed to get fulfillment queue: {e}")
         return {
             "success": False,
-            "error": str(e),
+            "error": "Failed to load fulfillment queue. Please try again.",
             "orders": []
         }
 
@@ -202,7 +202,7 @@ async def get_queue_stats(current_user: User = Depends(get_current_user)):
         logger.error(f"Failed to get queue stats: {e}")
         return {
             "success": False,
-            "error": str(e)
+            "error": "Failed to get queue stats. Please try again."
         }
 
 
@@ -258,7 +258,7 @@ async def add_tracking_number(
         
     except Exception as e:
         logger.error(f"Failed to add tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")
 
 
 @router.post("/mark-fulfilled")
@@ -297,7 +297,7 @@ async def mark_order_fulfilled(
         raise
     except Exception as e:
         logger.error(f"Failed to mark fulfilled: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")
 
 
 # ============================================================================
@@ -345,7 +345,7 @@ async def check_supplier_tracking(
         raise
     except Exception as e:
         logger.error(f"Failed to check tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")
 
 
 # ============================================================================
@@ -423,7 +423,7 @@ async def sync_all_tracking(current_user: User = Depends(get_current_user)):
         
     except Exception as e:
         logger.error(f"Failed to sync tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")
 
 
 # ============================================================================
@@ -509,7 +509,7 @@ async def add_to_queue(
         
     except Exception as e:
         logger.error(f"Failed to add to queue: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")
 
 
 @router.delete("/queue/{shopify_order_id}")
@@ -540,4 +540,4 @@ async def remove_from_queue(
         raise
     except Exception as e:
         logger.error(f"Failed to remove from queue: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Fulfillment operation failed. Please try again.")

@@ -109,7 +109,7 @@ async def ai_chat(request: ChatRequest):
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process chat request: {str(e)}"
+            detail="Failed to process chat request. Please try again."
         )
 
 

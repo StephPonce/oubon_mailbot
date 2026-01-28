@@ -73,7 +73,7 @@ def get_task_status(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving task status: {str(e)}"
+            detail="Error retrieving task status. Please try again."
         )
 
 
@@ -114,7 +114,7 @@ def get_active_tasks(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving active tasks: {str(e)}"
+            detail="Error retrieving active tasks. Please try again."
         )
 
 
@@ -148,7 +148,7 @@ def get_scheduled_tasks(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving scheduled tasks: {str(e)}"
+            detail="Error retrieving scheduled tasks. Please try again."
         )
 
 
@@ -182,7 +182,7 @@ def revoke_task(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error revoking task: {str(e)}"
+            detail="Error revoking task. Please try again."
         )
 
 
@@ -225,7 +225,7 @@ def get_worker_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving worker stats: {str(e)}"
+            detail="Error retrieving worker stats. Please try again."
         )
 
 
@@ -256,7 +256,7 @@ def get_queue_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving queue stats: {str(e)}"
+            detail="Error retrieving queue stats. Please try again."
         )
 
 
@@ -290,7 +290,7 @@ def get_beat_schedule(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving beat schedule: {str(e)}"
+            detail="Error retrieving beat schedule. Please try again."
         )
 
 
@@ -324,7 +324,7 @@ def trigger_product_discovery(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error triggering product discovery: {str(e)}"
+            detail="Error triggering product discovery. Please try again."
         )
 
 
@@ -356,7 +356,7 @@ def trigger_store_sync(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error triggering store sync: {str(e)}"
+            detail="Error triggering store sync. Please try again."
         )
 
 
@@ -392,7 +392,7 @@ def trigger_email_send(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error triggering email send: {str(e)}"
+            detail="Error triggering email send. Please try again."
         )
 
 
@@ -424,7 +424,7 @@ def trigger_performance_analysis(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error triggering performance analysis: {str(e)}"
+            detail="Error triggering performance analysis. Please try again."
         )
 
 
@@ -456,5 +456,5 @@ def trigger_daily_brief(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error triggering daily brief: {str(e)}"
+            detail="Error triggering daily brief. Please try again."
         )

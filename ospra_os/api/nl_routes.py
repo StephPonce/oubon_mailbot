@@ -108,10 +108,11 @@ async def parse_nl_command(request: ParseRequest):
         )
         
     except Exception as e:
+        logger.error(f"Command parsing error: {e}")
         return ParseResponse(
             success=False,
             parsed={},
-            message=str(e)
+            message="Failed to parse command. Please try again."
         )
 
 

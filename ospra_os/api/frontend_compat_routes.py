@@ -195,7 +195,7 @@ async def get_niche_products(
         }
     except Exception as e:
         logger.error(f"Failed to get products for niche {niche_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Operation failed. Please try again.")
 
 
 # ============================================================================
@@ -408,7 +408,7 @@ async def ignore_email(
             "success": False,
             "message_id": message_id,
             "error": "Failed to mark as ignored",
-            "detail": str(e)[:200]
+            "detail": "Operation failed. Please try again."
         }
 
 
@@ -444,7 +444,7 @@ async def analyze_product_intelligence(
         }
     except Exception as e:
         logger.error(f"Failed to analyze product {product_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Operation failed. Please try again.")
 
 
 @router.post("/api/intelligence/analyze/niche/{niche_id}")
@@ -479,7 +479,7 @@ async def analyze_niche_intelligence(
             "success": False,
             "niche_id": niche_id,
             "error": "Niche analysis temporarily unavailable",
-            "detail": str(e)[:200],  # Truncate error for security
+            "detail": "Analysis failed. Please try again later.",
             "analysis": {
                 "niche_id": niche_id,
                 "health_score": 0,

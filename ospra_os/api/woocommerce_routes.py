@@ -440,7 +440,7 @@ async def get_store_stats(
             }
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="WooCommerce operation failed. Please try again.")
 
 
 @router.get("/stores/{store_id:path}/products")
@@ -492,7 +492,7 @@ async def get_products(
             "page": page,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="WooCommerce operation failed. Please try again.")
 
 
 @router.get("/stores/{store_id:path}/orders")
@@ -543,7 +543,7 @@ async def get_orders(
             "page": page,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="WooCommerce operation failed. Please try again.")
 
 
 @router.post("/stores/{store_id:path}/products")
@@ -577,7 +577,7 @@ async def create_product(
         product = await client.create_product(product_data)
         return {"success": True, "product": product}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="WooCommerce operation failed. Please try again.")
 
 
 @router.get("/info")

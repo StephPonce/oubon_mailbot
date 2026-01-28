@@ -55,7 +55,7 @@ async def get_daily_brief(
 
     except Exception as e:
         logger.error(f"Error generating daily brief: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate daily brief: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate daily brief. Please try again.")
 
 
 @router.post("/daily-brief/send-email")
@@ -114,7 +114,7 @@ async def send_daily_brief_email(
 
     except Exception as e:
         logger.error(f"Error sending daily brief email: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to send daily brief: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send daily brief. Please try again.")
 
 
 @router.get("/daily-brief/preview")
@@ -142,4 +142,4 @@ async def preview_daily_brief(
 
     except Exception as e:
         logger.error(f"Error previewing daily brief: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to preview daily brief: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to preview daily brief. Please try again.")

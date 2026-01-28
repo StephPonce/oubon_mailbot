@@ -182,7 +182,7 @@ async def sync_sales_data(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error syncing sales data: {str(e)}"
+            detail="Error syncing sales data. Please try again."
         )
 
 
@@ -240,7 +240,7 @@ def get_product_performance(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving performance data: {str(e)}"
+            detail="Error retrieving performance data. Please try again."
         )
 
 
@@ -281,7 +281,7 @@ def get_all_performance(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving performance data: {str(e)}"
+            detail="Error retrieving performance data. Please try again."
         )
 
 
@@ -311,7 +311,7 @@ async def evaluate_outcomes(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error evaluating outcomes: {str(e)}"
+            detail="Error evaluating outcomes. Please try again."
         )
 
 
@@ -365,7 +365,7 @@ def get_outcomes(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving outcomes: {str(e)}"
+            detail="Error retrieving outcomes. Please try again."
         )
 
 
@@ -452,7 +452,7 @@ def get_learning_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving learning stats: {str(e)}"
+            detail="Error retrieving learning stats. Please try again."
         )
 
 
@@ -480,5 +480,5 @@ def process_learning_events(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error processing learning events: {str(e)}"
+            detail="Error processing learning events. Please try again."
         )

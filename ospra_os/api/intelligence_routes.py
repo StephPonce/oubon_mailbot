@@ -188,7 +188,7 @@ async def discover_trends(
         logger.error(f"Trend discovery error: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Intelligence operation failed. Please try again later.")
 
 
 @router.post("/analyze")
@@ -253,7 +253,7 @@ async def analyze_product(
         }
     except Exception as e:
         logger.error(f"Analysis error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Intelligence operation failed. Please try again later.")
 
 
 @router.get("/trending")
@@ -291,7 +291,7 @@ async def get_trending_now(
         
     except Exception as e:
         logger.error(f"Trending fetch error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Intelligence operation failed. Please try again later.")
 
 
 @router.post("/generate-image")
@@ -329,7 +329,7 @@ async def generate_product_image(
         
     except Exception as e:
         logger.error(f"Image generation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Intelligence operation failed. Please try again later.")
 
 
 @router.get("/sources")

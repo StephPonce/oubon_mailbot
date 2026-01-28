@@ -3,14 +3,29 @@ Amazon FBA Models - GROK RECOMMENDATION #16
 
 Database models for Amazon Selling Partner API integration.
 Supports multi-marketplace selling, FBA inventory, and order management.
+
+SECURITY: Sensitive credentials (tokens, secrets, keys) are encrypted at rest.
+Use set_credentials() and get_credentials() methods for secure handling.
 """
 
 from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, ForeignKey, Boolean, Enum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
+import logging
 
 from ospra_os.database import Base
+
+logger = logging.getLogger(__name__)
+
+
+# Lazy import encryption to avoid circular imports
+def _get_field_encryption():
+    try:
+        from ospra_os.security.credential_encryption import encrypt_field, decrypt_field
+        return encrypt_field, decrypt_field
+    except ImportError:
+        return None, None
 
 
 class AmazonMarketplace(str, enum.Enum):
@@ -94,6 +109,85 @@ class AmazonAccount(Base):
     listings = relationship("AmazonListing", back_populates="account", cascade="all, delete-orphan")
     orders = relationship("AmazonOrder", back_populates="account", cascade="all, delete-orphan")
     shipments = relationship("FBAShipment", back_populates="account", cascade="all, delete-orphan")
+
+    # SECURITY: Credential encryption methods
+    def set_sensitive_credentials(
+        self,
+        refresh_token: str = None,
+        access_token: str = None,
+        lwa_client_secret: str = None,
+        sp_api_client_secret: str = None,
+        aws_secret_key: str = None,
+    ):
+        """
+        Set sensitive credentials with encryption.
+
+        SECURITY: All secrets are encrypted before storage.
+        Use this method instead of directly setting the columns.
+        """
+        encrypt_field, _ = _get_field_encryption()
+
+        if encrypt_field:
+            if refresh_token is not None:
+                self.refresh_token = encrypt_field(refresh_token)
+            if access_token is not None:
+                self.access_token = encrypt_field(access_token)
+            if lwa_client_secret is not None:
+                self.lwa_client_secret = encrypt_field(lwa_client_secret)
+            if sp_api_client_secret is not None:
+                self.sp_api_client_secret = encrypt_field(sp_api_client_secret)
+            if aws_secret_key is not None:
+                self.aws_secret_key = encrypt_field(aws_secret_key)
+        else:
+            # Fallback if encryption not available
+            logger.warning("Credential encryption not available - storing plain text")
+            if refresh_token is not None:
+                self.refresh_token = refresh_token
+            if access_token is not None:
+                self.access_token = access_token
+            if lwa_client_secret is not None:
+                self.lwa_client_secret = lwa_client_secret
+            if sp_api_client_secret is not None:
+                self.sp_api_client_secret = sp_api_client_secret
+            if aws_secret_key is not None:
+                self.aws_secret_key = aws_secret_key
+
+    def get_decrypted_credentials(self) -> dict:
+        """
+        Get all sensitive credentials decrypted.
+
+        SECURITY: Use this method to access secrets for API calls.
+
+        Returns:
+            dict: All decrypted credential fields
+        """
+        _, decrypt_field = _get_field_encryption()
+
+        if decrypt_field:
+            return {
+                "refresh_token": decrypt_field(self.refresh_token) if self.refresh_token else None,
+                "access_token": decrypt_field(self.access_token) if self.access_token else None,
+                "lwa_client_id": self.lwa_client_id,  # Not sensitive
+                "lwa_client_secret": decrypt_field(self.lwa_client_secret) if self.lwa_client_secret else None,
+                "sp_api_client_id": self.sp_api_client_id,  # Not sensitive
+                "sp_api_client_secret": decrypt_field(self.sp_api_client_secret) if self.sp_api_client_secret else None,
+                "aws_access_key": self.aws_access_key,  # Not as sensitive
+                "aws_secret_key": decrypt_field(self.aws_secret_key) if self.aws_secret_key else None,
+                "role_arn": self.role_arn,
+            }
+        else:
+            # Return as-is if encryption not available
+            return {
+                "refresh_token": self.refresh_token,
+                "access_token": self.access_token,
+                "lwa_client_id": self.lwa_client_id,
+                "lwa_client_secret": self.lwa_client_secret,
+                "sp_api_client_id": self.sp_api_client_id,
+                "sp_api_client_secret": self.sp_api_client_secret,
+                "aws_access_key": self.aws_access_key,
+                "aws_secret_key": self.aws_secret_key,
+                "role_arn": self.role_arn,
+            }
 
 
 class AmazonListing(Base):

@@ -118,6 +118,18 @@ from .performance_models import (
     PerformanceOutcome,
 )
 
+# Security Audit Models
+try:
+    from ospra_os.security.security_audit import SecurityAuditLog
+except ImportError:
+    SecurityAuditLog = None  # Optional - created if security_audit module exists
+
+# Tenant Audit Models
+try:
+    from ospra_os.tenancy.audit import TenantAuditLog
+except ImportError:
+    TenantAuditLog = None  # Optional - created if tenancy module exists
+
 # Backwards compatibility - these functions are now available from connection.py
 # and email_models.py/init_multi_store.py but kept in __all__ for compatibility
 
@@ -204,6 +216,10 @@ __all__ = [
     "GlobalLearningWeights",
     "PersonalLearningWeights",
     "PerformanceOutcome",
+
+    # Audit Models
+    "SecurityAuditLog",
+    "TenantAuditLog",
 
     # Helper Functions (backwards compatible)
     "init_multi_store_db",

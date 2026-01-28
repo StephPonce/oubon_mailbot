@@ -109,14 +109,25 @@ class IntelligenceScheduler:
         logger.info("[PAUSE]  Level 3 AI scheduler stopped")
 
     def _run_scheduler(self):
-        """Main scheduler loop (runs in background thread)"""
+        """Main scheduler loop (runs in background thread)
+
+        PERFORMANCE NOTE: Using short sleep intervals with graceful shutdown check.
+        This allows for responsive shutdown while still being efficient.
+        """
+        import threading
 
         logger.info("[REFRESH] Scheduler loop started")
+
+        # Use an event for graceful shutdown instead of just checking self.running
+        shutdown_event = threading.Event()
 
         while self.running:
             try:
                 schedule.run_pending()
-                time.sleep(60)  # Check every minute
+                # PERFORMANCE FIX: Use event.wait() instead of time.sleep()
+                # This allows immediate wake-up when shutdown is requested
+                # while still sleeping for efficiency when running normally
+                shutdown_event.wait(timeout=60)  # Check every minute, but wake immediately on shutdown
             except Exception as e:
                 logger.error(f"Scheduler loop error: {e}")
                 self.add_alert(

@@ -483,7 +483,7 @@ async def chat_with_oi(
         
     except ValueError as e:
         logger.error(f"Chat ValueError: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Invalid request. Please check your input.")
     except Exception as e:
         logger.error(f"Unexpected chat error: {e}")
         logger.error(traceback.format_exc())
@@ -520,7 +520,7 @@ async def get_user_memory(
         
     except Exception as e:
         logger.error(f"Failed to get memory: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 @router.post("/memory")
@@ -544,7 +544,7 @@ async def update_user_memory(
         
     except Exception as e:
         logger.error(f"Failed to update memory: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 @router.delete("/memory")
@@ -569,7 +569,7 @@ async def clear_user_memory(
         
     except Exception as e:
         logger.error(f"Failed to clear memory: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 # ============================================================================
@@ -600,7 +600,7 @@ async def track_interaction(
         
     except Exception as e:
         logger.error(f"Failed to track interaction: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Failed to track interaction. Please try again."}
 
 
 @router.post("/feedback")
@@ -633,7 +633,7 @@ async def submit_feedback(
         
     except Exception as e:
         logger.error(f"Failed to record feedback: {e}")
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": "Failed to record feedback. Please try again."}
 
 
 @router.get("/recommendations", response_model=RecommendationsResponse)
@@ -660,7 +660,7 @@ async def get_recommendations(
         
     except Exception as e:
         logger.error(f"Failed to get recommendations: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 # ============================================================================
@@ -703,7 +703,7 @@ async def execute_quick_action(
         
     except Exception as e:
         logger.error(f"Action error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 # ============================================================================
@@ -777,7 +777,7 @@ async def get_current_context(
         
     except Exception as e:
         logger.error(f"Context error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 # ============================================================================
@@ -799,7 +799,7 @@ async def get_conversation_summary(
         
     except Exception as e:
         logger.error(f"Conversation summary error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 @router.post("/conversation/clear")
@@ -817,7 +817,7 @@ async def clear_conversation(
         
     except Exception as e:
         logger.error(f"Clear conversation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="AI assistant operation failed. Please try again.")
 
 
 # ============================================================================

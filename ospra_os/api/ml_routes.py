@@ -122,7 +122,7 @@ async def get_cost_report(current_user: User = Depends(get_current_user)):
         logger.error(f"Error getting cost report: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -143,7 +143,7 @@ async def reset_cost_stats(current_user: User = Depends(get_current_user)):
         logger.error(f"Error resetting stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -190,7 +190,7 @@ async def generate_ai_response(
         logger.error(f"Error generating AI response: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -224,7 +224,7 @@ async def score_product(
         logger.error(f"Error scoring product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -252,7 +252,7 @@ async def generate_email_response(
         logger.error(f"Error generating email response: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -281,7 +281,7 @@ async def generate_ad_copy(
         logger.error(f"Error generating ad copy: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -340,7 +340,7 @@ async def collect_training_data(
         logger.error(f"Error starting training data collection: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -414,7 +414,7 @@ async def start_fine_tuning(
         logger.error(f"Error starting fine-tuning: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -441,7 +441,7 @@ async def get_training_status(
         logger.error(f"Error getting training status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -491,7 +491,7 @@ async def list_available_models(current_user: User = Depends(get_current_user)):
         logger.error(f"Error listing models: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 
@@ -520,7 +520,7 @@ async def get_task_complexity_mapping(current_user: User = Depends(get_current_u
         logger.error(f"Error getting task complexity mapping: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="ML operation failed. Please try again."
         )
 
 

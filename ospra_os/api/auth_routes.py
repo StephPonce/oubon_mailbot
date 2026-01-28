@@ -11,12 +11,19 @@ Endpoints:
 - POST /api/auth/change-password - Change password (FIXED to accept JSON body)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from datetime import datetime
 from pydantic import BaseModel
 from typing import Optional
 
+from ospra_os.security.security_audit import (
+    log_login_success,
+    log_login_failed,
+    log_password_changed,
+    log_security_event,
+    SecurityEventType,
+)
 from ospra_os.auth.jwt_auth import (
     UserCreate,
     UserLogin,
@@ -106,21 +113,32 @@ async def register(
 # ============================================================================
 
 @router.post("/login", response_model=TokenResponse)
-async def login(credentials: UserLogin, db: Session = Depends(get_db)):
+async def login(
+    credentials: UserLogin,
+    request: Request,
+    db: Session = Depends(get_db)
+):
     """
     Login with email and password.
-    
+
     Returns access and refresh tokens upon successful authentication.
     """
     user = authenticate_user(db, credentials.email, credentials.password)
-    
+
     if not user:
+        # SECURITY AUDIT: Log failed login
+        log_login_failed(
+            email=credentials.email,
+            reason="Invalid credentials",
+            request=request,
+            db=db,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Update last login
     try:
         user.last_login = datetime.utcnow()
@@ -128,7 +146,15 @@ async def login(credentials: UserLogin, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         # Non-critical error - don't fail login if last_login update fails
-        print(f"[WARNING] Failed to update last_login for user {user.id}: {str(e)}")
+        pass
+
+    # SECURITY AUDIT: Log successful login
+    log_login_success(
+        user_id=user.id,
+        user_email=user.email,
+        request=request,
+        db=db,
+    )
 
     # Generate tokens
     return generate_tokens(user)
@@ -210,18 +236,32 @@ async def get_me(user: User = Depends(get_current_user)):
 # ============================================================================
 
 @router.post("/logout")
-async def logout(user: User = Depends(get_current_user)):
+async def logout(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Logout endpoint.
-    
+
     Note: JWT tokens are stateless, so actual token invalidation
     happens client-side by removing the stored tokens.
-    
+
     This endpoint exists for:
     1. Consistency in API design
     2. Future token blacklist implementation
     3. Logging logout events
     """
+    # SECURITY AUDIT: Log logout
+    log_security_event(
+        event_type=SecurityEventType.LOGOUT,
+        user_id=user.id,
+        user_email=user.email,
+        message="User logged out",
+        request=request,
+        db=db,
+    )
+
     return {
         "success": True,
         "message": "Logged out successfully",
@@ -235,13 +275,14 @@ async def logout(user: User = Depends(get_current_user)):
 
 @router.post("/change-password")
 async def change_password(
+    http_request: Request,
     request: ChangePasswordRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Change user's password.
-    
+
     Requires current password for verification.
     Accepts JSON body with current_password and new_password.
     """
@@ -251,7 +292,7 @@ async def change_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-    
+
     # Validate new password
     if len(request.new_password) < 8:
         raise HTTPException(
@@ -273,12 +314,19 @@ async def change_password(
         db.commit()
     except Exception as e:
         db.rollback()
-        # Log the error for debugging
-        print(f"[ERROR] Failed to change password for user {user.id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to change password. Please try again."
         )
+
+    # SECURITY AUDIT: Log password change
+    log_password_changed(
+        user_id=user.id,
+        user_email=user.email,
+        via_reset=False,
+        request=http_request,
+        db=db,
+    )
 
     return {
         "success": True,

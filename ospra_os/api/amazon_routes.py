@@ -136,7 +136,7 @@ async def get_accounts(
         logger.error(f"Error getting accounts: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -240,7 +240,7 @@ async def get_account(
         logger.error(f"Error getting account: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -275,7 +275,7 @@ async def disconnect_account(
         logger.error(f"Error disconnecting account: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -321,7 +321,7 @@ async def research_products(
         logger.error(f"Error researching products: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -359,7 +359,7 @@ async def analyze_product(
         logger.error(f"Error analyzing product: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -417,7 +417,7 @@ async def get_listings(
         logger.error(f"Error getting listings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -473,7 +473,7 @@ async def create_listing(
         logger.error(f"Error creating listing: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -509,7 +509,7 @@ async def publish_listing(
         logger.error(f"Error publishing listing: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -537,7 +537,7 @@ async def sync_listings(
         logger.error(f"Error syncing listings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -588,7 +588,7 @@ async def get_orders(
         logger.error(f"Error getting orders: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -621,7 +621,7 @@ async def sync_orders(
         logger.error(f"Error syncing orders: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 
@@ -656,7 +656,7 @@ async def sync_inventory(
         logger.error(f"Error syncing inventory: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            detail="Operation failed. Please try again later."
         )
 
 

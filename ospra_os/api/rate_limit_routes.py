@@ -74,7 +74,7 @@ async def get_discovery_rate_limit_status(
             "hourly_remaining": 3,
             "hourly_limit": 3,
             "is_unlimited": False,
-            "error": str(e)
+            "error": "Failed to get rate limit status"
         }
 
 

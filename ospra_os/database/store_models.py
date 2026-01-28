@@ -1,7 +1,11 @@
 """
 Store Models for OspraOS
+
+SECURITY: Credentials are encrypted at rest using Fernet encryption.
+Use set_credentials() and get_credentials() methods to handle encryption.
 """
 
+import json
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
     ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum
@@ -15,6 +19,17 @@ from .base import (
     AIProvider, TaskType, TriggerType, ActionType, LifecycleStage,
     EntryTiming, RiskLevel
 )
+
+# Import encryption utilities (lazy import to avoid circular imports)
+def _get_encryption():
+    try:
+        from ospra_os.security.credential_encryption import (
+            encrypt_credentials,
+            decrypt_credentials,
+        )
+        return encrypt_credentials, decrypt_credentials
+    except ImportError:
+        return None, None
 
 
 class Store(Base):
@@ -72,9 +87,45 @@ class Store(Base):
     def __repr__(self):
         return f"<Store(id={self.id}, name='{self.store_name}', platform='{self.platform}', status='{self.status}')>"
 
-    def get_credentials(self):
-        """Helper to access credentials safely"""
-        return self.credentials if isinstance(self.credentials, dict) else json.loads(self.credentials)
+    def set_credentials(self, credentials: dict):
+        """
+        Set credentials with encryption.
+
+        SECURITY: Sensitive fields (access_token, secret, etc.) are encrypted
+        before storage. Use this method instead of directly setting self.credentials.
+
+        Args:
+            credentials: Dict with platform credentials
+        """
+        encrypt_creds, _ = _get_encryption()
+        if encrypt_creds:
+            self.credentials = encrypt_creds(credentials)
+        else:
+            # Fallback if encryption not available
+            self.credentials = credentials
+
+    def get_credentials(self) -> dict:
+        """
+        Get decrypted credentials.
+
+        SECURITY: Automatically decrypts credentials if they were encrypted.
+        Handles both encrypted strings and legacy plain JSON/dict formats.
+
+        Returns:
+            dict: Decrypted credentials
+        """
+        _, decrypt_creds = _get_encryption()
+
+        if decrypt_creds:
+            return decrypt_creds(self.credentials)
+
+        # Fallback for unencrypted data
+        if isinstance(self.credentials, dict):
+            return self.credentials
+        try:
+            return json.loads(self.credentials)
+        except (json.JSONDecodeError, TypeError):
+            return {}
 
 
 # ============================================================================

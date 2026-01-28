@@ -84,7 +84,7 @@ async def process_inbox(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing inbox: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing inbox. Please try again.")
 
 
 @router.post("/gmail/pubsub/webhook")
@@ -147,7 +147,7 @@ async def send_email(
         return {"success": True, "message": "Email sent successfully"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error sending email: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error sending email. Please try again.")
 
 
 @router.post("/gmail/watch/start")
@@ -182,7 +182,7 @@ async def start_gmail_watch(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error starting Gmail watch: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error starting Gmail watch. Please try again.")
 
 
 @router.post("/gmail/watch/stop")
@@ -199,7 +199,7 @@ async def stop_gmail_watch(
         return {"success": True, "message": "Gmail watch stopped"}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error stopping Gmail watch: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error stopping Gmail watch. Please try again.")
 
 
 @router.get("/gmail/watch/status", response_model=WatchStatusResponse)
@@ -226,7 +226,7 @@ async def get_gmail_watch_status(
             return WatchStatusResponse(active=False)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting watch status: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error getting watch status. Please try again.")
 
 
 # ============================================================================
@@ -246,7 +246,7 @@ async def get_today_stats(
         return stats
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching stats. Please try again.")
 
 
 @router.get("/stats/weekly")
@@ -262,7 +262,7 @@ async def get_weekly_stats(
         return stats
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching weekly stats: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching weekly stats. Please try again.")
 
 
 @router.get("/stats/top-labels")
@@ -279,7 +279,7 @@ async def get_top_labels(
         return {"labels": labels}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching labels: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching labels. Please try again.")
 
 
 @router.get("/stats/costs")
@@ -296,7 +296,7 @@ async def get_ai_costs(
         return costs
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching costs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error fetching costs. Please try again.")
 
 
 # ============================================================================
