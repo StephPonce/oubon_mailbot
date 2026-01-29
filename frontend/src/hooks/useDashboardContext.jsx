@@ -17,6 +17,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../services/api';
+import { authService } from '../services/auth';
 
 // WebSocket URL (same host, different path)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -134,21 +135,31 @@ export function DashboardProvider({ children }) {
   const refreshIntervalRef = useRef(null);
   
   // =========================================================================
-  // INITIALIZATION - Load ALL data on mount
+  // INITIALIZATION - Load ALL data on mount (only if authenticated)
   // =========================================================================
-  
+
   useEffect(() => {
+    // Only load data and connect WebSocket if user is authenticated
+    // This prevents "Load failed" errors on login/register pages
+    if (!authService.isAuthenticated()) {
+      console.debug('[DashboardContext] Skipping init - user not authenticated');
+      return;
+    }
+
     // Load all data immediately
     refreshAll();
-    
+
     // Connect to WebSocket for real-time alerts
     connectWebSocket();
-    
+
     // Set up periodic refresh (every 5 minutes)
     refreshIntervalRef.current = setInterval(() => {
-      refreshAll(true); // Silent refresh
+      // Re-check auth before refreshing (user might have logged out)
+      if (authService.isAuthenticated()) {
+        refreshAll(true); // Silent refresh
+      }
     }, 5 * 60 * 1000);
-    
+
     return () => {
       // Cleanup
       if (wsRef.current) {
@@ -171,10 +182,48 @@ export function DashboardProvider({ children }) {
       currentPage: page,
       lastUpdated: new Date().toISOString(),
     }));
-    
-    // Track page view
-    trackInteraction('page_view', { page });
+
+    // Track page view (only if authenticated)
+    if (authService.isAuthenticated()) {
+      trackInteraction('page_view', { page });
+    }
   }, [location.pathname]);
+
+  // Listen for auth state changes (load data when user logs in)
+  useEffect(() => {
+    const unsubscribe = authService.subscribe((authState) => {
+      if (authState.isAuthenticated) {
+        // User just logged in - load dashboard data
+        console.debug('[DashboardContext] User authenticated - loading data');
+        refreshAll();
+        connectWebSocket();
+
+        // Set up periodic refresh
+        if (!refreshIntervalRef.current) {
+          refreshIntervalRef.current = setInterval(() => {
+            if (authService.isAuthenticated()) {
+              refreshAll(true);
+            }
+          }, 5 * 60 * 1000);
+        }
+      } else {
+        // User logged out - cleanup
+        console.debug('[DashboardContext] User logged out - cleaning up');
+        if (wsRef.current) {
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+        // Reset state to initial
+        setState(initialState);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [refreshAll, connectWebSocket]);
   
   // =========================================================================
   // WEBSOCKET - Real-time alerts from Oi
@@ -185,6 +234,12 @@ export function DashboardProvider({ children }) {
   const MAX_RECONNECT_ATTEMPTS = 5;
   
   const connectWebSocket = useCallback(() => {
+    // Skip if not authenticated
+    if (!authService.isAuthenticated()) {
+      console.debug('[DashboardContext] Skipping WebSocket - not authenticated');
+      return;
+    }
+
     // Skip if we've exceeded max attempts
     if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
       console.log('[PLUGIN] WebSocket: Max reconnection attempts reached, using polling mode');
@@ -289,10 +344,16 @@ export function DashboardProvider({ children }) {
   // =========================================================================
   
   const refreshAll = useCallback(async (silent = false) => {
+    // Skip if not authenticated
+    if (!authService.isAuthenticated()) {
+      console.debug('[DashboardContext] Skipping refresh - not authenticated');
+      return;
+    }
+
     if (!silent) {
       setState(prev => ({ ...prev, alertsLoading: true }));
     }
-    
+
     try {
       // Fetch ALL data in parallel
       const [
@@ -342,6 +403,12 @@ export function DashboardProvider({ children }) {
   }, []);
   
   const refreshSection = useCallback(async (section) => {
+    // Skip if not authenticated
+    if (!authService.isAuthenticated()) {
+      console.debug(`[DashboardContext] Skipping refresh ${section} - not authenticated`);
+      return;
+    }
+
     try {
       switch (section) {
         case 'products':

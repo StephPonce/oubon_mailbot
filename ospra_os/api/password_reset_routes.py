@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 import secrets
 import uuid
 import logging
+import os
 
 from ospra_os.database import User, PasswordResetToken, get_db
 from ospra_os.auth.jwt_auth import hash_password, get_user_by_email, verify_password
@@ -197,16 +198,20 @@ async def forgot_password(
         # Generate reset token (stored in database)
         reset_token = create_reset_token(email, db)
 
-        # Send email
-        email_result = await send_password_reset_email(
-            to_email=email,
-            reset_token=reset_token,
+        # Build full reset URL
+        app_url = os.getenv("APP_URL", "https://ospra.io")
+        reset_link = f"{app_url}/reset-password?token={reset_token}"
+
+        # Send email (sync function, no await needed)
+        email_result = send_password_reset_email(
+            to=email,
+            reset_link=reset_link,
             user_name=user.name
         )
 
         if not email_result.get("success"):
             # Log error but don't reveal to user
-            logger.error(f"Failed to send password reset email to {email[:3]}***")
+            logger.error(f"Failed to send password reset email to {email[:3]}***: {email_result.get('error')}")
 
         # SECURITY AUDIT: Log password reset request
         log_password_reset_requested(

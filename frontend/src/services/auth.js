@@ -171,57 +171,173 @@ class AuthService {
   }
 
   // ---------------------------------------------------------------------------
+  // Server Health Check (for Render cold starts)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check if the server is awake and responsive.
+   * Call this early (e.g., when login page loads) to warm up Render.
+   * @returns {Promise<boolean>} true if server is responsive
+   */
+  async checkServerHealth() {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.debug('Server health check failed:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Wake up the server if needed (for Render cold starts).
+   * Useful to call when auth pages mount.
+   */
+  async wakeUpServer() {
+    const isHealthy = await this.checkServerHealth();
+    if (!isHealthy) {
+      console.log('Server appears to be waking up, retrying health check...');
+      // Try one more time after a delay
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      return this.checkServerHealth();
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
   // Authentication
   // ---------------------------------------------------------------------------
 
   /**
    * Register a new user.
+   * Includes retry logic for Render cold starts and better error handling.
    */
-  async register(name, email, password, tier = 'nest') {
-    const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password }),
-    });
+  async register(name, email, password, tier = 'nest', retries = 2) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const data = await response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      throw new Error(data.detail || 'Registration failed');
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Registration failed');
+      }
+
+      // Store tokens and user
+      storeTokens(data.access_token, data.refresh_token);
+      storeUser(data.user);
+
+      this._notify();
+
+      return data;
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle network errors (Safari shows "Load failed", Chrome shows "Failed to fetch")
+      const isNetworkError =
+        error.name === 'TypeError' ||
+        error.name === 'AbortError' ||
+        error.message === 'Load failed' ||
+        error.message === 'Failed to fetch' ||
+        error.message.includes('NetworkError');
+
+      if (isNetworkError && retries > 0) {
+        // Retry after a short delay (helps with Render cold starts)
+        console.log(`Register request failed, retrying... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        return this.register(name, email, password, tier, retries - 1);
+      }
+
+      // Provide user-friendly error messages
+      if (error.name === 'AbortError') {
+        throw new Error('Connection timed out. The server may be waking up - please try again.');
+      }
+      if (error.message === 'Load failed' || error.message === 'Failed to fetch') {
+        throw new Error('Unable to connect to server. Please check your internet connection and try again.');
+      }
+
+      throw error;
     }
-
-    // Store tokens and user
-    storeTokens(data.access_token, data.refresh_token);
-    storeUser(data.user);
-
-    this._notify();
-
-    return data;
   }
 
   /**
    * Login with email and password.
+   * Includes retry logic for Render cold starts and better error handling.
    */
-  async login(email, password) {
-    const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
+  async login(email, password, retries = 2) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const data = await response.json();
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      throw new Error(data.detail || 'Login failed');
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Login failed');
+      }
+
+      // Store tokens and user
+      storeTokens(data.access_token, data.refresh_token);
+      storeUser(data.user);
+
+      this._notify();
+
+      return data;
+
+    } catch (error) {
+      clearTimeout(timeoutId);
+
+      // Handle network errors (Safari shows "Load failed", Chrome shows "Failed to fetch")
+      const isNetworkError =
+        error.name === 'TypeError' ||
+        error.name === 'AbortError' ||
+        error.message === 'Load failed' ||
+        error.message === 'Failed to fetch' ||
+        error.message.includes('NetworkError');
+
+      if (isNetworkError && retries > 0) {
+        // Retry after a short delay (helps with Render cold starts)
+        console.log(`Login request failed, retrying... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
+        return this.login(email, password, retries - 1);
+      }
+
+      // Provide user-friendly error messages
+      if (error.name === 'AbortError') {
+        throw new Error('Connection timed out. The server may be waking up - please try again.');
+      }
+      if (error.message === 'Load failed' || error.message === 'Failed to fetch') {
+        throw new Error('Unable to connect to server. Please check your internet connection and try again.');
+      }
+
+      throw error;
     }
-
-    // Store tokens and user
-    storeTokens(data.access_token, data.refresh_token);
-    storeUser(data.user);
-
-    this._notify();
-
-    return data;
   }
 
   /**
