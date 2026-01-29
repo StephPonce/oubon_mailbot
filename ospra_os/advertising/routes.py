@@ -173,7 +173,7 @@ async def create_campaign(request: CreateCampaignRequest, background_tasks: Back
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Campaign creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Campaign creation failed. Please try again.")
 
 
 @router.get("/campaigns", response_model=List[CampaignResponse])
@@ -568,4 +568,4 @@ async def generate_ad_copy(request: GenerateAdCopyRequest):
                 'creative': creative
             }
         else:
-            raise HTTPException(status_code=500, detail=f"Ad copy generation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail="Ad copy generation failed. Please try again.")

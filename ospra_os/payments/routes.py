@@ -5,7 +5,7 @@ Endpoints for subscription management and webhook handling.
 """
 
 from fastapi import APIRouter, HTTPException, Request, Header, status
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from pydantic import BaseModel
 
 from ospra_os.core.tiers import SubscriptionTier, get_tier_definition
@@ -86,9 +86,10 @@ async def create_checkout(request: CreateCheckoutRequest):
         }
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -142,9 +143,10 @@ async def get_subscription(subscription_id: str):
         return subscription
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -167,9 +169,10 @@ async def cancel_subscription(subscription_id: str):
         }
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -192,9 +195,10 @@ async def resume_subscription(subscription_id: str):
         }
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -229,9 +233,10 @@ async def change_subscription_tier(request: ChangeTierRequest):
         }
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -253,9 +258,10 @@ async def get_customer_portal(customer_id: str):
         }
         
     except RuntimeError as e:
+        logger.error(f"Payment service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(e)
+            detail="Payment service unavailable. Please try again later."
         )
 
 
@@ -264,11 +270,13 @@ async def get_customer_portal(customer_id: str):
 @router.post("/webhook")
 async def lemonsqueezy_webhook(
     request: Request,
-    x_signature: Optional[str] = Header(None, alias="X-Signature")
+    x_signature: str = Header(..., alias="X-Signature")
 ):
     """
     LemonSqueezy webhook endpoint.
-    
+
+    SECURITY: Signature verification is REQUIRED.
+
     Handles:
     - subscription_created
     - subscription_updated
@@ -278,23 +286,31 @@ async def lemonsqueezy_webhook(
     """
     # Get raw body for signature verification
     body = await request.body()
-    
-    # Verify signature
-    if LEMONSQUEEZY_WEBHOOK_SECRET and x_signature:
-        if not verify_webhook_signature(body, x_signature):
-            logger.warning("Invalid webhook signature")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid signature"
-            )
-    
+
+    # SECURITY: Webhook secret MUST be configured in production
+    if not LEMONSQUEEZY_WEBHOOK_SECRET:
+        logger.error("LEMONSQUEEZY_WEBHOOK_SECRET not configured - rejecting webhook")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Webhook verification not configured"
+        )
+
+    # SECURITY: Always verify signature
+    if not verify_webhook_signature(body, x_signature):
+        logger.warning(f"Invalid LemonSqueezy webhook signature from {request.client.host}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid signature"
+        )
+
     # Parse event
     try:
-        event = await request.json()
-    except Exception as e:
+        import json
+        event = json.loads(body)
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON: {e}"
+            detail="Invalid JSON payload"
         )
     
     # Handle event

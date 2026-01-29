@@ -78,7 +78,7 @@ async def auto_discover_competitors(
 
     except Exception as e:
         logger.error(f"Error in auto-discovery: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================
@@ -175,7 +175,7 @@ async def add_competitor(
 
     except Exception as e:
         logger.error(f"Error adding competitor: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/{competitor_id}")

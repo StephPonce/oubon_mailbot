@@ -163,7 +163,7 @@ Format your response as JSON:
                     analysis = json.loads(json_match.group())
                 else:
                     raise ValueError("No JSON found in response")
-            except:
+            except (json.JSONDecodeError, ValueError, TypeError):
                 # Fallback if parsing fails
                 logger.warning("Failed to parse Claude response as JSON, using defaults")
                 analysis = {
@@ -508,8 +508,8 @@ Your role is to surface what matters, recommend actions, and help the CEO make i
                                     max_price = personal.optimal_price_range.get('max', 0)
                                     if min_price > 0 and max_price > 0:
                                         context_str += f"- Optimal price range: ${min_price:.0f}-${max_price:.0f}\n"
-                        except:
-                            pass  # Personal weights not available
+                        except (AttributeError, TypeError, KeyError):
+                            pass  # Personal weights not available or invalid format
                     except Exception as e:
                         logger.warning(f"Could not fetch fallback learning context: {e}")
 

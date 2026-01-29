@@ -12,10 +12,13 @@ import requests
 import hmac
 import hashlib
 import time
+import logging
 from urllib.parse import urlencode
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -187,9 +190,10 @@ class AliExpressOAuth:
             }
 
         except Exception as e:
+            logger.error(f"Token exchange failed: {e}")
             return {
                 "success": False,
-                "error": str(e)
+                "error": "Token exchange failed"
             }
 
     def _store_token(self, access_token: str, refresh_token: Optional[str], expires_at: datetime):
@@ -290,9 +294,10 @@ class AliExpressOAuth:
             }
 
         except Exception as e:
+            logger.error(f"Token refresh failed: {e}")
             return {
                 "success": False,
-                "error": str(e)
+                "error": "Token refresh failed"
             }
 
     def is_connected(self) -> bool:

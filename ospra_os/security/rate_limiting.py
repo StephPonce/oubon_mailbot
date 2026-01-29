@@ -2,6 +2,11 @@
 Rate Limiting Configuration for OspraOS
 ========================================
 Prevents API abuse and protects AI quota from being burned through.
+
+SECURITY: Includes strict limits for sensitive endpoints:
+- Login: 5 attempts per minute (brute force protection)
+- Password reset: 3 requests per hour (abuse prevention)
+- Registration: 3 per hour per IP (spam prevention)
 """
 
 from slowapi import Limiter
@@ -9,12 +14,158 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
+from functools import wraps
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, Optional
+import time
 import logging
 
 logger = logging.getLogger(__name__)
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
+
+
+# ============================================================================
+# SENSITIVE ENDPOINT RATE LIMITS (Stricter than general API limits)
+# ============================================================================
+
+# Sensitive endpoint configurations
+SENSITIVE_LIMITS = {
+    "login": {"max_attempts": 5, "window_seconds": 60, "lockout_seconds": 300},
+    "password_reset": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
+    "register": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
+    "forgot_password": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
+}
+
+
+class SensitiveEndpointRateLimiter:
+    """
+    In-memory rate limiter for sensitive authentication endpoints.
+
+    SECURITY: Provides stricter rate limiting than general API limits.
+    Implements exponential backoff on repeated violations.
+    """
+
+    def __init__(self):
+        # Format: {endpoint: {ip: {"attempts": count, "first_attempt": timestamp, "locked_until": timestamp}}}
+        self._attempts: Dict[str, Dict[str, Dict]] = defaultdict(lambda: defaultdict(dict))
+        self._last_cleanup = time.time()
+        self._cleanup_interval = 300  # 5 minutes
+
+    def _cleanup_old_entries(self):
+        """Remove expired entries to prevent memory leaks."""
+        now = time.time()
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+
+        self._last_cleanup = now
+        cutoff = now - 7200  # 2 hours
+
+        for endpoint in list(self._attempts.keys()):
+            for ip in list(self._attempts[endpoint].keys()):
+                entry = self._attempts[endpoint][ip]
+                if entry.get("first_attempt", 0) < cutoff:
+                    del self._attempts[endpoint][ip]
+
+    def check_rate_limit(self, endpoint: str, ip_address: str) -> tuple[bool, Optional[str], Optional[int]]:
+        """
+        Check if request is allowed for sensitive endpoint.
+
+        Returns:
+            (allowed, error_message, retry_after_seconds)
+        """
+        self._cleanup_old_entries()
+
+        config = SENSITIVE_LIMITS.get(endpoint)
+        if not config:
+            return True, None, None
+
+        now = time.time()
+        entry = self._attempts[endpoint][ip_address]
+
+        # Check if currently locked out
+        locked_until = entry.get("locked_until", 0)
+        if now < locked_until:
+            retry_after = int(locked_until - now)
+            logger.warning(f"[SECURITY] Rate limit lockout active for {ip_address} on /{endpoint}")
+            return False, f"Too many attempts. Please try again in {retry_after} seconds.", retry_after
+
+        # Reset if window expired
+        first_attempt = entry.get("first_attempt", 0)
+        if now - first_attempt > config["window_seconds"]:
+            entry["attempts"] = 0
+            entry["first_attempt"] = now
+
+        # Check attempt count
+        attempts = entry.get("attempts", 0)
+        if attempts >= config["max_attempts"]:
+            # Lock out the IP
+            entry["locked_until"] = now + config["lockout_seconds"]
+            logger.warning(
+                f"[SECURITY] Rate limit exceeded for {ip_address} on /{endpoint}. "
+                f"Locked out for {config['lockout_seconds']}s"
+            )
+            return False, f"Too many attempts. Please try again later.", config["lockout_seconds"]
+
+        return True, None, None
+
+    def record_attempt(self, endpoint: str, ip_address: str):
+        """Record an attempt for rate limiting."""
+        entry = self._attempts[endpoint][ip_address]
+        now = time.time()
+
+        if "first_attempt" not in entry:
+            entry["first_attempt"] = now
+
+        entry["attempts"] = entry.get("attempts", 0) + 1
+
+    def reset_attempts(self, endpoint: str, ip_address: str):
+        """Reset attempts on successful action (e.g., successful login)."""
+        if ip_address in self._attempts[endpoint]:
+            del self._attempts[endpoint][ip_address]
+
+
+# Global instance
+sensitive_rate_limiter = SensitiveEndpointRateLimiter()
+
+
+def check_sensitive_rate_limit(endpoint: str, request: Request) -> None:
+    """
+    Check rate limit for sensitive endpoint. Raises HTTPException if exceeded.
+
+    Usage in route:
+        check_sensitive_rate_limit("login", request)
+    """
+    ip = get_remote_address(request)
+    allowed, error_msg, retry_after = sensitive_rate_limiter.check_rate_limit(endpoint, ip)
+
+    if not allowed:
+        # Log to security audit
+        try:
+            from ospra_os.security.auth_logger import log_rate_limit_exceeded
+            log_rate_limit_exceeded(ip_address=ip, endpoint=f"/api/auth/{endpoint}", user_id=None)
+        except Exception:
+            pass
+
+        raise HTTPException(
+            status_code=429,
+            detail=error_msg,
+            headers={"Retry-After": str(retry_after)} if retry_after else {}
+        )
+
+
+def record_sensitive_attempt(endpoint: str, request: Request) -> None:
+    """Record an attempt for a sensitive endpoint."""
+    ip = get_remote_address(request)
+    sensitive_rate_limiter.record_attempt(endpoint, ip)
+
+
+def reset_sensitive_attempts(endpoint: str, request: Request) -> None:
+    """Reset attempts on successful action."""
+    ip = get_remote_address(request)
+    sensitive_rate_limiter.reset_attempts(endpoint, ip)
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):

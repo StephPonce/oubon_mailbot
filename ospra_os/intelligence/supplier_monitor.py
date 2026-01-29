@@ -24,6 +24,11 @@ from bs4 import BeautifulSoup
 
 from ospra_os.database import Product
 from ospra_os.intelligence.ai_actions import ActionType, get_action_manager
+from ospra_os.constants import (
+    PRICE_MONITOR_INTERVAL_HOURS,
+    PRICE_CHANGE_THRESHOLD,
+    PRICE_HISTORY_RETENTION_DAYS,
+)
 
 
 class PriceSnapshot:
@@ -65,8 +70,8 @@ class SupplierMonitor:
     def __init__(self, db: Session):
         self.db = db
         self.price_history: Dict[int, List[PriceSnapshot]] = {}
-        self.monitoring_interval = 6 * 3600  # 6 hours in seconds
-        self.price_change_threshold = 0.05  # 5% change triggers alert
+        self.monitoring_interval = PRICE_MONITOR_INTERVAL_HOURS * 3600  # hours to seconds
+        self.price_change_threshold = PRICE_CHANGE_THRESHOLD
 
     async def monitor_product(self, product_id: int) -> Dict[str, Any]:
         """
@@ -97,8 +102,8 @@ class SupplierMonitor:
 
         self.price_history[product_id].append(snapshot)
 
-        # Keep only last 30 days of history
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        # Keep only configured retention period of history
+        cutoff = datetime.utcnow() - timedelta(days=PRICE_HISTORY_RETENTION_DAYS)
         self.price_history[product_id] = [
             s for s in self.price_history[product_id]
             if s.timestamp > cutoff
@@ -187,8 +192,8 @@ class SupplierMonitor:
                     if price_meta:
                         try:
                             price = float(price_meta.get('content'))
-                        except:
-                            pass
+                        except (ValueError, TypeError):
+                            pass  # Invalid price format
 
                     # Try JSON-LD
                     if not price:
@@ -199,8 +204,8 @@ class SupplierMonitor:
                                 data = json.loads(json_ld.string)
                                 if 'offers' in data:
                                     price = float(data['offers'].get('price', 0))
-                            except:
-                                pass
+                            except (json.JSONDecodeError, ValueError, TypeError, AttributeError):
+                                pass  # Invalid JSON-LD data
 
                     # Try span with price class
                     if not price:
@@ -211,8 +216,8 @@ class SupplierMonitor:
                             if price_match:
                                 try:
                                     price = float(price_match.group())
-                                except:
-                                    pass
+                                except (ValueError, TypeError):
+                                    pass  # Invalid price format
 
                     if not price:
                         return None
@@ -233,8 +238,8 @@ class SupplierMonitor:
                             if orig_match:
                                 try:
                                     original_price = float(orig_match.group())
-                                except:
-                                    pass
+                                except (ValueError, TypeError):
+                                    pass  # Invalid price format
 
                     return PriceSnapshot(
                         product_id=product_id,
@@ -286,8 +291,8 @@ class SupplierMonitor:
                         if price_match:
                             try:
                                 price = float(price_match.group())
-                            except:
-                                pass
+                            except (ValueError, TypeError):
+                                pass  # Invalid price format
 
                     if not price:
                         return None
@@ -347,8 +352,8 @@ class SupplierMonitor:
                         if price_match:
                             try:
                                 price = float(price_match.group())
-                            except:
-                                pass
+                            except (ValueError, TypeError):
+                                pass  # Invalid price format
 
                     # Try elements with price-related classes
                     if not price:
@@ -359,8 +364,8 @@ class SupplierMonitor:
                             if price_match:
                                 try:
                                     price = float(price_match.group())
-                                except:
-                                    pass
+                                except (ValueError, TypeError):
+                                    pass  # Invalid price format
 
                     if not price:
                         return None

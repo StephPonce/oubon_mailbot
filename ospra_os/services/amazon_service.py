@@ -311,8 +311,8 @@ class AmazonService:
                 try:
                     pricing = client.get_competitive_pricing(asin)
                     product_info["buy_box_price"] = pricing.get("payload", [{}])[0].get("Product", {}).get("CompetitivePricing", {}).get("CompetitivePrices", [{}])[0].get("Price", {}).get("ListingPrice", {}).get("Amount")
-                except:
-                    product_info["buy_box_price"] = None
+                except (KeyError, IndexError, TypeError, AttributeError):
+                    product_info["buy_box_price"] = None  # Pricing data unavailable
 
                 # Estimate fees (if we have price)
                 if product_info["buy_box_price"]:
@@ -329,8 +329,8 @@ class AmazonService:
                         product_info["estimated_fees"] = total_fees
                         product_info["estimated_profit"] = float(product_info["buy_box_price"]) - total_fees
 
-                    except:
-                        product_info["estimated_fees"] = None
+                    except (KeyError, IndexError, TypeError, ValueError):
+                        product_info["estimated_fees"] = None  # Fees data unavailable
                         product_info["estimated_profit"] = None
 
                 products.append(product_info)

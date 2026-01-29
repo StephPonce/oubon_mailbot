@@ -471,8 +471,8 @@ class HybridLearningEngine:
                     dt = datetime.fromisoformat(sale_date) if isinstance(sale_date, str) else sale_date
                     day_name = dt.strftime('%A')
                     day_sales[day_name] += sale.get('units_sold', 1)
-                except:
-                    pass
+                except (ValueError, TypeError, AttributeError):
+                    pass  # Invalid date format or missing data
         
         # Find peak days
         if day_sales:

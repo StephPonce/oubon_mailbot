@@ -515,8 +515,8 @@ class ProductImageProcessor:
         try:
             font_size = max(width // 50, 16)
             font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
-        except:
-            font = ImageFont.load_default()
+        except (OSError, IOError):
+            font = ImageFont.load_default()  # System font not available
 
         bbox = draw.textbbox((0, 0), watermark_text, font=font)
         text_width = bbox[2] - bbox[0]

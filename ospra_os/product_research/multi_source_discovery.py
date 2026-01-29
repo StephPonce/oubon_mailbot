@@ -1622,8 +1622,8 @@ class MultiSourceDiscovery:
             try:
                 trend_score = await self._get_trend_score(product_name)
                 product_data['trend_score'] = trend_score
-            except:
-                product_data['trend_score'] = 50  # Default
+            except Exception:
+                product_data['trend_score'] = 50  # Default fallback if trend API fails
 
         # Calculate final score
         final_score = self._calculate_final_score(product_data)

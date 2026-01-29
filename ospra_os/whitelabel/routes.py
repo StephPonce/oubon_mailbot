@@ -213,7 +213,8 @@ def get_whitelabel_router() -> APIRouter:
             )
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            logger.warning(f"Partner registration validation error: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid partner registration data.")
 
     @router.post("/partners/{partner_id}/activate", dependencies=[Depends(require_admin)])
     async def activate_partner(
@@ -233,7 +234,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+            logger.warning(f"Partner activation error: {e}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partner not found or cannot be activated.")
 
     @router.post("/partners/{partner_id}/suspend", dependencies=[Depends(require_admin)])
     async def suspend_partner(
@@ -253,7 +255,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+            logger.warning(f"Partner suspension error: {e}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Partner not found or cannot be suspended.")
 
     # ==================== PARTNER ENDPOINTS ====================
 
@@ -332,7 +335,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            logger.warning(f"Branding update error: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid branding data.")
 
     @router.get("/partner/branding/css")
     async def get_partner_css(
@@ -368,7 +372,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            logger.warning(f"Domain configuration error: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid domain configuration.")
 
     @router.get("/partner/domain")
     async def get_partner_domain(
@@ -401,7 +406,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            logger.warning(f"Domain verification error: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Domain verification failed.")
 
     @router.get("/partner/clients")
     async def get_partner_clients(
@@ -459,7 +465,8 @@ def get_whitelabel_router() -> APIRouter:
             }
 
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            logger.warning(f"Client addition error: {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to add client. Client limit may be exceeded.")
 
     @router.delete("/partner/clients/{user_id}")
     async def remove_partner_client(

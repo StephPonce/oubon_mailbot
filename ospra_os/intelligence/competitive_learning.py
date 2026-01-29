@@ -286,8 +286,8 @@ FORMATTING REQUIREMENTS:
             elif line.startswith('CONFIDENCE:'):
                 try:
                     current_pattern['confidence'] = float(line.replace('CONFIDENCE:', '').strip())
-                except:
-                    current_pattern['confidence'] = 0.7
+                except (ValueError, TypeError):
+                    current_pattern['confidence'] = 0.7  # Default confidence if parsing fails
 
             elif line.startswith('ATTRIBUTES:'):
                 current_pattern['attributes'] = line.replace('ATTRIBUTES:', '').strip()
@@ -295,8 +295,8 @@ FORMATTING REQUIREMENTS:
             elif line.startswith('SAMPLE_SIZE:'):
                 try:
                     current_pattern['sample_size'] = int(line.replace('SAMPLE_SIZE:', '').strip())
-                except:
-                    current_pattern['sample_size'] = len(products)
+                except (ValueError, TypeError):
+                    current_pattern['sample_size'] = len(products)  # Default to product count
 
         # Add last pattern
         if current_pattern:
@@ -474,15 +474,15 @@ FORMATTING REQUIREMENTS:
                 try:
                     match = line.replace('SUCCESS_MATCH:', '').strip().replace('%', '')
                     result['success_match'] = float(match) / 100
-                except:
-                    result['success_match'] = 0.5
+                except (ValueError, TypeError):
+                    result['success_match'] = 0.5  # Default if parsing fails
 
             elif line.startswith('FAILURE_MATCH:'):
                 try:
                     match = line.replace('FAILURE_MATCH:', '').strip().replace('%', '')
                     result['failure_match'] = float(match) / 100
-                except:
-                    result['failure_match'] = 0.3
+                except (ValueError, TypeError):
+                    result['failure_match'] = 0.3  # Default if parsing fails
 
             elif line.startswith('RECOMMENDATION:'):
                 rec = line.replace('RECOMMENDATION:', '').strip()

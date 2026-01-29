@@ -120,7 +120,7 @@ def get_shopify_client():
             logger.info("[SUCCESS] Shopify client initialized")
         except Exception as e:
             logger.error(f"Failed to initialize Shopify client: {e}")
-            raise HTTPException(status_code=500, detail=f"Shopify not configured: {e}")
+            raise HTTPException(status_code=500, detail="Shopify not configured. Please check server configuration.")
     return _shopify_client
 
 
@@ -134,7 +134,7 @@ def get_deployment_service():
             logger.info("[SUCCESS] Legacy deployment service initialized")
         except Exception as e:
             logger.error(f"Failed to initialize deployment service: {e}")
-            raise HTTPException(status_code=500, detail=f"Deployment service error: {e}")
+            raise HTTPException(status_code=500, detail="Deployment service unavailable. Please try again.")
     return _deployment_service
 
 
@@ -148,7 +148,7 @@ def get_unified_deployer():
             logger.info("[SUCCESS] Unified AI deployer initialized (Claude + DALL-E + rembg)")
         except Exception as e:
             logger.error(f"Failed to initialize unified deployer: {e}")
-            raise HTTPException(status_code=500, detail=f"Unified deployer error: {e}")
+            raise HTTPException(status_code=500, detail="Unified deployer unavailable. Please try again.")
     return _unified_deployer
 
 
@@ -249,7 +249,7 @@ async def list_shopify_products(limit: int = 50):
         
     except Exception as e:
         logger.error(f"Failed to list products: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/deploy", response_model=DeploymentResult)
@@ -402,7 +402,7 @@ async def preview_deployment(request: ProductDeployRequest):
         logger.error(f"Preview failed: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/deploy/bulk", response_model=List[DeploymentResult])
@@ -451,7 +451,7 @@ async def bulk_deploy_products(request: BulkDeployRequest):
         
     except Exception as e:
         logger.error(f"Bulk deployment failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.delete("/products/{product_id}")
@@ -468,7 +468,7 @@ async def delete_product(product_id: int):
             
     except Exception as e:
         logger.error(f"Delete failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.patch("/products/{product_id}/inventory")
@@ -497,7 +497,7 @@ async def update_inventory(product_id: int, quantity: int):
         raise
     except Exception as e:
         logger.error(f"Inventory update failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/analytics")
@@ -533,4 +533,4 @@ async def shopify_analytics():
         
     except Exception as e:
         logger.error(f"Analytics failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")

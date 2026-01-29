@@ -41,10 +41,13 @@ class ToggleAutoPilotRequest(BaseModel):
 
 
 class UpdateSettingsRequest(BaseModel):
-    """Request to update auto-pilot settings"""
+    """Request to update auto-pilot settings.
+
+    SECURITY: All numeric fields have bounded ranges.
+    """
     auto_pilot_threshold: Optional[float] = Field(None, ge=0, le=100)
     daily_auto_execute_limit: Optional[int] = Field(None, ge=0, le=100)
-    max_auto_spend: Optional[float] = Field(None, ge=0)
+    max_auto_spend: Optional[float] = Field(None, ge=0, le=100000, description="Max $100,000 auto-spend limit")
     notify_on_auto_execute: Optional[bool] = None
     daily_summary_email: Optional[bool] = None
 

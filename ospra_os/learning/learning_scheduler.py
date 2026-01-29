@@ -17,6 +17,14 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from ospra_os.constants import (
+    DAILY_LEARNING_HOUR,
+    WEEKLY_LEARNING_DAY,
+    WEEKLY_LEARNING_HOUR,
+    TRACKING_SYNC_INTERVAL_HOURS,
+    LEARNING_DATA_RETENTION_DAYS,
+)
+
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
@@ -40,28 +48,28 @@ def start_learning_scheduler():
     
     _learning_scheduler = AsyncIOScheduler()
     
-    # Daily learning cycle at 3:00 AM
+    # Daily learning cycle at configured hour
     _learning_scheduler.add_job(
         run_daily_learning_cycle,
-        CronTrigger(hour=3, minute=0),
+        CronTrigger(hour=DAILY_LEARNING_HOUR, minute=0),
         id="daily_learning_cycle",
         name="Daily AI Learning Cycle",
         replace_existing=True
     )
-    
-    # Weekly comprehensive learning on Sundays at 4:00 AM
+
+    # Weekly comprehensive learning at configured day/hour
     _learning_scheduler.add_job(
         run_weekly_learning_update,
-        CronTrigger(day_of_week='sun', hour=4, minute=0),
+        CronTrigger(day_of_week=WEEKLY_LEARNING_DAY, hour=WEEKLY_LEARNING_HOUR, minute=0),
         id="weekly_learning_update",
         name="Weekly AI Model Update",
         replace_existing=True
     )
-    
-    # Tracking sync every 6 hours
+
+    # Tracking sync at configured interval
     _learning_scheduler.add_job(
         sync_supplier_tracking,
-        IntervalTrigger(hours=6),
+        IntervalTrigger(hours=TRACKING_SYNC_INTERVAL_HOURS),
         id="tracking_sync",
         name="Supplier Tracking Sync",
         replace_existing=True
@@ -79,9 +87,9 @@ def start_learning_scheduler():
     _learning_scheduler.start()
     
     logger.info("[BRAIN] Self-Learning Scheduler started")
-    logger.info("    📊 Daily learning: 3:00 AM")
-    logger.info("    📈 Weekly update: Sundays 4:00 AM")
-    logger.info("    📦 Tracking sync: Every 6 hours")
+    logger.info(f"    Daily learning: {DAILY_LEARNING_HOUR}:00 AM")
+    logger.info(f"    Weekly update: {WEEKLY_LEARNING_DAY.capitalize()}s {WEEKLY_LEARNING_HOUR}:00 AM")
+    logger.info(f"    Tracking sync: Every {TRACKING_SYNC_INTERVAL_HOURS} hours")
 
 
 async def run_daily_learning_cycle():
@@ -302,18 +310,18 @@ async def sync_supplier_tracking():
 async def cleanup_old_learning_data():
     """
     Clean up old learning events to prevent database bloat.
-    
-    Keeps last 90 days of data.
+
+    Keeps data for configured retention period.
     """
     logger.info("[CLEANUP] Cleaning old learning data...")
-    
+
     try:
         from ospra_os.database.connection import SessionLocal
         from ospra_os.database import AILearningEvent
-        
+
         db = SessionLocal()
         try:
-            cutoff = datetime.utcnow() - timedelta(days=90)
+            cutoff = datetime.utcnow() - timedelta(days=LEARNING_DATA_RETENTION_DAYS)
             
             deleted = db.query(AILearningEvent).filter(
                 AILearningEvent.timestamp < cutoff

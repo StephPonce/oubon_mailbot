@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.constants import SHOPIFY_API_TIMEOUT, DEFAULT_PAGE_SIZE, SHOPIFY_MAX_PAGE_SIZE
 
 load_dotenv()
 
@@ -84,18 +85,18 @@ class ShopifyClient:
                 f"{self.base_url}/{endpoint}",
                 headers=self.headers,
                 params=params,
-                timeout=30.0
+                timeout=SHOPIFY_API_TIMEOUT
             )
             resp.raise_for_status()
             return resp.json()
-    
+
     async def post(self, endpoint: str, data: dict) -> dict:
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{self.base_url}/{endpoint}",
                 headers=self.headers,
                 json=data,
-                timeout=30.0
+                timeout=SHOPIFY_API_TIMEOUT
             )
             resp.raise_for_status()
             return resp.json()
@@ -332,8 +333,8 @@ async def get_store_stats(
                 if days <= 30:
                     rev_30d += total
                     ord_30d += 1
-            except:
-                continue
+            except (ValueError, TypeError, AttributeError):
+                continue  # Invalid date format or missing data
         
         return {
             "success": True,

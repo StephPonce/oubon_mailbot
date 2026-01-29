@@ -19,6 +19,7 @@ ENDPOINTS (ALL GET):
 import os
 import logging
 import asyncio
+import json
 import aiohttp
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -115,7 +116,7 @@ class CJDropshippingClient:
                     if response.status == 200:
                         try:
                             result = await response.json()
-                        except:
+                        except (json.JSONDecodeError, aiohttp.ContentTypeError):
                             logger.error(f"[ERROR] CJ invalid JSON response: {response_text[:200]}")
                             return None
                         

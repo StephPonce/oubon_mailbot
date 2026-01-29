@@ -1,5 +1,6 @@
 """AliExpress OAuth routes for authentication."""
 import os
+import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
@@ -9,6 +10,7 @@ from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
 import time
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
 
 # In-memory storage for testing (replace with database later)
@@ -130,13 +132,11 @@ async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
         return HTMLResponse(content=html_content)
 
     except Exception as e:
-        import traceback
+        logger.error(f"OAuth initialization failed: {e}")
         return JSONResponse(
             status_code=500,
             content={
-                "error": str(e),
-                "type": type(e).__name__,
-                "traceback": traceback.format_exc()
+                "error": "OAuth initialization failed. Please try again."
             }
         )
 
@@ -283,13 +283,12 @@ async def oauth_callback(
             )
 
     except Exception as e:
-        import traceback
+        logger.error(f"OAuth callback processing failed: {e}")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
-                "error": f"Failed to process callback: {str(e)}",
-                "traceback": traceback.format_exc()
+                "error": "Failed to process OAuth callback. Please try again."
             }
         )
 
@@ -380,81 +379,26 @@ async def disconnect_aliexpress(
             }
         )
     except Exception as e:
+        logger.error(f"AliExpress disconnect failed: {e}")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
-                "error": str(e)
+                "error": "Failed to disconnect AliExpress. Please try again."
             }
         )
 
 
-@router.get("/debug/config")
-async def debug_config(
-    current_user: User = Depends(get_current_user),
-    settings: Settings = Depends(get_settings)
-):
-    """Debug endpoint to check AliExpress configuration."""
-    is_production = os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
-    if is_production:
-        raise HTTPException(status_code=404, detail="Not found")
-    try:
-        return {
-            "app_key_set": settings.ALIEXPRESS_API_KEY is not None,
-            "app_key_value": settings.ALIEXPRESS_API_KEY[:3] + "..." if settings.ALIEXPRESS_API_KEY else None,
-            "app_secret_set": settings.ALIEXPRESS_APP_SECRET is not None,
-            "base_url": settings.base_url,
-            "redirect_uri": f"{settings.base_url}/aliexpress/callback",
-            "database_url_set": settings.database_url is not None
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": str(e),
-                "type": type(e).__name__
-            }
-        )
-
-
-@router.get("/debug/auth-url")
-async def debug_auth_url(
-    current_user: User = Depends(get_current_user),
-    oauth: AliExpressOAuth = Depends(get_oauth_client)
-):
-    """Debug endpoint to see the OAuth URL without redirecting."""
-    is_production = os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
-    if is_production:
-        raise HTTPException(status_code=404, detail="Not found")
-    try:
-        from urllib.parse import urlparse, parse_qs
-
-        auth_url = oauth.get_authorization_url()
-
-        # Parse the URL to show components
-        parsed = urlparse(auth_url)
-        params = parse_qs(parsed.query)
-
-        return {
-            "auth_url": auth_url,
-            "parsed": {
-                "base_url": f"{parsed.scheme}://{parsed.netloc}{parsed.path}",
-                "parameters": {k: v[0] if len(v) == 1 else v for k, v in params.items()}
-            },
-            "credentials": {
-                "app_key": oauth.app_key,
-                "redirect_uri": oauth.redirect_uri
-            },
-            "message": "Copy auth_url and paste in browser to test",
-            "note": "If this fails, AliExpress might not support OAuth for your app type"
-        }
-    except Exception as e:
-        import traceback
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": str(e),
-                "type": type(e).__name__,
-                "traceback": traceback.format_exc()
-            }
-        )
+# =============================================================================
+# DEBUG ENDPOINTS REMOVED FOR SECURITY
+# =============================================================================
+# The following debug endpoints were removed for security:
+# - /debug/config: Exposed partial API keys and configuration
+# - /debug/auth-url: Exposed OAuth credentials
+#
+# SECURITY NOTE: Checking environment variables is not reliable for security.
+# These endpoints are blocked by DebugEndpointProtectionMiddleware in production,
+# but for defense-in-depth, they have been removed entirely.
+#
+# For debugging AliExpress integration, use admin tools or server logs.
+# =============================================================================

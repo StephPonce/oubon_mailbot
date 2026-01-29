@@ -61,25 +61,38 @@ class ProductAnalysis(BaseModel):
 
 
 class TrendDiscoveryRequest(BaseModel):
-    """Request for trend discovery."""
-    categories: List[str] = ["smart_home", "kitchen", "fitness"]
+    """Request for trend discovery.
+
+    SECURITY: All fields have proper validation and limits.
+    """
+    categories: List[str] = Field(
+        default=["smart_home", "kitchen", "fitness"],
+        max_length=20,
+        description="Categories to search"
+    )
     limit: int = Field(default=10, ge=1, le=50)
     min_trend_score: float = Field(default=50, ge=0, le=100)
 
 
 class ProductAnalysisRequest(BaseModel):
-    """Request for product analysis."""
-    product_name: str
-    product_url: Optional[str] = None
-    supplier_price: Optional[float] = None
-    category: Optional[str] = None
+    """Request for product analysis.
+
+    SECURITY: Fields have length limits and URL validation.
+    """
+    product_name: str = Field(..., min_length=1, max_length=500)
+    product_url: Optional[str] = Field(None, max_length=2000)
+    supplier_price: Optional[float] = Field(None, ge=0, le=100000)
+    category: Optional[str] = Field(None, max_length=100)
 
 
 class ImageGenerationRequest(BaseModel):
-    """Request for AI image generation."""
-    product_name: str
-    style: str = "professional"
-    quality: str = "standard"
+    """Request for AI image generation.
+
+    SECURITY: Fields have enums and length limits.
+    """
+    product_name: str = Field(..., min_length=1, max_length=500)
+    style: str = Field(default="professional", pattern="^(professional|lifestyle|minimal|artistic)$")
+    quality: str = Field(default="standard", pattern="^(standard|hd)$")
     count: int = Field(default=1, ge=1, le=5)
 
 
@@ -183,11 +196,9 @@ async def discover_trends(
         
     except ImportError as e:
         logger.error(f"Import error: {e}")
-        raise HTTPException(status_code=500, detail=f"Intelligence engine not available: {e}")
+        raise HTTPException(status_code=500, detail="Intelligence engine not available. Please contact support.")
     except Exception as e:
-        logger.error(f"Trend discovery error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Trend discovery error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Intelligence operation failed. Please try again later.")
 
 

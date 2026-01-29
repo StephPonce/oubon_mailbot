@@ -192,8 +192,8 @@ class SaturationScorer:
                 days_live = (datetime.now() - first_date).days
                 if days_live > 0:
                     return total_reviews / days_live
-            except:
-                pass
+            except (ValueError, TypeError):
+                pass  # Invalid date format - use fallback estimation
 
         # Fallback: Estimate based on review count
         # Assume product has been live for:

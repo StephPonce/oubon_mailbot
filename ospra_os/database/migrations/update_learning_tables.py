@@ -8,10 +8,14 @@ to the existing learning tables.
 Run with: python -m ospra_os.database.migrations.update_learning_tables
 
 Author: Ospra Intelligence
+
+SECURITY NOTE: Column names are validated against a whitelist to prevent
+SQL injection. All column definitions are hardcoded - never accept user input.
 """
 
 import os
 import sys
+import re
 from datetime import datetime
 
 # Add project root to path
@@ -20,6 +24,18 @@ sys.path.insert(0, project_root)
 
 from sqlalchemy import text, inspect
 from ospra_os.database.connection import engine, SessionLocal
+
+
+# SECURITY: Whitelist of valid column name patterns
+VALID_COLUMN_PATTERN = re.compile(r'^[a-z][a-z0-9_]{0,62}$')
+
+
+def validate_column_name(col_name: str) -> bool:
+    """Validate column name matches safe pattern.
+
+    SECURITY: Prevents SQL injection via column names.
+    """
+    return bool(VALID_COLUMN_PATTERN.match(col_name))
 
 
 def get_existing_columns(table_name: str) -> set:
@@ -91,8 +107,13 @@ def run_migration():
             
             for col_name, col_type in new_columns.items():
                 if col_name not in existing:
+                    # SECURITY: Validate column name before using in SQL
+                    if not validate_column_name(col_name):
+                        print(f"  ⚠️ Skipping invalid column name: {col_name}")
+                        continue
                     print(f"  Adding column: {col_name}")
                     try:
+                        # Use parameterized-style query construction with validated names
                         db.execute(text(f"ALTER TABLE global_learning_weights ADD COLUMN {col_name} {col_type}"))
                     except Exception as e:
                         print(f"    Warning: {e}")
@@ -101,8 +122,8 @@ def run_migration():
             if 'version' in existing:
                 try:
                     db.execute(text("ALTER TABLE global_learning_weights ALTER COLUMN version TYPE VARCHAR(20)"))
-                except:
-                    pass  # May already be correct type
+                except Exception:
+                    pass  # Column may already be correct type - safe to ignore
             
             print("  ✅ Table updated!")
         
@@ -149,6 +170,10 @@ def run_migration():
             
             for col_name, col_type in new_columns.items():
                 if col_name not in existing:
+                    # SECURITY: Validate column name before using in SQL
+                    if not validate_column_name(col_name):
+                        print(f"  ⚠️ Skipping invalid column name: {col_name}")
+                        continue
                     print(f"  Adding column: {col_name}")
                     try:
                         db.execute(text(f"ALTER TABLE ai_learning_events ADD COLUMN {col_name} {col_type}"))
@@ -158,27 +183,27 @@ def run_migration():
             # Make user_id nullable
             try:
                 db.execute(text("ALTER TABLE ai_learning_events ALTER COLUMN user_id DROP NOT NULL"))
-            except:
-                pass
-            
+            except Exception:
+                pass  # Column may already be nullable
+
             # Make context nullable
             try:
                 db.execute(text("ALTER TABLE ai_learning_events ALTER COLUMN context DROP NOT NULL"))
-            except:
-                pass
-            
+            except Exception:
+                pass  # Column may already be nullable
+
             # Make lesson_type nullable
             try:
                 db.execute(text("ALTER TABLE ai_learning_events ALTER COLUMN lesson_type DROP NOT NULL"))
-            except:
-                pass
-            
+            except Exception:
+                pass  # Column may already be nullable
+
             # Create indexes
             try:
                 db.execute(text("CREATE INDEX IF NOT EXISTS idx_learning_product ON ai_learning_events (product_id)"))
                 db.execute(text("CREATE INDEX IF NOT EXISTS idx_learning_timestamp ON ai_learning_events (timestamp)"))
-            except:
-                pass
+            except Exception:
+                pass  # Indexes may already exist
             
             print("  ✅ Table updated!")
         
@@ -240,6 +265,10 @@ def run_migration():
             
             for col_name, col_type in new_columns.items():
                 if col_name not in existing:
+                    # SECURITY: Validate column name before using in SQL
+                    if not validate_column_name(col_name):
+                        print(f"  ⚠️ Skipping invalid column name: {col_name}")
+                        continue
                     print(f"  Adding column: {col_name}")
                     try:
                         db.execute(text(f"ALTER TABLE personal_learning_weights ADD COLUMN {col_name} {col_type}"))

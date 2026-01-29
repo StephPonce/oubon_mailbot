@@ -27,6 +27,16 @@ from ospra_os.ai.providers.base import (
     InvalidResponseError
 )
 from ospra_os.ai.markdown_stripper import strip_markdown
+from ospra_os.constants import (
+    ANALYSIS_MAX_TOKENS,
+    DESCRIPTION_MAX_TOKENS,
+    CHAT_MAX_TOKENS,
+    EMAIL_MAX_TOKENS,
+    EMAIL_BODY_TRUNCATE_LENGTH,
+    AI_TEMPERATURE_BALANCED,
+    AI_TEMPERATURE_CREATIVE,
+    AI_TEMPERATURE_PRECISE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +124,8 @@ class GroqProvider(AIProvider):
                     {"role": "system", "content": "You are an expert e-commerce analyst. Return valid JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=2048,
-                temperature=0.7
+                max_tokens=ANALYSIS_MAX_TOKENS,
+                temperature=AI_TEMPERATURE_BALANCED
             )
             
             response_text = response.choices[0].message.content
@@ -143,8 +153,8 @@ class GroqProvider(AIProvider):
                     {"role": "system", "content": "You are an expert e-commerce copywriter. Return valid JSON only."},
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=2048,
-                temperature=0.8
+                max_tokens=DESCRIPTION_MAX_TOKENS,
+                temperature=AI_TEMPERATURE_CREATIVE
             )
             
             response_text = response.choices[0].message.content
@@ -169,8 +179,8 @@ class GroqProvider(AIProvider):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
                 ],
-                max_tokens=1024,
-                temperature=0.7
+                max_tokens=CHAT_MAX_TOKENS,
+                temperature=AI_TEMPERATURE_BALANCED
             )
             
             response_text = response.choices[0].message.content
@@ -402,7 +412,8 @@ Return valid JSON:
             result["score"] = float(result.get("score", 7))
             result["confidence"] = float(result.get("confidence", 0.7))
             return result
-        except:
+        except (json.JSONDecodeError, ValueError, TypeError, KeyError) as e:
+            logger.debug(f"Failed to parse analysis response: {e}")
             return {
                 "score": 7.0,
                 "explanation": text[:500],
@@ -412,12 +423,13 @@ Return valid JSON:
                 "pricing_suggestion": product_data.get("supplier_cost", 10) * 2.5,
                 "confidence": 0.7
             }
-    
+
     def _parse_description_response(self, text: str, product: Dict) -> Dict:
         try:
             json_str = self._extract_json(text)
             return json.loads(json_str)
-        except:
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            logger.debug(f"Failed to parse description response: {e}")
             return {
                 "title": product.get("name", "Product")[:60],
                 "description": f"<p>{text[:500]}</p>",
@@ -426,12 +438,13 @@ Return valid JSON:
                 "tags": [product.get("niche", "general")],
                 "headline": f"Get Your {product.get('name', 'Product')} Today"
             }
-    
+
     def _parse_pricing_response(self, text: str, product_data: Dict) -> Dict:
         try:
             json_str = self._extract_json(text)
             return json.loads(json_str)
-        except:
+        except (json.JSONDecodeError, ValueError, TypeError) as e:
+            logger.debug(f"Failed to parse pricing response: {e}")
             cost = product_data.get("supplier_cost", 10)
             price = round(cost * 2.5 - 0.01, 2)
             return {

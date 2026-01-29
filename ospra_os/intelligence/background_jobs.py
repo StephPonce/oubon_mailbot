@@ -137,13 +137,54 @@ class IntelligenceScheduler:
                 )
 
     def _job_wrapper(self, job_name: str, job_func):
-        """Wrapper to track job execution and handle errors"""
+        """
+        Wrapper to track job execution, handle errors, and enforce timeouts.
 
-        logger.info(f"[START] Running job: {job_name}")
+        SECURITY: All background jobs MUST have timeouts to prevent:
+        - Resource exhaustion from runaway jobs
+        - Database connection leaks
+        - Memory exhaustion
+        """
+        import signal
+
+        # Job timeout limits (in seconds)
+        JOB_TIMEOUTS = {
+            'analyze_products': 1800,      # 30 minutes
+            'monitor_competitors': 1800,   # 30 minutes
+            'track_trends': 900,           # 15 minutes
+            'auto_discover': 3600,         # 60 minutes (longer for discovery)
+            'weekly_report': 1800,         # 30 minutes
+        }
+
+        timeout_seconds = JOB_TIMEOUTS.get(job_name, 1800)  # Default 30 min
+
+        logger.info(f"[START] Running job: {job_name} (timeout: {timeout_seconds}s)")
         start_time = datetime.now()
 
+        # Timeout handler
+        def timeout_handler(signum, frame):
+            raise TimeoutError(f"Job {job_name} exceeded timeout of {timeout_seconds} seconds")
+
         try:
-            job_func()
+            # Set timeout signal (Unix only)
+            old_handler = None
+            try:
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(timeout_seconds)
+            except (AttributeError, ValueError):
+                # signal.SIGALRM not available on Windows
+                logger.warning(f"Timeout enforcement not available on this platform for {job_name}")
+
+            try:
+                job_func()
+            finally:
+                # Cancel the alarm
+                try:
+                    signal.alarm(0)
+                    if old_handler:
+                        signal.signal(signal.SIGALRM, old_handler)
+                except (AttributeError, ValueError):
+                    pass
 
             duration = (datetime.now() - start_time).total_seconds()
             self.job_history[job_name] = {
@@ -154,19 +195,38 @@ class IntelligenceScheduler:
 
             logger.info(f"[SUCCESS] Job completed: {job_name} ({duration:.1f}s)")
 
+        except TimeoutError as e:
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.error(f"[TIMEOUT] Job timed out: {job_name} after {duration:.1f}s")
+
+            self.job_history[job_name] = {
+                'last_run': start_time.isoformat(),
+                'status': 'timeout',
+                'duration_seconds': duration,
+                'timeout_limit': timeout_seconds
+            }
+
+            self.add_alert(
+                'critical',
+                f'Job Timeout: {job_name}',
+                f'Background job {job_name} exceeded {timeout_seconds}s timeout limit'
+            )
+
         except Exception as e:
-            logger.error(f"[ERROR] Job failed: {job_name} - {e}")
+            duration = (datetime.now() - start_time).total_seconds()
+            logger.error(f"[ERROR] Job failed: {job_name} - {type(e).__name__}")
 
             self.job_history[job_name] = {
                 'last_run': start_time.isoformat(),
                 'status': 'failed',
-                'error': str(e)
+                'duration_seconds': duration,
+                'error_type': type(e).__name__
             }
 
             self.add_alert(
                 'critical',
                 f'Job Failed: {job_name}',
-                f'Background job {job_name} failed: {str(e)}'
+                f'Background job {job_name} failed after {duration:.1f}s'
             )
 
     # ==========================================

@@ -1,6 +1,6 @@
 """Email automation API routes for OspraOS."""
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any
 from ospra_os.core.settings import Settings, get_settings
 from ospra_os.auth.jwt_auth import get_current_user
@@ -18,9 +18,16 @@ router = APIRouter(prefix="/api/email-automation", tags=["Email Automation"])
 # ============================================================================
 
 class ProcessInboxRequest(BaseModel):
-    """Request to process inbox with auto-replies."""
-    max_messages: int = 10
-    label_filter: Optional[str] = None
+    """Request to process inbox with auto-replies.
+
+    SECURITY: Message limit bounded to prevent abuse.
+    """
+    max_messages: int = Field(default=10, ge=1, le=100, description="Max messages to process")
+    label_filter: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Gmail label filter"
+    )
 
 
 class ProcessInboxResponse(BaseModel):
@@ -33,10 +40,13 @@ class ProcessInboxResponse(BaseModel):
 
 
 class SendEmailRequest(BaseModel):
-    """Request to send an email."""
-    to: str
-    subject: str
-    body: str
+    """Request to send an email.
+
+    SECURITY: Email validated, subject/body have length limits.
+    """
+    to: EmailStr = Field(..., description="Recipient email address")
+    subject: str = Field(..., min_length=1, max_length=500, description="Email subject")
+    body: str = Field(..., min_length=1, max_length=50000, description="Email body")
 
 
 class WatchStatusResponse(BaseModel):

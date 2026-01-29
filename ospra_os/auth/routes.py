@@ -13,6 +13,11 @@ Endpoints:
 - GET /api/auth/me - Get current user info
 - GET /api/auth/verify - Verify token validity
 
+SECURITY: Strict rate limiting on login, register, password reset.
+- Login: 5 attempts/minute, then 5-minute lockout
+- Register: 3 attempts/hour per IP
+- Password reset: 3 requests/hour per IP
+
 Author: Ospra OS
 Date: December 2024 (Fixed January 2026 - PostgreSQL)
 """
@@ -25,6 +30,13 @@ from datetime import datetime, timedelta
 import logging
 import os
 import secrets
+
+# SECURITY: Import rate limiting for sensitive endpoints
+from ospra_os.security.rate_limiting import (
+    check_sensitive_rate_limit,
+    record_sensitive_attempt,
+    reset_sensitive_attempts
+)
 
 from .jwt_handler import (
     create_token_pair,
@@ -186,13 +198,19 @@ def _user_to_dict(user: User) -> dict:
 # ============================================================================
 
 @router.post("/register")
-async def register(request: RegisterRequest, db: Session = Depends(get_db)):
+async def register(request: RegisterRequest, req: Request, db: Session = Depends(get_db)):
     """
     Register a new user account.
-    
+
     Returns access and refresh tokens on successful registration.
     Users are persisted to PostgreSQL database.
+
+    SECURITY: Rate limited to 3 registrations per hour per IP.
     """
+    # SECURITY: Check rate limit before processing
+    check_sensitive_rate_limit("register", req)
+    record_sensitive_attempt("register", req)
+
     # Check if user exists
     if _get_user_by_email(db, request.email):
         raise HTTPException(
@@ -242,12 +260,18 @@ async def register(request: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-async def login(request: LoginRequest, db: Session = Depends(get_db)):
+async def login(request: LoginRequest, req: Request, db: Session = Depends(get_db)):
     """
     Login with email and password.
-    
+
     Returns access and refresh tokens on successful login.
+
+    SECURITY: Rate limited to 5 attempts per minute with 5-minute lockout.
     """
+    # SECURITY: Check rate limit before processing
+    check_sensitive_rate_limit("login", req)
+    record_sensitive_attempt("login", req)
+
     # Find user in PostgreSQL
     user = _get_user_by_email(db, request.email)
     
@@ -266,10 +290,13 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
             detail="Invalid email or password"
         )
     
+    # SECURITY: Reset rate limit on successful login
+    reset_sensitive_attempts("login", req)
+
     # Update last login
     user.last_login = datetime.utcnow()
     db.commit()
-    
+
     logger.info(f"User logged in: {user.email} (ID: {user.id})")
     
     # Get tier value
@@ -432,13 +459,19 @@ async def get_token_details(
 # ============================================================================
 
 @router.post("/forgot-password", response_model=MessageResponse)
-async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+async def forgot_password(request: ForgotPasswordRequest, req: Request, db: Session = Depends(get_db)):
     """
     Request a password reset email.
-    
+
     For security, always returns success even if email doesn't exist.
     This prevents email enumeration attacks.
+
+    SECURITY: Rate limited to 3 requests per hour per IP.
     """
+    # SECURITY: Check rate limit before processing
+    check_sensitive_rate_limit("forgot_password", req)
+    record_sensitive_attempt("forgot_password", req)
+
     # Find user (but don't reveal if they exist)
     user = _get_user_by_email(db, request.email)
     
@@ -490,12 +523,18 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
 
 
 @router.post("/reset-password", response_model=MessageResponse)
-async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+async def reset_password(request: ResetPasswordRequest, req: Request, db: Session = Depends(get_db)):
     """
     Reset password using token from email.
-    
+
     Token is single-use and expires after 1 hour.
+
+    SECURITY: Rate limited to 3 attempts per hour per IP.
     """
+    # SECURITY: Check rate limit before processing
+    check_sensitive_rate_limit("password_reset", req)
+    record_sensitive_attempt("password_reset", req)
+
     # Find token
     reset_token = db.query(PasswordResetToken).filter(
         PasswordResetToken.token == request.token
@@ -545,74 +584,19 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 
 
 # ============================================================================
-# ADMIN ENDPOINTS (for development/testing)
+# DEBUG ENDPOINTS REMOVED FOR SECURITY
 # ============================================================================
-
-@router.get("/debug/users")
-async def list_users(db: Session = Depends(get_db)):
-    """
-    [DEBUG] List all users.
-    
-    Only available in development mode.
-    """
-    if os.getenv("ENVIRONMENT", "development") == "production":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not available in production"
-        )
-    
-    users = db.query(User).all()
-    
-    return {
-        "users": [_user_to_dict(u) for u in users],
-        "count": len(users)
-    }
-
-
-@router.post("/debug/set-tier")
-async def set_user_tier(
-    email: str,
-    tier: str,
-    user: TokenPayload = Depends(require_auth),
-    db: Session = Depends(get_db)
-):
-    """
-    [DEBUG] Set a user's tier.
-    
-    Only available in development mode.
-    """
-    if os.getenv("ENVIRONMENT", "development") == "production":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not available in production"
-        )
-    
-    tier_map = {
-        "nest": SubscriptionTier.NEST,
-        "flight": SubscriptionTier.FLIGHT,
-        "soar": SubscriptionTier.SOAR,
-        "stratosphere": SubscriptionTier.STRATOSPHERE,
-        "admin": SubscriptionTier.STRATOSPHERE,  # Admin gets highest tier
-    }
-    
-    if tier.lower() not in tier_map:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid tier. Must be one of: {list(tier_map.keys())}"
-        )
-    
-    target_user = _get_user_by_email(db, email)
-    if not target_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    target_user.subscription_tier = tier_map[tier.lower()]
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": f"Set {email} to tier: {tier}",
-        "user": _user_to_dict(target_user)
-    }
+# These debug endpoints were removed for security reasons:
+# - /debug/users: Listed all users (information disclosure)
+# - /debug/set-tier: Allowed tier changes (privilege escalation)
+#
+# SECURITY NOTE: Checking `os.getenv("ENVIRONMENT") == "production"` is not
+# reliable because:
+# 1. Environment variable might not be set
+# 2. Different deployment platforms use different variable names
+# 3. Default should be "secure" not "insecure"
+#
+# For admin operations, use proper admin endpoints with authentication:
+# - POST /api/admin/users (requires is_admin=True in JWT)
+# - POST /api/admin/user-tier (requires is_admin=True in JWT)
+# ============================================================================

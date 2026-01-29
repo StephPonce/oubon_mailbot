@@ -422,8 +422,8 @@ class AliExpressConnector(BaseConnector):
                         category=item.get("second_level_category_name", ""),
                     )
                     products.append(product)
-                except:
-                    continue
+                except (ValueError, TypeError, KeyError):
+                    continue  # Invalid product data - skip this item
             
             return products
             

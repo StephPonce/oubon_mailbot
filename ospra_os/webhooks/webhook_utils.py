@@ -52,8 +52,10 @@ def verify_webhook_signature(
     secret = webhook_secret or os.getenv("SHOPIFY_WEBHOOK_SECRET", "")
     
     if not secret:
-        logger.warning("⚠️ No webhook secret configured - allowing in DEV MODE")
-        return True  # Allow in development
+        # SECURITY: NEVER allow webhooks without verification in production
+        # If secret is not configured, fail closed (reject the request)
+        logger.error("❌ SECURITY: No webhook secret configured - rejecting request")
+        return False
     
     # Calculate HMAC
     computed_hmac = hmac.new(
@@ -97,11 +99,16 @@ async def verify_and_parse_webhook(
             store_id = store_info.get("id")
             webhook_secret = store_info.get("webhook_secret")
     
+    # SECURITY: Signature verification is REQUIRED in production
+    # If no HMAC header is provided, reject the request
+    if not hmac_header:
+        logger.error(f"❌ SECURITY: No HMAC signature header for shop: {shop_domain}")
+        raise HTTPException(status_code=401, detail="Missing webhook signature")
+
     # Verify signature
-    if hmac_header:
-        if not verify_webhook_signature(body, hmac_header, webhook_secret):
-            logger.error(f"❌ Invalid webhook signature for shop: {shop_domain}")
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    if not verify_webhook_signature(body, hmac_header, webhook_secret):
+        logger.error(f"❌ Invalid webhook signature for shop: {shop_domain}")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
     
     # Parse JSON
     try:

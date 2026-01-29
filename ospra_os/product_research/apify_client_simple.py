@@ -20,8 +20,8 @@ class ApifyClient:
                 headers = {'Authorization': f'Bearer {self.api_token}'}
                 response = await client.get(url, headers=headers)
                 return response.status_code == 200
-        except:
-            return False
+        except (httpx.RequestError, httpx.TimeoutException):
+            return False  # Network or timeout error
     
     async def scrape_amazon_quick(self, keyword: str, max_items: int = 5) -> List[Dict]:
         """Quick Amazon product scrape"""

@@ -3,6 +3,9 @@ Federated Learning API Routes - GROK RECOMMENDATION #18
 
 FastAPI endpoints for privacy-preserving collective intelligence.
 
+SECURITY NOTE: All endpoints extract user_id from JWT tokens via get_current_user.
+User ID is NEVER accepted as a request parameter to prevent user impersonation.
+
 Endpoints:
 - POST /api/federated/consent/enable - Opt into federated learning
 - POST /api/federated/consent/disable - Opt out of federated learning
@@ -10,7 +13,7 @@ Endpoints:
 - POST /api/federated/record/product - Record product outcome
 - POST /api/federated/record/pricing - Record pricing outcome
 - POST /api/federated/record/ad - Record ad outcome
-- POST /api/federated/aggregate - Run aggregation
+- POST /api/federated/aggregate - Run aggregation (admin only)
 - GET /api/federated/recommendations - Get recommendations
 - POST /api/federated/apply-insight - Apply an insight
 - POST /api/federated/insight-outcome - Record insight outcome
@@ -25,7 +28,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ospra_os.federated.service import FederatedLearningService
-from ospra_os.database import get_db
+from ospra_os.database import get_db, User
+from ospra_os.auth.jwt_auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +37,11 @@ router = APIRouter(prefix="/api/federated", tags=["federated-learning"])
 
 
 # ==================== REQUEST/RESPONSE MODELS ====================
+# SECURITY: user_id is NEVER accepted in request body.
+# It is always extracted from JWT token via Depends(get_current_user).
 
 class ConsentRequest(BaseModel):
-    user_id: int
+    """Request to enable/disable federated learning consent."""
     contribute_products: bool = True
     contribute_pricing: bool = True
     contribute_ads: bool = True
@@ -51,7 +57,7 @@ class ConsentStatusResponse(BaseModel):
 
 
 class ProductOutcomeRequest(BaseModel):
-    user_id: int
+    """Request to record a product outcome."""
     niche: str
     outcome: str = Field(..., description="success, partial, or failure")
     price: Optional[float] = None
@@ -61,7 +67,7 @@ class ProductOutcomeRequest(BaseModel):
 
 
 class PricingOutcomeRequest(BaseModel):
-    user_id: int
+    """Request to record a pricing outcome."""
     niche: str
     old_price: float
     new_price: float
@@ -69,7 +75,7 @@ class PricingOutcomeRequest(BaseModel):
 
 
 class AdOutcomeRequest(BaseModel):
-    user_id: int
+    """Request to record an ad campaign outcome."""
     niche: str
     platform: str = Field(..., description="facebook, google, tiktok, etc.")
     roas: Optional[float] = None
@@ -79,6 +85,7 @@ class AdOutcomeRequest(BaseModel):
 
 
 class AggregateRequest(BaseModel):
+    """Request to run aggregation (admin only)."""
     niche: Optional[str] = None
     aggregate_products: bool = True
     aggregate_pricing: bool = True
@@ -86,19 +93,20 @@ class AggregateRequest(BaseModel):
 
 
 class RecommendationsRequest(BaseModel):
-    user_id: int
+    """Request to get recommendations."""
     niche: Optional[str] = None
     context: Optional[str] = Field(None, description="product_selection, pricing_strategy, or ad_campaign")
     limit: int = 10
 
 
 class ApplyInsightRequest(BaseModel):
-    user_id: int
+    """Request to apply an insight."""
     insight_id: int
     context: Optional[Dict[str, Any]] = None
 
 
 class InsightOutcomeRequest(BaseModel):
+    """Request to record insight outcome."""
     application_id: int
     outcome: str = Field(..., description="success, partial, or failure")
 
@@ -108,20 +116,24 @@ class InsightOutcomeRequest(BaseModel):
 @router.post("/consent/enable")
 def enable_federated_learning(
     request: ConsentRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Enable federated learning for a user.
+    Enable federated learning for the current user.
+
+    SECURITY: User ID is extracted from JWT token, not from request body.
 
     This allows the user to contribute anonymized data and receive
     aggregate insights from the collective intelligence system.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         consent = service.enable_federated_learning(
-            user_id=request.user_id,
+            user_id=user_id,
             contribute_products=request.contribute_products,
             contribute_pricing=request.contribute_pricing,
             contribute_ads=request.contribute_ads
@@ -143,20 +155,23 @@ def enable_federated_learning(
         }
 
     except Exception as e:
-        logger.error(f"Error enabling federated learning: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error enabling federated learning for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to enable federated learning. Please try again.")
 
 
 @router.post("/consent/disable")
 def disable_federated_learning(
-    user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Disable federated learning for a user.
+    Disable federated learning for the current user.
+
+    SECURITY: User ID is extracted from JWT token.
 
     Stops future data collection (does not delete past contributions).
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
@@ -175,18 +190,21 @@ def disable_federated_learning(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error disabling federated learning: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error disabling federated learning for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to disable federated learning. Please try again.")
 
 
 @router.get("/consent/status", response_model=ConsentStatusResponse)
 def get_consent_status(
-    user_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get consent status for a user.
+    Get consent status for the current user.
+
+    SECURITY: User ID is extracted from JWT token.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
@@ -194,8 +212,8 @@ def get_consent_status(
         return status
 
     except Exception as e:
-        logger.error(f"Error getting consent status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting consent status for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get consent status. Please try again.")
 
 
 # ==================== DATA RECORDING ENDPOINTS ====================
@@ -203,20 +221,24 @@ def get_consent_status(
 @router.post("/record/product")
 def record_product_outcome(
     request: ProductOutcomeRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Record a product deployment outcome.
 
+    SECURITY: User ID is extracted from JWT token.
+
     Data is automatically anonymized and bucketed before storage.
     Only users who have opted into federated learning can contribute.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         contribution = service.record_product_outcome(
-            user_id=request.user_id,
+            user_id=user_id,
             niche=request.niche,
             outcome=request.outcome,
             price=request.price,
@@ -241,24 +263,28 @@ def record_product_outcome(
         }
 
     except Exception as e:
-        logger.error(f"Error recording product outcome: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error recording product outcome for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record product outcome. Please try again.")
 
 
 @router.post("/record/pricing")
 def record_pricing_outcome(
     request: PricingOutcomeRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Record a pricing decision outcome.
+
+    SECURITY: User ID is extracted from JWT token.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         contribution = service.record_pricing_outcome(
-            user_id=request.user_id,
+            user_id=user_id,
             niche=request.niche,
             old_price=request.old_price,
             new_price=request.new_price,
@@ -281,24 +307,28 @@ def record_pricing_outcome(
         }
 
     except Exception as e:
-        logger.error(f"Error recording pricing outcome: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error recording pricing outcome for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record pricing outcome. Please try again.")
 
 
 @router.post("/record/ad")
 def record_ad_outcome(
     request: AdOutcomeRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Record an ad campaign outcome.
+
+    SECURITY: User ID is extracted from JWT token.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         contribution = service.record_ad_outcome(
-            user_id=request.user_id,
+            user_id=user_id,
             niche=request.niche,
             platform=request.platform,
             roas=request.roas,
@@ -323,8 +353,8 @@ def record_ad_outcome(
         }
 
     except Exception as e:
-        logger.error(f"Error recording ad outcome: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error recording ad outcome for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to record ad outcome. Please try again.")
 
 
 # ==================== AGGREGATION ENDPOINTS ====================
@@ -332,14 +362,20 @@ def record_ad_outcome(
 @router.post("/aggregate")
 def run_aggregation(
     request: AggregateRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Run aggregation to create insights from contributions.
 
+    SECURITY: Requires admin privileges.
+
     This should typically be run as a background task (Celery).
     For testing, it can be triggered manually via this endpoint.
     """
+    # SECURITY: Admin-only endpoint
+    if not getattr(current_user, 'is_admin', False) and not getattr(current_user, 'is_superuser', False):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     try:
         service = FederatedLearningService(db)
@@ -398,9 +434,11 @@ def run_aggregation(
             "results": results
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error running aggregation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to run aggregation. Please try again.")
 
 
 # ==================== INSIGHT RETRIEVAL ENDPOINTS ====================
@@ -408,20 +446,24 @@ def run_aggregation(
 @router.post("/recommendations")
 def get_recommendations(
     request: RecommendationsRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get personalized recommendations based on aggregate insights.
 
+    SECURITY: User ID is extracted from JWT token.
+
     Returns insights most relevant to the user's niche and context,
     ranked by confidence and sample size.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         recommendations = service.get_recommendations(
-            user_id=request.user_id,
+            user_id=user_id,
             niche=request.niche,
             context=request.context,
             limit=request.limit
@@ -434,26 +476,30 @@ def get_recommendations(
         }
 
     except Exception as e:
-        logger.error(f"Error getting recommendations: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting recommendations for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get recommendations. Please try again.")
 
 
 @router.post("/apply-insight")
 def apply_insight(
     request: ApplyInsightRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Record that a user applied an insight.
 
+    SECURITY: User ID is extracted from JWT token.
+
     This creates a feedback loop to measure insight effectiveness.
     """
+    user_id = current_user.id
 
     try:
         service = FederatedLearningService(db)
 
         application = service.apply_insight(
-            user_id=request.user_id,
+            user_id=user_id,
             insight_id=request.insight_id,
             context=request.context
         )
@@ -466,17 +512,21 @@ def apply_insight(
         }
 
     except Exception as e:
-        logger.error(f"Error applying insight: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error applying insight for user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to apply insight. Please try again.")
 
 
 @router.post("/insight-outcome")
 def record_insight_outcome(
     request: InsightOutcomeRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Record the outcome of applying an insight.
+
+    SECURITY: Requires authentication. Only the user who applied the insight
+    should be able to record the outcome.
 
     This feedback helps measure which insights are most effective.
     """
@@ -504,15 +554,20 @@ def record_insight_outcome(
         raise
     except Exception as e:
         logger.error(f"Error recording insight outcome: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to record insight outcome. Please try again.")
 
 
 # ==================== STATISTICS ENDPOINTS ====================
 
 @router.get("/stats")
-def get_statistics(db: Session = Depends(get_db)):
+def get_statistics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Get comprehensive statistics about the federated learning system.
+
+    SECURITY: Requires authentication.
 
     Includes:
     - User participation rates
@@ -534,7 +589,7 @@ def get_statistics(db: Session = Depends(get_db)):
 
     except Exception as e:
         logger.error(f"Error getting statistics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to get statistics. Please try again.")
 
 
 @router.get("/health")

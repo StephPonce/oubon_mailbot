@@ -6,8 +6,8 @@ Endpoints for Stratosphere waitlist management
 SECURITY: Admin endpoints require authentication.
 """
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel, EmailStr
-from typing import Optional
+from pydantic import BaseModel, EmailStr, Field
+from typing import Optional, Literal
 import logging
 
 from .stratosphere_waitlist import (
@@ -27,15 +27,25 @@ router = APIRouter(prefix="/api/waitlist", tags=["waitlist"])
 # ==================== REQUEST MODELS ====================
 
 class WaitlistSignup(BaseModel):
-    """Waitlist signup request"""
-    email: str
-    name: Optional[str] = None
-    source: Optional[str] = "pricing_page"
+    """Waitlist signup request
+
+    SECURITY: Email validated with EmailStr, fields have length limits.
+    """
+    email: EmailStr = Field(..., description="Email address")
+    name: Optional[str] = Field(
+        None,
+        max_length=255,
+        description="Full name"
+    )
+    source: Literal["pricing_page", "landing_page", "referral", "social", "other"] = Field(
+        default="pricing_page",
+        description="Signup source"
+    )
 
 
 class WaitlistCheck(BaseModel):
     """Check waitlist status"""
-    email: str
+    email: EmailStr = Field(..., description="Email address to check")
 
 
 # ==================== PUBLIC ENDPOINTS ====================

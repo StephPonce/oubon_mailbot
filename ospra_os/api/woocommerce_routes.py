@@ -265,8 +265,8 @@ async def oauth_callback(request: Request):
     """
     try:
         body = await request.json()
-    except:
-        body = {}
+    except (json.JSONDecodeError, ValueError):
+        body = {}  # Empty body or invalid JSON
 
     # WooCommerce sends: user_id (our state token), consumer_key, consumer_secret
     state_token = body.get("user_id")  # This is our state token
@@ -423,8 +423,8 @@ async def get_store_stats(
                 if days <= 30:
                     rev_30d += total
                     ord_30d += 1
-            except:
-                continue
+            except (ValueError, TypeError, AttributeError):
+                continue  # Invalid date format or missing data
         
         return {
             "success": True,

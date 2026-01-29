@@ -59,8 +59,13 @@ async def tiktok_oauth_callback(
     code: str = Query(...),
     state: str = Query(None)
 ):
-    """Handle TikTok OAuth callback"""
+    """
+    Handle TikTok OAuth callback
 
+    SECURITY: Tokens are stored server-side only, never exposed to client.
+    The access token is securely stored using the same pattern as AliExpress tokens
+    and NOT returned in the API response.
+    """
     from ospra_os.integrations.tiktok_client import TikTokClient
 
     try:
@@ -73,35 +78,57 @@ async def tiktok_oauth_callback(
             )
 
         # Exchange code for token
-        logger.info(f"Exchanging code for TikTok access token...")
+        logger.info("Exchanging code for TikTok access token...")
         token_data = client.exchange_code_for_token(code)
 
         if not token_data:
             raise HTTPException(status_code=400, detail="Failed to get access token")
 
         access_token = token_data.get("access_token", "")
+        refresh_token = token_data.get("refresh_token", "")
+        expires_in = token_data.get("expires_in", 0)
 
+        # SECURITY: Store token server-side using the tiktok_tokens module
+        # Never return access token to client
+        try:
+            from ospra_os.database.tiktok_tokens import save_token as save_tiktok_token
+            save_tiktok_token(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_in=expires_in
+            )
+            logger.info("TikTok access token stored securely in database")
+            token_stored = True
+        except ImportError:
+            # If tiktok_tokens module doesn't exist, store in environment
+            # This is a fallback - log a warning for manual configuration
+            logger.warning("TikTok tokens module not found. Token must be stored manually.")
+            logger.warning("Set TIKTOK_ACCESS_TOKEN environment variable manually.")
+            token_stored = False
+        except Exception as db_error:
+            logger.error(f"Failed to store TikTok token: {db_error}")
+            token_stored = False
+
+        # SECURITY: Return success message WITHOUT the token
         return {
             "status": "success",
             "message": "TikTok authorized successfully!",
-            "access_token": access_token,
-            "expires_in": token_data.get("expires_in", 0),
-            "refresh_token": token_data.get("refresh_token", ""),
+            "token_stored": token_stored,
+            "expires_in_seconds": expires_in,
             "instructions": [
-                "1. Add to your .env file:",
-                f"   TIKTOK_ACCESS_TOKEN={access_token}",
+                "Your TikTok account has been connected successfully.",
+                "The access token has been securely stored server-side." if token_stored else "Please configure TIKTOK_ACCESS_TOKEN manually.",
+                "You can now use TikTok features in Ospra OS.",
                 "",
-                "2. Restart the backend:",
-                "   pkill -f 'uvicorn ospra_os'",
-                "   uv run uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001 --reload",
-                "",
-                "3. Test the integration:",
-                "   curl http://localhost:8001/api/dashboard/v2/products?niche=smart_home&per_page=10",
+                "Test the integration:",
+                "  GET /api/dashboard/v2/products?niche=smart_home&per_page=10",
                 "",
                 "You should now see 'TIKTOK_TRENDING' as the data source!"
             ]
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"TikTok OAuth callback failed: {e}")
         raise HTTPException(status_code=500, detail="TikTok operation failed. Please try again later.")

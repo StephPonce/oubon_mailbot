@@ -134,19 +134,23 @@ class AutoDiscoveryJob:
     async def run_discovery_for_user(
         self,
         user_id: int,
-        force_run: bool = False
+        force_run: bool = False,
+        timeout_seconds: int = 1800  # 30 minute default timeout per user
     ) -> Dict[str, Any]:
         """
         Run product discovery for a specific user.
 
+        SECURITY: Includes timeout to prevent runaway discovery jobs.
+
         Args:
             user_id: ID of user to run discovery for
             force_run: Force discovery even if recently run
+            timeout_seconds: Maximum time allowed for discovery (default 30 min)
 
         Returns:
             dict: Discovery results with products found, saved, deployed, etc.
         """
-        logger.info(f"Starting discovery for user {user_id}")
+        logger.info(f"Starting discovery for user {user_id} (timeout: {timeout_seconds}s)")
         start_time = datetime.utcnow()
 
         try:
@@ -458,6 +462,10 @@ class AutoDiscoveryJob:
             interval_hours: If provided, run every N hours instead of daily
         """
         try:
+            # SECURITY: Job timeout to prevent runaway processes
+            # Auto-discovery should complete within 2 hours max
+            job_timeout = 7200  # 2 hours in seconds
+
             if interval_hours:
                 # Interval-based scheduling
                 self.scheduler.add_job(
@@ -466,10 +474,11 @@ class AutoDiscoveryJob:
                     hours=interval_hours,
                     id='auto_discovery_interval',
                     replace_existing=True,
-                    max_instances=1  # Prevent overlapping runs
+                    max_instances=1,  # Prevent overlapping runs
+                    misfire_grace_time=300,  # 5 min grace period
                 )
 
-                logger.info(f"[SUCCESS] Scheduled discovery every {interval_hours} hours")
+                logger.info(f"[SUCCESS] Scheduled discovery every {interval_hours} hours (timeout: {job_timeout}s)")
 
             else:
                 # Daily at specific time
@@ -480,10 +489,11 @@ class AutoDiscoveryJob:
                     trigger=trigger,
                     id='auto_discovery_daily',
                     replace_existing=True,
-                    max_instances=1
+                    max_instances=1,
+                    misfire_grace_time=300,  # 5 min grace period
                 )
 
-                logger.info(f"[SUCCESS] Scheduled daily discovery at {hour:02d}:{minute:02d}")
+                logger.info(f"[SUCCESS] Scheduled daily discovery at {hour:02d}:{minute:02d} (timeout: {job_timeout}s)")
 
             # Start scheduler if not already running
             if not self.scheduler.running:

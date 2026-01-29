@@ -134,7 +134,7 @@ async def get_all_inventory(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # In-memory storage for restock orders (replace with database in production)
@@ -184,7 +184,7 @@ async def create_restock_order(order: dict, current_user: User = Depends(get_cur
 
     except Exception as e:
         logger.error(f"Error creating restock order: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/restock-orders")
@@ -215,7 +215,7 @@ async def get_restock_orders(
 
     except Exception as e:
         logger.error(f"Error fetching restock orders: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/restock-orders/{order_id}")
@@ -236,7 +236,7 @@ async def get_restock_order(order_id: str, current_user: User = Depends(get_curr
         raise
     except Exception as e:
         logger.error(f"Error fetching restock order: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/{product_id}")
@@ -287,7 +287,7 @@ async def get_product_forecast(product_id: str, current_user: User = Depends(get
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/health/summary")
@@ -334,7 +334,7 @@ async def get_inventory_health_summary(current_user: User = Depends(get_current_
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/alerts/restock")
@@ -390,7 +390,7 @@ async def get_restock_alerts(urgency: Optional[str] = Query(None), current_user:
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/alerts/stockout")
@@ -437,7 +437,7 @@ async def get_stockout_alerts(current_user: User = Depends(get_current_user)):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/alerts/check-and-send")
@@ -487,7 +487,7 @@ async def check_and_send_alerts(current_user: User = Depends(get_current_user)):
 
     except Exception as e:
         logger.error(f"Error checking and sending alerts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/alerts/send-test")
@@ -536,7 +536,7 @@ async def send_test_alert(current_user: User = Depends(get_current_user)):
 
     except Exception as e:
         logger.error(f"Error sending test alert: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/shopify/test-connection")
@@ -553,7 +553,7 @@ async def test_shopify_connection(current_user: User = Depends(get_current_user)
         return result
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/shopify/sync")
@@ -601,7 +601,7 @@ async def sync_from_shopify(current_user: User = Depends(get_current_user)):
 
     except Exception as e:
         logger.error(f"Error syncing from Shopify: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/shopify/products")
@@ -652,7 +652,7 @@ async def get_shopify_inventory(current_user: User = Depends(get_current_user)):
 
     except Exception as e:
         logger.error(f"Error fetching Shopify inventory: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================
@@ -712,7 +712,7 @@ async def save_forecast_snapshots(current_user: User = Depends(get_current_user)
 
     except Exception as e:
         logger.error(f"Error saving snapshots: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/history/recent")
@@ -739,7 +739,7 @@ async def get_recent_snapshots(
 
     except Exception as e:
         logger.error(f"Error fetching recent snapshots: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.delete("/history/cleanup")
@@ -766,7 +766,7 @@ async def cleanup_old_snapshots(
 
     except Exception as e:
         logger.error(f"Error cleaning up snapshots: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/history/{product_id}/trends")
@@ -796,7 +796,7 @@ async def get_product_trends(
 
     except Exception as e:
         logger.error(f"Error analyzing trends: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/history/{product_id}")
@@ -833,7 +833,7 @@ async def get_product_history(
 
     except Exception as e:
         logger.error(f"Error fetching product history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================
@@ -903,7 +903,7 @@ async def bulk_reorder_products(request: dict, current_user: User = Depends(get_
         raise
     except Exception as e:
         logger.error(f"Error creating bulk restock orders: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/bulk/export")
@@ -1002,7 +1002,7 @@ async def bulk_export_products(request: dict, current_user: User = Depends(get_c
         raise
     except Exception as e:
         logger.error(f"Error exporting products: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/bulk/alerts")
@@ -1032,7 +1032,7 @@ async def bulk_configure_alerts(request: dict, current_user: User = Depends(get_
         raise
     except Exception as e:
         logger.error(f"Error configuring bulk alerts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # Export router

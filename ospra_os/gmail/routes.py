@@ -176,17 +176,20 @@ async def callback(request: Request):
 
         except Exception as db_err:
             # Don't fail the whole OAuth if database save fails
-            import traceback
-            print(f"Warning: Failed to save Gmail to database: {str(db_err)}")
-            print(traceback.format_exc())
+            # SECURITY: Log error server-side, don't expose details
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to save Gmail to database: {db_err}", exc_info=True)
 
         return HTMLResponse(f"<h2>Gmail connected [SUCCESS]</h2><p>Saved tokens to <code>{token_path}</code> and database.</p>")
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Gmail OAuth callback failed: {e}", exc_info=True)
         return HTMLResponse(
             f"<h2>[ERROR] OAuth Error</h2>"
-            f"<p>Error: {str(e)}</p>"
-            f"<pre>{traceback.format_exc()}</pre>",
+            f"<p>Authentication failed. Please try again or contact support.</p>",
             status_code=500
         )
 
@@ -194,19 +197,14 @@ async def callback(request: Request):
 async def status():
     _, token_path = _paths()
     ok = os.path.exists(token_path) and os.path.getsize(token_path) > 0
-    return {"connected": ok, "token_path": token_path}
+    # SECURITY: Don't expose file paths in production
+    return {"connected": ok}
 
-@router.get("/debug")
-async def debug(request: Request):
-    cred_path, token_path = _paths()
-    redirect_uri = str(request.url_for("gmail_oauth_callback"))
-    return {
-        "redirect_uri": redirect_uri,
-        "cred_path": cred_path,
-        "token_path": token_path,
-        "creds_exist": os.path.exists(cred_path),
-        "scopes": SCOPES,
-    }
+
+# DEBUG ENDPOINT REMOVED FOR SECURITY
+# The /debug endpoint exposed sensitive file paths and OAuth scopes.
+# It has been removed. Use server logs for debugging.
+
 
 @router.get("/messages")
 async def get_messages(limit: int = 20):
@@ -286,10 +284,13 @@ async def get_messages(limit: int = 20):
         }
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to fetch Gmail messages: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to fetch messages: {str(e)}\n{traceback.format_exc()}"
+            detail="Failed to fetch messages. Please reconnect Gmail or try again."
         )
 
 @router.get("/stats")

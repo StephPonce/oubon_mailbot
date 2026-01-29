@@ -717,7 +717,106 @@ except Exception as e:
     print(f"[WARNING]  Could not import GmailClient: {e}")
     GmailClient = None
 
-app = FastAPI(title="OspraOS API", version="0.1")
+# ============================================================================
+# OPENAPI CONFIGURATION - Enhanced API Documentation
+# ============================================================================
+
+# Tag metadata for better API organization
+tags_metadata = [
+    {
+        "name": "Authentication",
+        "description": "User authentication, registration, and password management. **Rate limited for security.**",
+    },
+    {
+        "name": "User",
+        "description": "User profile and subscription management.",
+    },
+    {
+        "name": "Stores",
+        "description": "Multi-store management with cross-store learning capabilities.",
+    },
+    {
+        "name": "Analytics",
+        "description": "Revenue, profit, and performance analytics across all stores.",
+    },
+    {
+        "name": "Intelligence Engine",
+        "description": "AI-powered trend discovery, product analysis, and recommendations.",
+    },
+    {
+        "name": "Actions",
+        "description": "AI-suggested actions with auto-pilot execution capabilities.",
+    },
+    {
+        "name": "Payments",
+        "description": "Subscription billing and payment management via LemonSqueezy.",
+    },
+    {
+        "name": "AliExpress",
+        "description": "AliExpress OAuth and product sourcing integration.",
+    },
+    {
+        "name": "Voice",
+        "description": "Voice commands using OpenAI Whisper and text-to-speech.",
+    },
+    {
+        "name": "Learning",
+        "description": "Hybrid learning system that improves AI accuracy over time.",
+    },
+    {
+        "name": "Reports",
+        "description": "Generate and schedule business reports.",
+    },
+    {
+        "name": "Templates",
+        "description": "Action template marketplace for automation workflows.",
+    },
+]
+
+app = FastAPI(
+    title="Ospra OS API",
+    description="""
+## Ospra OS - AI-Powered E-Commerce Automation Platform
+
+Ospra OS provides intelligent automation for e-commerce businesses with features including:
+
+- **AI Product Discovery** - Find trending products using Google Trends, Reddit, and social signals
+- **Multi-Store Management** - Manage Shopify, Amazon, WooCommerce stores from one dashboard
+- **Smart Actions** - AI-suggested actions with auto-pilot execution
+- **Cross-Store Learning** - AI learns from your sales data to improve recommendations
+- **Voice Commands** - Control your business with voice using Whisper API
+
+### Security Features
+
+- JWT-based authentication with refresh tokens
+- Rate limiting on all endpoints (tier-based)
+- Strict validation on all inputs
+- Encrypted credential storage
+
+### Rate Limits
+
+Rate limits vary by subscription tier:
+- **Nest (Free)**: 30 API requests/minute, 5 AI requests/minute
+- **Flight**: 100 API requests/minute, 15 AI requests/minute
+- **Soar**: 300 API requests/minute, 30 AI requests/minute
+- **Stratosphere**: 1000 API requests/minute, 100 AI requests/minute
+
+### Support
+
+For API support, contact support@ospra.io
+    """,
+    version="2.0.0",
+    openapi_tags=tags_metadata,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    contact={
+        "name": "Ospra Support",
+        "email": "support@ospra.io",
+    },
+    license_info={
+        "name": "Proprietary",
+    },
+)
 
 #
 # SECURITY: Rate Limiting Setup (PHASE 1)
@@ -1514,12 +1613,12 @@ async def detailed_health_check(settings: Settings = Depends(get_settings)):
         health_status = await monitor.check_system_health()
         return health_status
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Health check failed: {e}", exc_info=True)
         return {
             "success": False,
             "status": "error",
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Health check failed. Please check server logs."
         }
 
 
@@ -1559,11 +1658,11 @@ async def run_discovery_now(settings: Settings = Depends(get_settings)):
         }
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Discovery job failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Discovery failed. Please check server logs."
         }
 
 
@@ -1655,11 +1754,11 @@ async def test_platform_credentials(
         result = await adapter.test_connection()
         return result
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Platform connection test failed for {platform}: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Connection test failed. Please verify your credentials."
         }
 
 
@@ -1735,10 +1834,10 @@ async def discover_products_api(
         return results
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Product discovery failed for niche '{niche}': {e}", exc_info=True)
         return {
-            "error": str(e),
-            "traceback": traceback.format_exc(),
+            "error": "Product discovery failed. Please try again.",
             "niche": niche,
             "total_found": 0,
         }
@@ -1773,10 +1872,10 @@ async def validate_product_api(
         return validation
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Product validation failed for '{product_name}': {e}", exc_info=True)
         return {
-            "error": str(e),
-            "traceback": traceback.format_exc(),
+            "error": "Product validation failed. Please try again.",
             "product_name": product_name,
         }
 
@@ -1901,11 +2000,11 @@ async def discover_multi_niche(
         }
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Multi-niche discovery failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
+            "error": "Multi-niche discovery failed. Please try again.",
             "total_products": 0,
             "niches_discovered": 0,
         }
@@ -1989,11 +2088,11 @@ async def deploy_to_shopify(
         return result
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Shopify deployment failed for '{product_name}': {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Shopify deployment failed. Please check your store connection."
         }
 
 
@@ -2047,11 +2146,11 @@ async def generate_product_content(
         }
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Content generation failed for '{product_name}': {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Content generation failed. Please try again."
         }
 
 
@@ -2139,11 +2238,11 @@ async def optimize_product_price(
         }
 
     except Exception as e:
-        import traceback
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Price optimization failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Price optimization failed. Please try again."
         }
 
 
@@ -2430,12 +2529,11 @@ async def generate_marketing_angle(
         }
 
     except Exception as e:
-        import traceback
-        logger.error(f"Marketing angle generation failed: {e}")
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Marketing angle generation failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Marketing angle generation failed. Please try again."
         }
 
 
@@ -2492,12 +2590,11 @@ async def generate_multiple_angles(
         }
 
     except Exception as e:
-        import traceback
-        logger.error(f"Multiple angles generation failed: {e}")
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Multiple angles generation failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Marketing angle generation failed. Please try again."
         }
 
 
@@ -2537,12 +2634,11 @@ async def get_available_angles(niche: str = 'smart_home'):
         }
 
     except Exception as e:
-        import traceback
-        logger.error(f"Failed to get available angles: {e}")
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Failed to get available angles: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Failed to retrieve available angles. Please try again."
         }
 
 
@@ -2606,12 +2702,11 @@ async def get_smart_recommendations(
         return recommendations
 
     except Exception as e:
-        import traceback
-        logger.error(f"Smart recommendations failed: {e}")
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Smart recommendations failed: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Smart recommendations failed. Please try again."
         }
 
 
@@ -2660,12 +2755,11 @@ async def get_recommendation_analytics(
         return analytics
 
     except Exception as e:
-        import traceback
-        logger.error(f"Failed to get analytics: {e}")
+        # SECURITY: Log traceback server-side, don't expose to client
+        logger.error(f"Failed to get analytics: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": "Failed to retrieve analytics. Please try again."
         }
 
 

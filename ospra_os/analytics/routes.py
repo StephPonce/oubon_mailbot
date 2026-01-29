@@ -95,7 +95,7 @@ async def get_analytics_overview(
         }
     except Exception as e:
         logger.error(f"Error getting analytics overview: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")
 
 
 @router.get("/revenue", response_model=RevenueTimeSeriesResponse)
@@ -130,7 +130,7 @@ async def get_revenue_over_time(
         }
     except Exception as e:
         logger.error(f"Error getting revenue over time: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")
 
 
 @router.get("/profit")
@@ -156,7 +156,7 @@ async def get_profit_breakdown(
         return engine.get_profit_metrics(date_range, store_id, user_id)
     except Exception as e:
         logger.error(f"Error getting profit breakdown: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")
 
 
 @router.get("/products", response_model=ProductPerformanceResponse)
@@ -194,7 +194,7 @@ async def get_product_performance(
         }
     except Exception as e:
         logger.error(f"Error getting product performance: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")
 
 
 @router.get("/stores", response_model=StoreComparisonResponse)
@@ -223,7 +223,7 @@ async def get_store_comparison(
         }
     except Exception as e:
         logger.error(f"Error getting store comparison: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")
 
 
 @router.get("/export")
@@ -329,4 +329,4 @@ async def export_csv(
 
     except Exception as e:
         logger.error(f"Error exporting CSV: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Analytics operation failed. Please try again.")

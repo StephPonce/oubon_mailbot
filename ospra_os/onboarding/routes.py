@@ -90,7 +90,7 @@ async def submit_onboarding_form(
         
     except Exception as e:
         logger.error(f"[ERROR] Form submission error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Onboarding operation failed. Please try again.")
 
 
 @router.get("/checklist/{user_id}")
@@ -154,7 +154,7 @@ async def handle_calendly_webhook(
         
     except Exception as e:
         logger.error(f"[ERROR] Calendly webhook error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Onboarding operation failed. Please try again.")
 
 
 @router.get("/status/{user_id}")

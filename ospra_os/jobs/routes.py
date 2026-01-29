@@ -49,7 +49,7 @@ async def start_scheduler():
         scheduler.start()
         return {"message": "Scheduler started successfully", "status": "running"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to start scheduler. Please try again.")
 
 
 @router.post("/stop")
@@ -62,7 +62,7 @@ async def stop_scheduler():
         scheduler.stop()
         return {"message": "Scheduler stopped successfully", "status": "stopped"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to stop scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to stop scheduler. Please try again.")
 
 
 @router.post("/jobs/{job_id}/run")
@@ -88,7 +88,7 @@ async def run_job_now(job_id: str):
             "job_name": job.name
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to run job: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to run job. Please try again.")
 
 
 @router.get("/jobs")

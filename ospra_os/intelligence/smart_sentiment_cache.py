@@ -276,8 +276,8 @@ class SmartSentimentCache:
         try:
             size_bytes = len(json.dumps([c.to_dict() for c in self._cache.values()]))
             return round(size_bytes / 1024, 2)
-        except:
-            return 0.0
+        except (TypeError, ValueError):
+            return 0.0  # JSON serialization failed
     
     def get_all_cached(self) -> List[dict]:
         """Get all cached items (for debugging)."""

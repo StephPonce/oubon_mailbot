@@ -548,8 +548,8 @@ class EmailSyncService:
                 # Parse date
                 try:
                     received_at = email.utils.parsedate_to_datetime(date_header)
-                except:
-                    received_at = datetime.utcnow()
+                except (ValueError, TypeError):
+                    received_at = datetime.utcnow()  # Default to now if date parsing fails
 
                 # Create email record
                 email_record = Email(
@@ -583,8 +583,8 @@ class EmailSyncService:
             try:
                 imap.close()
                 imap.logout()
-            except:
-                pass  # Already disconnected
+            except (imaplib.IMAP4.error, OSError):
+                pass  # Already disconnected or connection lost
 
             return {
                 'success': True,
@@ -626,8 +626,8 @@ class EmailSyncService:
             if imap:
                 try:
                     imap.logout()
-                except:
-                    pass
+                except (imaplib.IMAP4.error, OSError):
+                    pass  # Already disconnected or connection lost
 
     def _decode_header(self, header: str) -> str:
         """Decode email header with robust error handling."""

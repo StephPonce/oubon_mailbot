@@ -2,12 +2,14 @@
 Template Vault API Routes - GROK RECOMMENDATION #12
 
 FastAPI endpoints for action template marketplace.
+
+SECURITY: Input validation added to all request models.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ospra_os.database.connection import get_db
 from ospra_os.services.template_service import TemplateService
@@ -31,68 +33,112 @@ router = APIRouter(prefix="/api/templates", tags=["templates"])
 # ==================== REQUEST/RESPONSE MODELS ====================
 
 class TemplateBase(BaseModel):
+    """Base template model with validation.
+
+    SECURITY: All fields have proper length limits and validation.
+    """
     name: str = Field(..., min_length=5, max_length=255)
-    description: str = Field(..., min_length=50)
+    description: str = Field(..., min_length=50, max_length=10000)
     short_description: Optional[str] = Field(None, max_length=500)
-    category: str
-    tags: List[str] = []
-    niches: List[str] = []
+    category: str = Field(..., max_length=100)
+    tags: List[str] = Field(default=[], max_length=20)
+    niches: List[str] = Field(default=[], max_length=10)
     is_free: bool = True
-    price: float = 0
+    price: float = Field(default=0, ge=0, le=10000)
+
+    @field_validator('tags', 'niches')
+    @classmethod
+    def validate_string_lists(cls, v: List[str]) -> List[str]:
+        """Validate list items have reasonable length"""
+        for item in v:
+            if len(item) > 100:
+                raise ValueError(f'List item too long: {item[:20]}...')
+        return v
 
 
 class TemplateCreate(TemplateBase):
-    actions: List[Dict[str, Any]]
-    variables: List[Dict[str, Any]] = []
-    requirements: Dict[str, Any] = {}
+    """Template creation with structured action validation.
+
+    SECURITY: Actions and variables have size limits.
+    """
+    actions: List[Dict[str, Any]] = Field(..., max_length=50)
+    variables: List[Dict[str, Any]] = Field(default=[], max_length=30)
+    requirements: Dict[str, Any] = Field(default={})
+
+    @field_validator('actions')
+    @classmethod
+    def validate_actions(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate action structure"""
+        if len(v) == 0:
+            raise ValueError('At least one action is required')
+        for action in v:
+            if len(str(action)) > 10000:
+                raise ValueError('Action definition too large')
+        return v
 
 
 class TemplateUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    short_description: Optional[str] = None
-    tags: Optional[List[str]] = None
-    niches: Optional[List[str]] = None
+    """Template update model with validation."""
+    name: Optional[str] = Field(None, min_length=5, max_length=255)
+    description: Optional[str] = Field(None, min_length=50, max_length=10000)
+    short_description: Optional[str] = Field(None, max_length=500)
+    tags: Optional[List[str]] = Field(None, max_length=20)
+    niches: Optional[List[str]] = Field(None, max_length=10)
     is_free: Optional[bool] = None
-    price: Optional[float] = None
+    price: Optional[float] = Field(None, ge=0, le=10000)
 
 
 class TemplateUseRequest(BaseModel):
-    store_id: int
-    variables: Dict[str, Any]
+    """Template usage request with validation."""
+    store_id: int = Field(..., ge=1)
+    variables: Dict[str, str] = Field(default={})
+
+    @field_validator('variables')
+    @classmethod
+    def validate_variables(cls, v: Dict[str, str]) -> Dict[str, str]:
+        """Validate variable values"""
+        if len(v) > 50:
+            raise ValueError('Too many variables (max 50)')
+        for key, value in v.items():
+            if len(key) > 100 or len(str(value)) > 1000:
+                raise ValueError(f'Variable key or value too long: {key}')
+        return v
 
 
 class TemplatePurchaseRequest(BaseModel):
-    payment_token: str
+    """Template purchase request."""
+    payment_token: str = Field(..., min_length=10, max_length=500)
 
 
 class TemplateReviewRequest(BaseModel):
+    """Template review with validation."""
     rating: int = Field(..., ge=1, le=5)
-    title: Optional[str] = None
-    content: Optional[str] = None
-    revenue_reported: Optional[float] = None
+    title: Optional[str] = Field(None, max_length=200)
+    content: Optional[str] = Field(None, max_length=5000)
+    revenue_reported: Optional[float] = Field(None, ge=0, le=10000000)
 
 
 class TemplateFromActionsRequest(BaseModel):
-    """Create template from existing action sequence"""
-    name: str = Field(..., min_length=5)
-    description: str = Field(..., min_length=50)
-    category: str
-    action_ids: List[int]  # Scheduled action IDs to convert
+    """Create template from existing action sequence."""
+    name: str = Field(..., min_length=5, max_length=255)
+    description: str = Field(..., min_length=50, max_length=10000)
+    category: str = Field(..., max_length=100)
+    action_ids: List[int] = Field(..., min_length=1, max_length=50)
     is_free: bool = True
-    price: float = 0
-    tags: List[str] = []
-    niches: List[str] = []
+    price: float = Field(default=0, ge=0, le=10000)
+    tags: List[str] = Field(default=[], max_length=20)
+    niches: List[str] = Field(default=[], max_length=10)
 
 
 class BrowseTemplatesQuery(BaseModel):
-    category: Optional[str] = None
-    niche: Optional[str] = None
-    search: Optional[str] = None
+    """Template browse query with validation."""
+    category: Optional[str] = Field(None, max_length=100)
+    niche: Optional[str] = Field(None, max_length=100)
+    search: Optional[str] = Field(None, max_length=200)
     free_only: bool = False
-    sort_by: str = "popular"  # popular, rating, newest, price_low, price_high
-    page: int = 1
-    per_page: int = 20
+    sort_by: Literal["popular", "rating", "newest", "price_low", "price_high"] = "popular"
+    page: int = Field(default=1, ge=1, le=1000)
+    per_page: int = Field(default=20, ge=1, le=100)
 
 
 # ==================== ENDPOINTS ====================

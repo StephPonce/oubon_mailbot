@@ -4,6 +4,7 @@ HYBRID LEARNING API ROUTES
 Endpoints for the AI learning system.
 """
 
+import logging
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
@@ -12,6 +13,7 @@ from datetime import datetime
 from ospra_os.database import SessionLocal
 from ospra_os.learning.hybrid_learning_engine import get_learning_engine
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/learning", tags=["Learning"])
 
 
@@ -209,7 +211,7 @@ async def record_feedback(request: FeedbackRequest):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record feedback: {str(e)}"
+            detail="Failed to record feedback. Please try again."
         )
     finally:
         db.close()
@@ -438,7 +440,7 @@ async def record_ad_performance(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record ad performance: {str(e)}"
+            detail="Failed to record ad performance. Please try again."
         )
     finally:
         db.close()
@@ -515,7 +517,7 @@ async def trigger_global_analysis():
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Global analysis failed: {str(e)}"
+            detail="Global analysis failed. Please try again."
         )
 
 
@@ -547,7 +549,7 @@ async def trigger_personal_analysis(user_id: int):
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Personal analysis failed: {str(e)}"
+            detail="Personal analysis failed. Please try again."
         )
 
 
@@ -577,7 +579,7 @@ async def trigger_all_users_analysis():
         traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"All users analysis failed: {str(e)}"
+            detail="Analysis failed. Please try again."
         )
 
 
@@ -624,13 +626,14 @@ async def get_learning_status():
             "note": "Using fallback status (scheduler not running)"
         }
     except Exception as e:
+        logger.error(f"Learning status check failed: {e}")
         # Database not available or tables don't exist
         return {
             "status": "not_initialized",
             "learning_cycles": 0,
             "total_sales_analyzed": 0,
             "accuracy": {},
-            "error": str(e),
+            "error": "Learning system not initialized",
             "fix": "Run database migrations or initialize learning tables"
         }
     finally:
@@ -661,11 +664,10 @@ async def trigger_learning_now():
             detail="Learning scheduler module not available"
         )
     except Exception as e:
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Learning trigger failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Learning trigger failed: {str(e)}"
+            detail="Learning trigger failed. Please try again."
         )
 
 
@@ -699,10 +701,11 @@ async def get_recent_learning_events(limit: int = 50):
             ]
         }
     except Exception as e:
+        logger.error(f"Failed to get learning events: {e}")
         return {
             "count": 0,
             "events": [],
-            "error": str(e),
+            "error": "Failed to retrieve learning events",
             "note": "AILearningEvent table may not exist. Run migrations."
         }
     finally:
@@ -758,7 +761,7 @@ async def simulate_sale(
             db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to simulate sale: {str(e)}"
+            detail="Failed to simulate sale. Please try again."
         )
     finally:
         if db:

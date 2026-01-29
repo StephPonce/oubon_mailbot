@@ -155,7 +155,7 @@ async def generate_report(request: GenerateReportRequest):
 
     except Exception as e:
         logger.error(f"[ERROR] Report generation failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Report generation failed. Please try again.")
 
 
 @router.get("/templates")
@@ -331,7 +331,7 @@ async def create_schedule(request: CreateScheduleRequest):
 
     except Exception as e:
         logger.error(f"[ERROR] Failed to create schedule: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to create schedule. Please try again.")
 
 
 @router.get("/schedules")

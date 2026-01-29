@@ -109,7 +109,7 @@ async def get_fulfillment_queue(current_user: User = Depends(get_current_user)):
         logger.error(f"Failed to get fulfillment queue: {e}")
         return {
             "success": False,
-            "error": str(e),
+            "error": "Failed to get fulfillment queue. Please try again.",
             "orders": []
         }
 
@@ -158,7 +158,7 @@ async def get_queue_stats(current_user: User = Depends(get_current_user)):
         logger.error(f"Failed to get queue stats: {e}")
         return {
             "success": False,
-            "error": str(e)
+            "error": "Failed to get queue statistics. Please try again."
         }
 
 
@@ -188,7 +188,7 @@ async def add_tracking_number(request: AddTrackingRequest, current_user: User = 
         
     except Exception as e:
         logger.error(f"Failed to add tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to add tracking. Please try again.")
 
 
 @router.post("/mark-fulfilled")
@@ -212,7 +212,7 @@ async def mark_order_fulfilled(request: MarkFulfilledRequest, current_user: User
         
     except Exception as e:
         logger.error(f"Failed to mark fulfilled: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to mark order as fulfilled. Please try again.")
 
 
 # ============================================================================
@@ -252,7 +252,7 @@ async def check_supplier_tracking(supplier: str, order_id: str, current_user: Us
         raise
     except Exception as e:
         logger.error(f"Failed to check tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to check tracking. Please try again.")
 
 
 # ============================================================================
@@ -327,7 +327,7 @@ async def sync_all_tracking(current_user: User = Depends(get_current_user)):
         
     except Exception as e:
         logger.error(f"Failed to sync tracking: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Failed to sync tracking. Please try again.")
 
 
 # ============================================================================

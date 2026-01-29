@@ -202,7 +202,7 @@ async def get_products(
         logger.error(f"Database query failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve products: {str(e)}"
+            detail="Failed to retrieve products. Please try again."
         )
 
 
@@ -258,7 +258,7 @@ async def analyze_product(product_id: str, request_body: dict = {}, current_user
         logger.error(f"Product analysis failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Analysis failed: {str(e)}"
+            detail="Analysis failed. Please try again."
         )
 
 
@@ -295,7 +295,7 @@ async def claude_chat(request: dict, current_user: User = Depends(get_current_us
         logger.error(f"Chat failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Chat failed: {str(e)}"
+            detail="Chat failed. Please try again."
         )
 
 
@@ -356,7 +356,7 @@ async def get_analytics_summary(current_user: User = Depends(get_current_user)):
         logger.error(f"Analytics failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Analytics failed: {str(e)}"
+            detail="Analytics failed. Please try again."
         )
 
 
@@ -375,7 +375,7 @@ async def get_business_analytics(current_user: User = Depends(get_current_user))
         logger.error(f"Business analytics failed: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Analytics failed: {str(e)}"
+            detail="Analytics failed. Please try again."
         )
 
 
@@ -395,7 +395,7 @@ async def get_analytics(current_user: User = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Failed to get analytics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/products/{product_id}/deployment-status")
@@ -484,7 +484,7 @@ async def deploy_to_shopify(product_id: str, current_user: User = Depends(get_cu
 
     except Exception as e:
         logger.error(f"Shopify deployment failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/shopify/status")
@@ -524,7 +524,7 @@ async def get_deployments(current_user: User = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Failed to get deployments: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/notifications")
@@ -545,7 +545,7 @@ async def get_notifications(unread_only: bool = False, limit: int = 50, current_
         }
     except Exception as e:
         logger.error(f"Failed to get notifications: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/notifications/{notification_id}/read")
@@ -563,7 +563,7 @@ async def mark_notification_read(notification_id: int, current_user: User = Depe
             raise HTTPException(status_code=500, detail="Failed to mark notification read")
     except Exception as e:
         logger.error(f"Failed to mark notification read: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/orders")
@@ -581,7 +581,7 @@ async def get_orders(limit: int = 50, current_user: User = Depends(get_current_u
         }
     except Exception as e:
         logger.error(f"Failed to get orders: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ==========================================
@@ -609,7 +609,7 @@ async def get_product_patterns(days: int = 30, current_user: User = Depends(get_
         }
     except Exception as e:
         logger.error(f"Pattern analysis failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/intelligence/drop-candidates")
@@ -633,7 +633,7 @@ async def get_drop_candidates(min_views: int = 100, days: int = 30, current_user
         }
     except Exception as e:
         logger.error(f"Drop candidates failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/intelligence/predict")
@@ -656,7 +656,7 @@ async def predict_product_performance(product: Dict, current_user: User = Depend
         }
     except Exception as e:
         logger.error(f"Prediction failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================
@@ -708,4 +708,4 @@ async def get_live_products_endpoint(
         
     except Exception as e:
         logger.error(f"Live products fetch failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")

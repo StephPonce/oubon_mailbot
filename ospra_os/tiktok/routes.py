@@ -125,7 +125,7 @@ async def get_auth_url():
 
     except Exception as e:
         logger.error(f"Failed to generate auth URL: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/auth/callback")
@@ -174,7 +174,7 @@ async def handle_oauth_callback(
 
     except Exception as e:
         logger.error(f"OAuth callback failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================
@@ -201,7 +201,7 @@ async def get_user_profile(
 
     except Exception as e:
         logger.error(f"Failed to fetch profile: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/videos")
@@ -225,7 +225,7 @@ async def get_user_videos(
 
     except Exception as e:
         logger.error(f"Failed to fetch videos: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 # ============================================================================

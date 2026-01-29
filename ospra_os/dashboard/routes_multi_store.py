@@ -196,30 +196,8 @@ def get_db(settings: Settings = Depends(get_settings)):
         session.close()
 
 
-def get_current_user(db: Session = Depends(get_db)) -> User:
-    """
-    Get current authenticated user
-
-    TODO: Replace with real authentication (JWT, OAuth, etc.)
-    For now, returns default user or creates one
-    """
-    # For development: use default user
-    user_email = "steph@oubonshop.com"
-
-    user = db.query(User).filter(User.email == user_email).first()
-
-    if not user:
-        # Create default user
-        user = User(
-            email=user_email,
-            name="Stephen Ponce",
-            subscription_tier=SubscriptionTier.PRO
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-    return user
+# SECURITY: Import real JWT authentication - never use hardcoded users
+from ospra_os.auth.jwt_auth import get_current_user
 
 
 # ============================================================================
@@ -535,10 +513,11 @@ async def add_store(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Failed to add store: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add store: {str(e)}"
+            detail="Failed to add store. Please check your credentials and try again."
         )
 
 
@@ -718,10 +697,11 @@ async def update_store(
         )
 
     except Exception as e:
+        logger.error(f"Failed to update store {store_id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update store: {str(e)}"
+            detail="Failed to update store. Please try again."
         )
 
 
@@ -777,10 +757,11 @@ async def delete_store(
         return None
 
     except Exception as e:
+        logger.error(f"Failed to delete store {store_id}: {e}", exc_info=True)
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete store: {str(e)}"
+            detail="Failed to delete store. Please try again."
         )
 
 
@@ -850,14 +831,14 @@ async def test_store_connection(
         logger.error(f"Authentication error for store {store_id}: {e}")
         return TestConnectionResponse(
             success=False,
-            error=f"Authentication failed: {str(e)}"
+            error="Authentication failed. Please check your API credentials."
         )
 
     except Exception as e:
-        logger.error(f"Error testing connection for store {store_id}: {e}")
+        logger.error(f"Error testing connection for store {store_id}: {e}", exc_info=True)
         return TestConnectionResponse(
             success=False,
-            error=f"Connection error: {str(e)}"
+            error="Connection error. Please verify your store settings."
         )
 
 
@@ -973,19 +954,19 @@ async def sync_store(
             orders_synced=0,
             revenue_updated=0.0,
             store_info={},
-            error=f"Authentication failed: {str(e)}",
+            error="Authentication failed. Please reconnect your store.",
             last_sync_time=datetime.utcnow()
         )
 
     except Exception as e:
-        logger.error(f"Error syncing store {store_id}: {e}")
+        logger.error(f"Error syncing store {store_id}: {e}", exc_info=True)
         db.rollback()
         return SyncStoreResponse(
             success=False,
             orders_synced=0,
             revenue_updated=0.0,
             store_info={},
-            error=f"Sync error: {str(e)}",
+            error="Sync failed. Please try again later.",
             last_sync_time=datetime.utcnow()
         )
 
@@ -1057,10 +1038,10 @@ async def get_store_orders(
             }
 
     except Exception as e:
-        logger.error(f"Error fetching orders for store {store_id}: {e}")
+        logger.error(f"Error fetching orders for store {store_id}: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
+            "error": "Failed to fetch orders. Please try again.",
             "orders": [],
             "total_count": 0
         }
@@ -1134,10 +1115,10 @@ async def get_store_products(
             }
 
     except Exception as e:
-        logger.error(f"Error fetching products for store {store_id}: {e}")
+        logger.error(f"Error fetching products for store {store_id}: {e}", exc_info=True)
         return {
             "success": False,
-            "error": str(e),
+            "error": "Failed to fetch products. Please try again.",
             "products": [],
             "total_count": 0
         }
@@ -1266,7 +1247,7 @@ async def deploy_product_to_store(
         db.rollback()
         return DeployProductResponse(
             success=False,
-            error=f"Product not found: {str(e)}"
+            error="Product not found or unavailable for deployment."
         )
 
     except PlatformAPIError as e:
@@ -1274,13 +1255,13 @@ async def deploy_product_to_store(
         db.rollback()
         return DeployProductResponse(
             success=False,
-            error=f"Platform API error: {str(e)}"
+            error="Platform API error. Please try again or check your store connection."
         )
 
     except Exception as e:
-        logger.error(f"Error deploying product {request.product_id} to store {store_id}: {e}")
+        logger.error(f"Error deploying product {request.product_id} to store {store_id}: {e}", exc_info=True)
         db.rollback()
         return DeployProductResponse(
             success=False,
-            error=f"Deployment error: {str(e)}"
+            error="Deployment failed. Please try again."
         )

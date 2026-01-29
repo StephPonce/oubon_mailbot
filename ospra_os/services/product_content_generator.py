@@ -580,20 +580,20 @@ RATIONALE:
                 try:
                     price_text = line.split("SUGGESTED_PRICE:")[1].strip()
                     suggested_price = float(price_text.replace("$", "").strip())
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Keep fallback price
             elif "MIN_VIABLE_PRICE:" in line:
                 try:
                     price_text = line.split("MIN_VIABLE_PRICE:")[1].strip()
                     min_viable = float(price_text.replace("$", "").strip())
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Keep fallback price
             elif "PREMIUM_PRICE:" in line:
                 try:
                     price_text = line.split("PREMIUM_PRICE:")[1].strip()
                     premium_price = float(price_text.replace("$", "").strip())
-                except:
-                    pass
+                except (ValueError, IndexError):
+                    pass  # Keep fallback price
             elif "RATIONALE:" in line:
                 rationale = line.split("RATIONALE:")[1].strip()
 

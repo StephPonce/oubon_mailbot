@@ -99,7 +99,7 @@ async def get_campaigns():
         return {"connected": True, "campaigns": results}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Meta API error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Meta API error. Please try again.")
 
 
 @router.post("/campaigns/{campaign_id}/pause")
@@ -126,7 +126,7 @@ async def pause_campaign(campaign_id: str):
         campaign.api_update(params={'status': 'PAUSED'})
         return {"status": "paused", "campaign_id": campaign_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.post("/campaigns/{campaign_id}/resume")
@@ -153,7 +153,7 @@ async def resume_campaign(campaign_id: str):
         campaign.api_update(params={'status': 'ACTIVE'})
         return {"status": "active", "campaign_id": campaign_id}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
 @router.get("/performance")
@@ -208,4 +208,4 @@ async def get_performance():
             "roas": roas
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="An error occurred. Please try again.")

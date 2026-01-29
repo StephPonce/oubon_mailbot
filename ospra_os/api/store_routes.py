@@ -20,8 +20,9 @@ UPDATED: GROK RECOMMENDATION #14 - Multi-Tenant Isolation
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+from pydantic import BaseModel, Field, field_validator, HttpUrl
+from typing import List, Dict, Optional, Any, Literal
+import re
 
 from ospra_os.tenancy import get_tenant_db, get_tenant, log_success, log_failure
 from ospra_os.tenancy.queries import TenantScopedSession
@@ -37,18 +38,76 @@ router = APIRouter(prefix="/api/stores", tags=["Stores"])
 # ============================================================================
 
 class StoreCreate(BaseModel):
-    """Request model for creating a new store"""
-    store_name: str = Field(..., description="Store display name")
-    store_url: str = Field(..., description="Store URL")
-    platform: str = Field(..., description="Platform type (shopify, amazon, woocommerce)")
-    credentials: Dict[str, Any] = Field(..., description="Platform-specific credentials")
-    niche: Optional[str] = Field(None, description="Store niche (e.g., fitness, smart_home)")
+    """Request model for creating a new store
+
+    SECURITY: Validated fields with proper length limits and format checks.
+    """
+    store_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Store display name"
+    )
+    store_url: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Store URL"
+    )
+    platform: Literal["shopify", "amazon", "woocommerce", "etsy", "ebay"] = Field(
+        ...,
+        description="Platform type"
+    )
+    credentials: Dict[str, str] = Field(
+        ...,
+        description="Platform-specific credentials (key-value pairs)"
+    )
+    niche: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Store niche (e.g., fitness, smart_home)"
+    )
+
+    @field_validator('store_url')
+    @classmethod
+    def validate_store_url(cls, v: str) -> str:
+        """Validate store URL format"""
+        # Basic URL validation - must have scheme or be a domain
+        url_pattern = re.compile(
+            r'^https?://[^\s<>"{}|\\^`\[\]]+$|^[a-zA-Z0-9][a-zA-Z0-9-]*\.[a-zA-Z]{2,}$'
+        )
+        if not url_pattern.match(v):
+            raise ValueError('Invalid store URL format')
+        return v
+
+    @field_validator('credentials')
+    @classmethod
+    def validate_credentials(cls, v: Dict[str, str]) -> Dict[str, str]:
+        """Validate credentials structure and size"""
+        if len(v) > 20:
+            raise ValueError('Too many credential fields (max 20)')
+        for key, value in v.items():
+            if len(key) > 100:
+                raise ValueError(f'Credential key too long: {key[:20]}...')
+            if len(str(value)) > 1000:
+                raise ValueError(f'Credential value too long for key: {key}')
+        return v
 
 
 class StoreStatusUpdate(BaseModel):
-    """Request model for updating store status"""
-    status: str = Field(..., description="New status (active, paused, disconnected, error)")
-    sync_error: Optional[str] = Field(None, description="Error message if status is error")
+    """Request model for updating store status
+
+    SECURITY: Status field restricted to valid enum values.
+    """
+    status: Literal["active", "paused", "disconnected", "error"] = Field(
+        ...,
+        description="New status"
+    )
+    sync_error: Optional[str] = Field(
+        None,
+        max_length=1000,
+        description="Error message if status is error"
+    )
 
 
 class StoreResponse(BaseModel):

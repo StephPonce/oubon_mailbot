@@ -372,65 +372,96 @@ async def lemonsqueezy_order(
 # CJ DROPSHIPPING WEBHOOKS
 # =============================================================================
 
+async def verify_cj_webhook(
+    request: Request,
+    x_cj_signature: str = Header(..., alias="X-CJ-Signature")
+) -> bytes:
+    """
+    FastAPI dependency for CJ webhook verification.
+
+    SECURITY: Signature verification is REQUIRED.
+    """
+    import hmac
+    import hashlib
+    import os
+
+    body = await request.body()
+    secret = os.getenv("CJ_WEBHOOK_SECRET")
+
+    if not secret:
+        logger.error("CJ_WEBHOOK_SECRET not configured - rejecting webhook")
+        raise HTTPException(status_code=500, detail="Webhook verification not configured")
+
+    # CJ uses HMAC-SHA256
+    computed = hmac.new(
+        secret.encode('utf-8'),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(computed, x_cj_signature):
+        logger.warning(f"Invalid CJ webhook signature from {request.client.host}")
+        raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
+    return body
+
+
 @router.post("/cj/inventory")
 async def cj_inventory_update(
-    request: Request,
     background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit)
+    _: None = Depends(webhook_rate_limit),
+    body: bytes = Depends(verify_cj_webhook)
 ):
     """
     Handle CJ Dropshipping inventory update webhook.
-    
-    [SECURE] Verified with X-CJ-Signature (when configured)
+
+    [SECURE] Verified with X-CJ-Signature (REQUIRED)
     """
-    # Note: CJ webhook verification is optional until secret is configured
     try:
-        body = await request.body()
         data = json.loads(body)
-        
+
         product_id = data.get("pid")
         available = data.get("inventory", 0)
         warehouse = data.get("warehouse", "unknown")
-        
+
         logger.info(f"[PACKAGE] CJ inventory update: {product_id} -> {available} units ({warehouse})")
-        
+
         # TODO: Sync with Shopify inventory
-        
+
         return {
             "success": True,
             "product_id": product_id,
             "available": available,
             "warehouse": warehouse
         }
-        
+
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
 
 @router.post("/cj/shipment")
 async def cj_shipment_update(
-    request: Request,
     background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit)
+    _: None = Depends(webhook_rate_limit),
+    body: bytes = Depends(verify_cj_webhook)
 ):
     """
     Handle CJ Dropshipping shipment update webhook.
-    
-    [SECURE] Verified with X-CJ-Signature (when configured)
+
+    [SECURE] Verified with X-CJ-Signature (REQUIRED)
     """
     try:
-        body = await request.body()
         data = json.loads(body)
-        
+
         order_id = data.get("orderId")
         tracking_number = data.get("trackingNumber")
         carrier = data.get("carrier")
         status = data.get("status")
-        
+
         logger.info(f"[SHIPPING] CJ shipment update: {order_id} - {tracking_number} ({status})")
-        
+
         # TODO: Update Shopify fulfillment, send tracking to customer
-        
+
         return {
             "success": True,
             "order_id": order_id,
@@ -438,7 +469,7 @@ async def cj_shipment_update(
             "carrier": carrier,
             "status": status
         }
-        
+
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
 
@@ -539,38 +570,15 @@ async def gdpr_data_request(
 
 
 # =============================================================================
-# TEST ENDPOINT
+# TEST ENDPOINT REMOVED FOR SECURITY
 # =============================================================================
-
-@router.post("/test")
-async def test_webhook(
-    request: Request,
-    _: None = Depends(webhook_rate_limit)
-):
-    """
-    Test webhook endpoint (no signature verification).
-    
-    [WARNING] For development/testing only
-    """
-    try:
-        body = await request.body()
-        data = json.loads(body) if body else {}
-        
-        headers = dict(request.headers)
-        
-        return {
-            "success": True,
-            "message": "Webhook received",
-            "body": data,
-            "headers": {
-                k: v for k, v in headers.items()
-                if k.lower().startswith(("x-", "content-"))
-            }
-        }
-        
-    except json.JSONDecodeError:
-        return {
-            "success": True,
-            "message": "Webhook received (non-JSON body)",
-            "body_length": len(await request.body())
-        }
+# The /test endpoint was removed because it allowed unverified webhook
+# submissions, which could be exploited in production.
+#
+# For webhook testing, use the provider's official testing tools:
+# - Shopify: Partner Dashboard webhook testing
+# - LemonSqueezy: Test events from dashboard
+# - Stripe: CLI with `stripe trigger`
+#
+# Or create test scripts that include valid signatures.
+# =============================================================================

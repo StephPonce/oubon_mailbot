@@ -13,11 +13,11 @@ Endpoints for user profile and subscription management:
 import os
 import secrets
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from ospra_os.auth.jwt_auth import get_current_user, get_db, user_to_dict
 from ospra_os.database import User, SubscriptionTier, UserSettings
@@ -31,18 +31,38 @@ router = APIRouter(prefix="/api/user", tags=["User"])
 # ============================================================================
 
 class ProfileUpdate(BaseModel):
-    """Profile update request"""
-    name: Optional[str] = None
+    """Profile update request
+
+    SECURITY: Name field has length limits.
+    """
+    name: Optional[str] = Field(
+        None,
+        min_length=1,
+        max_length=255,
+        description="User's display name"
+    )
 
 
 class TierUpdate(BaseModel):
-    """Tier update request (for admin/dev)"""
-    tier: str  # nest, flight, soar, stratosphere
-    
+    """Tier update request (for admin/dev)
+
+    SECURITY: Tier restricted to valid enum values.
+    """
+    tier: Literal["nest", "flight", "soar", "stratosphere"] = Field(
+        ...,
+        description="Subscription tier"
+    )
+
 
 class SubscriptionUpgrade(BaseModel):
-    """Subscription upgrade request"""
-    tier: str
+    """Subscription upgrade request
+
+    SECURITY: Tier restricted to valid enum values.
+    """
+    tier: Literal["nest", "flight", "soar", "stratosphere"] = Field(
+        ...,
+        description="Target subscription tier"
+    )
 
 
 # ============================================================================

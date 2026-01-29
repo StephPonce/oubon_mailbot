@@ -401,8 +401,8 @@ class AIImageGenerator:
                     f.write(response.content)
                 logger.info(f"[SUCCESS] Mock image: {filepath}")
                 return str(filepath)
-        except:
-            pass
+        except (requests.RequestException, OSError, IOError):
+            pass  # Network error or file write failure - continue with fallback
 
         return str(filepath)
 

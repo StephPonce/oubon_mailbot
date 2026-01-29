@@ -168,7 +168,7 @@ class XAIProvider(AIProvider):
                 try:
                     error_body = e.response.json()
                     logger.warning(f"xAI error response: {error_body}")
-                except:
+                except (json.JSONDecodeError, ValueError):
                     logger.warning(f"xAI error text: {e.response.text[:500]}")
                 
                 if status == 429:
@@ -495,8 +495,8 @@ Return JSON:
                 try:
                     error_detail = e.response.json() if hasattr(e.response, 'json') else e.response.text
                     logger.error(f"xAI error response: {error_detail}")
-                except:
-                    pass
+                except (json.JSONDecodeError, ValueError, AttributeError):
+                    pass  # Could not parse error response
             return False
     
     def _parse_json_response(self, text: str, fallback_data: Dict) -> Dict:
@@ -505,14 +505,15 @@ Return JSON:
             # Remove markdown code blocks
             text = re.sub(r'```json\s*', '', text)
             text = re.sub(r'```\s*', '', text)
-            
+
             # Find JSON
             start = text.find('{')
             end = text.rfind('}') + 1
             if start != -1 and end > start:
                 return json.loads(text[start:end])
             return json.loads(text)
-        except:
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.debug(f"Failed to parse JSON response: {e}")
             return {
                 "raw_response": text[:500],
                 "parse_error": True,

@@ -865,8 +865,8 @@ class SentimentAnalyzer:
                     positive_phrases.extend(blob.noun_phrases)
                 elif polarity < -0.2:
                     negative_phrases.extend(blob.noun_phrases)
-            except:
-                continue
+            except Exception:
+                continue  # TextBlob parsing error - skip this review
 
         # Calculate overall
         avg_sentiment = sum(sentiments) / len(sentiments) if sentiments else 0.5

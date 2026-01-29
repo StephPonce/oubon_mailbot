@@ -471,7 +471,7 @@ async def sync_from_shopify(
 
     except Exception as e:
         logger.error(f"[ERROR] Sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Customer sync failed. Please try again.")
 
 
 @router.post("/sync/shopify/{customer_id}")
@@ -502,7 +502,7 @@ async def sync_single_customer(
         raise
     except Exception as e:
         logger.error(f"[ERROR] Sync error: {e}")
-        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Customer sync failed. Please try again.")
 
 
 # ==================== Search & Filter ====================

@@ -55,7 +55,7 @@ router = APIRouter(prefix="/webhooks/shopify", tags=["Shopify Webhooks"])
 async def webhook_orders_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle new order creation.
@@ -80,7 +80,7 @@ async def webhook_orders_create(
 async def webhook_orders_updated(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle order updates.
@@ -101,7 +101,7 @@ async def webhook_orders_updated(
 async def webhook_orders_paid(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle order payment confirmation.
@@ -127,7 +127,7 @@ async def webhook_orders_paid(
 async def webhook_orders_fulfilled(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle order fulfillment.
@@ -149,7 +149,7 @@ async def webhook_orders_fulfilled(
 async def webhook_orders_cancelled(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle order cancellation.
@@ -172,7 +172,7 @@ async def webhook_orders_cancelled(
 @router.post("/orders/edited")
 async def webhook_orders_edited(
     request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle order edits (post-purchase modifications).
@@ -193,7 +193,7 @@ async def webhook_orders_edited(
 async def webhook_refunds_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle refund creation.
@@ -225,7 +225,7 @@ async def webhook_refunds_create(
 async def webhook_disputes_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle dispute/chargeback creation.
@@ -255,7 +255,7 @@ async def webhook_disputes_create(
 async def webhook_products_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle new product creation in store.
@@ -279,7 +279,7 @@ async def webhook_products_create(
 async def webhook_products_update(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle product updates.
@@ -304,7 +304,7 @@ async def webhook_products_update(
 async def webhook_products_delete(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle product deletion.
@@ -331,7 +331,7 @@ async def webhook_products_delete(
 async def webhook_inventory_levels_update(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle inventory level updates.
@@ -357,7 +357,7 @@ async def webhook_inventory_levels_update(
 async def webhook_inventory_items_update(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle inventory item updates (SKU, cost, etc).
@@ -380,7 +380,7 @@ async def webhook_inventory_items_update(
 async def webhook_customers_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle new customer creation.
@@ -403,7 +403,7 @@ async def webhook_customers_create(
 @router.post("/customers/update")
 async def webhook_customers_update(
     request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle customer updates.
@@ -420,7 +420,7 @@ async def webhook_customers_update(
 async def webhook_customers_delete(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle customer deletion.
@@ -445,7 +445,7 @@ async def webhook_customers_delete(
 async def webhook_checkouts_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle checkout creation.
@@ -468,7 +468,7 @@ async def webhook_checkouts_create(
 @router.post("/checkouts/update")
 async def webhook_checkouts_update(
     request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle checkout updates.
@@ -489,7 +489,7 @@ async def webhook_checkouts_update(
 async def webhook_fulfillments_create(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle fulfillment creation.
@@ -507,7 +507,7 @@ async def webhook_fulfillments_create(
 @router.post("/fulfillments/update")
 async def webhook_fulfillments_update(
     request: Request,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle fulfillment updates (tracking info, status).
@@ -530,7 +530,7 @@ async def webhook_fulfillments_update(
 async def webhook_customers_data_request(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle customer data request (GDPR).
@@ -554,7 +554,7 @@ async def webhook_customers_data_request(
 async def webhook_customers_redact(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle customer data deletion request (GDPR).
@@ -578,7 +578,7 @@ async def webhook_customers_redact(
 async def webhook_shop_redact(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle shop data deletion (GDPR).
@@ -604,7 +604,7 @@ async def webhook_shop_redact(
 async def webhook_app_uninstalled(
     request: Request,
     background_tasks: BackgroundTasks,
-    x_shopify_hmac_sha256: Optional[str] = Header(None)
+    x_shopify_hmac_sha256: str = Header(..., alias="X-Shopify-Hmac-SHA256")
 ):
     """
     Handle app uninstallation.
