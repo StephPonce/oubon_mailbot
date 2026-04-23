@@ -16,8 +16,7 @@ I just deployed a **stable, fast version** that:
 
 **Restart backend:**
 ```bash
-kill -9 $(lsof -ti:8001)
-./START_SERVERS.sh
+./scripts/run.sh restart-backend
 ```
 
 ---
@@ -270,7 +269,7 @@ This is now your single source of truth for products!
 
 **Restart backend and test:**
 ```bash
-./START_SERVERS.sh
+./scripts/run.sh start
 ```
 
 Dashboard should load in <3 seconds now! 🚀
