@@ -153,3 +153,38 @@ class ActionLog(Base):
 
     def __repr__(self):
         return f"<ActionLog(action_id={self.action_id}, {self.old_status}→{self.new_status})>"
+
+
+class AutoPilotLog(Base):
+    """
+    Logs for Auto-Pilot automatic action execution.
+
+    Tracks when Auto-Pilot executes actions automatically,
+    including the confidence threshold that triggered execution.
+    """
+    __tablename__ = "auto_pilot_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action_id = Column(Integer, ForeignKey("actions.id"), nullable=True, index=True)
+
+    # What happened
+    action_type = Column(String(50), nullable=False)
+    was_executed = Column(Boolean, default=False)
+    confidence = Column(Float, nullable=True)
+    threshold = Column(Float, nullable=True)
+
+    # Outcome
+    success = Column(Boolean, nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    # Metadata
+    execution_time_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    user = relationship("User")
+    action = relationship("Action")
+
+    def __repr__(self):
+        return f"<AutoPilotLog(id={self.id}, action_type={self.action_type}, executed={self.was_executed})>"

@@ -203,26 +203,58 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+# Check if running in development mode (DEBUG=true increases rate limits)
+import os
+_IS_DEBUG = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+
 # Rate limit configurations by tier
+# In DEBUG mode, limits are significantly increased for local development
+if _IS_DEBUG:
+    logger.info("[DEV] Rate limiting in DEBUG mode - limits increased for local development")
+
 TIER_LIMITS = {
+    # Free tier (nest)
     "free": {
-        "ai": "5/minute",          # 5 AI requests per minute
-        "api": "30/minute",        # 30 API requests per minute
-        "discovery": "10/hour",    # 10 product discoveries per hour
+        "ai": "100/minute" if _IS_DEBUG else "5/minute",
+        "api": "500/minute" if _IS_DEBUG else "30/minute",
+        "discovery": "100/hour" if _IS_DEBUG else "10/hour",
     },
+    "nest": {  # Alias for free tier
+        "ai": "100/minute" if _IS_DEBUG else "5/minute",
+        "api": "500/minute" if _IS_DEBUG else "30/minute",
+        "discovery": "100/hour" if _IS_DEBUG else "10/hour",
+    },
+    # Starter tier (flight)
     "starter": {
-        "ai": "15/minute",
-        "api": "100/minute",
-        "discovery": "50/hour",
+        "ai": "100/minute" if _IS_DEBUG else "15/minute",
+        "api": "500/minute" if _IS_DEBUG else "100/minute",
+        "discovery": "100/hour" if _IS_DEBUG else "50/hour",
     },
+    "flight": {  # Alias for starter tier
+        "ai": "100/minute" if _IS_DEBUG else "15/minute",
+        "api": "500/minute" if _IS_DEBUG else "100/minute",
+        "discovery": "100/hour" if _IS_DEBUG else "50/hour",
+    },
+    # Pro tier (soar)
     "pro": {
-        "ai": "30/minute",
-        "api": "300/minute",
-        "discovery": "200/hour",
+        "ai": "100/minute" if _IS_DEBUG else "30/minute",
+        "api": "500/minute" if _IS_DEBUG else "300/minute",
+        "discovery": "200/hour" if _IS_DEBUG else "200/hour",
     },
+    "soar": {  # Alias for pro tier
+        "ai": "100/minute" if _IS_DEBUG else "30/minute",
+        "api": "500/minute" if _IS_DEBUG else "300/minute",
+        "discovery": "200/hour" if _IS_DEBUG else "200/hour",
+    },
+    # Enterprise tier (stratosphere)
     "enterprise": {
-        "ai": "100/minute",
-        "api": "1000/minute",
+        "ai": "1000/minute" if _IS_DEBUG else "100/minute",
+        "api": "10000/minute" if _IS_DEBUG else "1000/minute",
+        "discovery": "unlimited",
+    },
+    "stratosphere": {  # Alias for enterprise tier
+        "ai": "1000/minute" if _IS_DEBUG else "100/minute",
+        "api": "10000/minute" if _IS_DEBUG else "1000/minute",
         "discovery": "unlimited",
     }
 }
@@ -233,11 +265,12 @@ def get_tier_limit(tier: str, resource: str = "api") -> str:
     Get rate limit for a specific tier and resource type.
 
     Args:
-        tier: User subscription tier (free, starter, pro, enterprise)
+        tier: User subscription tier (nest/free, flight/starter, soar/pro, stratosphere/enterprise)
         resource: Resource type (ai, api, discovery)
 
     Returns:
         Rate limit string (e.g., "30/minute")
     """
-    tier_config = TIER_LIMITS.get(tier.lower(), TIER_LIMITS["free"])
+    tier_lower = tier.lower()
+    tier_config = TIER_LIMITS.get(tier_lower, TIER_LIMITS["nest"])
     return tier_config.get(resource, "10/minute")

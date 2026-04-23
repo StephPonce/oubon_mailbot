@@ -38,6 +38,29 @@ from .templates import (
     TemplateStatsResponse,
 )
 
+# Request schemas
+from .requests import (
+    PlatformCredentials,
+    ShopifyDeployRequest,
+    ShopifyBulkDeployRequest,
+    AliExpressSearchRequest,
+    AliExpressAffiliateLinkRequest,
+    AliExpressFulfillRequest,
+    AliExpressSyncRequest,
+    AliExpressMonitorPricesRequest,
+    MetaProductInfo,
+    MetaCampaignRequest,
+    MetaBulkCampaignCreateRequest,
+    CampaignStatusUpdate,
+    AdSetBudgetUpdate,
+    ScheduleCreateRequest,
+    DiscoverRequest,
+    ChatRequest,
+    MarketingAngleRequest,
+    BulkMarketingRequest,
+    SmartRecommendationRequest,
+)
+
 # Task schemas
 from .tasks import (
     TaskStatusResponse,
@@ -79,6 +102,26 @@ __all__ = [
     "TemplateCategoryOption",
     "TemplateCategoriesResponse",
     "TemplateStatsResponse",
+    # Requests
+    "PlatformCredentials",
+    "ShopifyDeployRequest",
+    "ShopifyBulkDeployRequest",
+    "AliExpressSearchRequest",
+    "AliExpressAffiliateLinkRequest",
+    "AliExpressFulfillRequest",
+    "AliExpressSyncRequest",
+    "AliExpressMonitorPricesRequest",
+    "MetaProductInfo",
+    "MetaCampaignRequest",
+    "MetaBulkCampaignCreateRequest",
+    "CampaignStatusUpdate",
+    "AdSetBudgetUpdate",
+    "ScheduleCreateRequest",
+    "DiscoverRequest",
+    "ChatRequest",
+    "MarketingAngleRequest",
+    "BulkMarketingRequest",
+    "SmartRecommendationRequest",
     # Tasks
     "TaskStatusResponse",
     "ActiveTaskResponse",

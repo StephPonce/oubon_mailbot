@@ -21,13 +21,42 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
-import { api } from '../services/api';
+import { api, API_BASE_URL } from '../services/api';
 import { PageLayout } from './Layout';
 import { AIImageComparison } from './AIImageComparison';
 
 // ============================================================================
+// HELPER: Resolve image URLs to full URLs
+// ============================================================================
+// Enhanced images are served from backend at /static/images/enhanced/
+// We need to prepend API_BASE_URL for these relative paths
+function resolveImageUrl(url) {
+  if (!url) return null;
+  // If it's already a full URL (http/https) or data URL, return as-is
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  // If it's a relative path from our backend (starts with /), prepend API_BASE_URL
+  if (url.startsWith('/')) {
+    return `${API_BASE_URL}${url}`;
+  }
+  return url;
+}
+
+// ============================================================================
 // HELPER: Normalize product data from any API source
 // ============================================================================
+// Generate a stable hash from a string (for consistent product IDs)
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
 function normalizeProduct(p, fallbackNiche = 'general') {
   const costPrice = parseFloat(p.cost_price || p.supplier_cost || p.targetSalePrice || p.price || 0);
   
@@ -72,28 +101,75 @@ function normalizeProduct(p, fallbackNiche = 'general') {
   // Oi Score - the single unified score
   const oiScore = Math.round(p.oi_score || p.score || p.final_score || p.productScore || p.opportunity_score || 50);
   
-  // Supplier link - check ALL possible field names
-  const supplierUrl = p.affiliate_url || p.affiliateUrl || p.affiliate_link || p.affiliateLink || 
-                      p.promotionLink || p.promotion_link || p.supplier_url || p.supplierUrl ||
-                      p.product_url || p.productUrl || p.url || null;
+  // Supplier link - check flat fields AND nested data_sources.*.url.
+  // Backend puts the real clickable URL in different places depending on the source:
+  //   - AliExpress affiliate: data_sources.aliexpress.url (or .promotion_link)
+  //   - CJ Dropshipping:       data_sources.cj_dropshipping.url
+  //   - Some normalized paths: supplier_url / product_url / affiliate_url (flat)
+  const ds = p.data_sources || {};
+  const aliSrc = ds.aliexpress || {};
+  const cjSrc = ds.cj_dropshipping || ds.cj || {};
+  const supplierUrl =
+    // Flat fields (legacy / normalized)
+    p.affiliate_url || p.affiliateUrl || p.affiliate_link || p.affiliateLink ||
+    p.promotionLink || p.promotion_link ||
+    p.supplier_url || p.supplierUrl ||
+    p.product_url  || p.productUrl ||
+    // Nested per-source URLs (what the backend actually produces today)
+    aliSrc.url || aliSrc.promotion_link || aliSrc.affiliate_url || aliSrc.product_url ||
+    cjSrc.url  || cjSrc.product_url ||
+    // Last-ditch fallbacks
+    p.url || p.source_url || null;
   
   // Check if scores are REAL or DEFAULT (50 = default)
   const hasRealDemandScore = p.demand_score !== undefined && p.demand_score !== 50;
   const hasRealTrendScore = p.trend_score !== undefined && p.trend_score !== 50;
+  // Post-Fix #15: sentiment_score is null when no real social data was found.
+  // null is NOT a "default estimate" - it's an honest empty state. Treat it
+  // as real data (we asked and got "no data"), distinct from `undefined` (never asked).
   const hasRealSentimentScore = p.sentiment_score !== undefined && p.sentiment_score !== 50;
   const hasAnyRealScores = hasRealDemandScore || hasRealTrendScore || hasRealSentimentScore || (p.sales_count > 0);
-  
+
   // Score breakdown - mark as estimated if default
   const demandScore = p.demand_score || p.demandScore || 50;
   const trendScore = p.trend_score || p.trendScore || 50;
-  const sentimentScore = p.sentiment_score || p.sentimentScore || 50;
+  // CRITICAL: preserve null sentiment_score from backend. Using `||` would
+  // silently coerce null → 50, reintroducing the fake default we just killed.
+  const sentimentScore =
+    p.sentiment_score !== undefined
+      ? p.sentiment_score   // may be number OR null (null = "we searched, found nothing")
+      : (p.sentimentScore !== undefined ? p.sentimentScore : null);
+  const sentimentWeightRedistributed = p.sentiment_weight_redistributed === true;
   const viralScore = p.viral_score || p.viralScore || 50;
   const profitMargin = (suggestedPrice > 0 && costPrice > 0) ? Math.round((profit / suggestedPrice) * 100) : 50;
   const profitScore = p.profit_score || p.profitScore || Math.min(100, profitMargin * 1.5);
   
+  // Generate a STABLE product ID based on title + main image (for cache consistency)
+  const title = p.title || p.name || p.product_title || 'Untitled Product';
+  const stableId = p.id || p.product_id || `prod_${simpleHash(title + (mainImage || ''))}`;
+
+  // Supplier/warehouse fields for badges + filter chips (Option A)
+  //   - available_on: ['aliexpress'], ['cj_dropshipping'], or both (cross-referenced)
+  //   - cross_referenced: true when the same product was found on both suppliers
+  //   - cj_warehouse / us_warehouse / eu_warehouse: raw CJ warehouse info
+  // Backend shape (ProductDiscovery._cross_reference_suppliers):
+  //   product.available_on = ['aliexpress'] | ['cj_dropshipping'] | ['aliexpress', 'cj_dropshipping']
+  //   product.cross_referenced = bool
+  //   product.data_sources.cj_dropshipping.us_warehouse / eu_warehouse / warehouse
+  const cjData = (p.data_sources && (p.data_sources.cj_dropshipping || p.data_sources.cj)) || {};
+  const availableOn = Array.isArray(p.available_on) && p.available_on.length > 0
+    ? p.available_on
+    : (p.source ? [p.source] : []);
+  const crossReferenced = p.cross_referenced === true || availableOn.length >= 2;
+  const usWarehouse = !!(cjData.us_warehouse || p.us_warehouse);
+  const euWarehouse = !!(cjData.eu_warehouse || p.eu_warehouse);
+  const cjWarehouse = cjData.warehouse || p.cj_warehouse || null;
+  const onCj = availableOn.includes('cj_dropshipping') || p.source === 'cj_dropshipping';
+  const onAli = availableOn.includes('aliexpress') || p.source === 'aliexpress';
+
   return {
-    id: p.id || p.product_id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    title: p.title || p.name || p.product_title || 'Untitled Product',
+    id: stableId,
+    title: title,
     image_url: mainImage,
     ai_image_url: p.ai_image_url || null,
     all_images: allImages,
@@ -107,12 +183,21 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     source: p.source || 'aliexpress',
     is_mock: p.is_mock || p.source === 'mock_data',
     supplier_url: supplierUrl,
+    // Supplier / warehouse metadata (Option A badges + filter chips)
+    available_on: availableOn,
+    cross_referenced: crossReferenced,
+    on_aliexpress: onAli,
+    on_cj: onCj,
+    us_warehouse: usWarehouse,
+    eu_warehouse: euWarehouse,
+    cj_warehouse: cjWarehouse,
     sales_count: p.sales_count || p.salesCount || p.productSalesCount || 0,
     rating: p.rating || null,
     // Score breakdown with estimation flag
     demand_score: demandScore,
     trend_score: trendScore,
     sentiment_score: sentimentScore,
+    sentiment_weight_redistributed: sentimentWeightRedistributed,
     viral_score: viralScore,
     profit_score: profitScore,
     scores_estimated: !hasAnyRealScores,
@@ -121,6 +206,14 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     reasons: p.reasons || [],
     risks: p.risks || [],
     data_sources: p.data_sources || {},
+    // Social evidence trail (post-Fix #15) - real tweets/posts we can show to the user
+    twitter_evidence: p.twitter_evidence || null,
+    reddit_evidence: p.reddit_evidence || null,
+    // Amazon evidence (Task #18) - niche-level Amazon search matched to this product
+    amazon_evidence: p.amazon_evidence || null,
+    amazon_buzz: typeof p.amazon_buzz === 'number' ? p.amazon_buzz : null,
+    amazon_rating: typeof p.amazon_rating === 'number' ? p.amazon_rating : null,
+    amazon_review_count: typeof p.amazon_review_count === 'number' ? p.amazon_review_count : null,
     raw_data: p,
   };
 }
@@ -143,7 +236,77 @@ function getScoreBgColor(score) {
 }
 
 // ============================================================================
-// COMPONENT: Product Card - CLICKABLE, Oi Score ONLY (no source badges)
+// COMPONENT: SupplierBadges - small pills showing where the product ships from
+// ============================================================================
+// Shown in the lower-left of each product image. Honest to real backend data:
+//   - US pill      → CJ product in a US warehouse (2–5 day shipping)
+//   - EU pill      → CJ product in an EU warehouse
+//   - ⚡ Cross-ref → Same product found on BOTH AliExpress and CJ
+//   - CJ pill     → CJ-only product (no AliExpress match)
+// AliExpress-only products get no badge (the default case — no visual noise).
+function SupplierBadges({ product }) {
+  const badges = [];
+
+  if (product.cross_referenced) {
+    badges.push(
+      <span
+        key="cross"
+        title="Same product found on AliExpress AND CJ Dropshipping — more reliable sourcing"
+        className="px-1.5 py-0.5 rounded-md bg-purple-500/80 text-white text-[10px] font-semibold flex items-center gap-0.5 backdrop-blur-sm"
+      >
+        <Zap className="w-2.5 h-2.5" />
+        Cross-ref
+      </span>
+    );
+  }
+
+  if (product.us_warehouse) {
+    badges.push(
+      <span
+        key="us"
+        title="Ships from US warehouse (2–5 day delivery)"
+        className="px-1.5 py-0.5 rounded-md bg-green-500/80 text-white text-[10px] font-semibold backdrop-blur-sm"
+      >
+        🇺🇸 US
+      </span>
+    );
+  } else if (product.eu_warehouse) {
+    badges.push(
+      <span
+        key="eu"
+        title="Ships from EU warehouse (3–7 day delivery)"
+        className="px-1.5 py-0.5 rounded-md bg-blue-500/80 text-white text-[10px] font-semibold backdrop-blur-sm"
+      >
+        🇪🇺 EU
+      </span>
+    );
+  }
+
+  // CJ-only pill: only show when we have CJ but NOT AliExpress (and no cross-ref pill).
+  // Cross-referenced products already signal "on CJ" via the lightning bolt.
+  if (product.on_cj && !product.on_aliexpress && !product.cross_referenced) {
+    badges.push(
+      <span
+        key="cj"
+        title="Only found on CJ Dropshipping — fewer competitors listing this on Shopify"
+        className="px-1.5 py-0.5 rounded-md bg-orange-500/80 text-white text-[10px] font-semibold backdrop-blur-sm"
+      >
+        CJ only
+      </span>
+    );
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-3 left-3 flex flex-wrap gap-1 max-w-[60%]">
+      {badges}
+    </div>
+  );
+}
+
+// ============================================================================
+// COMPONENT: Product Card - CLICKABLE, Oi Score + supplier badges
 // ============================================================================
 function ProductCard({ product, onClick }) {
   const [imageError, setImageError] = useState(false);
@@ -158,8 +321,8 @@ function ProductCard({ product, onClick }) {
       {/* Image */}
       <div className="aspect-square bg-gradient-to-br from-purple-500/10 to-cyan-500/10 relative overflow-hidden">
         {displayImage && !imageError ? (
-          <img 
-            src={displayImage} 
+          <img
+            src={resolveImageUrl(displayImage)}
             alt={product.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={() => setImageError(true)}
@@ -193,6 +356,9 @@ function ProductCard({ product, onClick }) {
             Est.
           </div>
         )}
+
+        {/* Supplier / warehouse badges (Option A) */}
+        <SupplierBadges product={product} />
         
         {/* Oi Score Badge - THE ONLY BADGE ON CARDS */}
         <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl bg-gradient-to-br ${getScoreBgColor(product.oi_score)} border backdrop-blur-sm`}>
@@ -250,42 +416,62 @@ function ProductCard({ product, onClick }) {
 }
 
 // ============================================================================
-// COMPONENT: Image Gallery with Toggle
+// COMPONENT: Image Gallery with Toggle - Shows ALL enhanced images
 // ============================================================================
-function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
-  const [showAiImage, setShowAiImage] = useState(!!aiImageUrl);
-  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+function ImageGallery({ product, aiImageUrl, enhancedImages, onRegenerateAi, regenerating }) {
+  // Get all enhanced images (array) or fall back to single aiImageUrl
+  const allEnhancedImages = enhancedImages && enhancedImages.length > 0
+    ? enhancedImages
+    : (aiImageUrl ? [aiImageUrl] : []);
+
+  const hasEnhancedImages = allEnhancedImages.length > 0;
+  const [showAiImage, setShowAiImage] = useState(hasEnhancedImages);
+  const [selectedOriginalIndex, setSelectedOriginalIndex] = useState(0);
+  const [selectedEnhancedIndex, setSelectedEnhancedIndex] = useState(0);
   const [imageError, setImageError] = useState(false);
-  
+
   const allOriginalImages = product.all_images || [product.image_url].filter(Boolean);
-  const currentOriginalImage = allOriginalImages[selectedImageIndex] || product.image_url;
-  const displayImage = showAiImage && aiImageUrl ? aiImageUrl : currentOriginalImage;
-  
+  const currentOriginalImage = allOriginalImages[selectedOriginalIndex] || product.image_url;
+  const currentEnhancedImage = allEnhancedImages[selectedEnhancedIndex] || null;
+  const displayImage = showAiImage && currentEnhancedImage ? currentEnhancedImage : currentOriginalImage;
+
+  // Reset image error when switching images
+  useEffect(() => {
+    setImageError(false);
+  }, [displayImage]);
+
   return (
     <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-white font-semibold flex items-center gap-2">
           <Camera className="w-4 h-4 text-purple-400" />
           Product Images
+          {/* Show count of enhanced images */}
+          {hasEnhancedImages && (
+            <span className="text-xs text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full">
+              {allEnhancedImages.length} enhanced
+            </span>
+          )}
         </h4>
-        
+
         <div className="flex items-center gap-2">
           {/* Image Type Toggle */}
           <button
             onClick={() => setShowAiImage(!showAiImage)}
+            disabled={!hasEnhancedImages}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all ${
-              showAiImage 
+              showAiImage && hasEnhancedImages
                 ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300'
                 : 'bg-white/5 border border-white/10 text-white/60'
-            }`}
+            } ${!hasEnhancedImages ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {showAiImage ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-            {showAiImage ? 'AI Image' : 'Original'}
+            {showAiImage && hasEnhancedImages ? 'Enhanced' : 'Original'}
           </button>
-          
+
           {/* Enhance Button */}
           <button
-            onClick={onRegenerateAi}
+            onClick={() => onRegenerateAi()}
             disabled={regenerating}
             className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1"
           >
@@ -297,19 +483,19 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
             ) : (
               <>
                 <Wand2 className="w-3 h-3" />
-                {aiImageUrl ? 'Re-enhance' : 'Enhance'}
+                {hasEnhancedImages ? 'Re-enhance' : 'Enhance'}
               </>
             )}
           </button>
         </div>
       </div>
-      
+
       {/* Main Image Display */}
       <div className="relative aspect-video rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/10 to-cyan-500/10 mb-3">
         {displayImage && !imageError ? (
-          <img 
-            src={displayImage} 
-            alt={product.title} 
+          <img
+            src={resolveImageUrl(displayImage)}
+            alt={product.title}
             className="w-full h-full object-contain"
             onError={() => setImageError(true)}
           />
@@ -319,58 +505,552 @@ function ImageGallery({ product, aiImageUrl, onRegenerateAi, regenerating }) {
             <p className="text-white/40 text-sm">No image available</p>
           </div>
         )}
-        
+
         {/* Image Type Badge */}
         <div className={`absolute top-3 left-3 px-2 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${
-          showAiImage && aiImageUrl 
-            ? 'bg-purple-500/80 text-white' 
+          showAiImage && hasEnhancedImages
+            ? 'bg-purple-500/80 text-white'
             : 'bg-white/20 text-white/80'
         }`}>
-          {showAiImage && aiImageUrl ? (
-            <><Sparkles className="w-3 h-3" /> AI Generated</>
+          {showAiImage && hasEnhancedImages ? (
+            <><Sparkles className="w-3 h-3" /> Enhanced {allEnhancedImages.length > 1 ? `(${selectedEnhancedIndex + 1}/${allEnhancedImages.length})` : ''}</>
           ) : (
-            <><ImageIcon className="w-3 h-3" /> Original</>
+            <><ImageIcon className="w-3 h-3" /> Original {allOriginalImages.length > 1 ? `(${selectedOriginalIndex + 1}/${allOriginalImages.length})` : ''}</>
           )}
         </div>
       </div>
-      
-      {/* Thumbnail Strip (Original Images Only) */}
-      {allOriginalImages.length > 1 && !showAiImage && (
+
+      {/* Thumbnail Strip - Shows ENHANCED images when in AI mode */}
+      {showAiImage && allEnhancedImages.length > 1 && (
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {allOriginalImages.map((img, idx) => (
+          {allEnhancedImages.map((img, idx) => (
             <button
               key={idx}
-              onClick={() => setSelectedImageIndex(idx)}
+              onClick={() => setSelectedEnhancedIndex(idx)}
               className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                selectedImageIndex === idx 
-                  ? 'border-purple-500' 
+                selectedEnhancedIndex === idx
+                  ? 'border-purple-500'
                   : 'border-transparent opacity-60 hover:opacity-100'
               }`}
             >
-              <img src={img} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+              <img src={resolveImageUrl(img)} alt={`Enhanced ${idx + 1}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
       )}
-      
+
+      {/* Thumbnail Strip - Shows ORIGINAL images when in original mode */}
+      {!showAiImage && allOriginalImages.length > 1 && (
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {allOriginalImages.map((img, idx) => (
+            <button
+              key={idx}
+              onClick={() => setSelectedOriginalIndex(idx)}
+              className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                selectedOriginalIndex === idx
+                  ? 'border-cyan-500'
+                  : 'border-transparent opacity-60 hover:opacity-100'
+              }`}
+            >
+              <img src={resolveImageUrl(img)} alt={`Original ${idx + 1}`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* AI Image Notice */}
-      {!aiImageUrl && (
+      {!hasEnhancedImages && (
         <p className="text-white/40 text-xs mt-2 text-center">
-          Click "Generate AI" to create a professional lifestyle photo (~$0.04)
+          Click "Enhance" to remove backgrounds (~$0.06/image)
           {allOriginalImages.length > 1 && (
             <span className="block text-cyan-400 mt-1">
-              💡 {allOriginalImages.length} images available - use "Compare AI Modes" to analyze all angles
+              {allOriginalImages.length} images available - use "All" button to enhance all at once
             </span>
           )}
         </p>
       )}
-      
+
       {/* Comparison Note */}
-      {aiImageUrl && (
+      {hasEnhancedImages && (
         <p className="text-white/40 text-xs mt-2 text-center">
-          Toggle between AI and Original to compare. AI images are styled for Oubon Shop branding.
+          {allEnhancedImages.length > 1
+            ? `${allEnhancedImages.length} enhanced images ready! Toggle to compare with originals.`
+            : 'Toggle between Enhanced and Original to compare.'}
         </p>
       )}
+    </div>
+  );
+}
+
+// ============================================================================
+// COMPONENT: Social Evidence Panel (Fix #15d)
+// ============================================================================
+// Renders the actual twitter/reddit evidence trail persisted by the backend.
+// Three states per source:
+//   1. Real matches  → show sample tweets / clickable Reddit posts
+//   2. Searched, no matches (backend: available=false, reason=no_matching_posts
+//      OR found_real_tweets=false) → labeled honest empty state
+//   3. No evidence object present at all (backend never ran enrichment) →
+//      show a muted "Not yet checked" line instead of silence
+//
+// This replaces the old "trust the aggregate number" pattern. Users can now
+// click through to real Reddit posts and read paraphrased Grok tweets.
+// ============================================================================
+function SocialEvidencePanel({ twitterEvidence, redditEvidence, amazonEvidence, dataSources }) {
+  // ── AMAZON STATE DETECTION (Task #18 - primary social signal) ────────────
+  // amazon_evidence can be:
+  //   { found_matches: true, top_matches: [...], buzz_score, ... }  → show data
+  //   { found_matches: false, reason: '...', ... }                   → show empty state
+  //   null/undefined                                                 → not checked
+  const amazon = amazonEvidence || null;
+  const amazonChecked = amazon !== null || dataSources?.amazon_reviews !== undefined;
+  const amazonHasRealData = amazon?.found_matches === true &&
+    Array.isArray(amazon?.top_matches) && amazon.top_matches.length > 0;
+  const amazonNicheSearched = amazon?.niche_searched || dataSources?.amazon_reviews?.niche_searched;
+
+  // ── TWITTER STATE DETECTION ──────────────────────────────────────────────
+  // twitter_evidence can be:
+  //   { found_real_tweets: true, sample_tweets: [...], ... }   → show data
+  //   { found_real_tweets: false, ... }                         → show empty state
+  //   { error: "...", found_real_tweets: false }                → show error state
+  //   null/undefined                                            → not checked
+  const twitter = twitterEvidence || null;
+  const twitterChecked = twitter !== null;
+  const twitterHasRealData = twitter?.found_real_tweets === true &&
+    Array.isArray(twitter?.sample_tweets) && twitter.sample_tweets.length > 0;
+  const twitterHadError = twitterChecked && !!twitter?.error;
+
+  // ── REDDIT STATE DETECTION ───────────────────────────────────────────────
+  const reddit = Array.isArray(redditEvidence) ? redditEvidence : null;
+  const redditChecked = reddit !== null || dataSources?.reddit !== undefined;
+  const redditHasRealData = Array.isArray(reddit) && reddit.length > 0;
+  const redditSubsSearched = dataSources?.reddit?.subreddits_searched || [];
+
+  // ── HELPERS ──────────────────────────────────────────────────────────────
+  const formatRelative = (iso) => {
+    if (!iso) return '';
+    try {
+      const then = new Date(iso).getTime();
+      const diffMin = Math.round((Date.now() - then) / 60000);
+      if (diffMin < 1) return 'just now';
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.round(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      return `${Math.round(diffHr / 24)}d ago`;
+    } catch { return ''; }
+  };
+
+  const formatRedditDate = (utc) => {
+    if (!utc) return '';
+    return formatRelative(new Date(utc * 1000).toISOString());
+  };
+
+  return (
+    <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-4 space-y-5">
+      <div className="flex items-center justify-between">
+        <h4 className="text-white font-semibold flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-cyan-400" />
+          Social Evidence
+        </h4>
+        <span
+          className="text-[10px] text-white/40 italic"
+          title="Sentiment signals from live social platforms. Twitter data is paraphrased from Grok (not live scraped). Reddit data is real and clickable."
+        >
+          What we actually found
+        </span>
+      </div>
+
+      {/* ── AMAZON SUB-SECTION (Task #18 - primary signal) ──────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-[#FF9900]/90 flex items-center justify-center text-[10px] font-bold text-black">
+              A
+            </div>
+            <span className="text-white/80 text-sm font-medium">Amazon</span>
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-300/80 border border-green-500/20"
+              title="Real Amazon listings fuzzy-matched to this product. Rating and review counts reflect actual purchase behavior."
+            >
+              purchase signal
+            </span>
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300/80 border border-cyan-500/20"
+              title="Primary sentiment source: aggregate rating × review count is the strongest validation of real market demand."
+            >
+              primary
+            </span>
+          </div>
+          {amazon?.fetched_at && (
+            <span className="text-[10px] text-white/30">
+              {formatRelative(amazon.fetched_at)}
+            </span>
+          )}
+        </div>
+
+        {!amazonChecked && (
+          <p className="text-white/40 text-xs italic pl-8">Not yet checked.</p>
+        )}
+
+        {amazonChecked && !amazonHasRealData && (
+          <div className="ml-8 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+            <span className="font-medium">No matching Amazon listings found.</span>
+            <span className="block text-[10px] text-white/40 mt-0.5">
+              {amazonNicheSearched
+                ? `Searched the "${amazonNicheSearched}" niche — this product didn't fuzzy-match any listings in the pool.`
+                : 'This product didn\'t fuzzy-match any listings in the niche pool.'}
+              {amazon?.reason === 'outside_enrichment_cap' &&
+                ' (Only the top 15 products get Amazon enrichment per discovery.)'}
+            </span>
+          </div>
+        )}
+
+        {amazonHasRealData && (
+          <div className="ml-8 space-y-2">
+            {/* Summary stats: aggregate rating + review count + buzz score */}
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              {typeof amazon.aggregate_rating === 'number' && (
+                <span className="px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
+                  ★ {amazon.aggregate_rating.toFixed(2)} avg
+                </span>
+              )}
+              {typeof amazon.total_reviews === 'number' && amazon.total_reviews > 0 && (
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/70">
+                  {amazon.total_reviews.toLocaleString()} reviews
+                </span>
+              )}
+              {typeof amazon.buzz_score === 'number' && (
+                <span
+                  className={`px-2 py-0.5 rounded border ${
+                    amazon.buzz_score >= 75 ? 'bg-green-500/10 border-green-500/30 text-green-300' :
+                    amazon.buzz_score >= 50 ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300' :
+                    'bg-white/5 border-white/10 text-white/60'
+                  }`}
+                  title="Buzz score blends rating and review count (log-saturated so giants don't pin at 100)"
+                >
+                  buzz: {Math.round(amazon.buzz_score)}
+                </span>
+              )}
+              {typeof amazon.match_count === 'number' && amazon.match_count > 0 && (
+                <span className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-300/90">
+                  {amazon.match_count} match{amazon.match_count === 1 ? '' : 'es'} in pool
+                </span>
+              )}
+            </div>
+
+            {/* Top matching Amazon listings - clickable */}
+            <div className="space-y-1.5">
+              {amazon.top_matches.slice(0, 3).map((match, i) => (
+                <a
+                  key={match.asin || i}
+                  href={match.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block bg-white/5 hover:bg-white/10 border border-[#FF9900]/20 hover:border-[#FF9900]/50 rounded-lg px-3 py-2.5 transition-all group"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-white/90 group-hover:text-yellow-200 leading-snug line-clamp-2">
+                        {match.title}
+                      </span>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-white/30 group-hover:text-yellow-300 flex-shrink-0 mt-0.5" />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] text-white/50">
+                    {typeof match.rating === 'number' && match.rating > 0 && (
+                      <span className="text-yellow-300/90">★ {match.rating.toFixed(1)}</span>
+                    )}
+                    {typeof match.reviews_count === 'number' && match.reviews_count > 0 && (
+                      <span>{match.reviews_count.toLocaleString()} reviews</span>
+                    )}
+                    {typeof match.price === 'number' && match.price > 0 && (
+                      <span className="text-green-300/80">${match.price.toFixed(2)}</span>
+                    )}
+                    {typeof match.match_score === 'number' && (
+                      <span
+                        className="text-cyan-300/70"
+                        title="Title similarity to your product (0-1). Higher = more confident match."
+                      >
+                        match: {(match.match_score * 100).toFixed(0)}%
+                      </span>
+                    )}
+                    {match.bestseller_rank > 0 && (
+                      <span className="text-purple-300/80">#{match.bestseller_rank} BSR</span>
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-white/10" />
+
+      {/* ── TWITTER SUB-SECTION ─────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-black/40 flex items-center justify-center text-[10px] font-bold text-white border border-white/10">
+              X
+            </div>
+            <span className="text-white/80 text-sm font-medium">Twitter / X</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-300/80 border border-yellow-500/20" title="Grok paraphrases based on training data, not verbatim live tweets.">
+              paraphrased
+            </span>
+          </div>
+          {twitterChecked && twitter?.fetched_at && (
+            <span className="text-[10px] text-white/30">
+              {formatRelative(twitter.fetched_at)}
+            </span>
+          )}
+        </div>
+
+        {!twitterChecked && (
+          <p className="text-white/40 text-xs italic pl-8">Not yet checked.</p>
+        )}
+
+        {twitterChecked && twitterHadError && (
+          <div className="ml-8 text-xs text-red-300/80 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
+            Twitter data unavailable for this product.
+            <span className="block text-[10px] text-red-300/60 mt-0.5">
+              {String(twitter.error).slice(0, 120)}
+            </span>
+          </div>
+        )}
+
+        {twitterChecked && !twitterHadError && !twitterHasRealData && (
+          <div className="ml-8 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+            <span className="font-medium">No tweets found at product or category level.</span>
+            <span className="block text-[10px] text-white/40 mt-0.5">
+              Common for unbranded or generic products.
+              {twitter?.recommendation === 'INSUFFICIENT_DATA' && ' Grok honestly returned no data rather than fabricating.'}
+            </span>
+          </div>
+        )}
+
+        {twitterHasRealData && (
+          <div className="ml-8 space-y-2">
+            {/* Search level indicator (product-specific vs category-level) */}
+            {twitter.search_level === 'category' && (
+              <div className="text-[11px] bg-blue-500/10 border border-blue-500/30 rounded-lg px-2.5 py-1.5 text-blue-300">
+                <span className="font-medium">Category-level signal:</span>{' '}
+                <span className="text-blue-200/90">
+                  {twitter.category_searched ? `"${twitter.category_searched}"` : 'product type'}
+                </span>
+                <span className="block text-[10px] text-blue-300/60 mt-0.5">
+                  No product-specific tweets found, so showing tweets about the category.
+                </span>
+              </div>
+            )}
+            {twitter.search_level === 'product' && (
+              <div className="text-[11px] text-green-300/80">
+                <span className="px-1.5 py-0.5 rounded bg-green-500/10 border border-green-500/30">
+                  Product-specific
+                </span>
+              </div>
+            )}
+
+            {/* Summary row */}
+            <div className="flex flex-wrap gap-2 text-[11px]">
+              {typeof twitter.tweet_count === 'number' && twitter.tweet_count > 0 && (
+                <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white/70">
+                  ~{twitter.tweet_count.toLocaleString()} tweets
+                </span>
+              )}
+              {twitter.sentiment_label && (
+                <span className={`px-2 py-0.5 rounded border ${
+                  twitter.sentiment_label === 'positive' ? 'bg-green-500/10 border-green-500/30 text-green-300' :
+                  twitter.sentiment_label === 'negative' ? 'bg-red-500/10 border-red-500/30 text-red-300' :
+                  twitter.sentiment_label === 'mixed' ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300' :
+                  'bg-white/5 border-white/10 text-white/70'
+                }`}>
+                  {twitter.sentiment_label}
+                </span>
+              )}
+              {typeof twitter.sentiment_score === 'number' && (
+                <span className="px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">
+                  score: {twitter.sentiment_score.toFixed(2)}
+                </span>
+              )}
+              {twitter.buzz_level && (
+                <span className="px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/30 text-purple-300">
+                  buzz: {twitter.buzz_level}
+                </span>
+              )}
+            </div>
+
+            {/* Sample tweets (paraphrased) */}
+            <div className="space-y-1.5">
+              {twitter.sample_tweets.slice(0, 5).map((t, i) => (
+                <div key={i} className="text-xs text-white/75 bg-white/5 border border-white/10 rounded-lg px-3 py-2 leading-relaxed">
+                  <span className="text-white/40 mr-1">›</span>{t}
+                </div>
+              ))}
+            </div>
+
+            {/* Praise / complaints */}
+            {(twitter.common_praise?.length > 0 || twitter.common_complaints?.length > 0) && (
+              <div className="grid grid-cols-2 gap-2 text-[11px] mt-2">
+                {twitter.common_praise?.length > 0 && (
+                  <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-2.5 py-2">
+                    <p className="text-green-400/80 font-medium mb-1">Praise</p>
+                    <ul className="text-white/70 space-y-0.5">
+                      {twitter.common_praise.slice(0, 4).map((c, i) => <li key={i}>• {c}</li>)}
+                    </ul>
+                  </div>
+                )}
+                {twitter.common_complaints?.length > 0 && (
+                  <div className="bg-red-500/5 border border-red-500/20 rounded-lg px-2.5 py-2">
+                    <p className="text-red-400/80 font-medium mb-1">Complaints</p>
+                    <ul className="text-white/70 space-y-0.5">
+                      {twitter.common_complaints.slice(0, 4).map((c, i) => <li key={i}>• {c}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-white/10" />
+
+      {/* ── REDDIT SUB-SECTION ──────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-orange-600/80 flex items-center justify-center text-[10px] font-bold text-white">
+              R
+            </div>
+            <span className="text-white/80 text-sm font-medium">Reddit</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-300/80 border border-green-500/20" title="Real posts from Reddit's public search API. URLs are live and clickable.">
+              verifiable
+            </span>
+          </div>
+          {redditHasRealData && (
+            <span className="text-[10px] text-white/40">
+              {reddit.length} match{reddit.length === 1 ? '' : 'es'}
+            </span>
+          )}
+        </div>
+
+        {!redditChecked && (
+          <p className="text-white/40 text-xs italic pl-8">Not yet checked.</p>
+        )}
+
+        {redditChecked && !redditHasRealData && (
+          <div className="ml-8 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg px-3 py-2">
+            <span className="font-medium">No Reddit matches found.</span>
+            {redditSubsSearched.length > 0 && (
+              <span className="block text-[10px] text-white/40 mt-0.5">
+                Searched: {redditSubsSearched.map(s => `r/${s}`).join(', ')}
+              </span>
+            )}
+          </div>
+        )}
+
+        {redditHasRealData && (
+          <div className="ml-8 space-y-2">
+            {/* Summary: how many product matches vs category matches */}
+            {(() => {
+              const productCount = reddit.filter(p => p.match_type === 'product').length;
+              const categoryCount = reddit.length - productCount;
+              if (productCount > 0 || categoryCount > 0) {
+                return (
+                  <div className="flex gap-1.5 text-[10px] mb-1">
+                    {productCount > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-green-500/10 border border-green-500/30 text-green-300" title="Posts actually discussing this product type">
+                        {productCount} product match{productCount === 1 ? '' : 'es'}
+                      </span>
+                    )}
+                    {categoryCount > 0 && (
+                      <span className="px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300" title="Posts about the category (capabilities/features), not this product specifically">
+                        {categoryCount} category match{categoryCount === 1 ? '' : 'es'}
+                      </span>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {reddit.slice(0, 5).map((post, i) => {
+              const isProduct = post.match_type === 'product';
+              const matchBorder = isProduct
+                ? 'border-green-500/20 hover:border-green-500/50'
+                : 'border-blue-500/20 hover:border-blue-500/40';
+              return (
+                <a
+                  key={i}
+                  href={post.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`block bg-white/5 hover:bg-white/10 border ${matchBorder} rounded-lg px-3 py-2.5 transition-all group`}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="flex-1 min-w-0">
+                      {/* Match type chip - green for product-specific, blue for category */}
+                      {post.match_type && (
+                        <span
+                          className={`inline-block text-[9px] px-1.5 py-0.5 rounded mr-1.5 mb-0.5 ${
+                            isProduct
+                              ? 'bg-green-500/15 text-green-300 border border-green-500/30'
+                              : 'bg-blue-500/10 text-blue-300/90 border border-blue-500/30'
+                          }`}
+                          title={isProduct
+                            ? 'Match on product-type keywords - likely a real product discussion'
+                            : 'Match on capability/feature keywords only - likely category discussion'}
+                        >
+                          {isProduct ? 'product' : 'category'}
+                        </span>
+                      )}
+                      <span className="text-sm text-white/90 group-hover:text-orange-200 leading-snug line-clamp-2">
+                        {post.title}
+                      </span>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-white/30 group-hover:text-orange-300 flex-shrink-0 mt-0.5" />
+                  </div>
+
+                  <div className="flex items-center gap-3 text-[10px] text-white/50">
+                    <span className="font-medium text-orange-300/80">r/{post.subreddit}</span>
+                    <span className="flex items-center gap-0.5">
+                      <TrendingUp className="w-2.5 h-2.5" />
+                      {(post.score ?? 0).toLocaleString()}
+                    </span>
+                    <span className="flex items-center gap-0.5">
+                      <MessageSquare className="w-2.5 h-2.5" />
+                      {(post.num_comments ?? 0).toLocaleString()}
+                    </span>
+                    {post.created_utc && (
+                      <span>{formatRedditDate(post.created_utc)}</span>
+                    )}
+                  </div>
+
+                  {Array.isArray(post.matched_on) && post.matched_on.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {post.matched_on.map((tok, idx) => (
+                        <span key={idx} className="text-[9px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-300/80 border border-orange-500/20">
+                          {tok}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {post.selftext_excerpt && (
+                    <p className="text-[10px] text-white/50 mt-1.5 italic line-clamp-2">
+                      "{post.selftext_excerpt}"
+                    </p>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -387,6 +1067,7 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   const [generatingImage, setGeneratingImage] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [currentAiImageUrl, setCurrentAiImageUrl] = useState(product.ai_image_url);
+  const [enhancedImages, setEnhancedImages] = useState(product.enhanced_images || []);
   const [analysisError, setAnalysisError] = useState(null);
   
   // AUTO-GENERATE ANALYSIS ON MOUNT
@@ -395,31 +1076,116 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
     generateAIAnalysis(); // Auto-generate analysis when panel opens
   }, [product.id]);
   
-  // Generate AI image using Stability AI background removal (NEW SYSTEM)
-  const generateAiImage = async () => {
+  // Load cached images ONLY (no auto-enhancement to avoid spending money)
+  useEffect(() => {
+    const loadCachedImages = async () => {
+      // Skip if we already have enhanced images
+      if (enhancedImages.length > 0 || currentAiImageUrl) {
+        // console.log('[PRODUCT-DETAIL] Already has enhanced images, skipping cache check');
+        return;
+      }
+
+      // Skip if no product images
+      const allImages = product.all_images || [product.image_url].filter(Boolean);
+      if (allImages.length === 0) {
+        return;
+      }
+
+      try {
+        // Check cache for this product by product ID
+        const cached = await api.getCachedEnhancedImages(product.id);
+        if (cached.success && cached.cached && cached.enhanced_urls?.length > 0) {
+          // console.log('[PRODUCT-DETAIL] ✅ Found cached images via product_id (FREE):', cached.enhanced_urls.length);
+          setEnhancedImages(cached.enhanced_urls);
+          setCurrentAiImageUrl(cached.primary_enhanced_url || cached.enhanced_urls[0]);
+          if (onUpdateProduct) {
+            onUpdateProduct({
+              ...product,
+              ai_image_url: cached.primary_enhanced_url || cached.enhanced_urls[0],
+              enhanced_images: cached.enhanced_urls
+            });
+          }
+          return;
+        }
+
+        // Check file-based cache by image URLs
+        const cacheCheck = await api.checkImageCache(allImages);
+        if (cacheCheck.cached_count > 0) {
+          const cachedUrls = Object.values(cacheCheck.cached || {});
+          // console.log('[PRODUCT-DETAIL] ✅ Found file-cached images (FREE):', cachedUrls.length);
+          setEnhancedImages(cachedUrls);
+          setCurrentAiImageUrl(cachedUrls[0]);
+          if (onUpdateProduct) {
+            onUpdateProduct({
+              ...product,
+              ai_image_url: cachedUrls[0],
+              enhanced_images: cachedUrls
+            });
+          }
+          return;
+        }
+
+        // Last resort: Try smart cache recovery (checks multiple hash variants)
+        // console.log('[PRODUCT-DETAIL] 🔍 Trying smart cache recovery...');
+        const recovery = await api.smartCacheRecovery(allImages, product.id);
+        if (recovery.success && recovery.matches_found > 0) {
+          const recoveredUrls = recovery.matches.map(m => m.enhanced_url);
+          // console.log('[PRODUCT-DETAIL] ✅ Smart recovery found cached images (FREE):', recoveredUrls.length);
+          setEnhancedImages(recoveredUrls);
+          setCurrentAiImageUrl(recoveredUrls[0]);
+          if (onUpdateProduct) {
+            onUpdateProduct({
+              ...product,
+              ai_image_url: recoveredUrls[0],
+              enhanced_images: recoveredUrls
+            });
+          }
+          return;
+        }
+
+        // No cached images found - user can manually enhance if they want
+        // console.log('[PRODUCT-DETAIL] ⚠️ No cached images found. Click "Enhance" to generate (~$0.06/image)');
+
+      } catch (e) {
+        // console.log('[PRODUCT-DETAIL] Cache check failed:', e.message);
+      }
+    };
+
+    loadCachedImages();
+  }, [product.id]);
+
+  // Generate AI image using Stability AI background removal (AUTHENTICATED + CACHED)
+  const generateAiImage = async (imageUrlOverride = null) => {
     setGeneratingImage(true);
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      
-      // Use the NEW /api/images/enhance endpoint (background removal)
-      const response = await fetch(`${apiBase}/api/images/enhance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: product.image_url,
-          niche: product.niche || 'smart_home',
-          background_style: null, // Auto-select based on niche
-          add_shadow: true
-        })
-      });
-      
-      const data = await response.json();
-      
+      // Use the authenticated API method with product_id for caching
+      const targetImageUrl = imageUrlOverride || product.image_url;
+      const data = await api.enhanceImage(
+        targetImageUrl,
+        product.niche || 'smart_home',
+        null, // backgroundStyle
+        product.id // product_id for caching
+      );
+
       if (data.success && data.enhanced_image_url) {
         setCurrentAiImageUrl(data.enhanced_image_url);
+        // Add to enhanced images array (replace if re-enhancing same image)
+        setEnhancedImages(prev => {
+          if (prev.length === 0) return [data.enhanced_image_url];
+          // Replace first image if re-enhancing main image
+          return [data.enhanced_image_url, ...prev.slice(1)];
+        });
         // Update parent if callback provided
         if (onUpdateProduct) {
-          onUpdateProduct({ ...product, ai_image_url: data.enhanced_image_url });
+          onUpdateProduct({
+            ...product,
+            ai_image_url: data.enhanced_image_url,
+            enhanced_images: [data.enhanced_image_url, ...(product.enhanced_images || []).slice(1)]
+          });
+        }
+        // Show if result was from cache (FREE)
+        if (data.cached) {
+          // console.log('Image was already enhanced (cached - FREE)');
         }
       } else {
         alert('Image enhancement failed. ' + (data.error || 'Check if STABILITY_API_KEY is configured.'));
@@ -432,14 +1198,75 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
     }
   };
 
+  // Enhance ALL product images in batch
+  const enhanceAllImages = async () => {
+    if (!product.all_images || product.all_images.length === 0) {
+      alert('No images available to enhance');
+      return;
+    }
+
+    setGeneratingImage(true);
+    try {
+      const imagesToEnhance = product.all_images.map((url, idx) => ({
+        url: url,
+        id: `${product.id}_img_${idx}`,
+        title: product.title,
+        niche: product.niche
+      }));
+
+      const result = await api.enhanceBatchImages(imagesToEnhance, product.niche || 'smart_home');
+
+      if (result.successful > 0) {
+        // Get all successful enhanced image URLs
+        const allEnhancedUrls = result.results
+          .filter(r => r.success)
+          .map(r => r.enhanced_image_url);
+
+        // Update local state to show all enhanced images
+        setEnhancedImages(allEnhancedUrls);
+        setCurrentAiImageUrl(allEnhancedUrls[0]); // First one as main
+
+        // Update parent with all enhanced images
+        if (onUpdateProduct) {
+          onUpdateProduct({
+            ...product,
+            ai_image_url: allEnhancedUrls[0],
+            enhanced_images: allEnhancedUrls
+          });
+        }
+
+        alert(`Enhanced ${result.successful} of ${result.total} images (~$${(result.successful * 0.06).toFixed(2)} cost)`);
+      } else {
+        alert('All image enhancements failed. ' + (result.results[0]?.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Batch enhancement failed:', error);
+      alert('Batch enhancement failed: ' + (error.message || 'Unknown error'));
+    } finally {
+      setGeneratingImage(false);
+    }
+  };
+
   // STABLE score breakdown - computed once, memoized
+  // Post-Fix #15: sentiment_score can be null when no real social data was found.
+  // null → render a "No social data yet" state, NOT a 0 bar (which would lie
+  // about the scoring). `unavailable: true` triggers the honest empty UI.
   const scoreBreakdown = useMemo(() => [
     { key: 'demand_score', label: 'Demand', icon: TrendingUp, color: 'text-green-400', value: product.demand_score, estimated: product.demand_score === 50 },
     { key: 'trend_score', label: 'Trend', icon: Zap, color: 'text-cyan-400', value: product.trend_score, estimated: product.trend_score === 50 },
-    { key: 'sentiment_score', label: 'Sentiment', icon: MessageSquare, color: 'text-blue-400', value: product.sentiment_score, estimated: product.sentiment_score === 50 },
+    {
+      key: 'sentiment_score',
+      label: 'Sentiment',
+      icon: MessageSquare,
+      color: 'text-blue-400',
+      value: product.sentiment_score,
+      estimated: false,
+      unavailable: product.sentiment_score === null || product.sentiment_score === undefined,
+      note: product.sentiment_weight_redistributed ? "Weight redistributed to other signals" : null,
+    },
     { key: 'viral_score', label: 'Viral Potential', icon: Sparkles, color: 'text-pink-400', value: product.viral_score, estimated: product.viral_score === 50 },
     { key: 'profit_score', label: 'Profit Margin', icon: DollarSign, color: 'text-purple-400', value: product.profit_score, estimated: false },
-  ], [product.demand_score, product.trend_score, product.sentiment_score, product.viral_score, product.profit_score]);
+  ], [product.demand_score, product.trend_score, product.sentiment_score, product.sentiment_weight_redistributed, product.viral_score, product.profit_score]);
 
   const generateSEOCaption = async () => {
     setGeneratingCaption(true);
@@ -476,39 +1303,16 @@ Free shipping on orders over $50. 30-day hassle-free returns.`;
   const generateAIAnalysis = async () => {
     setGeneratingAnalysis(true);
     setAnalysisError(null);
-    
+
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/oi/analyze-product`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_id: product.id,
-          product_title: product.title,
-          product_data: {
-            niche: product.niche,
-            cost_price: product.cost_price,
-            suggested_price: product.suggested_price,
-            profit: product.profit,
-            oi_score: product.oi_score,
-            demand_score: product.demand_score,
-            trend_score: product.trend_score,
-            sentiment_score: product.sentiment_score,
-            sales_count: product.sales_count,
-            rating: product.rating,
-            source: product.source,
-            data_sources: product.data_sources,
-            scores_estimated: product.scores_estimated,
-          }
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+      // Routes through authService.post() so the JWT is attached.
+      // Backend endpoint /api/oi/analyze-product requires auth (Depends(get_current_user)).
+      const data = await api.analyzeProduct(product);
+
+      if (!data || data.success === false) {
+        throw new Error(data?.error || 'Analysis failed');
       }
-      
-      const data = await response.json();
-      
+
       if (data.success && data.analysis) {
         // Format the analysis nicely
         const a = data.analysis;
@@ -603,23 +1407,56 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
 
         <div className="p-6 space-y-6">
           {/* Image Gallery with Toggle */}
-          <ImageGallery 
+          <ImageGallery
             product={product}
             aiImageUrl={currentAiImageUrl}
-            onRegenerateAi={generateAiImage}
+            enhancedImages={enhancedImages}
+            onRegenerateAi={() => generateAiImage()}
             regenerating={generatingImage}
           />
           
-          {/* Enhance Image Button */}
-          {product.image_url && onEnhance && (
-            <button
-              onClick={() => onEnhance(product)}
-              className="w-full py-3 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-medium hover:bg-cyan-500/30 flex items-center justify-center gap-2 transition-all"
-            >
-              <Wand2 className="w-5 h-5" />
-              Enhance Product Image
-              <span className="text-cyan-400/60 text-sm">(~$0.06)</span>
-            </button>
+          {/* Enhance Image Buttons */}
+          {product.image_url && (
+            <div className="flex gap-3">
+              {/* Single Image Enhancement */}
+              <button
+                onClick={() => generateAiImage()}
+                disabled={generatingImage}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-cyan-500/20 border border-purple-500/30 text-white font-medium hover:from-purple-500/30 hover:to-cyan-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+              >
+                {generatingImage ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Enhancing...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-5 h-5" />
+                    Enhance Image
+                    <span className="text-white/50 text-sm">(~$0.06)</span>
+                  </>
+                )}
+              </button>
+
+              {/* Batch Enhancement - show if multiple images available */}
+              {product.all_images && product.all_images.length > 1 && (
+                <button
+                  onClick={enhanceAllImages}
+                  disabled={generatingImage}
+                  className="py-3 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-medium hover:bg-cyan-500/30 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  title={`Enhance all ${product.all_images.length} images`}
+                >
+                  {generatingImage ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-5 h-5" />
+                      All ({product.all_images.length})
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           )}
 
           {/* Product Title + Oi Score */}
@@ -668,6 +1505,41 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
             <div className="space-y-3">
               {scoreBreakdown.map((item) => {
                 const Icon = item.icon;
+
+                // POST-FIX #15: honest "no data" state for sentiment when backend
+                // couldn't find real social signal. Don't show a 0 bar - show
+                // "No data" so the user knows we didn't fake a number.
+                if (item.unavailable) {
+                  return (
+                    <div key={item.key} className="flex items-center gap-3 opacity-70">
+                      <div className="p-2 rounded-lg bg-white/5">
+                        <Icon className={`w-4 h-4 ${item.color}`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-white/70 text-sm">
+                            {item.label}
+                            <span className="text-white/40 text-xs ml-2">(No social data yet)</span>
+                          </span>
+                          <span className="text-white/40 text-xs italic">N/A</span>
+                        </div>
+                        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                          {/* Striped "data unavailable" bar */}
+                          <div
+                            className="h-full w-full opacity-40"
+                            style={{
+                              background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.15) 0 6px, transparent 6px 12px)'
+                            }}
+                          />
+                        </div>
+                        {item.note && (
+                          <p className="text-white/40 text-[10px] mt-1 italic">{item.note}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const value = Math.min(100, Math.max(0, item.value || 0));
                 return (
                   <div key={item.key} className="flex items-center gap-3">
@@ -683,7 +1555,7 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                         <span className={`font-bold ${item.color}`}>{value}</span>
                       </div>
                       <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full rounded-full bg-gradient-to-r ${
                             value >= 80 ? 'from-green-500 to-green-400' :
                             value >= 60 ? 'from-cyan-500 to-cyan-400' :
@@ -822,6 +1694,21 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
               )}
             </div>
           </div>
+
+          {/* ==========================================================
+              SOCIAL EVIDENCE PANEL (Fix #15d)
+              Honest display of what we actually found on Twitter/Reddit.
+              Distinguishes between:
+              - Real evidence (clickable URLs, sample tweets) → show it
+              - "Searched, found nothing" → labeled empty state
+              - "Not searched yet" → no section (don't show anything)
+              ========================================================== */}
+          <SocialEvidencePanel
+            twitterEvidence={product.twitter_evidence}
+            redditEvidence={product.reddit_evidence}
+            amazonEvidence={product.amazon_evidence}
+            dataSources={dataSources}
+          />
 
           {/* Pricing Cards */}
           <div className="grid grid-cols-3 gap-4">
@@ -969,17 +1856,61 @@ export function ProductDiscovery() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState('trending');
+  // Supplier/warehouse filter (Option A): 'all' | 'us' | 'eu' | 'cross' | 'cj_only'
+  const [supplierFilter, setSupplierFilter] = useState('all');
+  const [currentNiche, setCurrentNiche] = useState('smart_home');
   const [rateLimit, setRateLimit] = useState(null);
   const [selectedProduct, setSelectedProductState] = useState(null);
   const [hasMockData, setHasMockData] = useState(false);
   const [hasEstimatedScores, setHasEstimatedScores] = useState(false);
+  // Populated when the discovery API returns a 503 / structured error.
+  // Shape: { error, discovery_error, diagnostics, hint, status } or null.
+  const [discoveryError, setDiscoveryError] = useState(null);
   const [generatingImages, setGeneratingImages] = useState(false);
   const [showEnhancer, setShowEnhancer] = useState(false);
   const [enhancerProduct, setEnhancerProduct] = useState(null);
+  // Auto-enhance OFF by default - user must opt-in (prevents accidental API costs)
+  // Persist preference in localStorage
+  const [autoEnhanceEnabled, setAutoEnhanceEnabled] = useState(() => {
+    const saved = localStorage.getItem('ospra_auto_enhance');
+    return saved === 'true'; // Default to false unless explicitly enabled
+  });
 
+  // Save preference when it changes
+  useEffect(() => {
+    localStorage.setItem('ospra_auto_enhance', autoEnhanceEnabled.toString());
+  }, [autoEnhanceEnabled]);
+  const [enhanceProgress, setEnhanceProgress] = useState({ current: 0, total: 0, enhancing: false });
+
+  // Initial load
   useEffect(() => {
     loadProducts();
     loadRateLimit();
+  }, []);
+
+  // Re-sort when filter changes (no API call, just re-sort existing products)
+  useEffect(() => {
+    if (products.length === 0) return;
+
+    let sortedProducts = [...products];
+
+    if (filter === 'trending') {
+      sortedProducts.sort((a, b) => {
+        const aScore = (a.trend_score || 50) + (a.viral_score || 0);
+        const bScore = (b.trend_score || 50) + (b.viral_score || 0);
+        return bScore - aScore;
+      });
+    } else if (filter === 'recommended') {
+      sortedProducts.sort((a, b) => (b.oi_score || 0) - (a.oi_score || 0));
+    } else if (filter === 'high-profit') {
+      sortedProducts.sort((a, b) => {
+        const aMargin = a.cost_price > 0 ? ((a.suggested_price - a.cost_price) / a.cost_price) : 0;
+        const bMargin = b.cost_price > 0 ? ((b.suggested_price - b.cost_price) / b.cost_price) : 0;
+        return bMargin - aMargin;
+      });
+    }
+
+    setProducts(sortedProducts);
   }, [filter]);
 
   useEffect(() => {
@@ -1002,24 +1933,235 @@ export function ProductDiscovery() {
     setActiveFilters({ filter, view: 'products' });
   }, [filter, setActiveFilters]);
 
-  const loadProducts = async () => {
+  // Supplier/warehouse counts for the filter chip row (Option A).
+  // Computed off the full `products` array so counts don't change when a
+  // filter is active (that's the standard filter-chip UX).
+  const supplierCounts = useMemo(() => ({
+    all: products.length,
+    us: products.filter(p => p.us_warehouse).length,
+    eu: products.filter(p => p.eu_warehouse).length,
+    cross: products.filter(p => p.cross_referenced).length,
+    cj_only: products.filter(p => p.on_cj && !p.on_aliexpress).length,
+  }), [products]);
+
+  // Apply the active supplier filter. Sorting already happened in the
+  // re-sort effect above, so we just need to filter here — preserve order.
+  const filteredProducts = useMemo(() => {
+    switch (supplierFilter) {
+      case 'us':      return products.filter(p => p.us_warehouse);
+      case 'eu':      return products.filter(p => p.eu_warehouse);
+      case 'cross':   return products.filter(p => p.cross_referenced);
+      case 'cj_only': return products.filter(p => p.on_cj && !p.on_aliexpress);
+      case 'all':
+      default:        return products;
+    }
+  }, [products, supplierFilter]);
+
+  // Auto-enhance ALL products in background when they load
+  // Optimized: Check disk cache first, only enhance non-cached images
+  const autoEnhanceAllProducts = async (productsToEnhance) => {
+    // Re-check autoEnhanceEnabled from localStorage (in case it changed)
+    const isEnabled = localStorage.getItem('ospra_auto_enhance') === 'true';
+
+    if (!isEnabled) {
+      // console.log('[AUTO-ENHANCE] ⛔ DISABLED - skipping (turn ON to enable)');
+      return;
+    }
+
+    if (productsToEnhance.length === 0) {
+      // console.log('[AUTO-ENHANCE] No products to enhance');
+      return;
+    }
+
+    // console.log('[AUTO-ENHANCE] 🚀 Starting with', productsToEnhance.length, 'products...');
+
+    // Phase 1: Collect ALL image URLs and check cache in one request
+    const allImageUrls = [];
+    const urlToProductIndex = {}; // Map URL -> product index for quick lookup
+
+    productsToEnhance.forEach((product, productIdx) => {
+      // Skip if already has enhanced images in state
+      if (product.enhanced_images?.length > 0 || product.ai_image_url) {
+        // console.log(`[AUTO-ENHANCE] Skipping product ${productIdx} - already has enhanced images`);
+        return;
+      }
+
+      const images = product.all_images || [product.image_url].filter(Boolean);
+      images.forEach(url => {
+        if (url && !allImageUrls.includes(url)) {
+          allImageUrls.push(url);
+          if (!urlToProductIndex[url]) urlToProductIndex[url] = [];
+          urlToProductIndex[url].push(productIdx);
+        }
+      });
+    });
+
+    if (allImageUrls.length === 0) {
+      // console.log('[AUTO-ENHANCE] ✅ All products already have enhanced images - nothing to do');
+      return;
+    }
+
+    // console.log('[AUTO-ENHANCE] 🔍 Checking cache for', allImageUrls.length, 'images...');
+
+    // Check which images are already cached on disk
+    try {
+      let cacheCheck = await api.checkImageCache(allImageUrls);
+      let cachedCount = cacheCheck.cached_count || 0;
+      let notCachedUrls = cacheCheck.not_cached || [];
+
+      // console.log(`[AUTO-ENHANCE] 📦 Initial cache check: ${cachedCount} CACHED (FREE), ${notCachedUrls.length} not found`);
+
+      // If many images weren't found, try smart cache recovery
+      if (notCachedUrls.length > 0 && cachedCount < allImageUrls.length / 2) {
+        // console.log('[AUTO-ENHANCE] 🔍 Trying smart cache recovery for', notCachedUrls.length, 'images...');
+        const recovery = await api.smartCacheRecovery(notCachedUrls, null);
+        if (recovery.success && recovery.matches_found > 0) {
+          // console.log(`[AUTO-ENHANCE] ✅ Smart recovery found ${recovery.matches_found} additional cached images!`);
+          // Merge recovered matches into cacheCheck
+          recovery.matches.forEach(match => {
+            // Find the original URL that was recovered
+            const originalUrl = notCachedUrls.find(url =>
+              url.includes(match.original_url.replace('...', '')) || match.original_url.includes(url.substring(0, 50))
+            );
+            if (originalUrl) {
+              cacheCheck.cached = cacheCheck.cached || {};
+              cacheCheck.cached[originalUrl] = match.enhanced_url;
+            }
+          });
+          cachedCount = Object.keys(cacheCheck.cached || {}).length;
+          notCachedUrls = notCachedUrls.filter(url => !cacheCheck.cached?.[url]);
+        }
+      }
+
+      // console.log(`[AUTO-ENHANCE] 📦 Final cache result: ${cachedCount} CACHED (FREE), ${notCachedUrls.length} need enhancement`);
+
+      // Phase 2: Apply cached images immediately (FREE - no API cost)
+      const updatedProducts = [...productsToEnhance];
+      const cachedMap = cacheCheck.cached || {};
+
+      // Apply cached URLs to products
+      let appliedCount = 0;
+      Object.entries(cachedMap).forEach(([originalUrl, cachedUrl]) => {
+        const productIndices = urlToProductIndex[originalUrl] || [];
+        productIndices.forEach(idx => {
+          const product = updatedProducts[idx];
+          const enhancedImages = product.enhanced_images || [];
+          if (!enhancedImages.includes(cachedUrl)) {
+            updatedProducts[idx] = {
+              ...product,
+              ai_image_url: product.ai_image_url || cachedUrl,
+              enhanced_images: [...enhancedImages, cachedUrl]
+            };
+            appliedCount++;
+          }
+        });
+      });
+
+      // Update UI with cached images immediately
+      if (appliedCount > 0) {
+        // console.log(`[AUTO-ENHANCE] ✅ Applied ${appliedCount} cached images (FREE - $0.00)`);
+        setProducts([...updatedProducts]);
+      }
+
+      // Phase 3: Check if we need to enhance anything new
+      if (notCachedUrls.length === 0) {
+        // console.log('[AUTO-ENHANCE] 🎉 Complete! All images were cached (FREE)');
+        return;
+      }
+
+      // STOP HERE if there are non-cached images - don't auto-spend money
+      // console.log(`[AUTO-ENHANCE] ⚠️ ${notCachedUrls.length} images NOT cached - manual enhancement needed (~$${(notCachedUrls.length * 0.06).toFixed(2)})`);
+      // console.log('[AUTO-ENHANCE] 💡 Click "Enhance All" button to enhance remaining images');
+
+      // Don't automatically enhance non-cached images - let user decide
+      return;
+
+    } catch (error) {
+      console.error('[AUTO-ENHANCE] ❌ Cache check failed:', error);
+      return;
+    }
+  };
+
+  const loadProducts = async (nicheOverride = null) => {
     setLoading(true);
     setHasMockData(false);
     setHasEstimatedScores(false);
-    
+    setDiscoveryError(null);
+
     try {
-      let niche = filter === 'trending' ? 'smart_home' : filter === 'recommended' ? 'tech' : 'fitness';
-      const response = await api.discoverProducts({ niche, count: 20 });
-      const loadedProducts = Array.isArray(response) ? response : (response.products || []);
-      const normalizedProducts = loadedProducts.map(p => normalizeProduct(p, niche));
+      // Use override niche if provided (from niche chip click), else use current niche
+      const niche = nicheOverride || currentNiche;
+      if (nicheOverride) setCurrentNiche(nicheOverride);
+
+      console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
+
+      // Fetch products (same niche for all filter types)
+      // Note: Backend limits count to 50 max
+      const response = await api.discoverProducts({ niche, count: 30 });
+      console.log('[ProductDiscovery] API Response:', response);
+
+      // Structured error from backend (503 with diagnostics) — surface it to the user.
+      if (response && response.__error) {
+        console.error('[ProductDiscovery] Discovery error:', response);
+        setDiscoveryError({
+          status: response.status,
+          error: response.error,
+          discovery_error: response.discovery_error,
+          diagnostics: response.diagnostics,
+          hint: response.hint,
+        });
+        setProducts([]);
+        return;
+      }
+
+      let loadedProducts = Array.isArray(response) ? response : (response.products || response.data || []);
+      console.log(`[ProductDiscovery] Loaded ${loadedProducts.length} products from API`);
+
+      // If still no products, log warning
+      if (!loadedProducts || loadedProducts.length === 0) {
+        console.warn('[ProductDiscovery] API returned 0 products - server may need restart');
+      }
+
+      let normalizedProducts = loadedProducts.map(p => normalizeProduct(p, niche));
+
+      // Sort based on selected filter
+      if (filter === 'trending') {
+        // Sort by trend score + viral score (higher = more trending)
+        normalizedProducts.sort((a, b) => {
+          const aScore = (a.trend_score || 50) + (a.viral_score || 0);
+          const bScore = (b.trend_score || 50) + (b.viral_score || 0);
+          return bScore - aScore;
+        });
+      } else if (filter === 'recommended') {
+        // Sort by OI score (balanced recommendation)
+        normalizedProducts.sort((a, b) => (b.oi_score || 0) - (a.oi_score || 0));
+      } else if (filter === 'high-profit') {
+        // Sort by profit margin
+        normalizedProducts.sort((a, b) => {
+          const aMargin = a.cost_price > 0 ? ((a.suggested_price - a.cost_price) / a.cost_price) : 0;
+          const bMargin = b.cost_price > 0 ? ((b.suggested_price - b.cost_price) / b.cost_price) : 0;
+          return bMargin - aMargin;
+        });
+      }
+
+      // Limit to 20 products after sorting
+      normalizedProducts = normalizedProducts.slice(0, 20);
+
       const mockCount = normalizedProducts.filter(p => p.is_mock).length;
       const estimatedCount = normalizedProducts.filter(p => p.scores_estimated).length;
       setHasMockData(mockCount > 0);
       setHasEstimatedScores(estimatedCount > normalizedProducts.length / 2);
       setProducts(normalizedProducts);
-      trackInteraction('filter', { filter, result_count: normalizedProducts.length, mock_count: mockCount });
+      trackInteraction('filter', { filter, niche, result_count: normalizedProducts.length, mock_count: mockCount });
+
+      // console.log(`[ProductDiscovery] Set ${normalizedProducts.length} products to state`);
+
+      // Auto-enhance all products in background (if enabled)
+      if (autoEnhanceEnabled && normalizedProducts.length > 0) {
+        setTimeout(() => autoEnhanceAllProducts(normalizedProducts), 500);
+      }
     } catch (error) {
-      console.error('Failed to load products:', error);
+      console.error('[ProductDiscovery] Failed to load products:', error);
       setProducts([]);
     } finally {
       setLoading(false);
@@ -1116,26 +2258,24 @@ export function ProductDiscovery() {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    addRecentSearch(searchQuery);
-    setLoading(true);
-    setHasMockData(false);
-    
-    try {
-      const response = await api.discoverProducts({ niche: searchQuery.trim(), count: 20 });
-      const searchResults = Array.isArray(response) ? response : (response.products || []);
-      const normalizedResults = searchResults.map(p => normalizeProduct(p, searchQuery));
-      const mockCount = normalizedResults.filter(p => p.is_mock).length;
-      setHasMockData(mockCount > 0);
-      setProducts(normalizedResults);
-      trackInteraction('search', { query: searchQuery, result_count: normalizedResults.length, mock_count: mockCount });
-    } catch (error) {
-      console.error('Search failed:', error);
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
+  const handleSearch = async (nicheQuery = null) => {
+    const query = nicheQuery || searchQuery.trim();
+    if (!query) return;
+
+    // Update current niche and searchQuery
+    const normalizedNiche = query.toLowerCase().replace(/\s+/g, '_');
+    setCurrentNiche(normalizedNiche);
+    if (!nicheQuery) addRecentSearch(query);
+
+    // Load products with new niche
+    await loadProducts(normalizedNiche);
+    trackInteraction('search', { query, result_count: products.length });
+  };
+
+  // Handler for niche chip clicks
+  const handleNicheClick = (nicheKey) => {
+    setSearchQuery(nicheKey.replace('_', ' '));
+    handleSearch(nicheKey);
   };
 
   const handleProductSelect = useCallback((product) => {
@@ -1161,12 +2301,15 @@ export function ProductDiscovery() {
 
   const handleDeploy = async (product, caption) => {
     if (product.is_mock) return;
-    await api.deployProduct(product.id, { caption });
+    // Task #21: send the full product object — the backend schema requires
+    // title/price/images, not just an ID. Works for AliExpress AND CJ.
+    await api.deployProduct(product, { caption });
     trackInteraction('product_deploy', {
       product_id: product.id,
       product_name: product.title,
       niche: product.niche,
       price: product.suggested_price,
+      source: product.source,
     });
   };
 
@@ -1201,10 +2344,12 @@ export function ProductDiscovery() {
         </div>
       )}
 
-      {/* Search & Filter */}
-      <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6 mb-8">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 flex gap-2">
+      {/* Search & Filter - Modern SaaS Design */}
+      <div className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 p-6 mb-6">
+        {/* Row 1: Search + Sort */}
+        <div className="flex flex-col lg:flex-row gap-4 items-center">
+          {/* Search Input - Full Width on Mobile */}
+          <div className="flex-1 w-full flex gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
               <input
@@ -1212,66 +2357,108 @@ export function ProductDiscovery() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search products or niches..."
-                className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50"
+                placeholder="Search winning products..."
+                className="w-full pl-12 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-white/40 focus:outline-none focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30"
               />
             </div>
-            <button onClick={handleSearch} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold hover:opacity-90 transition-opacity">
-              <Search className="w-4 h-4" />
+            <button onClick={handleSearch} className="px-5 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold hover:opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98]">
+              <Search className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex gap-2">
-            {['trending', 'recommended', 'high-profit'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
-                  filter === f
-                    ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300'
-                    : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {f === 'trending' && <TrendingUp className="w-4 h-4" />}
-                {f === 'recommended' && <Filter className="w-4 h-4" />}
-                {f === 'high-profit' && <BarChart3 className="w-4 h-4" />}
-                {f.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-              </button>
-            ))}
+
+          {/* Sort Dropdown - Replaces old tabs */}
+          <div className="flex items-center gap-3">
+            <span className="text-white/50 text-sm hidden sm:block">Sort by:</span>
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-medium focus:outline-none focus:border-purple-500/50 cursor-pointer appearance-none min-w-[160px]"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.75rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em', paddingRight: '2.5rem' }}
+            >
+              <option value="trending" className="bg-gray-900">Trending Now</option>
+              <option value="recommended" className="bg-gray-900">Top Rated</option>
+              <option value="high-profit" className="bg-gray-900">High Profit</option>
+            </select>
           </div>
         </div>
-        
-        {/* Image Enhancement Controls */}
-        <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-white/50 text-sm">Product images can be enhanced with clean backgrounds</span>
-            <span className="text-white/40 text-xs">(~$0.06/image)</span>
-          </div>
-          <div className="flex items-center gap-2">
+
+        {/* Row 2: Niche Quick Filters */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { key: 'smart_home', label: 'Smart Home' },
+            { key: 'tech', label: 'Tech' },
+            { key: 'fitness', label: 'Fitness' },
+            { key: 'kitchen', label: 'Kitchen' },
+            { key: 'beauty', label: 'Beauty' },
+            { key: 'pet', label: 'Pet' },
+          ].map((niche) => (
             <button
-              onClick={() => setShowEnhancer(true)}
-              className="px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-medium hover:bg-cyan-500/30 flex items-center gap-2"
+              key={niche.key}
+              onClick={() => handleNicheClick(niche.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                currentNiche === niche.key
+                  ? 'bg-purple-500/20 border border-purple-500/30 text-purple-300'
+                  : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white hover:border-purple-500/30'
+              }`}
             >
-              <Wand2 className="w-4 h-4" />
-              Enhance Single Image
+              {niche.label}
             </button>
-            <button
-              onClick={enhanceProductImages}
-              disabled={generatingImages || products.length === 0}
-              className="px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 text-sm font-medium hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {generatingImages ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Enhancing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Enhance All (Top 5)
-                </>
-              )}
-            </button>
+          ))}
+        </div>
+
+        {/* Row 3: Image Tools - Collapsible/Minimal */}
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setAutoEnhanceEnabled(!autoEnhanceEnabled)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 transition-all ${
+                  autoEnhanceEnabled
+                    ? 'bg-green-500/10 border border-green-500/20 text-green-400'
+                    : 'bg-white/5 border border-white/5 text-white/40 hover:text-white/60'
+                }`}
+              >
+                {autoEnhanceEnabled ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+                <span className="hidden sm:inline">Auto-Enhance</span>
+                <span className="sm:hidden">{autoEnhanceEnabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <span className="text-white/30 text-xs hidden md:block">
+                {products.length > 0 && `${products.length} products`}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => autoEnhanceAllProducts(products)}
+                disabled={enhanceProgress.enhancing || products.length === 0}
+                className="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-medium hover:bg-purple-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
+              >
+                {enhanceProgress.enhancing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>{enhanceProgress.current}/{enhanceProgress.total}</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Enhance Images</span>
+                    <span className="sm:hidden">Enhance</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* Progress Bar */}
+          {enhanceProgress.enhancing && (
+            <div className="mt-2">
+              <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 transition-all duration-300"
+                  style={{ width: `${(enhanceProgress.current / enhanceProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1289,20 +2476,132 @@ export function ProductDiscovery() {
           ))}
         </div>
       ) : products.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <ProductCard 
-              key={product.id} 
-              product={product} 
-              onClick={() => handleProductSelect(product)}
-            />
-          ))}
-        </div>
+        <>
+          {/* Supplier / warehouse filter chips (Option A) - only show when there's
+              something meaningful to filter by (don't clutter the UI with empty chips). */}
+          {(supplierCounts.us > 0 || supplierCounts.eu > 0 || supplierCounts.cross > 0 || supplierCounts.cj_only > 0) && (
+            <div className="mb-4 flex flex-wrap gap-2 items-center">
+              <span className="text-white/40 text-xs mr-1">Supplier:</span>
+              {[
+                { key: 'all',     label: 'All',        count: supplierCounts.all,     activeClass: 'bg-white/10 border-white/30 text-white' },
+                { key: 'us',      label: '🇺🇸 US',      count: supplierCounts.us,      activeClass: 'bg-green-500/20 border-green-500/40 text-green-300' },
+                { key: 'eu',      label: '🇪🇺 EU',      count: supplierCounts.eu,      activeClass: 'bg-blue-500/20 border-blue-500/40 text-blue-300' },
+                { key: 'cross',   label: '⚡ Cross-ref', count: supplierCounts.cross,   activeClass: 'bg-purple-500/20 border-purple-500/40 text-purple-300' },
+                { key: 'cj_only', label: 'CJ only',    count: supplierCounts.cj_only, activeClass: 'bg-orange-500/20 border-orange-500/40 text-orange-300' },
+              ]
+                .filter(chip => chip.key === 'all' || chip.count > 0)
+                .map(chip => {
+                  const isActive = supplierFilter === chip.key;
+                  return (
+                    <button
+                      key={chip.key}
+                      onClick={() => setSupplierFilter(chip.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                        isActive
+                          ? chip.activeClass
+                          : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <span>{chip.label}</span>
+                      <span className={`text-[10px] ${isActive ? '' : 'text-white/40'}`}>{chip.count}</span>
+                    </button>
+                  );
+                })}
+              {supplierFilter !== 'all' && (
+                <button
+                  onClick={() => setSupplierFilter('all')}
+                  className="text-white/40 hover:text-white text-xs ml-1 underline underline-offset-2"
+                >
+                  clear
+                </button>
+              )}
+            </div>
+          )}
+
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onClick={() => handleProductSelect(product)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 rounded-2xl bg-white/5 border border-white/10">
+              <Package className="w-12 h-12 text-white/20 mx-auto mb-3" />
+              <p className="text-white/70 mb-2">No products match this filter</p>
+              <button
+                onClick={() => setSupplierFilter('all')}
+                className="text-purple-300 hover:text-purple-200 text-sm underline underline-offset-2"
+              >
+                Show all {supplierCounts.all} products
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-center py-20">
           <Package className="w-16 h-16 text-white/20 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No products found</h3>
-          <p className="text-white/50">Try a different search or filter</p>
+          {discoveryError ? (
+            <>
+              <h3 className="text-xl font-semibold text-white mb-2">Discovery unavailable</h3>
+              <p className="text-red-300 mb-4 max-w-lg mx-auto">
+                {discoveryError.error || 'No real products could be fetched.'}
+              </p>
+
+              {discoveryError.diagnostics && (
+                <div className="max-w-lg mx-auto mb-4 text-left bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                  <div className="text-sm text-red-200 mb-2 font-semibold">
+                    Source status: {discoveryError.diagnostics.total_connected ?? 0}/{discoveryError.diagnostics.total_sources ?? 0} connected
+                  </div>
+
+                  {discoveryError.diagnostics.sources_connected?.length > 0 && (
+                    <div className="text-xs text-green-300 mb-2">
+                      <span className="font-semibold">Connected:</span>{' '}
+                      {discoveryError.diagnostics.sources_connected.join(', ')}
+                    </div>
+                  )}
+
+                  {discoveryError.diagnostics.sources_failed && Object.keys(discoveryError.diagnostics.sources_failed).length > 0 && (
+                    <div className="text-xs text-red-300">
+                      <span className="font-semibold">Failed:</span>
+                      <ul className="mt-1 ml-4 list-disc">
+                        {Object.entries(discoveryError.diagnostics.sources_failed).map(([k, v]) => (
+                          <li key={k}><span className="font-mono">{k}</span>: {String(v)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {discoveryError.discovery_error && (
+                    <div className="text-xs text-red-200 mt-2 font-mono break-all">
+                      Engine error: {discoveryError.discovery_error}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {discoveryError.hint && (
+                <p className="text-white/60 text-sm max-w-lg mx-auto mb-4">{discoveryError.hint}</p>
+              )}
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-semibold text-white mb-2">No products found</h3>
+              <p className="text-white/50 mb-4">No real products matched this niche. Try another niche or a fresh search.</p>
+            </>
+          )}
+
+          <button
+            onClick={() => loadProducts()}
+            className="px-6 py-3 rounded-xl bg-purple-500/20 border border-purple-500/30 text-purple-300 font-medium hover:bg-purple-500/30 flex items-center gap-2 mx-auto"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </button>
+          <p className="text-white/30 text-xs mt-4">Check browser console (F12) for API errors</p>
         </div>
       )}
 

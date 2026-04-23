@@ -58,7 +58,8 @@ from ospra_os.database import advertising_models
 from ospra_os.database import email_models
 from ospra_os.database import testing_models
 from ospra_os.database import action_models
-from ospra_os.database import actions_models
+# NOTE: actions_models (plural) was consolidated into action_models (singular).
+# The AutoPilotLog class now lives in action_models.
 from ospra_os.database import performance_models
 
 # Optional models (import if they exist)

@@ -1,6 +1,9 @@
 """
 Enhanced Trend Analysis System
 Integrates Google Trends, Instagram, TikTok for comprehensive product intelligence
+
+NOTE: pytrends is ARCHIVED (April 2025) and constantly hits 429 errors.
+This now uses Apify's Google Trends Scraper instead (99.7% success rate).
 """
 
 import os
@@ -11,13 +14,23 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-# Google Trends
+# Apify Google Trends (PREFERRED - 99.7% success rate, no 429 errors)
+HAS_APIFY_TRENDS = False
+try:
+    from ospra_os.product_research.connectors.apify.google_trends_apify import ApifyGoogleTrends
+    HAS_APIFY_TRENDS = True
+    logger.info("[SUCCESS] Apify Google Trends connector loaded (replaces pytrends)")
+except ImportError as e:
+    logger.warning(f"Apify Google Trends not available: {e}")
+
+# Legacy pytrends (DEPRECATED - archived April 2025, constant 429 errors)
 try:
     from pytrends.request import TrendReq
     HAS_PYTRENDS = True
+    logger.warning("[WARNING] pytrends loaded as fallback (DEPRECATED - use Apify instead)")
 except ImportError:
     HAS_PYTRENDS = False
-    logger.warning("pytrends not installed. Run: pip install pytrends")
+    logger.info("pytrends not installed (not needed - using Apify)")
 
 # Claude AI for product analysis
 try:
@@ -37,16 +50,29 @@ class TrendAnalyzer:
     """
 
     def __init__(self):
-        # Google Trends
-        if HAS_PYTRENDS:
+        # Google Trends - Apify FIRST (99.7% success rate, no 429 errors)
+        self.apify_trends = None
+        self.pytrends = None  # Legacy fallback
+
+        if HAS_APIFY_TRENDS:
+            try:
+                self.apify_trends = ApifyGoogleTrends()
+                logger.info("[SUCCESS] Apify Google Trends initialized (PREFERRED)")
+            except Exception as e:
+                logger.warning(f"[WARNING] Apify Google Trends init failed: {e}")
+                self.apify_trends = None
+
+        # Legacy pytrends fallback (DEPRECATED - constant 429 errors)
+        if not self.apify_trends and HAS_PYTRENDS:
             try:
                 self.pytrends = TrendReq(hl='en-US', tz=360)
-                logger.info("[SUCCESS] Google Trends initialized")
+                logger.warning("[WARNING] Using pytrends fallback (DEPRECATED - expect 429 errors)")
             except Exception as e:
-                logger.warning(f"[WARNING]  Google Trends init failed: {e}")
+                logger.warning(f"[WARNING] pytrends init failed: {e}")
                 self.pytrends = None
-        else:
-            self.pytrends = None
+
+        if not self.apify_trends and not self.pytrends:
+            logger.warning("[WARNING] NO Google Trends available - set APIFY_API_TOKEN")
 
         # Instagram Graph API
         self.instagram_token = os.getenv('INSTAGRAM_ACCESS_TOKEN')
@@ -191,70 +217,118 @@ Format your response as JSON:
     async def _get_google_trends(self, product_name: str, niche: str) -> Dict:
         """
         Get Google Trends data for product/niche
+
+        Uses Apify Google Trends Scraper (PREFERRED - 99.7% success rate)
+        Falls back to pytrends (DEPRECATED - constant 429 errors)
         """
-        if not self.pytrends:
-            return {'available': False, 'reason': 'pytrends not installed'}
+        # Extract key search terms
+        keywords = self._extract_keywords(product_name, niche)[:5]  # Max 5 keywords
 
-        try:
-            # Extract key search terms
-            keywords = self._extract_keywords(product_name, niche)[:5]  # Max 5 keywords
+        if not keywords:
+            return {'available': False, 'reason': 'no keywords'}
 
-            if not keywords:
-                return {'available': False, 'reason': 'no keywords'}
+        # TRY APIFY FIRST (99.7% success rate, no 429 errors)
+        if self.apify_trends:
+            try:
+                logger.info(f"[TRENDS] Fetching Google Trends via Apify: {keywords}")
 
-            # Build payload (last 90 days)
-            self.pytrends.build_payload(
-                keywords,
-                timeframe='today 3-m',  # Last 3 months
-                geo='US'
-            )
+                results = await self.apify_trends.get_interest(
+                    search_terms=keywords,
+                    geo='US',
+                    timeframe='today 3-m'
+                )
 
-            # Rate limiting: prevent 429 errors
-            await asyncio.sleep(2)
+                if results:
+                    # Convert Apify results to our format
+                    latest_values = {}
+                    momentum = {}
 
-            # Get interest over time
-            interest_over_time = self.pytrends.interest_over_time()
+                    for trend_data in results:
+                        kw = trend_data.search_term
+                        latest_values[kw] = trend_data.current_interest
+                        momentum[kw] = trend_data.velocity
 
-            if interest_over_time.empty:
-                return {'available': False, 'reason': 'no data'}
+                    primary_keyword = keywords[0]
+                    primary_momentum = momentum.get(primary_keyword, 0)
+                    trend_direction = 'RISING' if primary_momentum > 10 else \
+                                    'FALLING' if primary_momentum < -10 else 'STABLE'
 
-            # Calculate trends
-            latest_values = {}
-            momentum = {}
+                    logger.info(f"[SUCCESS] Apify Google Trends: {trend_direction}, {len(results)} terms")
 
-            for keyword in keywords:
-                if keyword in interest_over_time.columns:
-                    values = interest_over_time[keyword].values
-                    latest_values[keyword] = int(values[-1]) if len(values) > 0 else 0
+                    return {
+                        'available': True,
+                        'source': 'apify',  # Flag that we used Apify
+                        'keywords': keywords,
+                        'interest_scores': latest_values,
+                        'momentum': momentum,
+                        'trend_direction': trend_direction,
+                        'primary_momentum': primary_momentum
+                    }
 
-                    # Calculate momentum (% change over period)
-                    if len(values) >= 2:
-                        start_avg = values[:len(values)//3].mean()
-                        end_avg = values[-len(values)//3:].mean()
-                        if start_avg > 0:
-                            momentum[keyword] = round(((end_avg - start_avg) / start_avg) * 100, 1)
+            except Exception as e:
+                logger.warning(f"[WARNING] Apify Google Trends failed: {e}")
+                # Fall through to pytrends fallback
+
+        # FALLBACK: Legacy pytrends (DEPRECATED - expect 429 errors)
+        if self.pytrends:
+            logger.warning("[WARNING] Falling back to pytrends (DEPRECATED - expect 429 errors)")
+            try:
+                # Build payload (last 90 days)
+                self.pytrends.build_payload(
+                    keywords,
+                    timeframe='today 3-m',  # Last 3 months
+                    geo='US'
+                )
+
+                # Rate limiting: prevent 429 errors
+                await asyncio.sleep(2)
+
+                # Get interest over time
+                interest_over_time = self.pytrends.interest_over_time()
+
+                if interest_over_time.empty:
+                    return {'available': False, 'reason': 'no data'}
+
+                # Calculate trends
+                latest_values = {}
+                momentum = {}
+
+                for keyword in keywords:
+                    if keyword in interest_over_time.columns:
+                        values = interest_over_time[keyword].values
+                        latest_values[keyword] = int(values[-1]) if len(values) > 0 else 0
+
+                        # Calculate momentum (% change over period)
+                        if len(values) >= 2:
+                            start_avg = values[:len(values)//3].mean()
+                            end_avg = values[-len(values)//3:].mean()
+                            if start_avg > 0:
+                                momentum[keyword] = round(((end_avg - start_avg) / start_avg) * 100, 1)
+                            else:
+                                momentum[keyword] = 0
                         else:
                             momentum[keyword] = 0
-                    else:
-                        momentum[keyword] = 0
 
-            # Overall trend direction
-            primary_keyword = keywords[0]
-            trend_direction = 'RISING' if momentum.get(primary_keyword, 0) > 10 else \
-                            'FALLING' if momentum.get(primary_keyword, 0) < -10 else 'STABLE'
+                # Overall trend direction
+                primary_keyword = keywords[0]
+                trend_direction = 'RISING' if momentum.get(primary_keyword, 0) > 10 else \
+                                'FALLING' if momentum.get(primary_keyword, 0) < -10 else 'STABLE'
 
-            return {
-                'available': True,
-                'keywords': keywords,
-                'interest_scores': latest_values,
-                'momentum': momentum,
-                'trend_direction': trend_direction,
-                'primary_momentum': momentum.get(primary_keyword, 0)
-            }
+                return {
+                    'available': True,
+                    'source': 'pytrends',  # Flag that we used pytrends
+                    'keywords': keywords,
+                    'interest_scores': latest_values,
+                    'momentum': momentum,
+                    'trend_direction': trend_direction,
+                    'primary_momentum': momentum.get(primary_keyword, 0)
+                }
 
-        except Exception as e:
-            logger.error(f"Google Trends error: {e}")
-            return {'available': False, 'reason': str(e)}
+            except Exception as e:
+                logger.error(f"[ERROR] pytrends error (expected - use Apify instead): {e}")
+                return {'available': False, 'reason': str(e)}
+
+        return {'available': False, 'reason': 'no trends connector - set APIFY_API_TOKEN'}
 
     async def _get_instagram_data(self, product_name: str) -> Dict:
         """

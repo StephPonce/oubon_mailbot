@@ -5,8 +5,13 @@ FIXED: Uses correct API endpoints for keyword search.
 - Affiliate API (aliexpress.affiliate.product.query) for keyword search
 - Dropshipping API (aliexpress.ds.recommend.feed.get) for hot products feed
 
+IMPROVED: Added relevance filtering to prevent off-topic products.
+- Category ID mapping for precise filtering
+- Keyword relevance scoring
+- Exclude irrelevant products (e.g., CarPlay for "smart home")
+
 Author: OspraOS
-Updated: December 2024
+Updated: February 2025
 """
 
 from typing import List, Optional
@@ -16,7 +21,68 @@ import time
 import requests
 import asyncio
 import os
+import re
 from ..base import BaseConnector, ProductCandidate
+
+
+# ============================================================================
+# CATEGORY ID MAPPING - For more precise product filtering
+# ============================================================================
+ALIEXPRESS_CATEGORY_MAP = {
+    "smart_home": "200003498",      # Smart Home category
+    "smart home": "200003498",
+    "home automation": "200003498",
+    "kitchen": "100003070",         # Kitchen & Dining
+    "kitchen gadgets": "100003070",
+    "fitness": "200001557",         # Sports & Fitness
+    "sports": "200001557",
+    "beauty": "66",                 # Beauty & Health
+    "electronics": "44",            # Consumer Electronics
+    "tech": "44",
+    "pet": "200001886",             # Pet Supplies
+    "pet supplies": "200001886",
+    "automotive": "34",             # Automobiles & Motorcycles
+    "car": "34",
+    "phone": "509",                 # Phones & Telecommunications
+    "phone accessories": "509",
+}
+
+# ============================================================================
+# RELEVANCE KEYWORDS - Include/Exclude for filtering off-topic products
+# ============================================================================
+RELEVANCE_FILTERS = {
+    "smart_home": {
+        "include": ["smart", "wifi", "wireless", "alexa", "home", "automation", "sensor",
+                   "plug", "bulb", "light", "switch", "thermostat", "camera", "doorbell",
+                   "lock", "security", "motion", "zigbee", "z-wave"],
+        "exclude": ["carplay", "car play", "android auto", "car stereo", "car radio",
+                   "car screen", "car display", "car dvd", "car navigation", "car gps",
+                   "car holder", "car mount", "phone holder car", "windshield"],
+    },
+    "smart home": {
+        "include": ["smart", "wifi", "wireless", "alexa", "home", "automation", "sensor",
+                   "plug", "bulb", "light", "switch", "thermostat", "camera", "doorbell",
+                   "lock", "security", "motion", "zigbee", "z-wave"],
+        "exclude": ["carplay", "car play", "android auto", "car stereo", "car radio",
+                   "car screen", "car display", "car dvd", "car navigation", "car gps",
+                   "car holder", "car mount", "phone holder car", "windshield"],
+    },
+    "kitchen": {
+        "include": ["kitchen", "cooking", "chef", "food", "blender", "mixer", "knife",
+                   "pot", "pan", "utensil", "container", "storage", "gadget", "appliance"],
+        "exclude": ["car", "automotive", "phone case", "laptop", "computer"],
+    },
+    "fitness": {
+        "include": ["fitness", "gym", "workout", "exercise", "yoga", "sport", "training",
+                   "resistance", "band", "weight", "dumbbell", "mat", "tracker"],
+        "exclude": ["car", "carplay", "phone case", "laptop"],
+    },
+    "beauty": {
+        "include": ["beauty", "skin", "face", "hair", "makeup", "cosmetic", "nail",
+                   "brush", "cream", "serum", "mask"],
+        "exclude": ["car", "carplay", "laptop", "phone case"],
+    },
+}
 
 
 class AliExpressConnector(BaseConnector):
@@ -92,12 +158,16 @@ class AliExpressConnector(BaseConnector):
         Uses Affiliate API for keyword search (most reliable for discovery).
         Falls back to Dropshipping feed if Affiliate fails.
 
+        IMPROVED: Filters results for relevance to prevent off-topic products.
+
         Args:
             query: Product keyword or category
             min_price: Min price filter (USD)
             max_price: Max price filter (USD)
             min_rating: Min seller rating (0-5)
             sort: 'price_asc', 'price_desc', 'orders', 'rating'
+            filter_relevance: Enable relevance filtering (default: True)
+            niche: Niche for relevance filtering (auto-detected if not provided)
 
         Returns:
             Product candidates with pricing and supplier info
@@ -106,15 +176,106 @@ class AliExpressConnector(BaseConnector):
             print("[WARNING]  AliExpress API credentials not configured")
             return []
 
+        # Get category ID if available for more precise results
+        category_id = ALIEXPRESS_CATEGORY_MAP.get(query.lower())
+        if category_id:
+            kwargs['category_ids'] = category_id
+            print(f"[FILTER] Using category ID {category_id} for '{query}'")
+
         # Try Affiliate API first (supports keyword search)
         products = await self._search_affiliate(query, **kwargs)
-        
-        if products:
+
+        if not products:
+            # Fallback to Dropshipping feed (doesn't support keyword, but gets products)
+            print("[WARNING]  Affiliate search returned 0, trying Dropshipping feed...")
+            products = await self._get_feed_products(**kwargs)
+
+        # Apply relevance filtering
+        filter_relevance = kwargs.get('filter_relevance', True)
+        if filter_relevance and products:
+            niche = kwargs.get('niche', query.lower())
+            original_count = len(products)
+            products = self._filter_relevance(products, query, niche)
+            filtered_count = original_count - len(products)
+            if filtered_count > 0:
+                print(f"[FILTER] Removed {filtered_count} off-topic products from '{query}' results")
+
+        return products
+
+    def _filter_relevance(self, products: List[ProductCandidate], query: str, niche: str) -> List[ProductCandidate]:
+        """
+        Filter products for relevance to the search query.
+
+        Removes off-topic products (e.g., CarPlay adapters for "smart home" search).
+
+        Args:
+            products: List of products to filter
+            query: Original search query
+            niche: Niche category for filtering rules
+
+        Returns:
+            Filtered list of relevant products
+        """
+        # Get filter rules for this niche
+        filters = RELEVANCE_FILTERS.get(niche.lower(), RELEVANCE_FILTERS.get(query.lower(), {}))
+
+        if not filters:
+            # No specific filters - do basic keyword matching
+            return self._basic_relevance_filter(products, query)
+
+        include_keywords = [kw.lower() for kw in filters.get('include', [])]
+        exclude_keywords = [kw.lower() for kw in filters.get('exclude', [])]
+
+        filtered = []
+        for product in products:
+            name_lower = product.name.lower()
+            category_lower = (product.category or '').lower()
+
+            # Check for exclusion keywords (instant reject)
+            is_excluded = any(excl in name_lower for excl in exclude_keywords)
+            if is_excluded:
+                print(f"   [SKIP] Off-topic: {product.name[:50]}...")
+                continue
+
+            # Check for inclusion keywords (at least one must match)
+            if include_keywords:
+                has_include = any(incl in name_lower or incl in category_lower for incl in include_keywords)
+                if not has_include:
+                    # Give benefit of doubt to generic matches
+                    query_words = query.lower().split()
+                    has_query_match = any(word in name_lower for word in query_words if len(word) > 3)
+                    if not has_query_match:
+                        print(f"   [SKIP] Low relevance: {product.name[:50]}...")
+                        continue
+
+            filtered.append(product)
+
+        return filtered
+
+    def _basic_relevance_filter(self, products: List[ProductCandidate], query: str) -> List[ProductCandidate]:
+        """
+        Basic relevance filter when no specific rules exist.
+
+        Checks if product name contains any word from the query (>3 chars).
+        """
+        query_words = [w.lower() for w in query.split() if len(w) > 3]
+
+        if not query_words:
             return products
-        
-        # Fallback to Dropshipping feed (doesn't support keyword, but gets products)
-        print("[WARNING]  Affiliate search returned 0, trying Dropshipping feed...")
-        return await self._get_feed_products(**kwargs)
+
+        filtered = []
+        for product in products:
+            name_lower = product.name.lower()
+
+            # Check if ANY query word appears in product name
+            has_match = any(word in name_lower for word in query_words)
+
+            if has_match:
+                filtered.append(product)
+            else:
+                print(f"   [SKIP] No query match: {product.name[:50]}...")
+
+        return filtered
 
     async def _search_affiliate(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -160,6 +321,12 @@ class AliExpressConnector(BaseConnector):
             params["min_sale_price"] = str(min_price)
         if max_price is not None:
             params["max_sale_price"] = str(max_price)
+
+        # Add category filter if provided (improves relevance)
+        category_ids = kwargs.get("category_ids")
+        if category_ids:
+            params["category_ids"] = str(category_ids)
+            print(f"[FILTER] AliExpress API: category_ids={category_ids}")
 
         # Generate signature with affiliate secret
         params["sign"] = self._generate_signature(params, self.affiliate_app_secret)

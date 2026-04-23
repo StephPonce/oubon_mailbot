@@ -22,9 +22,11 @@ import logging
 import base64
 import aiohttp
 import asyncio
+import hashlib
 from typing import Optional, Dict, List
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 
 # Image processing
 try:
@@ -43,6 +45,112 @@ logger = logging.getLogger(__name__)
 def get_stability_key() -> str:
     """Get Stability API key at runtime"""
     return os.getenv('STABILITY_API_KEY', '')
+
+
+# Get the project root and images directory
+def get_enhanced_images_dir() -> Path:
+    """Get the directory for storing enhanced images"""
+    # Navigate from ospra_os/integrations/ up to project root, then to data/images/enhanced
+    project_root = Path(__file__).parent.parent.parent
+    enhanced_dir = project_root / "data" / "images" / "enhanced"
+    enhanced_dir.mkdir(parents=True, exist_ok=True)
+    return enhanced_dir
+
+
+def normalize_image_url(url: str) -> str:
+    """
+    Normalize image URL to get consistent hashes even when URLs vary slightly.
+
+    Handles common variations:
+    - Different CDN subdomains (ae01 vs ae02, etc.)
+    - Query parameters that change (timestamps, sessions)
+    - Protocol differences (http vs https)
+    """
+    if not url:
+        return url
+
+    from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+
+    try:
+        parsed = urlparse(url)
+
+        # Normalize protocol to https
+        scheme = 'https'
+
+        # Normalize common CDN hostname variations
+        hostname = parsed.netloc.lower()
+        # AliExpress CDN: ae01.alicdn.com, ae02.alicdn.com, etc. -> alicdn.com
+        if 'alicdn.com' in hostname:
+            # Extract the path part which contains the actual image ID
+            pass  # Keep hostname as-is, the path is what matters
+
+        # Remove common cache-busting query params
+        query_params = parse_qs(parsed.query)
+        # Remove timestamp, session, and cache-related params
+        params_to_remove = ['_', 't', 'timestamp', 'v', 'version', 'cb', 'cache', 'nocache', 'rand', 'random']
+        filtered_params = {k: v for k, v in query_params.items() if k.lower() not in params_to_remove}
+
+        # Rebuild URL without variable params
+        normalized = urlunparse((
+            scheme,
+            hostname,
+            parsed.path,
+            parsed.params,
+            urlencode(filtered_params, doseq=True) if filtered_params else '',
+            ''  # Remove fragment
+        ))
+
+        return normalized
+    except Exception:
+        # If parsing fails, return original
+        return url
+
+
+def get_image_url_hash(url: str) -> str:
+    """Generate a consistent hash for an image URL (with normalization)"""
+    normalized_url = normalize_image_url(url)
+    url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()[:16]
+    # Log if normalization changed the URL
+    if normalized_url != url:
+        logger.debug(f"[HASH] URL normalized: {url[:60]}... -> {normalized_url[:60]}...")
+    return url_hash
+
+
+def get_enhanced_image_path(original_url: str) -> Path:
+    """Get the file path for an enhanced image based on original URL"""
+    url_hash = get_image_url_hash(original_url)
+    return get_enhanced_images_dir() / f"{url_hash}.png"
+
+
+def get_enhanced_image_url(original_url: str) -> str:
+    """Get the static URL for an enhanced image"""
+    url_hash = get_image_url_hash(original_url)
+    return f"/static/images/enhanced/{url_hash}.png"
+
+
+def get_legacy_hash(url: str) -> str:
+    """Old hash function (without normalization) for backward compatibility"""
+    return hashlib.sha256(url.encode()).hexdigest()[:16]
+
+
+def check_enhanced_image_exists(original_url: str) -> Optional[str]:
+    """Check if an enhanced image already exists on disk, return URL if so.
+
+    Checks both normalized hash (new) and legacy hash (old) for backward compatibility.
+    """
+    # First check with normalized hash (new method)
+    file_path = get_enhanced_image_path(original_url)
+    if file_path.exists():
+        return get_enhanced_image_url(original_url)
+
+    # Backward compatibility: check with legacy (non-normalized) hash
+    legacy_hash = get_legacy_hash(original_url)
+    legacy_path = get_enhanced_images_dir() / f"{legacy_hash}.png"
+    if legacy_path.exists():
+        logger.info(f"[CACHE] Found with legacy hash: {legacy_hash}")
+        return f"/static/images/enhanced/{legacy_hash}.png"
+
+    return None
 
 # Oubon Shop brand backgrounds - MORE DISTINCT STYLES
 BACKGROUND_STYLES = {
@@ -133,22 +241,46 @@ class AIImageEnhancer:
         image_url: str,
         niche: str = "smart_home",
         background_style: str = None,
-        add_shadow: bool = True
+        add_shadow: bool = True,
+        skip_cache: bool = False
     ) -> Dict:
         """
         Enhance a product image by removing background and adding clean one.
-        
+
         Args:
             image_url: URL of the original product image
             niche: Product category (determines default background)
             background_style: Override background style (optional)
             add_shadow: Whether to add subtle shadow under product
-            
+            skip_cache: Force re-enhancement even if cached on disk
+
         Returns:
-            Dict with enhanced_image_url (base64), metadata, etc.
+            Dict with enhanced_image_url (persistent file URL), metadata, etc.
         """
         start_time = datetime.now()
-        
+
+        # Check for existing enhanced image on disk (FREE - no API call)
+        if not skip_cache:
+            url_hash = get_image_url_hash(image_url)
+            expected_path = get_enhanced_image_path(image_url)
+            logger.info(f"[ENHANCE] Checking cache for hash {url_hash} at {expected_path}")
+            existing_url = check_enhanced_image_exists(image_url)
+            if existing_url:
+                logger.info(f"[ENHANCE] ✅ CACHE HIT - returning cached: {existing_url}")
+                return {
+                    "success": True,
+                    "enhanced_image_url": existing_url,
+                    "original_url": image_url,
+                    "background_style": "cached",
+                    "background_name": "Cached",
+                    "processing_time": 0.0,
+                    "estimated_cost": "$0.00",
+                    "method": "disk_cache",
+                    "cached": True
+                }
+            else:
+                logger.info(f"[ENHANCE] ❌ CACHE MISS - file not found, will call Stability AI (~$0.06)")
+
         # Validate
         if not self.stability_key:
             return {
@@ -156,7 +288,7 @@ class AIImageEnhancer:
                 "error": "Stability API key not configured",
                 "original_url": image_url
             }
-        
+
         if not PIL_AVAILABLE:
             return {
                 "success": False,
@@ -201,22 +333,33 @@ class AIImageEnhancer:
                 add_shadow=add_shadow
             )
             
-            # Step 5: Convert to base64
-            enhanced_base64 = self._image_to_base64(final_image)
-            
+            # Step 5: Save to disk (persistent storage)
+            file_path = get_enhanced_image_path(image_url)
+            file_url = get_enhanced_image_url(image_url)
+
+            try:
+                final_image.save(file_path, format='PNG', optimize=True)
+                logger.info(f"[ENHANCE] Saved enhanced image to: {file_path}")
+            except Exception as save_error:
+                logger.error(f"[ENHANCE] Failed to save image to disk: {save_error}")
+                # Fall back to base64 if disk save fails
+                enhanced_base64 = self._image_to_base64(final_image)
+                file_url = f"data:image/png;base64,{enhanced_base64}"
+
             elapsed = (datetime.now() - start_time).total_seconds()
-            
-            logger.info(f"[ENHANCE] ✅ Complete in {elapsed:.2f}s")
-            
+
+            logger.info(f"[ENHANCE] ✅ Complete in {elapsed:.2f}s - saved to {file_url}")
+
             return {
                 "success": True,
-                "enhanced_image_url": f"data:image/png;base64,{enhanced_base64}",
+                "enhanced_image_url": file_url,
                 "original_url": image_url,
                 "background_style": bg_style,
                 "background_name": BACKGROUND_STYLES[bg_style]["name"],
                 "processing_time": round(elapsed, 2),
                 "estimated_cost": "$0.06",
-                "method": "stability_bg_removal"
+                "method": "stability_bg_removal",
+                "cached": False
             }
             
         except Exception as e:
@@ -522,21 +665,24 @@ def get_image_enhancer() -> AIImageEnhancer:
 async def enhance_product_image(
     image_url: str,
     niche: str = "smart_home",
-    background_style: str = None
+    background_style: str = None,
+    skip_cache: bool = False
 ) -> Dict:
     """
     Simple function to enhance a single product image.
-    
+
+    Images are cached to disk - subsequent calls for the same image are FREE.
+
     Usage:
         result = await enhance_product_image(
             "https://aliexpress.com/ugly-product.jpg",
             niche="smart_home"
         )
         if result["success"]:
-            enhanced_url = result["enhanced_image_url"]
+            enhanced_url = result["enhanced_image_url"]  # Real file URL, not base64
     """
     enhancer = get_image_enhancer()
-    return await enhancer.enhance_product_image(image_url, niche, background_style)
+    return await enhancer.enhance_product_image(image_url, niche, background_style, skip_cache=skip_cache)
 
 
 async def enhance_product_batch(

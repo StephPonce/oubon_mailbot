@@ -117,18 +117,38 @@ class CJDropshippingClient:
         return round(cost * margin, 2)
 
     def _parse_price(self, price_str) -> float:
-        """Parse price, handling price ranges like '8.28 -- 13.25'"""
+        """Parse price, handling price ranges like '8.28 -- 13.25' or '400.00-520.00'"""
         try:
             # Convert to string first in case it's already a number
-            price_str = str(price_str)
+            price_str = str(price_str).strip()
 
-            # Check if it's a price range
+            # Return early if it's already a valid number
+            if price_str.replace('.', '', 1).replace('-', '', 1).lstrip('-').isdigit():
+                try:
+                    return float(price_str)
+                except ValueError:
+                    pass
+
+            # Check if it's a price range with double dash
             if '--' in price_str:
                 # Take the lowest price from range
                 price_str = price_str.split('--')[0].strip()
+                return float(price_str)
+
+            # Check if it's a price range with single dash (e.g., "400.00-520.00")
+            # Need to be careful not to match negative numbers
+            if '-' in price_str and not price_str.startswith('-'):
+                parts = price_str.split('-')
+                # Only treat as range if we have exactly 2 parts that look like prices
+                if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+                    try:
+                        # Take the lowest price from range
+                        return float(parts[0].strip())
+                    except ValueError:
+                        pass
 
             return float(price_str)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError):
             # Return 0 if parsing fails
             return 0.0
 

@@ -309,3 +309,89 @@ class RedditConnector(BaseConnector):
         except Exception as e:
             print(f"[ERROR] Error fetching from r/{subreddit}: {e}")
             return []
+
+    async def search_subreddit_for_product(
+        self,
+        subreddit: str,
+        query: str,
+        time_filter: str = "year",
+        limit: int = 10,
+    ) -> List[dict]:
+        """
+        Search a subreddit for posts mentioning a product using Reddit's search API.
+
+        This is strictly better than browsing top posts and hoping for a keyword
+        match - Reddit's search endpoint actually looks for the query terms in
+        post titles, bodies, and comments.
+
+        Args:
+            subreddit: Subreddit name (without r/)
+            query: Product name or search phrase
+            time_filter: 'hour', 'day', 'week', 'month', 'year', 'all'
+            limit: Max posts to return (Reddit caps at 100)
+
+        Returns:
+            List of raw post dicts with:
+              - title, url, permalink, score, num_comments, upvote_ratio
+              - subreddit, author, created_utc, selftext (excerpt)
+            Returns [] on error (fail-open, don't crash discovery).
+        """
+        import aiohttp
+
+        url = f"https://www.reddit.com/r/{subreddit}/search.json"
+        params = {
+            "q": query,
+            "restrict_sr": "on",      # confine search to THIS subreddit only
+            "sort": "relevance",      # relevance, not top - we want matching, not popular
+            "t": time_filter,
+            "limit": min(limit, 25),
+        }
+        headers = {"User-Agent": self.user_agent}
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as response:
+                    if response.status != 200:
+                        # Reddit rate-limits or sub doesn't exist - fail quietly
+                        return []
+
+                    data = await response.json()
+                    posts_raw = data.get("data", {}).get("children", [])
+
+                    results = []
+                    for wrapper in posts_raw:
+                        post = wrapper.get("data", {})
+
+                        # Filter removed / stickied
+                        if post.get("stickied") or post.get("removed_by_category"):
+                            continue
+                        if post.get("selftext") == "[removed]" or post.get("selftext") == "[deleted]":
+                            continue
+
+                        # Keep a trimmed excerpt of the body for context (not the whole thing)
+                        selftext = post.get("selftext", "") or ""
+                        selftext_excerpt = selftext[:300] if selftext else ""
+
+                        results.append({
+                            "title": post.get("title", ""),
+                            "url": f"https://reddit.com{post.get('permalink', '')}",
+                            "permalink": post.get("permalink", ""),
+                            "score": post.get("score", 0),
+                            "num_comments": post.get("num_comments", 0),
+                            "upvote_ratio": post.get("upvote_ratio", 0.0),
+                            "subreddit": subreddit,
+                            "author": post.get("author", ""),
+                            "created_utc": post.get("created_utc", 0),
+                            "selftext_excerpt": selftext_excerpt,
+                        })
+
+                    return results
+
+        except Exception as e:
+            print(f"[WARNING] Reddit search r/{subreddit} for '{query[:40]}' failed: {e}")
+            return []

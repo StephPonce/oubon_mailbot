@@ -225,6 +225,8 @@ def merge_contexts(
         "has_stores": dashboard_context.connectionStatus.stores,
         "has_metrics": dashboard_context.storeMetrics is not None,
         "has_trending": len(dashboard_context.trendingProducts) > 0,
+        "has_products": len(dashboard_context.visibleProducts) > 0 or len(dashboard_context.trendingProducts) > 0,
+        "has_orders": dashboard_context.storeMetrics is not None and (dashboard_context.storeMetrics.orders_7d > 0 or dashboard_context.storeMetrics.orders_30d > 0),
         "has_email": dashboard_context.connectionStatus.email,
         "has_ads": dashboard_context.connectionStatus.ads,
     }
@@ -383,15 +385,29 @@ async def chat_with_oi(
         }
         
         # ===== THREE-LAYER CONTEXT BUILDING =====
-        
+
         # Layer 1: Dashboard context (already in merged_context)
+        # Use visible_products and trending_products from frontend context
+        visible_products = merged_context.get("visible_products", [])
+        trending_products = merged_context.get("trending_products", [])
+
+        # Combine for full product awareness
+        all_products = visible_products + [
+            p for p in trending_products
+            if not any(v.get("id") == p.get("id") for v in visible_products)
+        ]
+
         dashboard_context = {
-            "products": merged_context.get("products", []),
+            "products": all_products,  # Combined visible + trending (deduped)
+            "visible_products": visible_products,
+            "trending_products": trending_products,
             "autopilot": merged_context.get("autopilot", {}),
             "pending_actions": merged_context.get("pending_actions", []),
             "store_metrics": merged_context.get("store_metrics", {}),
             "current_page": merged_context.get("current_page", "dashboard"),
         }
+
+        logger.debug(f"Dashboard context: {len(all_products)} products, {len(trending_products)} trending")
         
         # Layer 2: User memory (from database)
         # For now, use learning system as memory proxy

@@ -102,7 +102,7 @@ class ApifyClient:
                     f"{self.base_url}/users/me",
                     headers=self.headers
                 )
-                
+
                 if response.status_code == 200:
                     data = response.json()['data']
                     return {
@@ -121,6 +121,90 @@ class ApifyClient:
                 'connected': False,
                 'error': str(e)
             }
+
+    async def get_account_usage(self) -> Dict:
+        """
+        Get current account usage and remaining budget.
+
+        Apify has TWO types of credits:
+        1. Subscription credits (monthlyUsageCreditsUsd) - Monthly allocation
+        2. Prepaid credits (prepaidUsd) - One-time purchased credits
+
+        Returns dict with:
+        - remaining_usd: Total remaining (subscription + prepaid)
+        - used_usd: Amount used this billing period
+        - plan: Current plan name
+        - can_run_paid_actors: True if enough credits for paid actors
+        """
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                # Get user info with plan details
+                response = await client.get(
+                    f"{self.base_url}/users/me",
+                    headers=self.headers
+                )
+
+                if response.status_code != 200:
+                    return {'error': f"HTTP {response.status_code}"}
+
+                data = response.json().get('data', {})
+                plan = data.get('plan', {})
+
+                # Debug: print raw response to see actual fields
+                # print(f"[DEBUG] Apify user data keys: {list(data.keys())}")
+                # print(f"[DEBUG] Apify plan data: {plan}")
+
+                # Get subscription limit (if on paid plan)
+                monthly_limit = plan.get('monthlyUsageCreditsUsd', 0)
+
+                # Get prepaid balance - Apify uses multiple possible field names
+                # Check all possible fields for prepaid/available balance
+                prepaid_usd = (
+                    data.get('prepaidUsd', 0) or
+                    data.get('availableUsd', 0) or
+                    data.get('prepaidBalance', 0) or
+                    data.get('balance', 0) or
+                    plan.get('prepaidUsd', 0) or
+                    0
+                )
+
+                # Also check the proxy field which sometimes contains balance info
+                proxy_info = data.get('proxy', {})
+                if isinstance(proxy_info, dict):
+                    proxy_balance = proxy_info.get('availableUsd', 0)
+                    if proxy_balance > prepaid_usd:
+                        prepaid_usd = proxy_balance
+
+                # Get current usage
+                usage_response = await client.get(
+                    f"{self.base_url}/users/me/usage/monthly",
+                    headers=self.headers
+                )
+
+                used_usd = 0
+                if usage_response.status_code == 200:
+                    usage_data = usage_response.json().get('data', {})
+                    used_usd = usage_data.get('usageCreditsUsedUsd', 0)
+
+                # Calculate remaining from subscription
+                subscription_remaining = max(0, monthly_limit - used_usd)
+
+                # Total available = subscription remaining + prepaid
+                total_remaining = subscription_remaining + prepaid_usd
+
+                return {
+                    'remaining_usd': round(total_remaining, 2),
+                    'used_usd': round(used_usd, 2),
+                    'monthly_limit_usd': monthly_limit,
+                    'subscription_remaining_usd': round(subscription_remaining, 2),
+                    'prepaid_usd': round(prepaid_usd, 2),
+                    'plan': plan.get('id', 'unknown'),
+                    'can_run_paid_actors': total_remaining > 1.0,  # Need at least $1 for paid actors
+                }
+
+        except Exception as e:
+            print(f"[WARNING] Could not check Apify usage: {e}")
+            return {'error': str(e), 'can_run_paid_actors': False}
     
     async def run_actor(
         self,
@@ -480,6 +564,10 @@ class ApifyClient:
         
         print(f"\n[SUCCESS] Total products discovered: {len(all_products)}")
         return all_products
+
+
+# Alias for backward compatibility - TikTokShopScraper and AmazonBestsellersScraper inherit from this
+ApifyConnector = ApifyClient
 
 
 # Factory function for Intelligence Engine

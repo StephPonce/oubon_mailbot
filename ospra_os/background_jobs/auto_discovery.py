@@ -538,7 +538,7 @@ class AutoDiscoveryJob:
 
         # PRIMARY: Use new Apify-first unified discovery
         try:
-            from ospra_os.intelligence.unified_product_discovery import get_live_products
+            from ospra_os.intelligence.product_discovery import get_live_products
             
             results = await get_live_products(
                 niche=niche,

@@ -27,7 +27,7 @@ from sqlalchemy.orm import sessionmaker
 import json
 
 from ospra_os.services.product_deployer import ProductDeployer
-from ospra_os.intelligence.unified_product_discovery import UnifiedProductDiscovery
+from ospra_os.intelligence.product_discovery import ProductDiscoveryEngine as UnifiedProductDiscovery
 
 logger = logging.getLogger(__name__)
 

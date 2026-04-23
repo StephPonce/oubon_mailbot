@@ -115,10 +115,11 @@ class ProductDeployer:
 
     async def prepare_product(
         self,
-        aliexpress_product: Dict,
-        niche: str,
+        aliexpress_product: Dict = None,
+        niche: str = None,
         auto_enhance_images: bool = True,
-        auto_generate_content: bool = True
+        auto_generate_content: bool = True,
+        source_product: Dict = None,  # Task #21: source-agnostic alias
     ) -> Dict:
         """
         Prepare product for deployment WITHOUT deploying
@@ -126,7 +127,9 @@ class ProductDeployer:
         Good for preview/review before going live.
 
         Args:
-            aliexpress_product: Raw product data from AliExpress
+            source_product (or aliexpress_product): Raw product data from ANY supplier
+                                                    (AliExpress, CJ Dropshipping, etc.).
+                                                    Both args are accepted for back-compat.
             niche: Product niche
             auto_enhance_images: Enhance images with AI
             auto_generate_content: Generate content with AI
@@ -134,6 +137,14 @@ class ProductDeployer:
         Returns:
             Complete product data ready for Shopify
         """
+        # Task #21: accept either arg name. The legacy name "aliexpress_product"
+        # was misleading — CJ Dropshipping products flow through this same path.
+        product_data = source_product if source_product is not None else aliexpress_product
+        if product_data is None:
+            raise ValueError("prepare_product requires either source_product or aliexpress_product")
+        # Keep the legacy local name so downstream code continues to work.
+        aliexpress_product = product_data
+
         logger.info(f"\n{'='*70}")
         logger.info(f"[FIX] PREPARING PRODUCT")
         logger.info(f"{'='*70}")
@@ -141,10 +152,30 @@ class ProductDeployer:
         start_time = time.time()
         costs = {"content": 0.0, "images": 0.0}
 
-        # Extract data
-        product_name = aliexpress_product.get("title", "Product")
-        cost_price = aliexpress_product.get("price", 0)
-        images = aliexpress_product.get("images", [])
+        # Extract data — support CJ + AliExpress + generic shapes.
+        # AliExpress uses: title, price, images
+        # CJ Dropshipping uses: title, price (also cost_price/supplier_cost), all_images
+        # Generic discovery payload may use: name instead of title
+        product_name = (
+            aliexpress_product.get("title")
+            or aliexpress_product.get("name")
+            or "Product"
+        )
+        cost_price = (
+            aliexpress_product.get("price")
+            or aliexpress_product.get("cost_price")
+            or aliexpress_product.get("supplier_cost")
+            or 0
+        )
+        # CJ normalized products store URLs in `all_images`; AliExpress uses `images`.
+        # Accept both so CJ-only products don't deploy with zero images.
+        images = (
+            aliexpress_product.get("images")
+            or aliexpress_product.get("all_images")
+            or ([aliexpress_product.get("image_url")] if aliexpress_product.get("image_url") else [])
+        )
+        # Normalize: strip falsy entries
+        images = [url for url in (images or []) if url]
 
         logger.info(f"Product: {product_name[:50]}")
         logger.info(f"Niche: {niche}")
@@ -278,16 +309,18 @@ class ProductDeployer:
 
     async def deploy_product(
         self,
-        aliexpress_product: Dict,
-        niche: str,
+        aliexpress_product: Dict = None,
+        niche: str = None,
         shopify_store_id: Optional[str] = None,
-        options: Optional[Dict] = None
+        options: Optional[Dict] = None,
+        source_product: Dict = None,  # Task #21: source-agnostic alias
     ) -> Dict:
         """
         Full deployment pipeline to Shopify
 
         Args:
-            aliexpress_product: Raw product data
+            source_product (or aliexpress_product): Raw product data from ANY
+                                                    supplier (AliExpress, CJ Dropshipping, etc.)
             niche: Product niche
             shopify_store_id: Optional specific store
             options: Deployment options
@@ -295,8 +328,16 @@ class ProductDeployer:
         Returns:
             Deployment result with Shopify product ID and URLs
         """
+        # Task #21: accept both arg names for back-compat with callers that
+        # still pass the legacy name.
+        product_data = source_product if source_product is not None else aliexpress_product
+        if product_data is None:
+            raise ValueError("deploy_product requires either source_product or aliexpress_product")
+
         logger.info(f"\n{'='*70}")
         logger.info(f"[START] DEPLOYING PRODUCT TO SHOPIFY")
+        source_tag = product_data.get("source") or "unknown"
+        logger.info(f"[SOURCE] {source_tag}")
         logger.info(f"{'='*70}")
 
         if not self.shopify:
@@ -309,7 +350,7 @@ class ProductDeployer:
 
         # Step 1-3: Prepare product
         prepared = await self.prepare_product(
-            aliexpress_product=aliexpress_product,
+            source_product=product_data,
             niche=niche,
             auto_enhance_images=opts.enhance_images,
             auto_generate_content=opts.generate_content
@@ -333,7 +374,12 @@ class ProductDeployer:
                 "tags": content.get("tags", []),
                 "price": pricing["suggested_price"],
                 "compare_at_price": pricing.get("premium_price"),
-                "sku": f"AE-{hash(content['title']) % 1000000}",
+                # Task #21: SKU prefix reflects actual source.
+                # AliExpress → AE-, CJ Dropshipping → CJ-, otherwise PROD-.
+                "sku": (
+                    f"{'CJ' if product_data.get('source') == 'cj_dropshipping' else ('AE' if product_data.get('source') == 'aliexpress' else 'PROD')}"
+                    f"-{hash(content['title']) % 1000000}"
+                ),
                 "inventory": 100,
                 "images": images,
                 "weight": 0.5,

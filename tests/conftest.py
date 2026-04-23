@@ -44,6 +44,7 @@ def engine():
         RankingHistory, Niche, NicheSnapshot, CrossStoreLearning
     )
     from ospra_os.database.action_models import ActionLog
+    from ospra_os.database.job_models import Job  # Background job storage
     from ospra_os.learning.hybrid_learning_engine import GlobalLearningWeights, PersonalLearningWeights
 
     # Use file-based test database to avoid :memory: per-connection issues

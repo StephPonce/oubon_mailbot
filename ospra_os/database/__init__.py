@@ -21,6 +21,7 @@ from .connection import (
     init_database,
     check_database_connection,
     SessionLocal,  # Module-level SessionLocal for backward compatibility
+    get_multi_store_session,  # Multi-store session support
 )
 
 # Base and Enums
@@ -46,9 +47,7 @@ from .action_models import (
     Action,
     AIActionType,
     AIActionStatus,
-)
-from .actions_models import (
-    AutoPilotLog,
+    AutoPilotLog,  # Consolidated from actions_models.py
 )
 
 # User Models

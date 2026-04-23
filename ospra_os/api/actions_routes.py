@@ -254,21 +254,24 @@ async def execute_action(action: Action, db: Session) -> Dict[str, Any]:
 # API ENDPOINTS
 # ============================================================================
 
-@router.get("", response_model=List[ActionResponse])
+@router.get("")
 async def get_actions(
     status: Optional[AIActionStatus] = Query(None, description="Filter by status"),
     action_type: Optional[AIActionType] = Query(None, description="Filter by action type"),
     min_confidence: Optional[float] = Query(None, ge=0, le=100, description="Minimum confidence score"),
-    limit: int = Query(50, le=200, description="Max results to return"),
-    offset: int = Query(0, ge=0, description="Results offset for pagination"),
+    page: int = Query(1, ge=1, le=1000, description="Page number (1-indexed)"),
+    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Get actions with optional filtering.
+    Get actions with optional filtering and pagination.
 
     Returns actions for the current user, sorted by created_at (newest first).
+    Includes pagination metadata in response.
     """
+    from sqlalchemy import func
+
     query = db.query(Action).filter(Action.user_id == current_user.id)
 
     if status:
@@ -285,8 +288,25 @@ async def get_actions(
         (Action.expires_at.is_(None)) | (Action.expires_at > datetime.utcnow())
     )
 
-    actions = query.order_by(desc(Action.created_at)).offset(offset).limit(limit).all()
-    return actions
+    # Get total count for pagination
+    total = query.count()
+
+    # Calculate pagination
+    total_pages = (total + per_page - 1) // per_page if per_page > 0 else 0
+    offset = (page - 1) * per_page
+
+    actions = query.order_by(desc(Action.created_at)).offset(offset).limit(per_page).all()
+
+    return {
+        "success": True,
+        "data": [ActionResponse.model_validate(a) for a in actions],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1
+    }
 
 
 @router.get("/stats", response_model=ActionStatsResponse)

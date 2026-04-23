@@ -1,22 +1,23 @@
-// 
-// PROTECTED ROUTE
-// Redirects to login if not authenticated
-// 
+//
+// PROTECTED ROUTE & PUBLIC ONLY ROUTE
+// Auth-based route guards
+//
 
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
-interface ProtectedRouteProps {
+interface RouteProps {
   children: React.ReactNode;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+// Protected Route - redirects to login if not authenticated
+export function ProtectedRoute({ children }: RouteProps) {
+  const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
   // Show loading while checking auth
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="app-background" />
@@ -30,10 +31,35 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
-    // Save the attempted URL for redirecting after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Render protected content
   return <>{children}</>;
 }
+
+// Public Only Route - redirects to dashboard if already authenticated
+export function PublicOnlyRoute({ children }: RouteProps) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="app-background" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-accent mx-auto mb-4" />
+          <p className="text-secondary text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to dashboard if already authenticated
+  if (isAuthenticated) {
+    return <Navigate to="/products" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Default export for backward compatibility
+export default ProtectedRoute;

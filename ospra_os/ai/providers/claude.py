@@ -228,6 +228,23 @@ class ClaudeProvider(AIProvider):
             system_prompt = self._build_chat_system_prompt(context)
             logger.debug("Building system prompt internally")
 
+        # Temperature — callers that need low-variance, near-deterministic output
+        # (e.g. AI product analyzer generating structured JSON) can pass
+        # context["temperature"]=0.2. Without this, Anthropic defaults to 1.0
+        # which was producing >10% drift between refreshes on the same product.
+        temperature = 1.0
+        if context and "temperature" in context:
+            try:
+                temperature = float(context["temperature"])
+                # Clamp to Anthropic's valid range [0.0, 1.0]
+                temperature = max(0.0, min(1.0, temperature))
+            except (TypeError, ValueError):
+                logger.warning(
+                    f"Invalid temperature in context: {context.get('temperature')!r} "
+                    f"— falling back to default 1.0"
+                )
+                temperature = 1.0
+
         # Build user message
         user_message = message
 
@@ -237,6 +254,7 @@ class ClaudeProvider(AIProvider):
                 model=self.model_name,
                 max_tokens=1024,
                 system=system_prompt,
+                temperature=temperature,
                 messages=[
                     {
                         "role": "user",

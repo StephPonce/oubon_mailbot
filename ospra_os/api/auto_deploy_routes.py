@@ -17,8 +17,11 @@ Date: December 2025
 
 import logging
 from typing import Dict, List, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +99,7 @@ class RunNowResponse(BaseModel):
 # ============================================================================
 
 @router.post("/enable")
-async def enable_auto_deploy():
+async def enable_auto_deploy(current_user: User = Depends(get_current_user)):
     """
     [SUCCESS] Enable Auto-Deployment
 
@@ -136,7 +139,7 @@ async def enable_auto_deploy():
 
 
 @router.post("/disable")
-async def disable_auto_deploy():
+async def disable_auto_deploy(current_user: User = Depends(get_current_user)):
     """
     [PAUSE] Disable Auto-Deployment
 
@@ -167,7 +170,7 @@ async def disable_auto_deploy():
 
 
 @router.get("/status", response_model=StatusResponse)
-async def get_auto_deploy_status():
+async def get_auto_deploy_status(current_user: User = Depends(get_current_user)):
     """
     [STATS] Get Auto-Deploy Status
 
@@ -211,7 +214,7 @@ async def get_auto_deploy_status():
 
 
 @router.put("/criteria")
-async def update_criteria(criteria: CriteriaUpdate):
+async def update_criteria(criteria: CriteriaUpdate, current_user: User = Depends(get_current_user)):
     """
     [CONFIG] Update Deployment Criteria
 
@@ -266,7 +269,7 @@ async def update_criteria(criteria: CriteriaUpdate):
 
 
 @router.get("/history", response_model=List[DeploymentHistoryItem])
-async def get_deployment_history(limit: int = 50):
+async def get_deployment_history(limit: int = 50, current_user: User = Depends(get_current_user)):
     """
      Get Deployment History
 
@@ -307,7 +310,7 @@ async def get_deployment_history(limit: int = 50):
 
 
 @router.post("/run-now", response_model=RunNowResponse)
-async def run_deployment_now(background_tasks: BackgroundTasks):
+async def run_deployment_now(background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """
      Run Deployment Check Now
 
@@ -375,7 +378,7 @@ async def run_deployment_now(background_tasks: BackgroundTasks):
 
 
 @router.get("/health")
-async def auto_deploy_health():
+async def auto_deploy_health(current_user: User = Depends(get_current_user)):
     """
      Health Check
 

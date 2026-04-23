@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
 import logging
+import time
 
 from ospra_os.auth.jwt_auth import (
     get_db,
@@ -178,10 +179,10 @@ async def get_niche_products(
     New endpoint - queries the product discovery system for niche-specific products.
     Requires authentication.
     """
-    from ospra_os.intelligence.unified_product_discovery import UnifiedProductDiscovery
+    from ospra_os.intelligence.product_discovery import ProductDiscoveryEngine
 
     try:
-        discovery = UnifiedProductDiscovery()
+        discovery = ProductDiscoveryEngine()
         result = await discovery.discover_products(
             niche=niche_id,
             max_products=limit
@@ -201,6 +202,224 @@ async def get_niche_products(
 # ============================================================================
 # PRODUCTS - Missing Endpoints
 # ============================================================================
+
+@router.get("/api/dashboard/v2/products")
+async def get_dashboard_products(
+    niche: str = "smart_home",
+    per_page: int = 10,
+    page: int = 1,
+    force_refresh: bool = False,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    GET /api/dashboard/v2/products → get product recommendations with TIER-BASED CACHING.
+
+    Features:
+    - Instant loading from cache when available
+    - Cache TTL matches rate limit cooldown per tier
+    - Higher tiers (SOAR/STRATOSPHERE) get fresher data
+    - force_refresh=true bypasses cache (Stratosphere only)
+
+    Cache TTLs:
+    - NEST: 4 hours (matches cooldown)
+    - FLIGHT: 2 hours (matches cooldown)
+    - SOAR: 30 minutes (matches cooldown)
+    - STRATOSPHERE: 5 minutes (near real-time)
+
+    Requires authentication.
+    """
+    import time
+    start_time = time.time()
+
+    try:
+        from ospra_os.intelligence.product_discovery import discover_products
+        from ospra_os.product_research.product_cache import get_products_with_cache
+        from ospra_os.core.tiers import SubscriptionTier
+
+        # Get user's subscription tier
+        user_tier = current_user.subscription_tier
+        if isinstance(user_tier, str):
+            user_tier = SubscriptionTier(user_tier)
+
+        # Only Stratosphere can force refresh
+        can_force = user_tier == SubscriptionTier.STRATOSPHERE
+        actual_force = force_refresh and can_force
+
+        # Get products with tier-based caching
+        result = await get_products_with_cache(
+            niche=niche,
+            tier=user_tier,
+            discovery_func=discover_products,
+            count=per_page,
+            force_refresh=actual_force
+        )
+
+        load_time = time.time() - start_time
+
+        if result.get("products"):
+            all_products = result["products"]
+            total_products = len(all_products)
+
+            # Apply pagination
+            start_idx = (page - 1) * per_page
+            end_idx = start_idx + per_page
+            paginated_products = all_products[start_idx:end_idx]
+
+            # Calculate pagination metadata
+            total_pages = (total_products + per_page - 1) // per_page  # Ceiling division
+            has_next = page < total_pages
+            has_prev = page > 1
+
+            return {
+                "success": True,
+                "products": paginated_products,
+                "total": total_products,
+                "page": page,
+                "per_page": per_page,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_prev": has_prev,
+                "niche": niche,
+                # Cache info for frontend
+                "from_cache": result.get("from_cache", False),
+                "cache_age_seconds": result.get("cache_age_seconds", 0),
+                "cache_ttl_remaining": result.get("cache_ttl_remaining", 0),
+                "stale": result.get("stale", False),
+                # Performance metrics
+                "load_time_ms": round(load_time * 1000, 2),
+                "tier": user_tier.value
+            }
+
+    except Exception as e:
+        logger.warning(f"Product discovery with cache failed: {e}")
+
+    # Return demo products for development
+    import random
+    from datetime import datetime
+
+    logger.info(f"[DEMO] Returning demo products for dashboard")
+
+    DEMO_PRODUCTS = [
+        {"title": "Smart LED Strip Lights RGB WiFi", "cost_price": 8.50, "niche": "smart_home"},
+        {"title": "WiFi Smart Plug Energy Monitor", "cost_price": 6.99, "niche": "smart_home"},
+        {"title": "Smart Motion Sensor PIR", "cost_price": 5.50, "niche": "smart_home"},
+        {"title": "WiFi Smart Bulb RGBW", "cost_price": 4.99, "niche": "smart_home"},
+        {"title": "Electric Milk Frother", "cost_price": 5.99, "niche": "kitchen"},
+        {"title": "Silicone Kitchen Utensil Set", "cost_price": 12.50, "niche": "kitchen"},
+        {"title": "Resistance Bands Set", "cost_price": 6.50, "niche": "fitness"},
+        {"title": "Yoga Mat Non-Slip 6mm", "cost_price": 11.00, "niche": "fitness"},
+        {"title": "Wireless Earbuds Bluetooth", "cost_price": 12.50, "niche": "tech"},
+        {"title": "USB C Hub 7-in-1", "cost_price": 15.00, "niche": "tech"},
+    ]
+
+    demo_list = []
+    for i, item in enumerate(DEMO_PRODUCTS[:per_page]):
+        cost = item["cost_price"]
+        suggested = round(cost * 2.5, 2)
+        oi_score = random.randint(55, 88)
+
+        demo_list.append({
+            "product_id": f"demo_{i}_{int(datetime.now().timestamp())}",
+            "title": item["title"],
+            "cost_price": cost,
+            "supplier_cost": cost,
+            "suggested_price": suggested,
+            "profit": round(suggested - cost, 2),
+            "image_url": f"https://via.placeholder.com/300x300?text={item['title'][:10]}",
+            "source": "demo",
+            "available_on": ["demo_supplier"],
+            "is_mock": True,
+            "niche": item["niche"],
+            "sales_count": random.randint(100, 2000),
+            "trend_score": random.randint(50, 85),
+            "oi_score": oi_score,
+            "final_score": oi_score,
+            "tier": "GOOD" if oi_score >= 70 else "FAIR",
+            "recommendation": "Demo product - connect APIs for real discovery",
+            "_discovery_metadata": {
+                "sources_queried": ["demo"],
+                "discovered_at": datetime.now().isoformat(),
+                "niche": item["niche"],
+                "flow": "demo_fallback"
+            }
+        })
+
+    return {
+        "success": True,
+        "products": demo_list,
+        "total": len(demo_list),
+        "page": page,
+        "per_page": per_page,
+        "niche": niche,
+        "demo_mode": True,
+        "from_cache": False,
+        "load_time_ms": round((time.time() - start_time) * 1000, 2),
+        "note": "Demo data - connect CJ/AliExpress APIs for real products"
+    }
+
+
+@router.get("/api/dashboard/v2/cache-status")
+async def get_cache_status(current_user: User = Depends(get_current_user)):
+    """
+    GET /api/dashboard/v2/cache-status → get product cache statistics.
+
+    Shows cache hit rates, entries by tier, and TTL configuration.
+    Useful for debugging and monitoring cache performance.
+    """
+    try:
+        from ospra_os.product_research.product_cache import get_product_cache
+
+        cache = get_product_cache()
+        stats = cache.get_stats()
+
+        return {
+            "success": True,
+            "cache_stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Failed to get cache status: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@router.post("/api/dashboard/v2/cache-invalidate")
+async def invalidate_cache(
+    niche: Optional[str] = None,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    POST /api/dashboard/v2/cache-invalidate → invalidate product cache.
+
+    Admin/debug endpoint to force cache refresh.
+    If niche is provided, only that niche is invalidated.
+    Otherwise, entire cache is cleared.
+    """
+    try:
+        from ospra_os.product_research.product_cache import get_product_cache
+
+        cache = get_product_cache()
+
+        if niche:
+            cache.invalidate(niche)
+            return {
+                "success": True,
+                "message": f"Cache invalidated for niche: {niche}"
+            }
+        else:
+            cache.invalidate_all()
+            return {
+                "success": True,
+                "message": "Entire product cache cleared"
+            }
+    except Exception as e:
+        logger.error(f"Failed to invalidate cache: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 
 @router.get("/api/dashboard/v2/products/{product_id}")
 async def get_product_by_id(

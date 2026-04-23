@@ -14,14 +14,15 @@ from pydantic import BaseModel
 import logging
 
 from ..services.oi_alerts import (
-    alert_store, 
-    oi_alert_service, 
-    Alert, 
+    alert_store,
+    oi_alert_service,
+    Alert,
     AlertPreferences,
     AlertType,
     AlertPriority,
 )
-from ..auth.jwt_auth import get_current_user
+from ..auth.jwt_auth import get_current_user, decode_token
+from ..database import User
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +63,10 @@ async def get_alerts(
     priority: Optional[str] = Query(None, description="Filter by priority"),
     type: Optional[str] = Query(None, description="Filter by type"),
     limit: int = Query(50, ge=1, le=100),
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Get alerts for the current user"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     
     alerts = alert_store.get_user_alerts(
         user_id=user_id,
@@ -85,10 +86,10 @@ async def get_alerts(
 @router.post("/{alert_id}/read")
 async def mark_alert_read(
     alert_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Mark an alert as read"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     
     if alert_store.mark_read(user_id, alert_id):
         return {"success": True, "message": "Alert marked as read"}
@@ -98,10 +99,10 @@ async def mark_alert_read(
 
 @router.post("/read-all")
 async def mark_all_alerts_read(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Mark all alerts as read"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     count = alert_store.mark_all_read(user_id)
     return {"success": True, "count": count, "message": f"Marked {count} alerts as read"}
 
@@ -109,10 +110,10 @@ async def mark_all_alerts_read(
 @router.delete("/{alert_id}")
 async def dismiss_alert(
     alert_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Dismiss/delete an alert"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     
     if alert_store.dismiss(user_id, alert_id):
         return {"success": True, "message": "Alert dismissed"}
@@ -124,10 +125,10 @@ async def dismiss_alert(
 async def execute_alert_action(
     alert_id: str,
     request: AlertActionRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Execute an action from an alert"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     
     # Get the alert first
     alerts = alert_store.get_user_alerts(user_id, limit=100)
@@ -188,10 +189,10 @@ async def execute_alert_action(
 
 @router.get("/preferences")
 async def get_alert_preferences(
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Get user's alert preferences"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     prefs = alert_store.get_preferences(user_id)
     return prefs.dict()
 
@@ -199,10 +200,10 @@ async def get_alert_preferences(
 @router.put("/preferences")
 async def update_alert_preferences(
     request: AlertPreferencesUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Update user's alert preferences"""
-    user_id = current_user.get("sub") or current_user.get("user_id")
+    user_id = str(current_user.id)
     
     # Get current preferences
     current = alert_store.get_preferences(user_id)
@@ -245,12 +246,27 @@ async def websocket_alerts(websocket: WebSocket):
             await websocket.close()
             return
         
-        # TODO: Validate token
+        # SECURITY FIX: Validate token and extract user_id from it
+        # Never trust client-provided user_id!
         token = auth_data.get("token")
-        user_id = auth_data.get("user_id")  # For now, trust the client
-        
-        if not user_id:
-            await websocket.send_json({"type": "error", "message": "Invalid authentication"})
+
+        if not token:
+            await websocket.send_json({"type": "error", "message": "Token required"})
+            await websocket.close()
+            return
+
+        try:
+            # Decode and validate the JWT token
+            payload = decode_token(token)
+            user_id = payload.get("sub") or payload.get("user_id")
+
+            if not user_id:
+                await websocket.send_json({"type": "error", "message": "Invalid token payload"})
+                await websocket.close()
+                return
+        except Exception as e:
+            logger.warning(f"WebSocket auth failed: {e}")
+            await websocket.send_json({"type": "error", "message": "Invalid or expired token"})
             await websocket.close()
             return
         

@@ -19,6 +19,18 @@
 import { authService, API_BASE_URL } from './auth';
 
 /**
+ * In-flight request deduplication map.
+ * Keyed by full request URL. If a call is already in-flight for a URL,
+ * new callers receive the same promise instead of firing a duplicate request.
+ *
+ * Currently used by discoverProducts — discovery is the slowest endpoint
+ * (multi-source parallel fetch) and users frequently double-click Retry or
+ * rapidly switch niches, triggering 3x concurrent hammering and rate-limit
+ * cascades on CJ/Apify.
+ */
+const _inflightDiscovery = new Map();
+
+/**
  * Base API class with error handling
  */
 class OspraAPI {
@@ -317,27 +329,94 @@ class OspraAPI {
   
   /**
    * Quick product discovery by niche (WORKING)
-   * Uses: GET /api/discovery/quick/{niche}?count=10&include_ai_images=true
-   * 
+   * Uses: GET /api/discovery/quick/{niche}?count=10&include_ai_images=true&include_sentiment=true
+   *
    * @param {object} params - Discovery parameters
    * @param {string} params.niche - Product niche/category
    * @param {number} params.count - Number of products to fetch
    * @param {boolean} params.includeAiImages - Generate AI images for top products (~$0.04/image)
+   * @param {boolean} params.includeSentiment - Enrich with X/Twitter + Reddit sentiment
+   *   (adds up to ~6s first load; powers sentiment_score and source badges).
+   *   Default true. Cached results carry the sentiment flag so subsequent loads are fast.
    */
   async discoverProducts(params = {}) {
     const niche = params.niche || 'smart_home';
-    const count = params.count || params.limit || 10;
+    // Backend limits count to 50 max (le=50 in FastAPI)
+    const count = Math.min(params.count || params.limit || 10, 50);
     const includeAiImages = params.includeAiImages !== false; // Enable AI images by default
-    try {
-      const url = `${API_BASE_URL}/api/discovery/quick/${niche}?count=${count}&include_ai_images=${includeAiImages}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      // Normalize response format
-      return data.products || data.data || data || [];
-    } catch (error) {
-      console.error('discoverProducts error:', error);
-      return [];
+    const includeSentiment = params.includeSentiment !== false; // Enable sentiment by default
+    const url = `${API_BASE_URL}/api/discovery/quick/${niche}?count=${count}&include_ai_images=${includeAiImages}&include_sentiment=${includeSentiment}`;
+
+    // ---------- REQUEST DEDUPLICATION ----------
+    // If an identical request is already in-flight, return the same promise
+    // instead of firing a duplicate. Prevents the 3x concurrent hammering we
+    // saw in the uvicorn logs (Retry clicks + rapid niche switches).
+    if (_inflightDiscovery.has(url)) {
+      console.log('[API] discoverProducts DEDUP — reusing in-flight request:', url);
+      return _inflightDiscovery.get(url);
     }
+
+    const promise = (async () => {
+      try {
+        console.log('[API] discoverProducts URL:', url);
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          // Backend returns 503 with detailed diagnostics when no real products available.
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            errorBody = { error: `HTTP ${response.status} ${response.statusText}` };
+          }
+          console.error('[API] discoverProducts HTTP error:', response.status, errorBody);
+
+          // Return structured error so UI can display real reason instead of silent empty.
+          return {
+            __error: true,
+            status: response.status,
+            error: errorBody?.detail?.error || errorBody?.error || `HTTP ${response.status}`,
+            discovery_error: errorBody?.detail?.discovery_error,
+            diagnostics: errorBody?.detail?.diagnostics,
+            hint: errorBody?.detail?.hint,
+            products: []
+          };
+        }
+
+        const data = await response.json();
+        console.log('[API] discoverProducts response:', {
+          success: data.success,
+          count: data.count,
+          from_cache: data.from_cache,
+          is_fallback: data.is_fallback,
+          products_length: (data.products || data.data || []).length
+        });
+
+        // If backend used ALLOW_DEMO_FALLBACK (dev mode), pass the warning through.
+        if (data.is_fallback) {
+          console.warn('[API] Backend returned demo products (dev fallback):', data.warning);
+        }
+
+        // Normalize: return array when success, error object when explicit error.
+        return data.products || data.data || [];
+      } catch (error) {
+        console.error('[API] discoverProducts network error:', error);
+        return {
+          __error: true,
+          status: 0,
+          error: error.message || 'Network error reaching discovery API',
+          hint: 'Backend may be down. Check that uvicorn is running on the configured port.',
+          products: []
+        };
+      } finally {
+        // Release the dedup slot whether success or failure, so the NEXT
+        // retry/niche switch triggers a fresh request.
+        _inflightDiscovery.delete(url);
+      }
+    })();
+
+    _inflightDiscovery.set(url, promise);
+    return promise;
   }
   
   /**
@@ -527,11 +606,133 @@ class OspraAPI {
   }
   
   // ===========================================================================
-  // AI IMAGE GENERATION
+  // AI IMAGE GENERATION & ENHANCEMENT
   // ===========================================================================
-  
+
   /**
-   * Generate AI product image for Oubon Shop aesthetic
+   * Enhance a single product image (background removal + clean background)
+   * Uses Stability AI - AUTHENTICATED endpoint
+   *
+   * @param {string} imageUrl - URL of the product image
+   * @param {string} niche - Product category for background selection
+   * @param {string} backgroundStyle - Optional override (clean_white, soft_gray, etc.)
+   * @returns {object} { success, enhanced_image_url, error, ... }
+   */
+  async enhanceImage(imageUrl, niche = 'smart_home', backgroundStyle = null, productId = null) {
+    try {
+      const result = await authService.post('/api/images/enhance', {
+        image_url: String(imageUrl || ''),
+        niche: String(niche || 'smart_home'),
+        background_style: backgroundStyle ? String(backgroundStyle) : null,
+        add_shadow: true,
+        product_id: productId ? String(productId) : null
+      });
+      return result;
+    } catch (error) {
+      console.error('enhanceImage error:', error);
+      // Safely extract error message to avoid circular reference issues
+      const errorMsg = typeof error === 'string' ? error :
+                       (error?.message || String(error) || 'Enhancement failed');
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Get cached enhanced images for a product
+   * Returns cached URLs if product was previously enhanced
+   */
+  async getCachedEnhancedImages(productId) {
+    try {
+      const result = await authService.get(`/api/images/cached/${productId}`);
+      return result;
+    } catch (error) {
+      console.error('getCachedEnhancedImages error:', error);
+      return { success: false, cached: false, enhanced_urls: [] };
+    }
+  }
+
+  /**
+   * Check which images are cached on disk (pre-flight cache check)
+   * Use this before batch enhancement to avoid unnecessary API calls
+   *
+   * @param {array} imageUrls - Array of image URLs to check
+   * @returns {object} { cached: {url: cachedUrl}, not_cached: [urls], cached_count: n }
+   */
+  async checkImageCache(imageUrls) {
+    try {
+      const result = await authService.post('/api/images/check-cache', {
+        image_urls: imageUrls.map(url => String(url || ''))
+      });
+      return result;
+    } catch (error) {
+      console.error('checkImageCache error:', error);
+      return { cached: {}, not_cached: imageUrls, cached_count: 0 };
+    }
+  }
+
+  /**
+   * Smart cache recovery - try to match URLs to existing cached files
+   * Uses multiple hash variants to find matches even when URLs have changed
+   *
+   * @param {array} imageUrls - Array of image URLs to check
+   * @param {string} productId - Product ID to associate matches with
+   * @returns {object} { matches: [...], no_match: [...] }
+   */
+  async smartCacheRecovery(imageUrls, productId = null) {
+    try {
+      const result = await authService.post('/api/images/smart-cache-recovery', {
+        image_urls: imageUrls.map(url => String(url || '')),
+        product_id: productId ? String(productId) : null
+      });
+      return result;
+    } catch (error) {
+      console.error('smartCacheRecovery error:', error);
+      return { success: false, matches: [], no_match: imageUrls };
+    }
+  }
+
+  /**
+   * Enhance multiple product images in batch
+   * Processes up to 20 images concurrently - AUTHENTICATED endpoint
+   *
+   * @param {array} images - Array of { url, id?, title?, niche? }
+   * @param {string} defaultNiche - Default niche for all images
+   * @param {number} maxConcurrent - Max parallel requests (1-5)
+   * @returns {object} { total, successful, failed, results: [...] }
+   */
+  async enhanceBatchImages(images, defaultNiche = 'smart_home', maxConcurrent = 3) {
+    try {
+      const result = await authService.post('/api/images/enhance/batch', {
+        images: images.map(img => ({
+          url: typeof img === 'string' ? img : (img.url || img.image_url),
+          id: img.id || null,
+          title: img.title || null,
+          niche: img.niche || defaultNiche
+        })),
+        niche: defaultNiche,
+        max_concurrent: Math.min(Math.max(maxConcurrent, 1), 5)
+      });
+      return result;
+    } catch (error) {
+      console.error('enhanceBatchImages error:', error);
+      // Safely extract error message to avoid circular reference issues
+      const errorMsg = typeof error === 'string' ? error :
+                       (error?.message || String(error) || 'Batch enhancement failed');
+      return {
+        total: images.length,
+        successful: 0,
+        failed: images.length,
+        results: images.map(img => ({
+          success: false,
+          error: errorMsg,
+          original_url: typeof img === 'string' ? img : (img.url || img.image_url)
+        }))
+      };
+    }
+  }
+
+  /**
+   * Generate AI product image for Oubon Shop aesthetic (legacy)
    */
   async generateProductImage(productTitle, niche = 'smart_home', originalImageUrl = null) {
     try {
@@ -552,9 +753,9 @@ class OspraAPI {
       return { success: false, ai_image_url: originalImageUrl };
     }
   }
-  
+
   /**
-   * Get AI image service status
+   * Get AI image service status (checks if Stability API key is configured)
    */
   async getImageServiceStatus() {
     try {
@@ -564,52 +765,77 @@ class OspraAPI {
       return { available: false };
     }
   }
+
+  /**
+   * Get available background styles for image enhancement
+   */
+  async getBackgroundStyles() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/images/backgrounds`);
+      return response.json();
+    } catch (error) {
+      return { styles: {}, niche_defaults: {} };
+    }
+  }
   
   // ===========================================================================
   // PRODUCT ANALYSIS (AI-powered)
   // ===========================================================================
   
   /**
-   * Get full AI analysis for a product
+   * Get full AI analysis for a product.
+   * Calls POST /api/oi/analyze-product (requires auth).
+   *
+   * @param {object} product - The product object from discovery
+   * @returns {Promise<{success: boolean, analysis?: object, source?: string, error?: string}>}
    */
-  async analyzeProduct(productData) {
+  async analyzeProduct(product) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products/analyze`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData)
+      const data = await authService.post('/api/oi/analyze-product', {
+        product_id: product.id,
+        product_title: product.title,
+        product_data: {
+          niche: product.niche,
+          cost_price: product.cost_price,
+          suggested_price: product.suggested_price,
+          profit: product.profit,
+          oi_score: product.oi_score,
+          demand_score: product.demand_score,
+          trend_score: product.trend_score,
+          sentiment_score: product.sentiment_score,
+          sales_count: product.sales_count,
+          rating: product.rating,
+          source: product.source,
+          data_sources: product.data_sources,
+          scores_estimated: product.scores_estimated,
+        }
       });
-      return response.json();
+      return data;
     } catch (error) {
-      console.error('analyzeProduct error:', error);
-      return { success: false };
+      console.error('[API] analyzeProduct error:', error);
+      return { success: false, error: error.message || 'Analysis failed' };
     }
   }
-  
+
   /**
-   * Generate SEO-optimized product caption
+   * Generate SEO-optimized product caption.
+   * Calls POST /api/oi/generate-caption (requires auth).
    */
   async generateCaption(productTitle, niche, price) {
     try {
-      // Use dedicated caption endpoint
-      const response = await fetch(`${API_BASE_URL}/api/oi/generate-caption`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_title: productTitle,
-          product_niche: niche,
-          price: parseFloat(price) || 0,
-          tags: [niche]
-        })
+      const data = await authService.post('/api/oi/generate-caption', {
+        product_title: productTitle,
+        product_niche: niche,
+        price: parseFloat(price) || 0,
+        tags: [niche]
       });
-      const data = await response.json();
       if (data.success && data.caption) {
         return { success: true, caption: data.caption };
       }
-      // Fallback to chat if endpoint fails
+      // Fallback to chat if endpoint returned no caption
       return this._generateCaptionViaChat(productTitle, niche, price);
     } catch (error) {
-      console.error('generateCaption error:', error);
+      console.error('[API] generateCaption error:', error);
       return this._generateCaptionViaChat(productTitle, niche, price);
     }
   }
@@ -666,12 +892,64 @@ Price: ${parseFloat(price).toFixed(2)}`;
   // DEPLOYMENT
   // ===========================================================================
   
-  async deployProduct(productId, options = {}) {
-    return authService.post('/api/deploy/product', { product_id: productId, ...options });
+  /**
+   * Deploy a single product to Shopify.
+   *
+   * Task #21 (Apr 2026): the backend `/api/deploy/product` endpoint expects
+   * `{ product, niche, shopify_store_id?, options? }` — NOT `{ product_id }`.
+   * The previous signature of this function just sent an ID, which caused
+   * a 422 ValidationError on every deploy attempt (both AliExpress AND CJ).
+   *
+   * New signature takes the full normalized product object and extracts the
+   * supplier fields the backend schema requires. Works for AliExpress AND
+   * CJ Dropshipping — the backend schema is now source-agnostic.
+   */
+  async deployProduct(product, options = {}) {
+    const { caption, ...deployOptions } = options;
+
+    // Build payload matching backend SourceProduct schema.
+    // CJ products use `all_images`; AliExpress uses a mix. We send both so
+    // the backend can pick whichever is populated.
+    const productPayload = {
+      title: product.title || product.name,
+      description: product.description || caption || product.title || product.name,
+      features: product.features || product.tags || [],
+      category: product.category || product.niche || null,
+      price: product.cost_price || product.price || product.supplier_cost || 0,
+      images: product.all_images || (product.image_url ? [product.image_url] : []),
+      all_images: product.all_images || null,
+      source: product.source || 'aliexpress',
+    };
+
+    return authService.post('/api/deploy/product', {
+      product: productPayload,
+      niche: product.niche || 'general',
+      options: {
+        // Pass caption through for downstream content-gen if the backend
+        // wants to honor it (currently unused; kept for future hook).
+        caption,
+        ...deployOptions,
+      },
+    });
   }
-  
-  async bulkDeploy(productIds, options = {}) {
-    return authService.post('/api/deploy/bulk', { product_ids: productIds, ...options });
+
+  async bulkDeploy(products, options = {}) {
+    const productsPayload = (products || []).map(p => ({
+      title: p.title || p.name,
+      description: p.description || p.title || p.name,
+      features: p.features || p.tags || [],
+      category: p.category || p.niche || null,
+      price: p.cost_price || p.price || p.supplier_cost || 0,
+      images: p.all_images || (p.image_url ? [p.image_url] : []),
+      all_images: p.all_images || null,
+      source: p.source || 'aliexpress',
+    }));
+
+    return authService.post('/api/deploy/bulk', {
+      products: productsPayload,
+      niche: (products && products[0]?.niche) || 'general',
+      options,
+    });
   }
   
   async getDeploymentStatus(deploymentId) {
@@ -765,5 +1043,8 @@ Price: ${parseFloat(price).toFixed(2)}`;
 
 // Singleton export
 export const api = new OspraAPI();
+
+// Re-export API_BASE_URL for components that need to resolve image URLs
+export { API_BASE_URL };
 
 export default api;

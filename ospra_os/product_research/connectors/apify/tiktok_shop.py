@@ -14,11 +14,123 @@ logger = logging.getLogger(__name__)
 class TikTokShopScraper(ApifyConnector):
     """Scrape TikTok Shop for trending products with comment analysis"""
 
-    # Apify actors for TikTok
-    # Updated 2025: Using verified actors from Apify Store
-    TIKTOK_SHOP_ACTOR = "clockworks/tiktok-scraper"
-    TIKTOK_HASHTAG_ACTOR = "apidojo/tiktok-scraper"
-    TIKTOK_PROFILE_ACTOR = "apidojo/tiktok-scraper"
+    # Apify actors for TikTok - VERIFIED WORKING ACTORS (2025)
+    #
+    # VERIFIED ACTORS (from Apify store):
+    # - clockworks/free-tiktok-scraper: FREE - basic scraping
+    # - clockworks/tiktok-trends-scraper: $5/month gets 800+ results
+    # - apidojo/tiktok-scraper: $0.006/query, reliable
+    # - webdatalabs/tiktok-shop-scraper: TikTok Shop specific
+    # - clockworks/tiktok-scraper: Most features but expensive
+    #
+    TIKTOK_ACTORS_PRIORITY = [
+        "clockworks/free-tiktok-scraper",   # FREE - try first!
+        "clockworks/tiktok-trends-scraper", # Cheap - good for trends
+        "webdatalabs/tiktok-shop-scraper",  # TikTok Shop specific
+        "apidojo/tiktok-scraper",           # Reliable, pay-per-query
+        "clockworks/tiktok-scraper",        # Full features, expensive
+    ]
+
+    # Default to free actor
+    TIKTOK_SHOP_ACTOR = "clockworks/free-tiktok-scraper"
+    TIKTOK_HASHTAG_ACTOR = "clockworks/free-tiktok-scraper"
+    TIKTOK_PROFILE_ACTOR = "clockworks/free-tiktok-scraper"
+
+    def _get_actor_input(self, actor_id: str, search_term: str, max_results: int) -> Dict:
+        """
+        Get the correct input format for each TikTok actor.
+        Different actors have different input schemas!
+        """
+        # Actor-specific input formats (verified from Apify docs)
+        if "free-tiktok-scraper" in actor_id:
+            return {
+                "profiles": [],
+                "hashtags": [search_term.replace(" ", "")],  # Remove spaces for hashtag
+                "searchQueries": [search_term],
+                "maxProfilesPerQuery": max_results,
+                "maxPostsPerProfile": 5,
+            }
+        elif "tiktok-trends-scraper" in actor_id:
+            return {
+                "region": "US",
+                "maxItems": max_results,
+            }
+        elif "tiktok-shop-scraper" in actor_id:
+            return {
+                "searchQueries": [search_term],
+                "maxItems": max_results,
+                "region": "US",
+            }
+        elif "apidojo/tiktok-scraper" in actor_id:
+            return {
+                "hashtags": [search_term.replace(" ", "")],
+                "resultsPerPage": max_results,
+                "shouldDownloadVideos": False,
+                "shouldDownloadCovers": False,
+            }
+        else:
+            # Default format (clockworks/tiktok-scraper)
+            return {
+                "searchQueries": [search_term],
+                "resultsPerPage": max_results,
+            }
+
+    async def _run_actor_with_fallback(
+        self,
+        search_term: str,
+        max_results: int = 10,
+        timeout_secs: int = 180
+    ) -> List[Dict]:
+        """
+        Try multiple TikTok actors in priority order until one works.
+        Each actor gets its correct input format.
+        """
+        last_error = None
+        tried_actors = []
+
+        for actor_id in self.TIKTOK_ACTORS_PRIORITY:
+            try:
+                # Get correct input format for this actor
+                run_input = self._get_actor_input(actor_id, search_term, max_results)
+
+                logger.info(f"[MOBILE] Trying TikTok actor: {actor_id}")
+                items = await self.run_actor(
+                    actor_id=actor_id,
+                    run_input=run_input,
+                    timeout_secs=timeout_secs
+                )
+
+                if items:  # Success!
+                    logger.info(f"[SUCCESS] Actor {actor_id} returned {len(items)} results")
+                    return items
+                else:
+                    logger.warning(f"[WARNING] Actor {actor_id} returned empty results")
+                    tried_actors.append(actor_id)
+
+            except Exception as e:
+                last_error = e
+                error_msg = str(e).lower()
+                tried_actors.append(actor_id)
+
+                # Check for billing/credit issues
+                if "402" in str(e) or "usage" in error_msg or "billing" in error_msg:
+                    logger.warning(f"[WARNING] Actor {actor_id} failed (billing): trying next...")
+                    continue
+                elif "404" in str(e) or "not found" in error_msg:
+                    logger.warning(f"[WARNING] Actor {actor_id} not found: trying next...")
+                    continue
+                elif "failed" in error_msg:
+                    logger.warning(f"[WARNING] Actor {actor_id} run failed: trying next...")
+                    continue
+                else:
+                    logger.warning(f"[WARNING] Actor {actor_id} error: {e}")
+                    continue
+
+        # All actors failed
+        logger.error(f"[ERROR] All TikTok actors failed. Tried: {tried_actors}")
+        if last_error:
+            logger.error(f"[ERROR] Last error: {last_error}")
+        return []
 
     async def discover_products(
         self,
@@ -44,15 +156,11 @@ class TikTokShopScraper(ApifyConnector):
         search_term = keyword if keyword else niche
         logger.info(f"[MOBILE] TikTok Discovery: Scraping products for '{search_term}'...")
 
-        run_input = {
-            "searchQueries": [search_term],
-            "resultsPerPage": max_products
-        }
-
         try:
-            items = await self.run_actor(
-                actor_id=self.TIKTOK_SHOP_ACTOR,
-                run_input=run_input,
+            # Use fallback mechanism to try multiple actors with correct input formats
+            items = await self._run_actor_with_fallback(
+                search_term=search_term,
+                max_results=max_products,
                 timeout_secs=180
             )
 

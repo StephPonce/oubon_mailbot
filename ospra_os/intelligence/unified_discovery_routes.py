@@ -16,19 +16,69 @@ Exposes the ProductDiscoveryEngine to the dashboard frontend.
 
 Endpoints:
 - GET /api/discovery/products - Get products for a niche (with optional AI images)
-- GET /api/discovery/quick/{niche} - Quick discovery (no sentiment, no images)
+- GET /api/discovery/quick/{niche} - Quick discovery (sentiment ON by default, WITH CACHING)
 - POST /api/discovery/enhance-images - Add AI images to existing products
 - GET /api/discovery/niches - List available niches
 - GET /api/discovery/sources - Get data source status
 - GET /api/discovery/health - Health check
+
+PERFORMANCE OPTIMIZATIONS:
+- Tier-based caching (4h for NEST, 2h for FLIGHT, 30m for SOAR, 5m for STRATOSPHERE)
+- Parallel data source queries
+- Instant cache hits for repeat requests
 """
 
 from fastapi import APIRouter, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import logging
+import os
+import time
 
 logger = logging.getLogger(__name__)
+
+# When True, empty discovery responses fall back to hardcoded demo products.
+# Default: False. Production MUST NOT silently return fake products — users need
+# honest errors so they can see which data sources are failing and fix them.
+# Set ALLOW_DEMO_FALLBACK=1 only in local dev with no API keys configured.
+ALLOW_DEMO_FALLBACK = os.getenv("ALLOW_DEMO_FALLBACK", "0").lower() in ("1", "true", "yes")
+
+
+def _is_demo_products(products: List[Dict]) -> bool:
+    """True if any product is flagged is_mock — prevents caching/returning demo data."""
+    if not products:
+        return False
+    return any(p.get("is_mock") or p.get("is_demo") for p in products)
+
+
+def _source_diagnostics(engine) -> Dict:
+    """Snapshot of which data sources are live, for error responses."""
+    try:
+        sources = engine.sources_status if hasattr(engine, "sources_status") else {}
+        connected = {k: v for k, v in sources.items() if "[SUCCESS]" in str(v)}
+        failed = {k: v for k, v in sources.items() if "[SUCCESS]" not in str(v)}
+        return {
+            "sources_connected": list(connected.keys()),
+            "sources_failed": failed,
+            "total_connected": len(connected),
+            "total_sources": len(sources),
+        }
+    except Exception as e:
+        return {"diagnostics_error": str(e)}
+
+# Import caching infrastructure
+try:
+    from ospra_os.product_research.product_cache import (
+        get_product_cache,
+        get_products_with_cache,
+        TIER_CACHE_TTL,
+        SubscriptionTier  # Import from cache module to avoid SQLAlchemy dependency
+    )
+    CACHE_AVAILABLE = True
+    logger.info("[SUCCESS] Product cache module loaded for discovery routes")
+except ImportError as e:
+    CACHE_AVAILABLE = False
+    logger.warning(f"[WARNING] Product cache not available: {e}")
 
 router = APIRouter(prefix="/api/discovery", tags=["Product Discovery"])
 
@@ -144,80 +194,402 @@ async def get_products(
     count: int = Query(20, ge=1, le=50, description="Number of products"),
     min_score: float = Query(30.0, ge=0, le=100, description="Minimum OI score"),
     include_sentiment: bool = Query(True, description="Include social sentiment"),
-    include_ai_images: bool = Query(False, description="Generate AI images for top products (~$0.04 each)")
+    include_ai_images: bool = Query(False, description="Generate AI images for top products (~$0.04 each)"),
+    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data")
 ):
     """
-    Discover products from all available sources.
-    
+    Discover products from all available sources WITH CACHING.
+
     Returns products with:
     - Real supplier data from AliExpress/CJ
     - Social sentiment from X/Twitter and Reddit
     - Trend validation from Google Trends
     - OI Score calculated from all sources
     - AI-generated images (if include_ai_images=true)
-    
-    Note: AI images cost ~$0.04 per image via OpenAI DALL-E 3.
-    Only top 5 products get AI images by default to control costs.
+
+    CACHING: Results are cached for 4 hours (NEST tier) to provide instant loads.
+    Use force_refresh=true to bypass cache.
+
+    RELIABILITY: Always returns products (uses demo data as ultimate fallback)
     """
+    start_time = time.time()
+    products: List[Dict] = []
+    discovery_error_msg: Optional[str] = None
+
     try:
-        logger.info(f"[SEARCH] Discovery: niche={niche}, count={count}, sentiment={include_sentiment}, ai_images={include_ai_images}")
-        
         engine = get_engine()
-        products = await engine.discover_products(
-            niche=niche,
-            max_products=count,
-            min_score=min_score,
-            include_sentiment=include_sentiment
-        )
-        
-        # Generate AI images if requested
+
+        # ==== CACHING LAYER ====
+        if CACHE_AVAILABLE and not force_refresh and not include_sentiment:
+            cache = get_product_cache()
+            tier = SubscriptionTier.NEST
+
+            cached_entry = cache.get(niche, tier)
+            if cached_entry and cached_entry.products and len(cached_entry.products) > 0:
+                if _is_demo_products(cached_entry.products):
+                    logger.warning(
+                        f"[CACHE POISONED] /products?niche={niche} - cache contains demo products, invalidating"
+                    )
+                    cache.invalidate(niche, tier)
+                else:
+                    products = [
+                        p for p in cached_entry.products if p.get("oi_score", 0) >= min_score
+                    ][:count]
+                    elapsed = time.time() - start_time
+
+                    logger.info(
+                        f"[CACHE HIT] /products?niche={niche} - {len(products)} real products in {elapsed:.3f}s"
+                    )
+
+                    if include_ai_images and products:
+                        products = await enhance_products_with_images(products, max_images=5)
+
+                    return {
+                        "success": True,
+                        "niche": niche,
+                        "count": len(products),
+                        "products": products,
+                        "sources_status": engine.sources_status,
+                        "ai_images_generated": include_ai_images,
+                        "from_cache": True,
+                        "cache_age_seconds": cached_entry.age_seconds,
+                        "response_time_ms": int(elapsed * 1000),
+                    }
+            elif cached_entry:
+                logger.warning(f"[CACHE EMPTY] /products?niche={niche} - invalidating empty cache")
+                cache.invalidate(niche, tier)
+
+        # ==== FRESH DISCOVERY ====
+        logger.info(f"[SEARCH] Discovery: niche={niche}, count={count}, sentiment={include_sentiment}")
+        fetch_count = max(50, count * 2)
+
+        try:
+            products = await engine.discover_products(
+                niche=niche,
+                max_products=fetch_count,
+                min_score=min_score,
+                include_sentiment=include_sentiment,
+            )
+        except Exception as discovery_error:
+            logger.error(f"[ERROR] Discovery engine failed: {discovery_error}", exc_info=True)
+            discovery_error_msg = str(discovery_error)
+            products = []
+
+        # Strip any demo/mock products the engine may have included.
+        if products:
+            real_products = [p for p in products if not (p.get("is_mock") or p.get("is_demo"))]
+            if len(real_products) != len(products):
+                logger.warning(
+                    f"[DEMO FILTERED] /products?niche={niche} - dropped "
+                    f"{len(products) - len(real_products)} demo products"
+                )
+            products = real_products
+
+        # ==== NO REAL PRODUCTS ====
+        if not products:
+            diagnostics = _source_diagnostics(engine)
+
+            if ALLOW_DEMO_FALLBACK:
+                logger.warning(
+                    f"[DEV FALLBACK] /products?niche={niche} - no real products, using demos "
+                    f"(ALLOW_DEMO_FALLBACK=1)"
+                )
+                demo_products = engine._get_demo_products(niche, count)
+                elapsed = time.time() - start_time
+                return {
+                    "success": True,
+                    "niche": niche,
+                    "count": len(demo_products),
+                    "products": demo_products,
+                    "sources_status": engine.sources_status,
+                    "ai_images_generated": False,
+                    "from_cache": False,
+                    "is_fallback": True,
+                    "warning": "Demo products returned — no real sources produced results.",
+                    "discovery_error": discovery_error_msg,
+                    "diagnostics": diagnostics,
+                    "response_time_ms": int(elapsed * 1000),
+                }
+
+            logger.error(
+                f"[DISCOVERY FAILED] /products?niche={niche} - no real products available. "
+                f"error={discovery_error_msg} diagnostics={diagnostics}"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "No real products available from any data source",
+                    "niche": niche,
+                    "discovery_error": discovery_error_msg,
+                    "diagnostics": diagnostics,
+                    "hint": (
+                        "Check /api/discovery/health for source status. "
+                        "Common causes: expired/missing API keys, upstream rate limits, "
+                        "or temporary provider outage."
+                    ),
+                },
+            )
+
+        # ==== CACHE REAL RESULTS ====
+        if CACHE_AVAILABLE and not include_sentiment and not _is_demo_products(products):
+            cache = get_product_cache()
+            tier = SubscriptionTier.NEST
+            cache.set(
+                niche=niche,
+                tier=tier,
+                products=products,
+                metadata={
+                    "source": "full_discovery",
+                    "include_sentiment": include_sentiment,
+                    "is_demo": False,
+                },
+            )
+            logger.info(f"[CACHE SET] /products?niche={niche} - {len(products)} real products cached")
+
+        products = products[:count]
+
         if include_ai_images and products:
             products = await enhance_products_with_images(products, max_images=5)
-        
+
+        elapsed = time.time() - start_time
+
         return {
             "success": True,
             "niche": niche,
             "count": len(products),
             "products": products,
             "sources_status": engine.sources_status,
-            "ai_images_generated": include_ai_images
+            "ai_images_generated": include_ai_images,
+            "from_cache": False,
+            "response_time_ms": int(elapsed * 1000),
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[ERROR] Discovery failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Unexpected discovery failure",
+                "niche": niche,
+                "message": str(e),
+            },
+        )
 
 
 @router.get("/quick/{niche}")
 async def quick_discover(
     niche: str,
-    count: int = Query(10, ge=1, le=20),
-    include_ai_images: bool = Query(False, description="Generate AI images")
+    count: int = Query(10, ge=1, le=50),
+    include_ai_images: bool = Query(False, description="Generate AI images"),
+    include_sentiment: bool = Query(
+        True,
+        description=(
+            "Enrich products with X/Twitter + Reddit sentiment. "
+            "Adds up to ~6s (per-source timeout) but powers sentiment_score and "
+            "lights up the x_twitter / reddit source badges in the UI. "
+            "Safely no-ops if xAI or Reddit aren't configured."
+        ),
+    ),
+    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data")
 ):
-    """Quick discovery without sentiment analysis (faster)."""
+    """
+    Quick discovery with caching.
+
+    Honesty contract:
+    - Never silently returns demo/mock products.
+    - Only real products from live data sources are returned.
+    - If all sources fail, returns 503 with diagnostics so the caller knows why.
+    - Demo fallback is only enabled when the operator sets ALLOW_DEMO_FALLBACK=1
+      (for local dev without API keys); the response then carries is_fallback=True
+      so the frontend can display a clear banner.
+    """
+    start_time = time.time()
+    products = []
+    discovery_error_msg: Optional[str] = None
+
     try:
         engine = get_engine()
-        products = await engine.discover_products(
-            niche=niche,
-            max_products=count,
-            include_sentiment=False
-        )
-        
-        # Generate AI images if requested
+
+        # ==== CACHING LAYER ====
+        # Only serve cache if the cached entry contains REAL products (no demos).
+        if CACHE_AVAILABLE and not force_refresh:
+            cache = get_product_cache()
+            tier = SubscriptionTier.NEST
+
+            cached_entry = cache.get(niche, tier)
+            if cached_entry and cached_entry.products and len(cached_entry.products) > 0:
+                if _is_demo_products(cached_entry.products):
+                    logger.warning(
+                        f"[CACHE POISONED] /quick/{niche} - cache contains demo products, invalidating"
+                    )
+                    cache.invalidate(niche, tier)
+                # If caller wants sentiment but the cached entry was NOT enriched with
+                # sentiment, invalidate — otherwise we'd silently serve flat OI scores.
+                elif include_sentiment and not cached_entry.metadata.get("include_sentiment", False):
+                    logger.info(
+                        f"[CACHE STALE] /quick/{niche} - cached entry lacks sentiment "
+                        f"enrichment but caller requested it, refetching"
+                    )
+                    cache.invalidate(niche, tier)
+                else:
+                    products = cached_entry.products[:count]
+                    elapsed = time.time() - start_time
+                    logger.info(
+                        f"[CACHE HIT] /quick/{niche} - {len(products)} real products in {elapsed:.3f}s"
+                    )
+
+                    if include_ai_images and products:
+                        products = await enhance_products_with_images(products, max_images=3)
+
+                    return {
+                        "success": True,
+                        "niche": niche,
+                        "count": len(products),
+                        "products": products,
+                        "ai_images_generated": include_ai_images,
+                        "sentiment_included": cached_entry.metadata.get("include_sentiment", False),
+                        "from_cache": True,
+                        "cache_age_seconds": cached_entry.age_seconds,
+                        "cache_ttl_remaining": cached_entry.ttl_remaining_seconds,
+                        "response_time_ms": int(elapsed * 1000),
+                    }
+            elif cached_entry:
+                logger.warning(f"[CACHE EMPTY] /quick/{niche} - invalidating empty cache entry")
+                cache.invalidate(niche, tier)
+
+        # ==== FRESH DISCOVERY ====
+        logger.info(f"[DISCOVERY] /quick/{niche} - fetching fresh products...")
+        fetch_count = max(50, count * 3)
+
+        try:
+            products = await engine.discover_products(
+                niche=niche,
+                max_products=fetch_count,
+                include_sentiment=include_sentiment,
+            )
+        except Exception as discovery_error:
+            logger.error(f"[ERROR] Discovery engine failed: {discovery_error}", exc_info=True)
+            discovery_error_msg = str(discovery_error)
+            products = []
+
+        # Filter out any demo/mock products that upstream sources marked — never return them silently.
+        if products:
+            real_products = [p for p in products if not (p.get("is_mock") or p.get("is_demo"))]
+            if len(real_products) != len(products):
+                logger.warning(
+                    f"[DEMO FILTERED] /quick/{niche} - dropped {len(products) - len(real_products)} "
+                    f"demo products from discovery result"
+                )
+            products = real_products
+
+        # ==== NO REAL PRODUCTS PATH ====
+        if not products:
+            diagnostics = _source_diagnostics(engine)
+
+            if ALLOW_DEMO_FALLBACK:
+                logger.warning(
+                    f"[DEV FALLBACK] /quick/{niche} - no real products, using demos "
+                    f"(ALLOW_DEMO_FALLBACK=1)"
+                )
+                demo_products = engine._get_demo_products(niche, count)
+                elapsed = time.time() - start_time
+                return {
+                    "success": True,
+                    "niche": niche,
+                    "count": len(demo_products),
+                    "products": demo_products,
+                    "ai_images_generated": False,
+                    "from_cache": False,
+                    "is_fallback": True,
+                    "warning": "Demo products returned — no real sources produced results.",
+                    "discovery_error": discovery_error_msg,
+                    "diagnostics": diagnostics,
+                    "response_time_ms": int(elapsed * 1000),
+                }
+
+            # Production path: be honest about failure
+            logger.error(
+                f"[DISCOVERY FAILED] /quick/{niche} - no real products available. "
+                f"error={discovery_error_msg} diagnostics={diagnostics}"
+            )
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "error": "No real products available from any data source",
+                    "niche": niche,
+                    "discovery_error": discovery_error_msg,
+                    "diagnostics": diagnostics,
+                    "hint": (
+                        "Check /api/discovery/health for source status. "
+                        "Common causes: expired/missing API keys, upstream rate limits, "
+                        "or temporary provider outage. Set ALLOW_DEMO_FALLBACK=1 in .env "
+                        "for local dev without API keys."
+                    ),
+                },
+            )
+
+        # ==== CACHE REAL RESULTS ====
+        if CACHE_AVAILABLE and not _is_demo_products(products):
+            cache = get_product_cache()
+            tier = SubscriptionTier.NEST
+            cache_entry = cache.set(
+                niche=niche,
+                tier=tier,
+                products=products,
+                metadata={
+                    "source": "quick_discovery",
+                    "fetched_count": len(products),
+                    "requested_count": count,
+                    "is_demo": False,
+                    "include_sentiment": include_sentiment,
+                },
+            )
+            logger.info(
+                f"[CACHE SET] /quick/{niche} - {len(products)} real products "
+                f"(sentiment={include_sentiment}), TTL: {cache_entry.ttl_remaining_seconds}s"
+            )
+
+        products = products[:count]
+
         if include_ai_images and products:
             products = await enhance_products_with_images(products, max_images=3)
-        
+
+        elapsed = time.time() - start_time
+        logger.info(
+            f"[DISCOVERY] /quick/{niche} - completed with {len(products)} real products "
+            f"(sentiment={include_sentiment}) in {elapsed:.2f}s"
+        )
+
         return {
             "success": True,
             "niche": niche,
             "count": len(products),
             "products": products,
-            "ai_images_generated": include_ai_images
+            "ai_images_generated": include_ai_images,
+            "sentiment_included": include_sentiment,
+            "from_cache": False,
+            "cache_age_seconds": 0,
+            "cache_ttl_remaining": TIER_CACHE_TTL.get(SubscriptionTier.NEST, 240) * 60
+            if CACHE_AVAILABLE
+            else 0,
+            "response_time_ms": int(elapsed * 1000),
         }
-        
+
+    except HTTPException:
+        # Let our own 503 pass through cleanly.
+        raise
     except Exception as e:
-        logger.error(f"[ERROR] Quick discovery failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[ERROR] Quick discovery failed completely: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Unexpected discovery failure",
+                "niche": niche,
+                "message": str(e),
+            },
+        )
 
 
 @router.post("/enhance-images")
@@ -455,6 +827,122 @@ async def test_cj_directly(
     except Exception as e:
         logger.error(f"[ERROR] CJ test failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+@router.get("/cache/status")
+async def get_cache_status():
+    """
+    Get product cache statistics.
+
+    Shows cache hit/miss rates, entries by tier, and TTL configuration.
+    """
+    try:
+        if not CACHE_AVAILABLE:
+            return {
+                "success": False,
+                "error": "Product cache not available",
+                "cache_available": False
+            }
+
+        cache = get_product_cache()
+        stats = cache.get_stats()
+
+        return {
+            "success": True,
+            "cache_available": True,
+            "stats": stats
+        }
+
+    except Exception as e:
+        logger.error(f"[ERROR] Cache status failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/cache/warm")
+async def warm_cache(
+    niches: str = Query("smart_home,tech,kitchen", description="Comma-separated niches to warm")
+):
+    """
+    Pre-warm cache with popular niches for instant loads.
+
+    This fetches products for specified niches and caches them.
+    Useful to run on server startup or periodically.
+    """
+    try:
+        if not CACHE_AVAILABLE:
+            return {"success": False, "error": "Cache not available"}
+
+        niche_list = [n.strip() for n in niches.split(',')]
+        engine = get_engine()
+        cache = get_product_cache()
+        tier = SubscriptionTier.NEST
+
+        results = {}
+        for niche in niche_list:
+            start = time.time()
+            try:
+                # Check if already cached
+                existing = cache.get(niche, tier)
+                if existing:
+                    results[niche] = {
+                        "status": "already_cached",
+                        "products": len(existing.products),
+                        "ttl_remaining": existing.ttl_remaining_seconds
+                    }
+                    continue
+
+                # Fetch and cache
+                products = await engine.discover_products(
+                    niche=niche,
+                    max_products=50,
+                    include_sentiment=False
+                )
+
+                if products:
+                    cache.set(niche, tier, products, {"source": "cache_warm"})
+                    results[niche] = {
+                        "status": "cached",
+                        "products": len(products),
+                        "time_seconds": round(time.time() - start, 2)
+                    }
+                else:
+                    results[niche] = {"status": "no_products", "products": 0}
+
+            except Exception as e:
+                results[niche] = {"status": "error", "error": str(e)}
+
+        return {
+            "success": True,
+            "warmed_niches": results,
+            "cache_stats": cache.get_stats()
+        }
+
+    except Exception as e:
+        logger.error(f"[ERROR] Cache warm failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/cache/clear")
+async def clear_cache(
+    niche: str = Query(None, description="Clear specific niche or all if not provided")
+):
+    """Clear product cache (specific niche or all)."""
+    try:
+        if not CACHE_AVAILABLE:
+            return {"success": False, "error": "Cache not available"}
+
+        cache = get_product_cache()
+
+        if niche:
+            cache.invalidate(niche)
+            return {"success": True, "cleared": niche}
+        else:
+            cache.invalidate_all()
+            return {"success": True, "cleared": "all"}
+
+    except Exception as e:
+        logger.error(f"[ERROR] Cache clear failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/health")

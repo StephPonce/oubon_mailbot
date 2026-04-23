@@ -202,7 +202,7 @@ def _import_all_models():
     
     model_modules = [
         'user_models',
-        'federated_models', 
+        'federated_models',
         'core_models',
         'product_models',
         'store_models',
@@ -210,13 +210,14 @@ def _import_all_models():
         'email_models',
         'action_models',
         'advertising_models',
-        'actions_models',
+        
         'performance_models',
         'whitelabel_models',
         'template_models',
         'amazon_models',
         'aliexpress_tokens',
         'cached_products',
+        'enhanced_image_cache',  # Enhanced image caching for Stability AI
     ]
     
     imported = 0

@@ -136,7 +136,7 @@ class RealtimeUpdater:
         """
         try:
             # Use the new unified discovery engine
-            from ospra_os.intelligence.unified_product_discovery import get_live_products
+            from ospra_os.intelligence.product_discovery import get_live_products
 
             products = await get_live_products(niche="smart_home", limit=100)
             logger.info(f"Fetched {len(products)} products from discovery engine")

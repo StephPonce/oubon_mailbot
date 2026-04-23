@@ -531,6 +531,130 @@ class StoreService:
         }
 
     # ========================================================================
+    # STORE CONTEXT FOR AI ANALYSIS
+    # ========================================================================
+
+    def get_store_context_for_ai(self, store_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Build store context dict for AI product analysis.
+
+        This provides all the store-specific information that the AI analyzer
+        needs to give personalized recommendations.
+
+        Args:
+            store_id: Store ID
+            user_id: User ID for ownership verification
+
+        Returns:
+            Store context dict for AIProductAnalyzer, or None if not found
+
+        Example output:
+            {
+                "store_name": "Oubon Shop",
+                "niche": "smart_home",
+                "target_market": "US",
+                "best_sellers": "LED Strip Lights, Smart Doorbell, WiFi Camera",
+                "avg_order_value": 32.50,
+                "conversion_rate": 2.4,
+                "store_url": "https://oubon-shop.myshopify.com",
+                "monthly_revenue": 5420.00,
+                "total_products": 45,
+                "aesthetic": "modern minimalist tech"
+            }
+        """
+        store = self.db.query(Store)\
+            .filter(Store.id == store_id)\
+            .filter(Store.user_id == user_id)\
+            .first()
+
+        if not store:
+            return None
+
+        # Get best-selling products for this store
+        best_sellers = self._get_best_sellers_summary(store.id)
+
+        # Calculate average order value from recent orders
+        avg_order_value = store.total_revenue / max(1, store.total_orders)
+
+        # Count products
+        product_count = self.db.query(func.count(Product.id))\
+            .filter(Product.store_id == store.id)\
+            .scalar() or 0
+
+        return {
+            "store_name": store.store_name,
+            "niche": store.niche or "general",
+            "target_market": store.target_market or "US",
+            "currency": store.currency or "USD",
+            "best_sellers": best_sellers,
+            "avg_order_value": round(avg_order_value, 2),
+            "conversion_rate": store.conversion_rate or 2.0,
+            "store_url": store.store_url,
+            "monthly_revenue": store.monthly_revenue or 0.0,
+            "total_products": product_count,
+            "total_orders": store.total_orders or 0,
+            "platform": store.platform.value if store.platform else "unknown",
+            # Derived from niche for style recommendations
+            "aesthetic": self._niche_to_aesthetic(store.niche),
+        }
+
+    def _get_best_sellers_summary(self, store_id: int, limit: int = 5) -> str:
+        """Get a comma-separated summary of best-selling products."""
+        best_products = self.db.query(Product.product_name)\
+            .filter(Product.store_id == store_id)\
+            .filter(Product.total_sales > 0)\
+            .order_by(desc(Product.total_sales))\
+            .limit(limit)\
+            .all()
+
+        if not best_products:
+            return "Not enough sales data yet"
+
+        return ", ".join([p[0][:30] for p in best_products])
+
+    def _niche_to_aesthetic(self, niche: Optional[str]) -> str:
+        """Map niche to store aesthetic for AI recommendations."""
+        aesthetic_map = {
+            "smart_home": "modern minimalist tech",
+            "kitchen": "clean functional lifestyle",
+            "fitness": "energetic athletic lifestyle",
+            "beauty": "elegant premium self-care",
+            "tech": "sleek modern gadgets",
+            "home_decor": "cozy aesthetic living",
+            "pet": "playful family-friendly",
+            "outdoor": "rugged adventure lifestyle",
+            "gaming": "bold RGB gamer aesthetic",
+            "fashion": "trendy stylish fashion",
+        }
+        return aesthetic_map.get(niche, "general e-commerce") if niche else "general e-commerce"
+
+    def get_default_store_context(
+        self,
+        store_name: str = "My Store",
+        niche: str = "smart_home"
+    ) -> Dict[str, Any]:
+        """
+        Get a default store context for users without a connected store.
+
+        Useful for demo/testing when no store is connected yet.
+        """
+        return {
+            "store_name": store_name,
+            "niche": niche,
+            "target_market": "US",
+            "currency": "USD",
+            "best_sellers": "Not enough sales data yet",
+            "avg_order_value": 35.00,
+            "conversion_rate": 2.0,
+            "store_url": "",
+            "monthly_revenue": 0.0,
+            "total_products": 0,
+            "total_orders": 0,
+            "platform": "unknown",
+            "aesthetic": self._niche_to_aesthetic(niche),
+        }
+
+    # ========================================================================
     # HELPER METHODS
     # ========================================================================
 

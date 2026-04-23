@@ -204,7 +204,7 @@ class AuthService {
   async wakeUpServer() {
     const isHealthy = await this.checkServerHealth();
     if (!isHealthy) {
-      console.log('Server appears to be waking up, retrying health check...');
+      // console.log('Server appears to be waking up, retrying health check...');
       // Try one more time after a delay
       await new Promise(resolve => setTimeout(resolve, 3000));
       return this.checkServerHealth();
@@ -261,7 +261,7 @@ class AuthService {
 
       if (isNetworkError && retries > 0) {
         // Retry after a short delay (helps with Render cold starts)
-        console.log(`Register request failed, retrying... (${retries} attempts left)`);
+        // console.log(`Register request failed, retrying... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
         return this.register(name, email, password, tier, retries - 1);
       }
@@ -323,7 +323,7 @@ class AuthService {
 
       if (isNetworkError && retries > 0) {
         // Retry after a short delay (helps with Render cold starts)
-        console.log(`Login request failed, retrying... (${retries} attempts left)`);
+        // console.log(`Login request failed, retrying... (${retries} attempts left)`);
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
         return this.login(email, password, retries - 1);
       }

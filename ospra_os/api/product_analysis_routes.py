@@ -8,12 +8,18 @@ Routes:
 - POST /api/oi/generate-caption - Generate Shopify caption
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+import hashlib
+import json
 import logging
 import os
+import time
 import httpx
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +27,78 @@ router = APIRouter(prefix="/api/oi", tags=["AI Analysis"])
 
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY') or os.getenv('CLAUDE_API_KEY')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
+# Task #11: Variance controls for AI analysis
+# ----------------------------------------------------------------------
+# Two users looked at the same product 5 minutes apart and saw two very
+# different analyses. Three causes were identified:
+#   1. Claude was being called with the default temperature (1.0), so every
+#      refresh sampled differently.
+#   2. The prompt was constructed from unsorted dict iteration order, so
+#      the BYTES of the prompt differed between runs.
+#   3. There was no server-side cache, so every UI refresh hit the API.
+# We fix all three: deterministic prompt, low temperature, short-TTL cache.
+ANALYSIS_TEMPERATURE = 0.2          # low-but-nonzero: stable w/o degenerate tokens
+ANALYSIS_CACHE_TTL = int(os.getenv("ANALYSIS_CACHE_TTL_SECONDS", "900"))  # 15min
+_analysis_cache: Dict[str, tuple] = {}  # key -> (result, expires_at)
+
+
+def _round_num(v, decimals: int = 2):
+    """Deterministic number formatter used in prompt construction."""
+    try:
+        return round(float(v), decimals)
+    except (TypeError, ValueError):
+        return v
+
+
+def _analysis_cache_key(title: str, product: dict) -> str:
+    """
+    Build a stable cache key so two refreshes of the same product — with
+    identical signals — hit the cache instead of firing a fresh API call.
+
+    We SORT keys, ROUND floats, and JSON-dump with sort_keys=True so the
+    hash is byte-identical across runs, regardless of dict insertion order.
+    """
+    # Only include fields that actually influence the analysis. Others
+    # (e.g. a changing 'refreshed_at' timestamp) would invalidate the cache
+    # on every call and defeat the purpose.
+    relevant = {
+        'title': title.strip() if title else '',
+        'niche': product.get('niche', 'general'),
+        'cost_price': _round_num(product.get('cost_price', 0)),
+        'suggested_price': _round_num(product.get('suggested_price', 0)),
+        'profit': _round_num(product.get('profit', 0)),
+        'oi_score': _round_num(product.get('oi_score', product.get('score', 50)), 1),
+        'demand_score': _round_num(product.get('demand_score', 50), 1),
+        'trend_score': _round_num(product.get('trend_score', 50), 1),
+        'sentiment_score': _round_num(product.get('sentiment_score', 50), 1),
+        'sales_count': product.get('sales_count', 'Unknown'),
+        'rating': product.get('rating', 'Unknown'),
+        'source': product.get('source', 'Unknown'),
+        'data_sources': sorted((product.get('data_sources') or {}).keys()),
+    }
+    blob = json.dumps(relevant, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()
+
+
+def _cache_get(key: str) -> Optional[dict]:
+    entry = _analysis_cache.get(key)
+    if not entry:
+        return None
+    result, expires_at = entry
+    if time.time() > expires_at:
+        _analysis_cache.pop(key, None)
+        return None
+    return result
+
+
+def _cache_put(key: str, result: dict) -> None:
+    _analysis_cache[key] = (result, time.time() + ANALYSIS_CACHE_TTL)
+
+
+def _clear_analysis_cache() -> None:
+    """Test hook / admin helper."""
+    _analysis_cache.clear()
 
 
 # ============================================================================
@@ -45,7 +123,7 @@ class CaptionRequest(BaseModel):
 # ============================================================================
 
 @router.post("/analyze-product")
-async def analyze_product(request: ProductAnalysisRequest):
+async def analyze_product(request: ProductAnalysisRequest, current_user: User = Depends(get_current_user)):
     """
     Generate comprehensive AI analysis for a product.
     Uses Claude (Anthropic) or falls back to rule-based analysis.
@@ -66,8 +144,27 @@ async def analyze_product(request: ProductAnalysisRequest):
     return {"success": True, "analysis": analysis, "source": "fallback"}
 
 
+@router.post("/refresh-sentiment")
+async def refresh_sentiment_now(current_user: User = Depends(get_current_user)):
+    """
+    Task #17: On-demand sentiment refresh for the current user's watched products.
+
+    Normally the scheduler runs this every 4 hours, but users can hit this
+    endpoint to force a refresh (e.g., after a viral TikTok hits a product
+    in their store). Returns a summary of how many products were refreshed.
+    """
+    try:
+        from ospra_os.intelligence.sentiment_refresher import SentimentRefresher
+        refresher = SentimentRefresher()
+        summary = await refresher.refresh_watched_products()
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        logger.error(f"Manual sentiment refresh failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Refresh failed: {e}")
+
+
 @router.post("/generate-caption")
-async def generate_caption(request: CaptionRequest):
+async def generate_caption(request: CaptionRequest, current_user: User = Depends(get_current_user)):
     """
     Generate Shopify-ready product caption.
     Professional, clean copy - NO emojis, NO hashtags.
@@ -100,44 +197,68 @@ async def generate_caption(request: CaptionRequest):
 # CLAUDE API INTEGRATION
 # ============================================================================
 
+def _build_analysis_prompt(title: str, product: dict) -> str:
+    """
+    Task #11: Build a BYTE-STABLE analysis prompt.
+
+    Every field is explicitly formatted (rounded floats, sorted lists) so
+    two calls with identical product data produce identical prompts. This
+    is a prerequisite for caching and for reducing the non-sampling variance
+    the user was hitting.
+    """
+    ds_keys = sorted((product.get('data_sources') or {}).keys())
+    return (
+        "You are an e-commerce analyst for Oubon Shop, a premium smart home and lifestyle store.\n\n"
+        "Analyze this product for dropshipping potential:\n\n"
+        f"Product: {title}\n"
+        f"Niche: {product.get('niche', 'general')}\n"
+        f"Supplier Cost: ${_round_num(product.get('cost_price', 0)):.2f}\n"
+        f"Suggested Retail Price: ${_round_num(product.get('suggested_price', 0)):.2f}\n"
+        f"Profit: ${_round_num(product.get('profit', 0)):.2f}\n"
+        f"OI Score: {_round_num(product.get('oi_score', product.get('score', 50)), 1)}/100\n"
+        f"Demand Score: {_round_num(product.get('demand_score', 50), 1)}/100\n"
+        f"Trend Score: {_round_num(product.get('trend_score', 50), 1)}/100\n"
+        f"Sentiment Score: {_round_num(product.get('sentiment_score', 50), 1)}/100\n"
+        f"Sales Count: {product.get('sales_count', 'Unknown')}\n"
+        f"Rating: {product.get('rating', 'Unknown')}\n"
+        f"Source: {product.get('source', 'Unknown')}\n\n"
+        f"Data Sources Available: {ds_keys}\n\n"
+        "Provide a PROFESSIONAL analysis in this exact JSON format:\n"
+        "{\n"
+        '    "summary": "Brief 2-sentence executive summary of product viability",\n'
+        '    "verdict": "BUY | CONSIDER | SKIP",\n'
+        '    "confidence": 85,\n'
+        '    "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],\n'
+        '    "risks": ["specific risk 1", "specific risk 2"],\n'
+        '    "target_audience": "Precise target demographic description",\n'
+        '    "marketing_angles": ["angle 1", "angle 2", "angle 3"],\n'
+        '    "ad_spend_recommendation": "Recommended daily ad budget and approach",\n'
+        '    "price_strategy": "Pricing recommendation with reasoning",\n'
+        '    "competition_assessment": "Assessment of competitive landscape",\n'
+        '    "seasonal_factors": "Any seasonal considerations"\n'
+        "}\n\n"
+        "Be specific and data-driven. No generic advice. Only respond with valid JSON."
+    )
+
+
 async def _analyze_with_claude(title: str, product: dict) -> Optional[dict]:
-    """Generate analysis using Claude API"""
-    
-    prompt = f"""You are an e-commerce analyst for Oubon Shop, a premium smart home and lifestyle store.
+    """
+    Generate analysis using Claude API.
 
-Analyze this product for dropshipping potential:
+    Task #11: Variance-locked. See module-level comments.
+      - Deterministic prompt (sorted lists, rounded floats)
+      - temperature=0.2 (low-but-nonzero sampling)
+      - 15-minute in-memory result cache to stop UI refresh loops from
+        burning API tokens and producing drifting analyses.
+    """
+    # Cache check FIRST — same signals, same analysis.
+    cache_key = _analysis_cache_key(title, product)
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        logger.debug(f"[AI-ANALYSIS] Cache hit for {title[:40]!r} (key={cache_key[:8]})")
+        return cached
 
-Product: {title}
-Niche: {product.get('niche', 'general')}
-Supplier Cost: ${product.get('cost_price', 0):.2f}
-Suggested Retail Price: ${product.get('suggested_price', 0):.2f}
-Profit: ${product.get('profit', 0):.2f}
-OI Score: {product.get('oi_score', product.get('score', 50))}/100
-Demand Score: {product.get('demand_score', 50)}/100
-Trend Score: {product.get('trend_score', 50)}/100
-Sentiment Score: {product.get('sentiment_score', 50)}/100
-Sales Count: {product.get('sales_count', 'Unknown')}
-Rating: {product.get('rating', 'Unknown')}
-Source: {product.get('source', 'Unknown')}
-
-Data Sources Available: {list(product.get('data_sources', {}).keys())}
-
-Provide a PROFESSIONAL analysis in this exact JSON format:
-{{
-    "summary": "Brief 2-sentence executive summary of product viability",
-    "verdict": "BUY | CONSIDER | SKIP",
-    "confidence": 85,
-    "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
-    "risks": ["specific risk 1", "specific risk 2"],
-    "target_audience": "Precise target demographic description",
-    "marketing_angles": ["angle 1", "angle 2", "angle 3"],
-    "ad_spend_recommendation": "Recommended daily ad budget and approach",
-    "price_strategy": "Pricing recommendation with reasoning",
-    "competition_assessment": "Assessment of competitive landscape",
-    "seasonal_factors": "Any seasonal considerations"
-}}
-
-Be specific and data-driven. No generic advice. Only respond with valid JSON."""
+    prompt = _build_analysis_prompt(title, product)
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -150,15 +271,15 @@ Be specific and data-driven. No generic advice. Only respond with valid JSON."""
             json={
                 "model": "claude-sonnet-4-20250514",
                 "max_tokens": 1024,
+                "temperature": ANALYSIS_TEMPERATURE,
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=30.0
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             content = data["content"][0]["text"]
-            import json
             content = content.strip()
             if content.startswith("```json"):
                 content = content[7:]
@@ -166,7 +287,13 @@ Be specific and data-driven. No generic advice. Only respond with valid JSON."""
                 content = content[3:]
             if content.endswith("```"):
                 content = content[:-3]
-            return json.loads(content.strip())
+            try:
+                parsed = json.loads(content.strip())
+            except json.JSONDecodeError as e:
+                logger.error(f"[AI-ANALYSIS] Claude returned non-JSON: {e}")
+                return None
+            _cache_put(cache_key, parsed)
+            return parsed
         else:
             logger.error(f"Claude API error: {response.status_code} - {response.text}")
             return None
@@ -175,39 +302,68 @@ Be specific and data-driven. No generic advice. Only respond with valid JSON."""
 async def _generate_caption_with_claude(title: str, niche: str, price: float, tags: list) -> Optional[str]:
     """
     Generate PROFESSIONAL Shopify product caption.
-    
-    Requirements:
-    - NO emojis
-    - NO hashtags
-    - Clean, premium copywriting
-    - Oubon Shop brand voice
+
+    Task #16: Prompt now feeds Claude the specific product signals
+    (title tokens, tags, price tier) so copy varies per product
+    instead of sounding like a niche template.
     """
-    
-    prompt = f"""You are a professional copywriter for Oubon Shop, a premium smart home and lifestyle e-commerce store.
+    import re as _re
 
-Write a Shopify product description for:
+    clean_tags = [t for t in (tags or []) if isinstance(t, str) and t.strip()]
+    tag_line = ", ".join(clean_tags[:12]) if clean_tags else "(none provided)"
 
-Product: {title}
+    # Extract feature-bearing tokens from the title so the prompt
+    # has something to chew on even when tags are sparse.
+    title_tokens = [
+        t for t in _re.findall(r"[A-Za-z][A-Za-z0-9-]{2,}", title or "")
+        if t.lower() not in {"the", "and", "with", "for", "pro", "max", "mini", "plus"}
+    ]
+    key_tokens = ", ".join(title_tokens[:8]) if title_tokens else "(none detected)"
+
+    if price <= 0:
+        price_tier = "accessible entry price"
+    elif price < 15:
+        price_tier = f"budget-friendly (~${price:.2f})"
+    elif price < 40:
+        price_tier = f"mid-range (${price:.2f})"
+    elif price < 100:
+        price_tier = f"considered purchase (${price:.2f})"
+    else:
+        price_tier = f"premium tier (${price:.2f})"
+
+    prompt = f"""You are a senior copywriter for Oubon Shop, a premium smart home and lifestyle e-commerce store.
+
+Write a Shopify product description for THIS SPECIFIC product. Do NOT reuse generic niche-level copy.
+
+Product title: {title}
 Category: {niche.replace('_', ' ').title()}
-Price: ${price:.2f}
+Price tier: {price_tier}
+Tags: {tag_line}
+Salient title tokens: {key_tokens}
+
+CRITICAL: The final copy must be clearly distinguishable from a description of any
+other product in the same category. Work in at least two product-specific signals
+drawn from the title, tags, or salient tokens above (e.g. material, mechanism,
+power source, form factor). If the product mentions something concrete —
+"wireless", "stainless", "foldable", "rechargeable", "smart", "silicone",
+"bluetooth", "LED" — weave that in. Do not invent specs that weren't provided.
 
 STRICT REQUIREMENTS:
 - NO emojis whatsoever
 - NO hashtags
-- NO exclamation marks in excess (max 1)
-- Professional, clean, premium tone
-- Oubon Shop brand voice: sophisticated, modern, trustworthy
-- Focus on benefits, not features
-- Create subtle urgency without being salesy
-- 80-120 words maximum
+- Max 1 exclamation mark in the whole piece
+- Professional, clean, premium tone (Oubon Shop brand: sophisticated, modern, trustworthy)
+- Focus on how it fits into real life, not a spec sheet
+- Subtle urgency, never salesy
+- 80-120 words total
 
 STRUCTURE:
-1. Opening hook (1 sentence)
-2. Key benefits (2-3 short sentences)
-3. Quality/trust statement (1 sentence)
-4. Soft call-to-action (1 sentence)
+1. Opening hook that references the actual product (not the category) — 1 sentence
+2. 2-3 benefit sentences grounded in the specific signals above
+3. Quality / trust statement tied to {price_tier}
+4. Soft call-to-action — 1 sentence
 
-Write ONLY the caption text. No explanations, no formatting instructions."""
+Output ONLY the caption text. No preamble, no labels, no markdown."""
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -316,55 +472,148 @@ def _generate_fallback_analysis(title: str, product: dict) -> dict:
 
 def _generate_template_caption(title: str, niche: str, price: float, tags: list) -> str:
     """
-    Generate PROFESSIONAL template-based caption.
+    Task #16: Generate a per-product caption that actually varies across
+    products in the same niche.
+
+    The old version had 5 hard-coded niche templates and produced
+    identical copy for every product in the same niche (only the title
+    swapped in). This version composes from three rotating slots (hook,
+    body, close) seeded deterministically from the product title + price,
+    so the same product always gets the same caption, but different
+    products in the same niche get materially different copy.
+
+    It also weaves in product-specific details:
+      - Price tier language ("under $20", "premium at $149")
+      - Feature hints mined from the title & tags
+      - Niche-appropriate hooks (fallback to a generic-lifestyle set)
+
     NO emojis, NO hashtags.
     """
-    
-    clean_niche = niche.replace('_', ' ')
-    
-    # Different templates based on niche
-    templates = {
-        "smart_home": f"""Transform your living space with the {title}.
+    import hashlib
+    import re as _re
 
-Designed for the modern home, this device seamlessly integrates into your daily routine while delivering exceptional performance. Experience the convenience of smart technology without the complexity.
+    clean_niche = (niche or "").replace('_', ' ').strip() or "lifestyle"
+    # Deterministic seed from title + price so the caption is stable per product.
+    seed_src = f"{title}|{price:.2f}".encode('utf-8')
+    seed = int(hashlib.sha1(seed_src).hexdigest()[:8], 16)
 
-Built to last with premium materials and backed by our satisfaction guarantee. Elevate your home today.""",
+    def pick(options):
+        return options[seed % len(options)]
 
-        "kitchen": f"""Elevate your culinary experience with the {title}.
+    def pick_next(options, shift):
+        return options[(seed // shift) % len(options)] if options else ""
 
-This thoughtfully designed kitchen essential combines form and function, making meal preparation more efficient and enjoyable. Quality construction ensures years of reliable use.
+    # ---- Price tier phrase --------------------------------------------------
+    if price <= 0:
+        price_phrase = "at an accessible price point"
+    elif price < 15:
+        price_phrase = f"for under ${int(price + 1)}"
+    elif price < 40:
+        price_phrase = f"at ${price:.2f}"
+    elif price < 100:
+        price_phrase = f"at a mid-tier ${price:.2f}"
+    else:
+        price_phrase = f"at a premium ${price:.2f}"
 
-Join thousands of home chefs who have upgraded their kitchen. Order now and experience the difference.""",
+    # ---- Feature hints from title + tags -----------------------------------
+    title_tokens = set(_re.findall(r"[A-Za-z][A-Za-z0-9-]{2,}", (title or "").lower()))
+    tag_tokens = set(t.lower() for t in (tags or []) if isinstance(t, str))
+    signals = title_tokens | tag_tokens
 
-        "fitness": f"""Reach your fitness goals with the {title}.
+    feature_hints = []
+    keyword_map = [
+        (["wireless", "bluetooth", "cordless"], "wireless convenience"),
+        (["rechargeable", "battery", "usb-c", "usb"],  "long-lasting rechargeable power"),
+        (["smart", "app", "wifi", "voice"],   "seamless smart connectivity"),
+        (["led", "light", "rgb", "lamp"],     "adjustable ambient lighting"),
+        (["stainless", "steel", "aluminum", "alloy"], "durable metal construction"),
+        (["portable", "compact", "travel", "mini"], "a compact, portable design"),
+        (["waterproof", "ipx", "water-resistant"], "reliable water-resistant build"),
+        (["silicone", "eco", "organic", "bpa-free"], "skin-safe, food-grade materials"),
+        (["massage", "relief", "therapy"],    "therapeutic comfort"),
+        (["foldable", "collapsible"],         "space-saving foldable design"),
+        (["rgb", "colors", "dimmable"],       "customizable color control"),
+        (["automatic", "auto", "sensor"],     "hands-free automatic operation"),
+    ]
+    for needles, phrase in keyword_map:
+        if any(n in signals for n in needles):
+            feature_hints.append(phrase)
+        if len(feature_hints) == 3:
+            break
 
-Engineered for performance, this equipment helps you maximize every workout whether at home or on the go. Durable construction meets ergonomic design for comfort during even the most intense sessions.
-
-Invest in your health today.""",
-
-        "beauty": f"""Discover your best self with the {title}.
-
-This professional-grade beauty tool brings salon results to your home. Gentle yet effective, it works with your natural beauty to enhance your daily routine.
-
-Premium quality you can feel. Results you can see.""",
-
-        "tech": f"""Stay ahead with the {title}.
-
-Cutting-edge technology meets intuitive design in this must-have device. Whether for work or play, experience seamless performance that keeps up with your lifestyle.
-
-Modern solutions for modern life. Upgrade today.""",
+    # ---- Hook (opening sentence) -------------------------------------------
+    niche_hooks = {
+        "smart_home": [
+            f"Bring smarter control to the spaces you live in most with the {title}.",
+            f"Upgrade your home's rhythm with the {title}.",
+            f"Meet the {title} — a quiet upgrade to how your home works.",
+        ],
+        "kitchen": [
+            f"Make every cook feel a little more effortless with the {title}.",
+            f"The {title} earns a permanent place on your countertop.",
+            f"Bring thoughtful craftsmanship to your kitchen routine with the {title}.",
+        ],
+        "fitness": [
+            f"Train smarter, not harder, with the {title}.",
+            f"The {title} makes every session count.",
+            f"Build better habits around the {title}.",
+        ],
+        "beauty": [
+            f"Reveal a more polished routine with the {title}.",
+            f"Bring salon-level results home with the {title}.",
+            f"The {title} is the quiet upgrade your routine has been missing.",
+        ],
+        "tech": [
+            f"Keep up with your day — and get ahead of it — with the {title}.",
+            f"Cleaner design, quieter performance: the {title}.",
+            f"The {title} replaces three half-measures with one that works.",
+        ],
     }
-    
-    # Get template or use default
-    caption = templates.get(niche)
-    
-    if not caption:
-        caption = f"""Introducing the {title}.
+    generic_hooks = [
+        f"Meet the {title} — designed around the way you actually use it.",
+        f"The {title} quietly earns its keep, one use at a time.",
+        f"Simple where it should be, capable where it matters: the {title}.",
+        f"A small upgrade that punches above its weight — the {title}.",
+    ]
+    hooks = niche_hooks.get(niche, generic_hooks)
+    hook = pick(hooks)
 
-Thoughtfully designed for everyday use, this {clean_niche} essential combines quality craftsmanship with practical functionality. Every detail has been considered to enhance your experience.
+    # ---- Body (middle — weaves in features) --------------------------------
+    if feature_hints:
+        if len(feature_hints) >= 2:
+            feature_phrase = f"{feature_hints[0]}, {feature_hints[1]}"
+            if len(feature_hints) >= 3:
+                feature_phrase += f", and {feature_hints[2]}"
+        else:
+            feature_phrase = feature_hints[0]
+        body_variants = [
+            f"Built around {feature_phrase}, it fits into your day without asking for much in return.",
+            f"It leans on {feature_phrase} — the kind of details that show up every time you use it.",
+            f"Between {feature_phrase}, there's a reason this sits in the top of its category.",
+        ]
+    else:
+        body_variants = [
+            f"Made for real, daily use — not a showroom photo — it earns its spot quickly.",
+            f"It's the kind of {clean_niche} piece you stop noticing in the best way: it just works.",
+            f"Every choice in its construction was weighed against how you'd actually use it.",
+        ]
+    body = pick_next(body_variants, 16)
 
-Premium quality at an exceptional value. Satisfaction guaranteed.
+    # ---- Trust + price line ------------------------------------------------
+    trust_variants = [
+        f"Quality you can feel, {price_phrase}, with our satisfaction guarantee behind it.",
+        f"Priced {price_phrase}, backed by responsive support and a no-fuss returns policy.",
+        f"A considered piece {price_phrase}, supported by our customer-first guarantee.",
+    ]
+    trust = pick_next(trust_variants, 256)
 
-Add to your collection today."""
-    
-    return caption
+    # ---- Close (CTA) -------------------------------------------------------
+    close_variants = [
+        "Add it to your cart and see why customers come back for more.",
+        "Order yours and see the difference on the first use.",
+        "Take it home — the hard part was finding it.",
+        "Ready when you are.",
+    ]
+    close = pick_next(close_variants, 4096)
+
+    return f"{hook}\n\n{body} {trust}\n\n{close}"

@@ -3,6 +3,8 @@
  * =================================
  * Simple component to enhance product images.
  * Removes ugly backgrounds, adds clean professional ones.
+ *
+ * Uses authenticated API for image enhancement.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -10,6 +12,7 @@ import {
   Sparkles, Loader2, X, Check, AlertTriangle,
   DollarSign, Clock, RefreshCw, ImageIcon, Wand2
 } from 'lucide-react';
+import { api } from '../services/api';
 
 // Background style options
 const BACKGROUND_STYLES = {
@@ -53,9 +56,7 @@ export function AIImageEnhancer({
   
   const checkStatus = async () => {
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/images/status`);
-      const data = await response.json();
+      const data = await api.getImageServiceStatus();
       setApiAvailable(data.available);
     } catch (e) {
       setApiAvailable(false);
@@ -67,32 +68,25 @@ export function AIImageEnhancer({
       setError('Please enter an image URL');
       return;
     }
-    
+
     setEnhancing(true);
     setError(null);
     setResult(null);
-    
+
     try {
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${apiBase}/api/images/enhance`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          image_url: imageUrl,
-          niche: niche,
-          background_style: backgroundStyle || null,
-          add_shadow: true
-        })
-      });
-      
-      const data = await response.json();
+      // Use the authenticated API method
+      const data = await api.enhanceImage(imageUrl, niche, backgroundStyle || null);
       setResult(data);
-      
+
       // Callback if provided
       if (data.success && onImageEnhanced) {
         onImageEnhanced(data.enhanced_image_url);
       }
-      
+
+      if (!data.success) {
+        setError(data.error || 'Enhancement failed');
+      }
+
     } catch (e) {
       setError(e.message || 'Enhancement failed');
     } finally {
@@ -231,7 +225,7 @@ export function AIImageEnhancer({
         
         {/* Enhance Button */}
         <button
-          onClick={enhanceImage}
+          onClick={() => enhanceImage()}
           disabled={enhancing || !imageUrl.trim() || !apiAvailable}
           className="w-full py-4 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
         >

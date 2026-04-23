@@ -13,8 +13,7 @@ from sqlalchemy import func
 from ospra_os.database import (
     UserSettings, User
 )
-from ospra_os.database.action_models import Action, AIActionStatus, AIActionType
-from ospra_os.database.actions_models import AutoPilotLog
+from ospra_os.database.action_models import Action, AIActionStatus, AIActionType, AutoPilotLog
 
 
 class AutoPilotEngine:

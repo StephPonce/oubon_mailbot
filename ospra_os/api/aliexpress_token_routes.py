@@ -1,11 +1,14 @@
 """
 API routes for AliExpress token management
+SECURED: All endpoints now require authentication
 """
-from fastapi import APIRouter, BackgroundTasks, Body
+from fastapi import APIRouter, BackgroundTasks, Body, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
 from datetime import datetime
 from pydantic import BaseModel
 from ospra_os.api.aliexpress_token_refresh import refresh_all_tokens, refresh_dropship_token, refresh_affiliate_token
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 router = APIRouter(prefix="/api/aliexpress/tokens", tags=["aliexpress-tokens"])
 
@@ -19,7 +22,10 @@ class TokenEntry(BaseModel):
 
 
 @router.post("/refresh/all")
-async def refresh_all_tokens_endpoint(background_tasks: BackgroundTasks):
+async def refresh_all_tokens_endpoint(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     """
     Manually trigger token refresh for all AliExpress APIs
 
@@ -37,7 +43,10 @@ async def refresh_all_tokens_endpoint(background_tasks: BackgroundTasks):
 
 
 @router.post("/refresh/dropship")
-async def refresh_dropship_token_endpoint(background_tasks: BackgroundTasks):
+async def refresh_dropship_token_endpoint(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     """
     Manually trigger token refresh for Dropshipping API
     """
@@ -51,7 +60,10 @@ async def refresh_dropship_token_endpoint(background_tasks: BackgroundTasks):
 
 
 @router.post("/refresh/affiliate")
-async def refresh_affiliate_token_endpoint(background_tasks: BackgroundTasks):
+async def refresh_affiliate_token_endpoint(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user)
+):
     """
     Manually trigger token refresh for Affiliate API
     """
@@ -65,7 +77,7 @@ async def refresh_affiliate_token_endpoint(background_tasks: BackgroundTasks):
 
 
 @router.get("/status")
-async def get_token_status():
+async def get_token_status(current_user: User = Depends(get_current_user)):
     """
     Get status of all AliExpress tokens (from database)
 
@@ -79,7 +91,7 @@ async def get_token_status():
 
 
 @router.get("/debug/env")
-async def debug_environment():
+async def debug_environment(current_user: User = Depends(get_current_user)):
     """
     DEBUG: Check environment variable configuration.
 
@@ -99,7 +111,7 @@ async def debug_environment():
 
 
 @router.get("/manual-entry")
-async def show_manual_entry_form():
+async def show_manual_entry_form(current_user: User = Depends(get_current_user)):
     """
     Display form for manually entering AliExpress tokens
 
@@ -310,7 +322,10 @@ async def show_manual_entry_form():
 
 
 @router.post("/manual-entry")
-async def save_manual_token(token_data: TokenEntry):
+async def save_manual_token(
+    token_data: TokenEntry,
+    current_user: User = Depends(get_current_user)
+):
     """
     Manually save AliExpress token to database
 

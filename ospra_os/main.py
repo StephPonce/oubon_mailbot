@@ -9,7 +9,6 @@ env_path = project_root / ".env"
 load_dotenv(dotenv_path=env_path, override=True)
 
 # Debug: Print if OAuth vars are loaded
-print(f" GOOGLE_OAUTH_CLIENT_ID loaded: {bool(os.getenv('GOOGLE_OAUTH_CLIENT_ID'))}")
 
 from fastapi import FastAPI, Depends, Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +21,28 @@ from typing import Optional, List, Dict
 from pydantic import BaseModel
 import logging
 
+# API Request Schemas (Input Validation)
+from ospra_os.api.schemas import (
+    PlatformCredentials,
+    ShopifyDeployRequest,
+    ShopifyBulkDeployRequest,
+    AliExpressSearchRequest,
+    AliExpressAffiliateLinkRequest,
+    AliExpressFulfillRequest,
+    AliExpressSyncRequest,
+    AliExpressMonitorPricesRequest,
+    MetaCampaignRequest,
+    MetaBulkCampaignCreateRequest,
+    CampaignStatusUpdate,
+    AdSetBudgetUpdate,
+    ScheduleCreateRequest,
+    DiscoverRequest as DiscoverRequestSchema,
+    ChatRequest as ChatRequestSchema,
+    MarketingAngleRequest,
+    BulkMarketingRequest,
+    SmartRecommendationRequest,
+)
+
 # Security - Rate Limiting (PHASE 1 SECURITY)
 from slowapi.errors import RateLimitExceeded
 from ospra_os.security.rate_limiting import limiter, rate_limit_exceeded_handler, get_tier_limit
@@ -30,66 +51,64 @@ from ospra_os.security.rate_limiting import limiter, rate_limit_exceeded_handler
 from ospra_os.tenancy.middleware import TenantMiddleware, StoreContextMiddleware
 
 # Observability (TECHNICAL FIX T5)
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 try:
     from ospra_os.observability import setup_logging, setup_sentry, get_logger
     from ospra_os.observability.middleware import RequestLoggingMiddleware
     from ospra_os.observability.exception_handlers import register_exception_handlers
     _HAS_OBSERVABILITY = True
-    print("[SUCCESS] Observability system loaded successfully")
+    logger = get_logger(__name__)
+    logger.info("Observability system loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Observability system not loaded: {e}")
     _HAS_OBSERVABILITY = False
-    # Fallback to standard logging
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    get_logger = logging.getLogger
-
-# Initialize logger
-logger = get_logger(__name__) if _HAS_OBSERVABILITY else logging.getLogger(__name__)
+    logger.warning(f"Observability system not loaded: {e}")
 
 # New integrations - Platform Adapters, AI, Deployment, Auto-Discovery
 try:
     from ospra_os.platforms.factory import PlatformFactory
     _HAS_PLATFORM_FACTORY = True
-    print("[SUCCESS] Platform Factory loaded successfully")
+    logger.info("Platform Factory loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Platform Factory not loaded: {e}")
+    logger.warning(f"Platform Factory not loaded: {e}")
     PlatformFactory = None
     _HAS_PLATFORM_FACTORY = False
 
 try:
     from ospra_os.deployment import UnifiedProductDeployer
     _HAS_UNIFIED_DEPLOYER = True
-    print("[SUCCESS] Unified Product Deployer loaded successfully")
+    logger.info("Unified Product Deployer loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Unified Product Deployer not loaded: {e}")
+    logger.warning(f"Unified Product Deployer not loaded: {e}")
     UnifiedProductDeployer = None
     _HAS_UNIFIED_DEPLOYER = False
 
 try:
     from ospra_os.ai.factory import AIFactory
     _HAS_AI_FACTORY = True
-    print("[SUCCESS] AI Factory loaded successfully")
+    logger.info("AI Factory loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AI Factory not loaded: {e}")
+    logger.warning(f"AI Factory not loaded: {e}")
     AIFactory = None
     _HAS_AI_FACTORY = False
 
 try:
     from ospra_os.background_jobs import start_auto_discovery_scheduler
     _HAS_AUTO_DISCOVERY = True
-    print("[SUCCESS] Auto-Discovery system loaded successfully")
+    logger.info("Auto-Discovery system loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Auto-Discovery not loaded: {e}")
+    logger.warning(f"Auto-Discovery not loaded: {e}")
     start_auto_discovery_scheduler = None
     _HAS_AUTO_DISCOVERY = False
 
 try:
     from ospra_os.utils.health_monitor import HealthMonitor
     _HAS_HEALTH_MONITOR = True
-    print("[SUCCESS] Health Monitor loaded successfully")
+    logger.info("Health Monitor loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Health Monitor not loaded: {e}")
+    logger.warning(f"Health Monitor not loaded: {e}")
     HealthMonitor = None
     _HAS_HEALTH_MONITOR = False
 
@@ -98,9 +117,9 @@ try:
     from ospra_os.auth.jwt_auth import get_current_user
     from ospra_os.database import User
     _HAS_JWT_AUTH = True
-    print("[SUCCESS] JWT Authentication loaded successfully")
+    logger.info("JWT Authentication loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  JWT Authentication not loaded: {e}")
+    logger.warning(f"JWT Authentication not loaded: {e}")
     _HAS_JWT_AUTH = False
     get_current_user = None
     User = None
@@ -109,9 +128,9 @@ except Exception as e:
 try:
     from ospra_os.api.auth_routes import router as auth_router  # type: ignore
     _HAS_AUTH = True
-    print("[SUCCESS] Authentication router loaded successfully")
+    logger.info("Authentication router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Authentication router not loaded: {e}")
+    logger.warning(f"Authentication router not loaded: {e}")
     auth_router = None
     _HAS_AUTH = False
 
@@ -119,9 +138,9 @@ except Exception as e:
 try:
     from ospra_os.api.password_reset_routes import router as password_reset_router  # type: ignore
     _HAS_PASSWORD_RESET = True
-    print("[SUCCESS] Password reset router loaded successfully")
+    logger.info("Password reset router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Password reset router not loaded: {e}")
+    logger.warning(f"Password reset router not loaded: {e}")
     password_reset_router = None
     _HAS_PASSWORD_RESET = False
 
@@ -129,28 +148,28 @@ except Exception as e:
 try:
     from ospra_os.api.frontend_compat_routes import router as frontend_compat_router  # type: ignore
     _HAS_FRONTEND_COMPAT = True
-    print("[SUCCESS] Frontend compatibility router loaded successfully")
+    logger.info("Frontend compatibility router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Frontend compatibility router not loaded: {e}")
+    logger.warning(f"Frontend compatibility router not loaded: {e}")
     frontend_compat_router = None
     _HAS_FRONTEND_COMPAT = False
 
 # Gmail OAuth router (optional)
 try:
     from ospra_os.gmail.routes import router as gmail_oauth_router  # type: ignore
-    print("[SUCCESS] Gmail OAuth router loaded successfully")
+    logger.info("Gmail OAuth router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Gmail OAuth router not loaded: {e}")
+    logger.warning(f"Gmail OAuth router not loaded: {e}")
     gmail_oauth_router = None
 
 # TikTok router is optional — don't crash if it's not present
 try:
     from ospra_os.tiktok.routes import router as tiktok_router  # type: ignore
     _HAS_TIKTOK = True
-    print("[SUCCESS] TikTok router loaded successfully")
+    logger.info("TikTok router loaded successfully")
 except Exception as e:  # ImportError, etc.
-    print(f"[WARNING]  TikTok router not loaded: {e}")
-    print("   This is expected if TikTok integration is not yet enabled")
+    logger.warning(f"TikTok router not loaded: {e}")
+    logger.debug("This is expected if TikTok integration is not yet enabled")
     tiktok_router = None
     _HAS_TIKTOK = False
 
@@ -158,9 +177,9 @@ except Exception as e:  # ImportError, etc.
 try:
     from ospra_os.product_research.routes import router as research_router  # type: ignore
     _HAS_RESEARCH = True
-    print("[SUCCESS] Product Research router loaded successfully")
+    logger.info("Product Research router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Product Research router not loaded: {e}")
+    logger.warning(f"Product Research router not loaded: {e}")
     research_router = None
     _HAS_RESEARCH = False
 
@@ -168,9 +187,9 @@ except Exception as e:
 try:
     from ospra_os.admin.routes import router as admin_router  # type: ignore
     _HAS_ADMIN = True
-    print("[SUCCESS] Admin Dashboard router loaded successfully")
+    logger.info("Admin Dashboard router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Admin Dashboard router not loaded: {e}")
+    logger.warning(f"Admin Dashboard router not loaded: {e}")
     admin_router = None
     _HAS_ADMIN = False
 
@@ -178,9 +197,9 @@ except Exception as e:
 try:
     from ospra_os.advertising.routes import router as advertising_router  # type: ignore
     _HAS_ADVERTISING = True
-    print("[SUCCESS] Advertising Automation router loaded successfully")
+    logger.info("Advertising Automation router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Advertising router not loaded: {e}")
+    logger.warning(f"Advertising router not loaded: {e}")
     advertising_router = None
     _HAS_ADVERTISING = False
 
@@ -188,9 +207,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.oauth.routes import router as email_oauth_router  # type: ignore
     _HAS_EMAIL_OAUTH = True
-    print("[SUCCESS] Email OAuth router loaded successfully")
+    logger.info("Email OAuth router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Email OAuth router not loaded: {e}")
+    logger.warning(f"Email OAuth router not loaded: {e}")
     email_oauth_router = None
     _HAS_EMAIL_OAUTH = False
 
@@ -198,9 +217,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.analytics_routes import router as email_analytics_router  # type: ignore
     _HAS_EMAIL_ANALYTICS = True
-    print("[SUCCESS] Email Analytics router loaded successfully")
+    logger.info("Email Analytics router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Email Analytics router not loaded: {e}")
+    logger.warning(f"Email Analytics router not loaded: {e}")
     email_analytics_router = None
     _HAS_EMAIL_ANALYTICS = False
 
@@ -208,9 +227,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.sync_routes import router as email_sync_router  # type: ignore
     _HAS_EMAIL_SYNC = True
-    print("[SUCCESS] Email Sync router loaded successfully")
+    logger.info("Email Sync router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Email Sync router not loaded: {e}")
+    logger.warning(f"Email Sync router not loaded: {e}")
     email_sync_router = None
     _HAS_EMAIL_SYNC = False
 
@@ -218,9 +237,9 @@ except Exception as e:
 try:
     from ospra_os.api.email_automation_routes import router as email_automation_router  # type: ignore
     _HAS_EMAIL_AUTOMATION = True
-    print("[SUCCESS] Email Automation router loaded successfully (/api/email-automation/*)")
+    logger.info("Email Automation router loaded successfully (/api/email-automation/*)")
 except Exception as e:
-    print(f"[WARNING]  Email Automation router not loaded: {e}")
+    logger.warning(f"Email Automation router not loaded: {e}")
     email_automation_router = None
     _HAS_EMAIL_AUTOMATION = False
 
@@ -228,9 +247,9 @@ except Exception as e:
 try:
     from ospra_os.email_automation.settings_routes import router as email_settings_router  # type: ignore
     _HAS_EMAIL_SETTINGS = True
-    print("[SUCCESS] Email User Settings router loaded successfully")
+    logger.info("Email User Settings router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Email User Settings router not loaded: {e}")
+    logger.warning(f"Email User Settings router not loaded: {e}")
     email_settings_router = None
     _HAS_EMAIL_SETTINGS = False
 
@@ -238,9 +257,9 @@ except Exception as e:
 try:
     from ospra_os.dashboard.routes import router as dashboard_v2_router  # type: ignore
     _HAS_DASHBOARD_V2 = True
-    print("[SUCCESS] Dashboard V2 REAL-TIME router loaded successfully")
+    logger.info("Dashboard V2 REAL-TIME router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Dashboard V2 REAL-TIME router not loaded: {e}")
+    logger.warning(f"Dashboard V2 REAL-TIME router not loaded: {e}")
     import traceback
     traceback.print_exc()
     dashboard_v2_router = None
@@ -250,9 +269,9 @@ except Exception as e:
 try:
     from ospra_os.dashboard.routes_multi_store import router as multi_store_router  # type: ignore
     _HAS_MULTI_STORE = True
-    print("[SUCCESS] Multi-Store Portfolio router loaded successfully")
+    logger.info("Multi-Store Portfolio router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Multi-Store Portfolio router not loaded: {e}")
+    logger.warning(f"Multi-Store Portfolio router not loaded: {e}")
     multi_store_router = None
     _HAS_MULTI_STORE = False
 
@@ -260,9 +279,9 @@ except Exception as e:
 try:
     from ospra_os.aliexpress.routes import router as aliexpress_router  # type: ignore
     _HAS_ALIEXPRESS = True
-    print("[SUCCESS] AliExpress OAuth router loaded successfully")
+    logger.info("AliExpress OAuth router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AliExpress OAuth router not loaded: {e}")
+    logger.warning(f"AliExpress OAuth router not loaded: {e}")
     aliexpress_router = None
     _HAS_ALIEXPRESS = False
 
@@ -270,9 +289,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_oauth import router as aliexpress_callback_router  # type: ignore
     _HAS_ALIEXPRESS_CALLBACK = True
-    print("[SUCCESS] AliExpress Dropshipping API callback router loaded successfully")
+    logger.info("AliExpress Dropshipping API callback router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AliExpress callback router not loaded: {e}")
+    logger.warning(f"AliExpress callback router not loaded: {e}")
     aliexpress_callback_router = None
     _HAS_ALIEXPRESS_CALLBACK = False
 
@@ -280,9 +299,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_affiliate_oauth import router as aliexpress_affiliate_callback_router  # type: ignore
     _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = True
-    print("[SUCCESS] AliExpress Affiliate API callback router loaded successfully")
+    logger.info("AliExpress Affiliate API callback router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AliExpress Affiliate callback router not loaded: {e}")
+    logger.warning(f"AliExpress Affiliate callback router not loaded: {e}")
     aliexpress_affiliate_callback_router = None
     _HAS_ALIEXPRESS_AFFILIATE_CALLBACK = False
 
@@ -290,9 +309,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_token_routes import router as aliexpress_token_router  # type: ignore
     _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = True
-    print("[SUCCESS] AliExpress Token Management router loaded successfully")
+    logger.info("AliExpress Token Management router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AliExpress Token Management router not loaded: {e}")
+    logger.warning(f"AliExpress Token Management router not loaded: {e}")
     aliexpress_token_router = None
     _HAS_ALIEXPRESS_TOKEN_MANAGEMENT = False
 
@@ -300,9 +319,9 @@ except Exception as e:
 try:
     from ospra_os.api.aliexpress_product_routes import router as aliexpress_product_router  # type: ignore
     _HAS_ALIEXPRESS_PRODUCTS = True
-    print("[SUCCESS] AliExpress Product Scraping router loaded successfully")
+    logger.info("AliExpress Product Scraping router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AliExpress Product Scraping router not loaded: {e}")
+    logger.warning(f"AliExpress Product Scraping router not loaded: {e}")
     aliexpress_product_router = None
     _HAS_ALIEXPRESS_PRODUCTS = False
 
@@ -310,9 +329,9 @@ except Exception as e:
 try:
     from ospra_os.auth.tiktok_oauth import router as tiktok_oauth_router  # type: ignore
     _HAS_TIKTOK_OAUTH = True
-    print("[SUCCESS] TikTok OAuth router loaded successfully")
+    logger.info("TikTok OAuth router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  TikTok OAuth router not loaded: {e}")
+    logger.warning(f"TikTok OAuth router not loaded: {e}")
     tiktok_oauth_router = None
     _HAS_TIKTOK_OAUTH = False
 
@@ -320,9 +339,9 @@ except Exception as e:
 try:
     from ospra_os.webhooks.shopify_webhooks import router as shopify_webhooks_router  # type: ignore
     _HAS_SHOPIFY_WEBHOOKS = True
-    print("[SUCCESS] Shopify webhooks router loaded successfully")
+    logger.info("Shopify webhooks router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Shopify webhooks router not loaded: {e}")
+    logger.warning(f"Shopify webhooks router not loaded: {e}")
     shopify_webhooks_router = None
     _HAS_SHOPIFY_WEBHOOKS = False
 
@@ -330,9 +349,9 @@ except Exception as e:
 try:
     from ospra_os.api.shopify_oauth_routes import router as shopify_oauth_router  # type: ignore
     _HAS_SHOPIFY_OAUTH = True
-    print("[SUCCESS] Shopify OAuth router loaded successfully")
+    logger.info("Shopify OAuth router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Shopify OAuth router not loaded: {e}")
+    logger.warning(f"Shopify OAuth router not loaded: {e}")
     shopify_oauth_router = None
     _HAS_SHOPIFY_OAUTH = False
 
@@ -340,9 +359,9 @@ except Exception as e:
 try:
     from ospra_os.integrations.shopify.routes import router as shopify_deployment_router  # type: ignore
     _HAS_SHOPIFY_DEPLOYMENT = True
-    print("[SUCCESS] Shopify Deployment router loaded successfully (AI-powered)")
+    logger.info("Shopify Deployment router loaded successfully (AI-powered)")
 except Exception as e:
-    print(f"[WARNING]  Shopify Deployment router not loaded: {e}")
+    logger.warning(f"Shopify Deployment router not loaded: {e}")
     shopify_deployment_router = None
     _HAS_SHOPIFY_DEPLOYMENT = False
 
@@ -350,9 +369,9 @@ except Exception as e:
 try:
     from ospra_os.api.shopify_routes import router as shopify_store_router  # type: ignore
     _HAS_SHOPIFY_STORES = True
-    print("[SUCCESS] Shopify Store Management router loaded successfully")
+    logger.info("Shopify Store Management router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Shopify Store Management router not loaded: {e}")
+    logger.warning(f"Shopify Store Management router not loaded: {e}")
     shopify_store_router = None
     _HAS_SHOPIFY_STORES = False
 
@@ -360,9 +379,9 @@ except Exception as e:
 try:
     from ospra_os.api.woocommerce_routes import router as woocommerce_router  # type: ignore
     _HAS_WOOCOMMERCE = True
-    print("[SUCCESS] WooCommerce Store Management router loaded successfully")
+    logger.info("WooCommerce Store Management router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  WooCommerce Store Management router not loaded: {e}")
+    logger.warning(f"WooCommerce Store Management router not loaded: {e}")
     woocommerce_router = None
     _HAS_WOOCOMMERCE = False
 
@@ -370,9 +389,9 @@ except Exception as e:
 try:
     from ospra_os.integrations.meta.routes import router as meta_ads_router  # type: ignore
     _HAS_META_ADS = True
-    print("[SUCCESS] Meta Ads router loaded successfully (Real API only)")
+    logger.info("Meta Ads router loaded successfully (Real API only)")
 except Exception as e:
-    print(f"[WARNING]  Meta Ads router not loaded: {e}")
+    logger.warning(f"Meta Ads router not loaded: {e}")
     meta_ads_router = None
     _HAS_META_ADS = False
 
@@ -380,9 +399,9 @@ except Exception as e:
 try:
     from ospra_os.api.deployment_routes import router as deployment_router  # type: ignore
     _HAS_DEPLOYMENT = True
-    print("[SUCCESS] Unified Deployment router loaded successfully (AI-powered)")
+    logger.info("Unified Deployment router loaded successfully (AI-powered)")
 except Exception as e:
-    print(f"[WARNING]  Deployment router not loaded: {e}")
+    logger.warning(f"Deployment router not loaded: {e}")
     deployment_router = None
     _HAS_DEPLOYMENT = False
 
@@ -390,9 +409,9 @@ except Exception as e:
 try:
     from ospra_os.api.auto_deploy_routes import router as auto_deploy_router  # type: ignore
     _HAS_AUTO_DEPLOY = True
-    print("[SUCCESS] Auto-Deploy router loaded successfully")
+    logger.info("Auto-Deploy router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Auto-Deploy router not loaded: {e}")
+    logger.warning(f"Auto-Deploy router not loaded: {e}")
     auto_deploy_router = None
     _HAS_AUTO_DEPLOY = False
 
@@ -400,9 +419,9 @@ except Exception as e:
 try:
     from ospra_os.analytics.routes import router as analytics_router  # type: ignore
     _HAS_ANALYTICS = True
-    print("[SUCCESS] Analytics router loaded successfully")
+    logger.info("Analytics router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Analytics router not loaded: {e}")
+    logger.warning(f"Analytics router not loaded: {e}")
     analytics_router = None
     _HAS_ANALYTICS = False
 
@@ -410,9 +429,9 @@ except Exception as e:
 try:
     from ospra_os.analytics.customer_routes import router as customer_analytics_router  # type: ignore
     _HAS_CUSTOMER_ANALYTICS = True
-    print("[SUCCESS] Customer Analytics router loaded successfully")
+    logger.info("Customer Analytics router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Customer Analytics router not loaded: {e}")
+    logger.warning(f"Customer Analytics router not loaded: {e}")
     customer_analytics_router = None
     _HAS_CUSTOMER_ANALYTICS = False
 
@@ -420,9 +439,9 @@ except Exception as e:
 try:
     from ospra_os.jobs.routes import router as jobs_router  # type: ignore
     _HAS_JOBS = True
-    print("[SUCCESS] Background Jobs router loaded successfully")
+    logger.info("Background Jobs router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Background Jobs router not loaded: {e}")
+    logger.warning(f"Background Jobs router not loaded: {e}")
     jobs_router = None
     _HAS_JOBS = False
 
@@ -430,9 +449,9 @@ except Exception as e:
 try:
     from ospra_os.services.notification_routes import router as notifications_router  # type: ignore
     _HAS_NOTIFICATIONS = True
-    print("[SUCCESS] Notifications router loaded successfully")
+    logger.info("Notifications router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Notifications router not loaded: {e}")
+    logger.warning(f"Notifications router not loaded: {e}")
     notifications_router = None
     _HAS_NOTIFICATIONS = False
 
@@ -440,9 +459,9 @@ except Exception as e:
 try:
     from ospra_os.monitoring.routes import router as health_monitor_router  # type: ignore
     _HAS_HEALTH_MONITOR = True
-    print("[SUCCESS] System Health Monitoring router loaded successfully")
+    logger.info("System Health Monitoring router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  System Health Monitoring router not loaded: {e}")
+    logger.warning(f"System Health Monitoring router not loaded: {e}")
     health_monitor_router = None
     _HAS_HEALTH_MONITOR = False
 
@@ -450,9 +469,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.niche_routes import router as niche_router  # type: ignore
     _HAS_NICHE_ANALYSIS = True
-    print("[SUCCESS] Niche Analysis router loaded successfully")
+    logger.info("Niche Analysis router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Niche Analysis router not loaded: {e}")
+    logger.warning(f"Niche Analysis router not loaded: {e}")
     niche_router = None
     _HAS_NICHE_ANALYSIS = False
 
@@ -460,9 +479,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.routes import router as competitor_router  # type: ignore
     _HAS_COMPETITOR_INTEL = True
-    print("[SUCCESS] Competitor Intelligence router loaded successfully")
+    logger.info("Competitor Intelligence router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Competitor Intelligence router not loaded: {e}")
+    logger.warning(f"Competitor Intelligence router not loaded: {e}")
     competitor_router = None
     _HAS_COMPETITOR_INTEL = False
 
@@ -470,9 +489,9 @@ except Exception as e:
 try:
     from ospra_os.reports.routes import router as report_router  # type: ignore
     _HAS_REPORTS = True
-    print("[SUCCESS] Report Engine router loaded successfully")
+    logger.info("Report Engine router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Report Engine router not loaded: {e}")
+    logger.warning(f"Report Engine router not loaded: {e}")
     report_router = None
     _HAS_REPORTS = False
 
@@ -480,9 +499,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.unified_discovery_routes import router as unified_discovery_router  # type: ignore
     _HAS_UNIFIED_DISCOVERY = True
-    print("[SUCCESS] Unified Product Discovery router loaded successfully")
+    logger.info("Unified Product Discovery router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Unified Product Discovery router not loaded: {e}")
+    logger.warning(f"Unified Product Discovery router not loaded: {e}")
     unified_discovery_router = None
     _HAS_UNIFIED_DISCOVERY = False
 
@@ -490,9 +509,9 @@ except Exception as e:
 try:
     from ospra_os.intelligence.intelligence_core_routes import router as intelligence_core_router  # type: ignore
     _HAS_INTELLIGENCE_CORE = True
-    print("[SUCCESS] Intelligence Core router loaded successfully")
+    logger.info("Intelligence Core router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Intelligence Core router not loaded: {e}")
+    logger.warning(f"Intelligence Core router not loaded: {e}")
     intelligence_core_router = None
     _HAS_INTELLIGENCE_CORE = False
 
@@ -500,9 +519,9 @@ except Exception as e:
 try:
     from ospra_os.learning.learning_routes import router as learning_router  # type: ignore
     _HAS_LEARNING = True
-    print("[SUCCESS] Learning System router loaded successfully")
+    logger.info("Learning System router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Learning System router not loaded: {e}")
+    logger.warning(f"Learning System router not loaded: {e}")
     learning_router = None
     _HAS_LEARNING = False
 
@@ -510,9 +529,9 @@ except Exception as e:
 try:
     from ospra_os.api.fulfillment_routes import router as fulfillment_router  # type: ignore
     _HAS_FULFILLMENT = True
-    print("[SUCCESS] Fulfillment System router loaded successfully")
+    logger.info("Fulfillment System router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Fulfillment System router not loaded: {e}")
+    logger.warning(f"Fulfillment System router not loaded: {e}")
     fulfillment_router = None
     _HAS_FULFILLMENT = False
 
@@ -520,19 +539,29 @@ except Exception as e:
 try:
     from ospra_os.api.oi_routes import router as oi_router  # type: ignore
     _HAS_OI = True
-    print("[SUCCESS] Oi AI Assistant router loaded successfully [BRAIN]")
+    logger.info("Oi AI Assistant router loaded successfully [BRAIN]")
 except Exception as e:
-    print(f"[WARNING]  Oi AI Assistant router not loaded: {e}")
+    logger.warning(f"Oi AI Assistant router not loaded: {e}")
     oi_router = None
     _HAS_OI = False
+
+# Product Analysis router (AI analysis and caption generation)
+try:
+    from ospra_os.api.product_analysis_routes import router as product_analysis_router  # type: ignore
+    _HAS_PRODUCT_ANALYSIS = True
+    logger.info("Product Analysis router loaded successfully")
+except Exception as e:
+    logger.warning(f"Product Analysis router not loaded: {e}")
+    product_analysis_router = None
+    _HAS_PRODUCT_ANALYSIS = False
 
 # Oi Alerts router (Real-time notifications for Oi AI)
 try:
     from ospra_os.api.alert_routes import router as alert_router, ws_router as alert_ws_router  # type: ignore
     _HAS_ALERTS = True
-    print("[SUCCESS] Oi Alerts router loaded successfully")
+    logger.info("Oi Alerts router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Oi Alerts router not loaded: {e}")
+    logger.warning(f"Oi Alerts router not loaded: {e}")
     alert_router = None
     alert_ws_router = None
     _HAS_ALERTS = False
@@ -541,9 +570,9 @@ except Exception as e:
 try:
     from ospra_os.inventory.routes import router as inventory_router  # type: ignore
     _HAS_INVENTORY = True
-    print("[SUCCESS] Inventory Forecasting router loaded successfully")
+    logger.info("Inventory Forecasting router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Inventory Forecasting router not loaded: {e}")
+    logger.warning(f"Inventory Forecasting router not loaded: {e}")
     inventory_router = None
     _HAS_INVENTORY = False
 
@@ -551,9 +580,9 @@ except Exception as e:
 try:
     from ospra_os.testing.routes import router as abtesting_router  # type: ignore
     _HAS_ABTESTING = True
-    print("[SUCCESS] A/B Testing router loaded successfully")
+    logger.info("A/B Testing router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  A/B Testing router not loaded: {e}")
+    logger.warning(f"A/B Testing router not loaded: {e}")
     abtesting_router = None
     _HAS_ABTESTING = False
 
@@ -561,9 +590,9 @@ except Exception as e:
 try:
     from ospra_os.api.image_routes import router as image_router  # type: ignore
     _HAS_IMAGE_PROCESSING = True
-    print("[SUCCESS] Image Processing router loaded successfully")
+    logger.info("Image Processing router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Image Processing router not loaded: {e}")
+    logger.warning(f"Image Processing router not loaded: {e}")
     image_router = None
     _HAS_IMAGE_PROCESSING = False
 
@@ -571,9 +600,9 @@ except Exception as e:
 try:
     from ospra_os.api.ai_chat_routes import router as ai_chat_router  # type: ignore
     _HAS_AI_CHAT = True
-    print("[SUCCESS] AI Chat router loaded successfully")
+    logger.info("AI Chat router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AI Chat router not loaded: {e}")
+    logger.warning(f"AI Chat router not loaded: {e}")
     ai_chat_router = None
     _HAS_AI_CHAT = False
 
@@ -581,9 +610,9 @@ except Exception as e:
 try:
     from ospra_os.api.image_generation_routes import router as image_generation_router  # type: ignore
     _HAS_IMAGE_GENERATION = True
-    print("[SUCCESS] AI Image Generation router loaded successfully")
+    logger.info("AI Image Generation router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  AI Image Generation router not loaded: {e}")
+    logger.warning(f"AI Image Generation router not loaded: {e}")
     image_generation_router = None
     _HAS_IMAGE_GENERATION = False
 
@@ -591,9 +620,9 @@ except Exception as e:
 try:
     from ospra_os.api.actions_routes import router as actions_router  # type: ignore
     _HAS_ACTIONS = True
-    print("[SUCCESS] Actions Queue router loaded successfully")
+    logger.info("Actions Queue router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Actions Queue router not loaded: {e}")
+    logger.warning(f"Actions Queue router not loaded: {e}")
     actions_router = None
     _HAS_ACTIONS = False
 
@@ -601,19 +630,18 @@ except Exception as e:
 try:
     from ospra_os.api.daily_brief_routes import router as daily_brief_router  # type: ignore
     _HAS_DAILY_BRIEF = True
-    print("[SUCCESS] Daily Brief router loaded successfully")
+    logger.info("Daily Brief router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Daily Brief router not loaded: {e}")
+    logger.warning(f"Daily Brief router not loaded: {e}")
     daily_brief_router = None
     _HAS_DAILY_BRIEF = False
 
 # Auto-Pilot router (Autonomous action execution - GROK RECOMMENDATION #7)
+# NOTE: Using autopilot_routes.py (consolidated - auto_pilot_routes.py was duplicate)
 try:
-    from ospra_os.api.auto_pilot_routes import router as auto_pilot_router  # type: ignore
+    from ospra_os.api.autopilot_routes import router as auto_pilot_router  # type: ignore
     _HAS_AUTO_PILOT = True
-    print("[SUCCESS] Auto-Pilot router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Auto-Pilot router not loaded: {e}")
     auto_pilot_router = None
     _HAS_AUTO_PILOT = False
 
@@ -621,9 +649,9 @@ except Exception as e:
 try:
     from ospra_os.api.voice_routes import router as voice_router  # type: ignore
     _HAS_VOICE = True
-    print("[SUCCESS] Voice Commands router loaded successfully")
+    logger.info("Voice Commands router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Voice Commands router not loaded: {e}")
+    logger.warning(f"Voice Commands router not loaded: {e}")
     voice_router = None
     _HAS_VOICE = False
 
@@ -631,9 +659,9 @@ except Exception as e:
 try:
     from ospra_os.api.store_routes import router as store_router  # type: ignore
     _HAS_STORES = True
-    print("[SUCCESS] Store Management router loaded successfully")
+    logger.info("Store Management router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Store Management router not loaded: {e}")
+    logger.warning(f"Store Management router not loaded: {e}")
     store_router = None
     _HAS_STORES = False
 
@@ -641,9 +669,9 @@ except Exception as e:
 try:
     from ospra_os.api.template_routes import router as template_router  # type: ignore
     _HAS_TEMPLATES = True
-    print("[SUCCESS] Template Vault router loaded successfully")
+    logger.info("Template Vault router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Template Vault router not loaded: {e}")
+    logger.warning(f"Template Vault router not loaded: {e}")
     template_router = None
     _HAS_TEMPLATES = False
 
@@ -651,9 +679,9 @@ except Exception as e:
 try:
     from ospra_os.api.task_routes import router as task_router  # type: ignore
     _HAS_TASKS = True
-    print("[SUCCESS] Task Monitoring router loaded successfully")
+    logger.info("Task Monitoring router loaded successfully")
 except Exception as e:
-    print(f"[WARNING]  Task Monitoring router not loaded: {e}")
+    logger.warning(f"Task Monitoring router not loaded: {e}")
     task_router = None
     _HAS_TASKS = False
 
@@ -661,9 +689,9 @@ except Exception as e:
 try:
     from ospra_os.api.ml_routes import router as ml_router  # type: ignore
     _HAS_ML = True
-    print("[SUCCESS] ML System router loaded successfully (Cost-optimized AI)")
+    logger.info("ML System router loaded successfully (Cost-optimized AI)")
 except Exception as e:
-    print(f"[WARNING]  ML System router not loaded: {e}")
+    logger.warning(f"ML System router not loaded: {e}")
     ml_router = None
     _HAS_ML = False
 
@@ -671,9 +699,9 @@ except Exception as e:
 try:
     from ospra_os.api.amazon_routes import router as amazon_router  # type: ignore
     _HAS_AMAZON = True
-    print("[SUCCESS] Amazon FBA router loaded successfully (Multi-Marketplace)")
+    logger.info("Amazon FBA router loaded successfully (Multi-Marketplace)")
 except Exception as e:
-    print(f"[WARNING]  Amazon FBA router not loaded: {e}")
+    logger.warning(f"Amazon FBA router not loaded: {e}")
     amazon_router = None
     _HAS_AMAZON = False
 
@@ -682,9 +710,9 @@ try:
     from ospra_os.federated.routes import get_federated_router
     federated_router = get_federated_router()
     _HAS_FEDERATED = True
-    print("[SUCCESS] Federated Learning router loaded successfully (Privacy-Preserving)")
+    logger.info("Federated Learning router loaded successfully (Privacy-Preserving)")
 except Exception as e:
-    print(f"[WARNING]  Federated Learning router not loaded: {e}")
+    logger.warning(f"Federated Learning router not loaded: {e}")
     federated_router = None
     _HAS_FEDERATED = False
 
@@ -693,9 +721,9 @@ try:
     from ospra_os.whitelabel.routes import get_whitelabel_router
     whitelabel_router = get_whitelabel_router()
     _HAS_WHITELABEL = True
-    print("[SUCCESS] White-Label SaaS router loaded successfully (Agency Rebrand B2B2C)")
+    logger.info("White-Label SaaS router loaded successfully (Agency Rebrand B2B2C)")
 except Exception as e:
-    print(f"[WARNING]  White-Label SaaS router not loaded: {e}")
+    logger.warning(f"White-Label SaaS router not loaded: {e}")
     whitelabel_router = None
     _HAS_WHITELABEL = False
 
@@ -703,18 +731,48 @@ except Exception as e:
 try:
     from ospra_os.api.feedback_routes import router as feedback_router  # type: ignore
     _HAS_FEEDBACK = True
-    print("[SUCCESS] Feedback Loop router loaded successfully (G4: AI learns from sales)")
+    logger.info("Feedback Loop router loaded successfully (G4: AI learns from sales)")
 except Exception as e:
-    print(f"[WARNING]  Feedback Loop router not loaded: {e}")
+    logger.warning(f"Feedback Loop router not loaded: {e}")
     feedback_router = None
     _HAS_FEEDBACK = False
+
+# Marketing API router (Marketing angles, A/B testing)
+try:
+    from ospra_os.api.marketing_routes import router as marketing_router  # type: ignore
+    _HAS_MARKETING = True
+    logger.info("Marketing routes loaded successfully")
+except Exception as e:
+    logger.warning(f"Marketing routes not loaded: {e}")
+    marketing_router = None
+    _HAS_MARKETING = False
+
+# Live Trends router (Real-time product momentum)
+try:
+    from ospra_os.api.trends_routes import router as trends_router  # type: ignore
+    _HAS_TRENDS = True
+    logger.info("Trends routes loaded successfully")
+except Exception as e:
+    logger.warning(f"Trends routes not loaded: {e}")
+    trends_router = None
+    _HAS_TRENDS = False
+
+# Product Rankings router (Leaderboards and rank tracking)
+try:
+    from ospra_os.api.rankings_routes import router as rankings_router  # type: ignore
+    _HAS_RANKINGS = True
+    logger.info("Rankings routes loaded successfully")
+except Exception as e:
+    logger.warning(f"Rankings routes not loaded: {e}")
+    rankings_router = None
+    _HAS_RANKINGS = False
 
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
-    print("[SUCCESS] GmailClient loaded from app.gmail_client")
+    logger.info("GmailClient loaded from app.gmail_client")
 except Exception as e:
-    print(f"[WARNING]  Could not import GmailClient: {e}")
+    logger.warning(f"Could not import GmailClient: {e}")
     GmailClient = None
 
 # ============================================================================
@@ -824,7 +882,7 @@ For API support, contact support@ospra.io
 #
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
-print("[SUCCESS] ✓ Rate limiting enabled (Phase 1 Security)")
+logger.info("✓ Rate limiting enabled (Phase 1 Security)")
 
 #
 # OBSERVABILITY SETUP (TECHNICAL FIX T5)
@@ -860,7 +918,7 @@ if _HAS_OBSERVABILITY:
 # Adds X-Frame-Options, X-Content-Type-Options, HSTS, CSP, etc.
 from ospra_os.middleware.security_headers import SecurityHeadersMiddleware
 app.add_middleware(SecurityHeadersMiddleware, enable_hsts=True)
-print("[SUCCESS] ✓ Security headers middleware active (XSS, Clickjacking, HSTS protection)")
+logger.info("✓ Security headers middleware active (XSS, Clickjacking, HSTS protection)")
 
 #
 # CORS middleware - Restricted to ospra.io + localhost for dev (PHASE 1 SECURITY)
@@ -888,19 +946,19 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Store-ID"],
 )
-print("[SUCCESS] ✓ CORS restricted to ospra.io + localhost (Phase 1 Security)")
+logger.info("✓ CORS restricted to ospra.io + localhost (Phase 1 Security)")
 
 # Request Timeout Protection (PHASE 1 SECURITY)
 # Prevents requests from hanging indefinitely by enforcing 30-second timeout
 from ospra_os.middleware.timeout_middleware import TimeoutMiddleware
 app.add_middleware(TimeoutMiddleware, timeout_seconds=30)
-print("[SUCCESS] ✓ Request timeout protection active (30s limit)")
+logger.info("✓ Request timeout protection active (30s limit)")
 
 # Custom Rate Limiting (PHASE 1 SECURITY)
 # In-memory rate limiter with tier-based limits (upgradable to Redis)
 from ospra_os.middleware.custom_rate_limiter import CustomRateLimitMiddleware
 app.add_middleware(CustomRateLimitMiddleware, get_tier_limit_func=get_tier_limit)
-print("[SUCCESS] ✓ Custom rate limiting active (tier-based, in-memory)")
+logger.info("✓ Custom rate limiting active (tier-based, in-memory)")
 
 # Trust proxy headers from Render (for HTTPS URL generation)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
@@ -910,36 +968,43 @@ app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 # Order matters: Tenant middleware must come after CORS/Proxy but before routes
 app.add_middleware(StoreContextMiddleware)  # Extract store_id from query params/headers
 app.add_middleware(TenantMiddleware)  # Extract tenant_id from JWT token
-print("[SUCCESS] Tenant isolation middleware registered (GROK #14)")
+logger.info("Tenant isolation middleware registered (GROK #14)")
 
 # Tier Enforcement (PHASE 1 SECURITY)
 # Enforces subscription limits and feature access based on user tier
 from ospra_os.middleware.tier_enforcement import TierEnforcementMiddleware
 app.add_middleware(TierEnforcementMiddleware)
-print("[SUCCESS] ✓ Tier enforcement middleware active (Phase 1 Security)")
+logger.info("✓ Tier enforcement middleware active (Phase 1 Security)")
 
 # Debug Endpoint Protection (CRITICAL SECURITY)
 # Blocks /debug/* routes in production to prevent information leakage
 from ospra_os.security.debug_protection import DebugEndpointProtectionMiddleware
 app.add_middleware(DebugEndpointProtectionMiddleware)
-print("[SUCCESS] ✓ Debug endpoint protection active (blocks /debug/* in production)")
+logger.info("✓ Debug endpoint protection active (blocks /debug/* in production)")
 
 # Request Tracing Middleware (OBSERVABILITY)
 # Adds unique request IDs for tracking and debugging
 from ospra_os.observability.request_tracing import RequestTracingMiddleware
 app.add_middleware(RequestTracingMiddleware)
-print("[SUCCESS] ✓ Request tracing middleware active (X-Request-ID headers)")
+logger.info("✓ Request tracing middleware active (X-Request-ID headers)")
 
 # Mount static files for product images (only if directory exists)
 import os
 from pathlib import Path
 
-images_dir = Path("data/images")
+# Use absolute path to ensure static files work regardless of working directory
+PROJECT_ROOT = Path(__file__).parent.parent
+images_dir = PROJECT_ROOT / "data" / "images"
 if not images_dir.exists():
     os.makedirs(images_dir, exist_ok=True)
-    print(f"[SUCCESS] Created images directory: {images_dir}")
+    logger.info(f"Created images directory: {images_dir}")
 
-app.mount("/static/images", StaticFiles(directory="data/images"), name="images")
+# Also ensure enhanced subdirectory exists
+enhanced_dir = images_dir / "enhanced"
+enhanced_dir.mkdir(exist_ok=True)
+
+logger.debug(f"Mounting /static/images -> {images_dir}")
+app.mount("/static/images", StaticFiles(directory=str(images_dir)), name="images")
 
 # ---------------------------------------------------------------
 # CRITICAL: Immediate Health Check Endpoint
@@ -1002,22 +1067,22 @@ async def startup_event():
 
     # Skip startup initialization in test mode
     if os.getenv("APP_ENV") == "testing":
-        print("[TEST] Test mode detected - skipping startup initialization")
+        logger.debug("Test mode detected - skipping startup initialization")
         return
 
     startup_start = time.time()
-    print(f"[START] Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Validate environment variables
     try:
         from ospra_os.core.env_validator import validate_environment
         env_result = validate_environment(fail_fast=False, require_ai_provider=True)
         if env_result["errors"]:
-            print(f"[WARNING] Environment validation found {len(env_result['errors'])} error(s)")
+            logger.warning(f"Environment validation found {len(env_result['errors'])} error(s)")
         if env_result["warnings"]:
-            print(f"[INFO] Environment validation found {len(env_result['warnings'])} warning(s)")
+            logger.info(f"Environment validation found {len(env_result['warnings'])} warning(s)")
     except Exception as e:
-        print(f"[WARNING] Environment validation failed: {e}")
+        logger.warning(f"Environment validation failed: {e}")
 
     settings = get_settings()
 
@@ -1025,34 +1090,34 @@ async def startup_event():
     try:
         from app.models import init_followup_db
         init_followup_db(settings.database_url)
-        print("[SUCCESS] Follow-up database initialized")
+        logger.info("Follow-up database initialized")
     except Exception as e:
-        print(f"[WARNING]  Follow-up database initialization failed: {e}")
+        logger.warning(f"Follow-up database initialization failed: {e}")
 
     # Initialize analytics database
     try:
         from app.analytics import init_analytics_db
         init_analytics_db(settings.database_url)
-        print("[SUCCESS] Analytics database initialized")
+        logger.info("Analytics database initialized")
     except Exception as e:
-        print(f"[WARNING]  Analytics database initialization failed: {e}")
+        logger.warning(f"Analytics database initialization failed: {e}")
 
     # Initialize AliExpress OAuth database
     try:
         from ospra_os.aliexpress.oauth import init_aliexpress_oauth_db
         init_aliexpress_oauth_db(settings.database_url)
-        print("[SUCCESS] AliExpress OAuth database initialized")
+        logger.info("AliExpress OAuth database initialized")
     except Exception as e:
-        print(f"[WARNING]  AliExpress OAuth database initialization failed: {e}")
+        logger.warning(f"AliExpress OAuth database initialization failed: {e}")
 
     # Initialize Multi-Store database (CRITICAL: Must use init_database not init_multi_store_db)
     # init_multi_store_db uses legacy Base that doesn't include User model!
     try:
         from ospra_os.database import init_database
         init_database(settings.database_url)
-        print("[SUCCESS] All database tables initialized (including users table)")
+        logger.info("All database tables initialized (including users table)")
     except Exception as e:
-        print(f"[ERROR] Database initialization failed: {e}")
+        logger.error(f"Database initialization failed: {e}")
         import traceback
         traceback.print_exc()
         # Don't swallow this error - it's critical
@@ -1064,9 +1129,9 @@ async def startup_event():
         from ospra_os.database.connection import get_engine
         engine = get_engine(settings.database_url)
         Base.metadata.create_all(engine)
-        print("[SUCCESS] Ad Schedule database initialized")
+        logger.info("Ad Schedule database initialized")
     except Exception as e:
-        print(f"[WARNING]  Ad Schedule database initialization failed: {e}")
+        logger.warning(f"Ad Schedule database initialization failed: {e}")
 
     # Initialize Report database
     try:
@@ -1074,26 +1139,26 @@ async def startup_event():
         from ospra_os.database.connection import get_engine
         engine = get_engine(settings.database_url)
         init_report_tables(engine)
-        print("[SUCCESS] Report database initialized")
+        logger.info("Report database initialized")
     except Exception as e:
-        print(f"[WARNING]  Report database initialization failed: {e}")
+        logger.warning(f"Report database initialization failed: {e}")
 
     # Start report scheduler
     try:
         from ospra_os.reports.scheduler import get_scheduler
         scheduler = get_scheduler()
         await scheduler.start()
-        print("[SUCCESS] Report scheduler started")
+        logger.info("Report scheduler started")
     except Exception as e:
-        print(f"[WARNING]  Report scheduler failed to start: {e}")
+        logger.warning(f"Report scheduler failed to start: {e}")
 
     # Start background schedule processor
     try:
         from ospra_os.jobs.schedule_processor import start_schedule_processor
         start_schedule_processor()
-        print("[SUCCESS] Schedule processor started (runs every 5 minutes)")
+        logger.info("Schedule processor started (runs every 5 minutes)")
     except Exception as e:
-        print(f"[WARNING]  Schedule processor failed to start: {e}")
+        logger.warning(f"Schedule processor failed to start: {e}")
 
     # DEPRECATED: APScheduler replaced by Celery Beat (GROK #13)
     # Background email checking is now handled by Celery tasks
@@ -1102,19 +1167,17 @@ async def startup_event():
     # try:
     #     from app.scheduler import start_scheduler
     #     start_scheduler()
-    #     print("[SUCCESS] Background scheduler started")
+    #     logger.info("Background scheduler started")
     # except Exception as e:
-    #     print(f"[WARNING]  Scheduler failed to start: {e}")
-    print("[INFO]  Email scheduling managed by Celery Beat (see /api/tasks/beat-schedule)")
+    #     logger.warning(f"Scheduler failed to start: {e}")
+    logger.info(" Email scheduling managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start product monitoring in background thread
     try:
         from ospra_os.background_jobs.product_monitor import ProductMonitor
         from threading import Thread
         import time
-        import logging
 
-        logger = logging.getLogger(__name__)
         monitor = ProductMonitor()
 
         def monitoring_task():
@@ -1127,7 +1190,7 @@ async def startup_event():
                     if changes:
                         logger.info(f"[SUCCESS] Detected {len(changes)} product changes")
                         notification = monitor.format_notification(changes)
-                        print(notification)
+                        logger.info(f"Product changes notification:\n{notification}")
 
                         # Mark as notified
                         monitor.db.mark_all_notified()
@@ -1145,23 +1208,20 @@ async def startup_event():
         # Start monitoring thread
         monitor_thread = Thread(target=monitoring_task, daemon=True)
         monitor_thread.start()
-        print("[SUCCESS] Product monitoring started (6-hour intervals)")
+        logger.info("Product monitoring started (6-hour intervals)")
 
     except Exception as e:
-        print(f"[WARNING]  Product monitoring failed to start: {e}")
+        logger.warning(f"Product monitoring failed to start: {e}")
 
     # Start Level 3 AI background jobs
     try:
         from ospra_os.intelligence.background_jobs import start_background_jobs
-        import logging
-
-        logger = logging.getLogger(__name__)
 
         start_background_jobs()
         logger.info("[SUCCESS] Level 3 AI activated - background monitoring enabled")
-        print("[SUCCESS] Level 3 AI activated - background monitoring enabled")
+        logger.info("Level 3 AI activated - background monitoring enabled")
     except Exception as e:
-        print(f"[WARNING]  Level 3 AI not available - continuing without background monitoring: {e}")
+        logger.warning(f"Level 3 AI not available - continuing without background monitoring: {e}")
 
     # Start auto-discovery background scheduler
     if _HAS_AUTO_DISCOVERY and start_auto_discovery_scheduler:
@@ -1180,18 +1240,18 @@ async def startup_event():
                         database_url=settings.database_url,
                         interval_hours=int(discovery_interval)
                     )
-                    print(f"[SUCCESS] Auto-discovery scheduler started (every {discovery_interval} hours)")
+                    logger.info(f"Auto-discovery scheduler started (every {discovery_interval} hours)")
                 else:
                     # Daily scheduling
                     start_auto_discovery_scheduler(
                         database_url=settings.database_url,
                         hour=discovery_hour
                     )
-                    print(f"[SUCCESS] Auto-discovery scheduler started (daily at {discovery_hour:02d}:00)")
+                    logger.info(f"Auto-discovery scheduler started (daily at {discovery_hour:02d}:00)")
             else:
-                print("[WARNING]  Auto-discovery disabled in environment or no database URL")
+                logger.warning("Auto-discovery disabled in environment or no database URL")
         except Exception as e:
-            print(f"[WARNING]  Auto-discovery scheduler failed to start: {e}")
+            logger.warning(f"Auto-discovery scheduler failed to start: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1213,11 +1273,11 @@ async def startup_event():
                 hour=ranking_hour,
                 minute=ranking_minute
             )
-            print(f"[SUCCESS] Daily ranking scheduler started (daily at {ranking_hour:02d}:{ranking_minute:02d})")
+            logger.info(f"Daily ranking scheduler started (daily at {ranking_hour:02d}:{ranking_minute:02d})")
         else:
-            print("[WARNING]  Daily ranking disabled in environment or no database URL")
+            logger.warning("Daily ranking disabled in environment or no database URL")
     except Exception as e:
-        print(f"[WARNING]  Daily ranking scheduler failed to start: {e}")
+        logger.warning(f"Daily ranking scheduler failed to start: {e}")
         import traceback
         traceback.print_exc()
 
@@ -1226,9 +1286,9 @@ async def startup_event():
         from ospra_os.intelligence.realtime_updater import start_realtime_updates
 
         await start_realtime_updates()
-        print("[SUCCESS] Realtime momentum updater started (5-minute intervals)")
+        logger.info("Realtime momentum updater started (5-minute intervals)")
     except Exception as e:
-        print(f"[WARNING]  Realtime momentum updater failed to start: {e}")
+        logger.warning(f"Realtime momentum updater failed to start: {e}")
         import traceback
         traceback.print_exc()
 
@@ -1239,10 +1299,10 @@ async def startup_event():
     # try:
     #     from ospra_os.jobs.scheduler import start_scheduler as start_customer_scheduler
     #     start_customer_scheduler()
-    #     print("[SUCCESS] Customer analytics scheduler started")
+    #     logger.info("Customer analytics scheduler started")
     # except Exception as e:
-    #     print(f"[WARNING]  Customer analytics scheduler failed to start: {e}")
-    print("[INFO]  Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
+    #     logger.warning(f"Customer analytics scheduler failed to start: {e}")
+    logger.info(" Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start AliExpress token refresh scheduler
     try:
@@ -1250,29 +1310,38 @@ async def startup_event():
         start_token_refresh_scheduler()
         # Check tokens immediately on startup
         await check_tokens_on_startup()
-        print("[SUCCESS] AliExpress token refresh scheduler started")
+        logger.info("AliExpress token refresh scheduler started")
     except Exception as e:
-        print(f"[WARNING]  AliExpress token refresh scheduler failed to start: {e}")
+        logger.warning(f"AliExpress token refresh scheduler failed to start: {e}")
 
     # Start Auto-Deploy scheduler
     try:
         from ospra_os.background_jobs.auto_deploy_job import start_auto_deploy_scheduler
         start_auto_deploy_scheduler()
-        print("[SUCCESS] Auto-deploy scheduler started (runs every hour)")
+        logger.info("Auto-deploy scheduler started (runs every hour)")
     except Exception as e:
-        print(f"[WARNING]  Auto-deploy scheduler failed to start: {e}")
+        logger.warning(f"Auto-deploy scheduler failed to start: {e}")
 
     # Start Learning Summary background jobs
     try:
         from ospra_os.learning.summary_jobs import setup_summary_jobs
         setup_summary_jobs()
-        print("[SUCCESS] Learning summary jobs started (nightly at 3:00 AM UTC)")
+        logger.info("Learning summary jobs started (nightly at 3:00 AM UTC)")
     except Exception as e:
-        print(f"[WARNING]  Learning summary jobs failed to start: {e}")
+        logger.warning(f"Learning summary jobs failed to start: {e}")
+
+    # Task #17: Sentiment refresh on watched products (every 4 hours).
+    # Live social sentiment is the stated differentiator, so we keep watched
+    # (QUEUED/DEPLOYED/ACTIVE) products' sentiment fresh in the background.
+    try:
+        from ospra_os.intelligence.sentiment_refresher import start_sentiment_refresh_scheduler
+        start_sentiment_refresh_scheduler()
+    except Exception as e:
+        logger.warning(f"Sentiment refresh scheduler failed to start: {e}")
 
     # Log startup completion with timing
     startup_duration = time.time() - startup_start
-    print(f"[SUCCESS] Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 # ---------------------------------------------------------------
@@ -1281,51 +1350,56 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    import logging
-
-    logger = logging.getLogger(__name__)
     logger.info("[PAUSE]  Shutting down Ospra Intelligence...")
-    print("[PAUSE]  Shutting down Ospra Intelligence...")
+    logger.info(" Shutting down Ospra Intelligence...")
 
     # Stop Level 3 AI background jobs
     try:
         from ospra_os.intelligence.background_jobs import stop_background_jobs
         stop_background_jobs()
         logger.info("[SUCCESS] Background jobs stopped")
-        print("[SUCCESS] Background jobs stopped")
+        logger.info("Background jobs stopped")
     except Exception as e:
         logger.error(f"Error stopping background jobs: {e}")
-        print(f"[WARNING]  Error stopping background jobs: {e}")
+        logger.warning(f"Error stopping background jobs: {e}")
 
     # Stop learning summary jobs
     try:
         from ospra_os.learning.summary_jobs import shutdown_summary_jobs
         shutdown_summary_jobs()
         logger.info("[SUCCESS] Learning summary jobs stopped")
-        print("[SUCCESS] Learning summary jobs stopped")
+        logger.info("Learning summary jobs stopped")
     except Exception as e:
         logger.error(f"Error stopping summary jobs: {e}")
-        print(f"[WARNING]  Error stopping summary jobs: {e}")
+        logger.warning(f"Error stopping summary jobs: {e}")
 
     # Stop realtime momentum updater
     try:
         from ospra_os.intelligence.realtime_updater import stop_realtime_updates
         await stop_realtime_updates()
         logger.info("[SUCCESS] Realtime momentum updater stopped")
-        print("[SUCCESS] Realtime momentum updater stopped")
+        logger.info("Realtime momentum updater stopped")
     except Exception as e:
         logger.error(f"Error stopping realtime updater: {e}")
-        print(f"[WARNING]  Error stopping realtime updater: {e}")
+        logger.warning(f"Error stopping realtime updater: {e}")
+
+    # Stop sentiment refresh scheduler (Task #17)
+    try:
+        from ospra_os.intelligence.sentiment_refresher import stop_sentiment_refresh_scheduler
+        stop_sentiment_refresh_scheduler()
+        logger.info("[SUCCESS] Sentiment refresh scheduler stopped")
+    except Exception as e:
+        logger.warning(f"Error stopping sentiment refresh scheduler: {e}")
 
     # Stop AliExpress token refresh scheduler
     try:
         from ospra_os.api.aliexpress_token_scheduler import stop_token_refresh_scheduler
         stop_token_refresh_scheduler()
         logger.info("[SUCCESS] AliExpress token refresh scheduler stopped")
-        print("[SUCCESS] AliExpress token refresh scheduler stopped")
+        logger.info("AliExpress token refresh scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping token refresh scheduler: {e}")
-        print(f"[WARNING]  Error stopping token refresh scheduler: {e}")
+        logger.warning(f"Error stopping token refresh scheduler: {e}")
 
     # Stop report scheduler
     try:
@@ -1333,20 +1407,20 @@ async def shutdown_event():
         scheduler = get_scheduler()
         await scheduler.stop()
         logger.info("[SUCCESS] Report scheduler stopped")
-        print("[SUCCESS] Report scheduler stopped")
+        logger.info("Report scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping report scheduler: {e}")
-        print(f"[WARNING]  Error stopping report scheduler: {e}")
+        logger.warning(f"Error stopping report scheduler: {e}")
 
     # Stop customer analytics scheduler
     try:
         from ospra_os.jobs.scheduler import stop_scheduler as stop_customer_scheduler
         stop_customer_scheduler()
         logger.info("[SUCCESS] Customer analytics scheduler stopped")
-        print("[SUCCESS] Customer analytics scheduler stopped")
+        logger.info("Customer analytics scheduler stopped")
     except Exception as e:
         logger.error(f"Error stopping customer analytics scheduler: {e}")
-        print(f"[WARNING]  Error stopping customer analytics scheduler: {e}")
+        logger.warning(f"Error stopping customer analytics scheduler: {e}")
 
 
 if gmail_oauth_router:
@@ -1482,6 +1556,10 @@ if _HAS_FULFILLMENT and fulfillment_router:
 if _HAS_OI and oi_router:
     app.include_router(oi_router)  # exposes /api/oi/* (AI chat, actions, context)
 
+# Product Analysis (AI analysis and caption generation)
+if _HAS_PRODUCT_ANALYSIS and product_analysis_router:
+    app.include_router(product_analysis_router)  # exposes /api/oi/analyze-product, /api/oi/generate-caption
+
 # Oi Alerts (Real-time notifications for Oi AI)
 if _HAS_ALERTS and alert_router:
     app.include_router(alert_router)  # exposes /api/oi/alerts/* (CRUD endpoints)
@@ -1538,6 +1616,18 @@ if _HAS_WHITELABEL and whitelabel_router:
 
 if _HAS_FEEDBACK and feedback_router:
     app.include_router(feedback_router)  # exposes /api/feedback/* (G4: AI learns from real sales)
+
+# Marketing routes (extracted from main.py for better organization)
+if _HAS_MARKETING and marketing_router:
+    app.include_router(marketing_router)  # exposes /api/marketing/*
+
+# Trends routes (extracted from main.py for better organization)
+if _HAS_TRENDS and trends_router:
+    app.include_router(trends_router)  # exposes /api/trends/*
+
+# Rankings routes (extracted from main.py for better organization)
+if _HAS_RANKINGS and rankings_router:
+    app.include_router(rankings_router)  # exposes /api/rankings/*
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)
@@ -1728,7 +1818,7 @@ async def get_platforms():
 @app.post("/api/platforms/{platform}/test")
 async def test_platform_credentials(
     platform: str,
-    credentials: Dict = Body(...),
+    credentials: PlatformCredentials,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -1836,11 +1926,85 @@ async def discover_products_api(
     except Exception as e:
         # SECURITY: Log traceback server-side, don't expose to client
         logger.error(f"Product discovery failed for niche '{niche}': {e}", exc_info=True)
+
+        # Return demo products for development when APIs fail
+        if os.getenv("DEBUG", "").lower() in ("true", "1", "yes"):
+            logger.info(f"[DEMO] Returning demo products for {niche} due to API failure")
+            demo_products = _get_demo_products_fallback(niche, max_results)
+            return {
+                "niche": niche,
+                "total_found": len(demo_products),
+                "high_priority": len([p for p in demo_products if p.get("priority") == "high"]),
+                "medium_priority": len([p for p in demo_products if p.get("priority") == "medium"]),
+                "low_priority": len([p for p in demo_products if p.get("priority") == "low"]),
+                "products": demo_products,
+                "search_time": "0.1s",
+                "demo_mode": True,
+                "note": "Demo data - real APIs not connected"
+            }
+
         return {
             "error": "Product discovery failed. Please try again.",
             "niche": niche,
             "total_found": 0,
         }
+
+
+def _get_demo_products_fallback(niche: str, count: int = 10) -> List[Dict]:
+    """Return demo products for development when APIs fail."""
+    import random
+    from datetime import datetime
+
+    DEMO_DATA = {
+        "smart_home": [
+            {"name": "Smart LED Strip Lights RGB WiFi", "cost": 8.50},
+            {"name": "WiFi Smart Plug with Energy Monitor", "cost": 6.99},
+            {"name": "Smart Motion Sensor PIR Detector", "cost": 5.50},
+            {"name": "WiFi Smart Bulb RGBW Dimmable", "cost": 4.99},
+            {"name": "Smart Door Lock Fingerprint", "cost": 45.00},
+        ],
+        "kitchen": [
+            {"name": "Electric Milk Frother Handheld", "cost": 5.99},
+            {"name": "Silicone Kitchen Utensil Set", "cost": 12.50},
+            {"name": "Vegetable Chopper Dicer Slicer", "cost": 8.99},
+            {"name": "Digital Kitchen Scale 5kg", "cost": 7.50},
+            {"name": "Vacuum Food Storage Containers", "cost": 15.00},
+        ],
+        "fitness": [
+            {"name": "Resistance Bands Set 5 Levels", "cost": 6.50},
+            {"name": "Foam Roller Muscle Massage", "cost": 9.99},
+            {"name": "Jump Rope Speed Skipping", "cost": 4.50},
+            {"name": "Yoga Mat Non-Slip 6mm", "cost": 11.00},
+            {"name": "Adjustable Dumbbells Set", "cost": 35.00},
+        ],
+    }
+
+    products = []
+    base_data = DEMO_DATA.get(niche.replace(" ", "_").lower(), DEMO_DATA["smart_home"])
+
+    for i, item in enumerate(base_data[:count]):
+        cost = item["cost"]
+        price = round(cost * 2.5, 2)
+        score = random.uniform(6.0, 9.0)
+        priority = "high" if score >= 8 else "medium" if score >= 6.5 else "low"
+
+        products.append({
+            "id": f"demo_{i}",
+            "name": item["name"],
+            "niche": niche,
+            "cost_price": cost,
+            "suggested_price": price,
+            "profit_margin": round((price - cost) / price * 100, 1),
+            "score": round(score, 1),
+            "priority": priority,
+            "trend_score": random.randint(50, 85),
+            "sentiment_score": random.randint(60, 90),
+            "sources": ["demo"],
+            "is_demo": True,
+            "discovered_at": datetime.now().isoformat(),
+        })
+
+    return products
 
 
 @app.post("/api/validate-product")
@@ -2765,7 +2929,7 @@ async def get_recommendation_analytics(
 
 @app.post("/api/shopify/deploy")
 async def deploy_to_shopify(
-    request: Dict = Body(...),
+    request: ShopifyDeployRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -2794,11 +2958,11 @@ async def deploy_to_shopify(
         deployment_service = ProductDeploymentService()
 
         # Get product data
-        if request.get('product_id'):
+        if request.product_id:
             # TODO: Load from database
             product_data = {}  # Load from DB
         else:
-            product_data = request.get('product_data')
+            product_data = request.product_data
 
         if not product_data:
             return {
@@ -2812,7 +2976,7 @@ async def deploy_to_shopify(
         return result
 
     except Exception as e:
-        print(f"[ERROR] Deploy endpoint error: {e}")
+        logger.error(f"Deploy endpoint error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -2823,7 +2987,7 @@ async def deploy_to_shopify(
 
 @app.post("/api/shopify/bulk-deploy")
 async def bulk_deploy_to_shopify(
-    request: Dict = Body(...),
+    request: ShopifyBulkDeployRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -2850,11 +3014,11 @@ async def bulk_deploy_to_shopify(
         deployment_service = ProductDeploymentService()
 
         # Get products
-        if request.get('product_ids'):
+        if request.product_ids:
             # TODO: Load from database
             products = []  # Load from DB
         else:
-            products = request.get('products', [])
+            products = request.products or []
 
         if not products:
             return {
@@ -2876,7 +3040,7 @@ async def bulk_deploy_to_shopify(
         }
 
     except Exception as e:
-        print(f"[ERROR] Bulk deploy error: {e}")
+        logger.error(f"Bulk deploy error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -2916,7 +3080,7 @@ async def list_shopify_products(
         }
 
     except Exception as e:
-        print(f"[ERROR] List products error: {e}")
+        logger.error(f"List products error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -2958,7 +3122,7 @@ async def delete_shopify_product(
             }
 
     except Exception as e:
-        print(f"[ERROR] Delete product error: {e}")
+        logger.error(f"Delete product error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -2967,7 +3131,7 @@ async def delete_shopify_product(
 
 @app.post("/api/aliexpress/search")
 async def search_aliexpress(
-    request: Dict = Body(...),
+    request: AliExpressSearchRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -2993,9 +3157,9 @@ async def search_aliexpress(
         client = AliExpressClient()
 
         products = await client.search_products(
-            keywords=request.get('keywords'),
-            min_price=request.get('min_price'),
-            max_price=request.get('max_price')
+            keywords=request.keywords,
+            min_price=request.min_price,
+            max_price=request.max_price
         )
 
         return {
@@ -3005,7 +3169,7 @@ async def search_aliexpress(
         }
 
     except Exception as e:
-        print(f"[ERROR] AliExpress search error: {e}")
+        logger.error(f"AliExpress search error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -3014,7 +3178,7 @@ async def search_aliexpress(
 
 @app.post("/api/aliexpress/affiliate-links")
 async def generate_affiliate_links(
-    request: Dict = Body(...),
+    request: AliExpressAffiliateLinkRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3040,7 +3204,7 @@ async def generate_affiliate_links(
         client = AliExpressClient()
 
         links = await client.get_affiliate_links(
-            request.get('product_ids', [])
+            request.product_ids
         )
 
         return {
@@ -3049,7 +3213,7 @@ async def generate_affiliate_links(
         }
 
     except Exception as e:
-        print(f"[ERROR] Affiliate link error: {e}")
+        logger.error(f"Affiliate link error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -3058,7 +3222,7 @@ async def generate_affiliate_links(
 
 @app.post("/api/aliexpress/fulfill-order")
 async def fulfill_order(
-    request: Dict = Body(...),
+    request: AliExpressFulfillRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3085,14 +3249,14 @@ async def fulfill_order(
         fulfillment = OrderFulfillmentService()
 
         result = await fulfillment.fulfill_order(
-            request.get('shopify_order'),
-            request.get('aliexpress_product_id')
+            request.shopify_order,
+            request.aliexpress_product_id
         )
 
         return result
 
     except Exception as e:
-        print(f"[ERROR] Order fulfillment error: {e}")
+        logger.error(f"Order fulfillment error: {e}")
         import traceback
         traceback.print_exc()
         return {
@@ -3103,7 +3267,7 @@ async def fulfill_order(
 
 @app.post("/api/aliexpress/sync-inventory")
 async def sync_inventory(
-    request: Dict = Body(...),
+    request: AliExpressSyncRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3131,7 +3295,7 @@ async def sync_inventory(
         sync_service = InventorySyncService()
 
         results = await sync_service.bulk_sync(
-            request.get('products', [])
+            request.products
         )
 
         return {
@@ -3140,7 +3304,7 @@ async def sync_inventory(
         }
 
     except Exception as e:
-        print(f"[ERROR] Inventory sync error: {e}")
+        logger.error(f"Inventory sync error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -3149,7 +3313,7 @@ async def sync_inventory(
 
 @app.post("/api/aliexpress/monitor-prices")
 async def monitor_prices(
-    request: Dict = Body(...),
+    request: AliExpressMonitorPricesRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3179,8 +3343,8 @@ async def monitor_prices(
         sync_service = InventorySyncService()
 
         alerts = await sync_service.monitor_price_changes(
-            request.get('products', []),
-            request.get('threshold_percent', 10.0)
+            request.products,
+            request.threshold_percent
         )
 
         return {
@@ -3189,7 +3353,7 @@ async def monitor_prices(
         }
 
     except Exception as e:
-        print(f"[ERROR] Price monitoring error: {e}")
+        logger.error(f"Price monitoring error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -3202,7 +3366,7 @@ async def monitor_prices(
 
 @app.post("/api/meta/create-campaign")
 async def create_meta_campaign(
-    request: Dict = Body(...),
+    request: MetaCampaignRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3226,15 +3390,15 @@ async def create_meta_campaign(
         builder = CampaignBuilder()
 
         result = await builder.create_complete_campaign(
-            product=request.get('product'),
-            daily_budget=request.get('daily_budget', 10.0),
-            auto_activate=request.get('auto_activate', False)
+            product=request.product.model_dump(),
+            daily_budget=request.daily_budget,
+            auto_activate=request.auto_activate
         )
 
         return result
 
     except Exception as e:
-        print(f"[ERROR] Campaign creation error: {e}")
+        logger.error(f"Campaign creation error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -3243,7 +3407,7 @@ async def create_meta_campaign(
 
 @app.post("/api/meta/bulk-campaigns")
 async def create_bulk_campaigns(
-    request: Dict = Body(...),
+    request: MetaBulkCampaignCreateRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3261,8 +3425,8 @@ async def create_bulk_campaigns(
         builder = CampaignBuilder()
 
         results = await builder.bulk_create_campaigns(
-            products=request.get('products', []),
-            daily_budget_per_product=request.get('daily_budget_per_product', 10.0)
+            products=request.products,
+            daily_budget_per_product=request.daily_budget_per_product
         )
 
         successful = sum(1 for r in results if r.get('success'))
@@ -3314,7 +3478,7 @@ async def get_campaign_insights(
 @app.post("/api/meta/campaign/{campaign_id}/status")
 async def update_campaign_status(
     campaign_id: str,
-    request: Dict = Body(...),
+    request: CampaignStatusUpdate,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3332,7 +3496,7 @@ async def update_campaign_status(
 
         success = await client.update_campaign_status(
             campaign_id,
-            request.get('status')
+            request.status
         )
 
         return {
@@ -3349,7 +3513,7 @@ async def update_campaign_status(
 @app.post("/api/meta/adset/{ad_set_id}/budget")
 async def update_ad_set_budget(
     ad_set_id: str,
-    request: Dict = Body(...),
+    request: AdSetBudgetUpdate,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3365,7 +3529,7 @@ async def update_ad_set_budget(
 
         client = MetaAdsClient()
 
-        budget_cents = int(request.get('daily_budget', 10.0) * 100)
+        budget_cents = int((request.daily_budget or 10.0) * 100)
 
         success = await client.update_ad_set_budget(
             ad_set_id,
@@ -3389,7 +3553,7 @@ async def update_ad_set_budget(
 
 @app.post("/api/schedule/create")
 async def create_ad_schedule(
-    request: Dict = Body(...),
+    request: ScheduleCreateRequest,
     settings: Settings = Depends(get_settings)
 ):
     """
@@ -3412,29 +3576,29 @@ async def create_ad_schedule(
 
         # Parse dates
         scheduled_start = datetime.fromisoformat(
-            request.get('scheduled_start').replace('Z', '+00:00')
+            request.scheduled_start.replace('Z', '+00:00')
         )
 
         scheduled_end = None
-        if request.get('scheduled_end'):
+        if request.scheduled_end:
             scheduled_end = datetime.fromisoformat(
-                request.get('scheduled_end').replace('Z', '+00:00')
+                request.scheduled_end.replace('Z', '+00:00')
             )
 
         result = await manager.create_schedule(
-            product=request.get('product'),
+            product=request.product,
             scheduled_start=scheduled_start,
-            daily_budget=request.get('daily_budget', 10.0),
+            daily_budget=request.daily_budget,
             scheduled_end=scheduled_end,
-            total_budget=request.get('total_budget'),
-            platform=request.get('platform', 'meta'),
-            target_audience=request.get('target_audience')
+            total_budget=request.total_budget,
+            platform=request.platform,
+            target_audience=request.target_audience
         )
 
         return result
 
     except Exception as e:
-        print(f"[ERROR] Schedule creation error: {e}")
+        logger.error(f"Schedule creation error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -4406,13 +4570,13 @@ async def trends_websocket(websocket: WebSocket):
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
 except Exception as e:
-    print(f"[WARNING]  Static files not mounted: {e}")
+    logger.warning(f"Static files not mounted: {e}")
 
 # Mount generated images directory for AI-generated product images
 try:
     generated_images_dir = Path(__file__).parent.parent / "generated_images"
     generated_images_dir.mkdir(exist_ok=True)  # Create if doesn't exist
     app.mount("/generated_images", StaticFiles(directory=str(generated_images_dir)), name="generated_images")
-    print(f"[SUCCESS] Generated images mounted at /generated_images")
+    logger.info(f"Generated images mounted at /generated_images")
 except Exception as e:
-    print(f"[WARNING]  Generated images not mounted: {e}")
+    logger.warning(f"Generated images not mounted: {e}")

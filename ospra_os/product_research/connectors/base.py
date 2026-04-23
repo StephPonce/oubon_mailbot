@@ -43,6 +43,31 @@ class ProductCandidate:
     tags: List[str] = None
     discovered_at: datetime = None
 
+    # Evidence trail (populated by enrichment, not by source connectors)
+    # twitter_evidence: {
+    #   "found_real_tweets": bool,
+    #   "tweet_count": int,
+    #   "sentiment_score": float | None,
+    #   "sample_tweets": [str, ...],
+    #   "engagement": {"total_likes": int, "total_retweets": int, "total_replies": int},
+    #   "common_praise": [str, ...],
+    #   "common_complaints": [str, ...],
+    #   "fetched_at": ISO8601 timestamp
+    # }
+    twitter_evidence: Optional[Dict[str, Any]] = None
+    # reddit_evidence: list of matched posts with real URLs for verification
+    # [{"title": str, "url": str, "score": int, "num_comments": int, "subreddit": str, "created_utc": float}, ...]
+    reddit_evidence: Optional[List[Dict[str, Any]]] = None
+    # amazon_evidence: niche-level Amazon listings fuzzy-matched to this product
+    # {
+    #   "found_matches": bool, "match_count": int,
+    #   "top_matches": [{"title", "rating", "reviews_count", "price", "url",
+    #                    "image_url", "asin", "bestseller_rank", "match_score"}, ...],
+    #   "aggregate_rating": float, "total_reviews": int, "buzz_score": float,
+    #   "niche_searched": str, "fetched_at": ISO8601
+    # }
+    amazon_evidence: Optional[Dict[str, Any]] = None
+
     def __post_init__(self):
         if self.tags is None:
             self.tags = []
@@ -70,6 +95,9 @@ class ProductCandidate:
             "category": self.category,
             "tags": self.tags,
             "discovered_at": self.discovered_at.isoformat() if self.discovered_at else None,
+            "twitter_evidence": self.twitter_evidence,
+            "reddit_evidence": self.reddit_evidence,
+            "amazon_evidence": self.amazon_evidence,
         }
 
 

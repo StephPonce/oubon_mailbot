@@ -5,7 +5,7 @@ SEARCH RELEVANCE API ROUTES
 Endpoints for testing and using the search relevance filter.
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Dict, Optional
 from pydantic import BaseModel
 
@@ -14,6 +14,9 @@ from ospra_os.product_research.search_relevance_filter import (
     QueryOptimizer,
     RelevanceScore
 )
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 router = APIRouter(prefix="/api/search-relevance", tags=["Search Relevance"])
 
@@ -43,7 +46,7 @@ class FilterRequest(BaseModel):
 
 
 @router.post("/score")
-async def score_products(request: ScoreRequest):
+async def score_products(request: ScoreRequest, current_user: User = Depends(get_current_user)):
     """
     Score products for relevance to a search query.
     
@@ -92,7 +95,7 @@ async def score_products(request: ScoreRequest):
 
 
 @router.post("/filter")
-async def filter_products(request: FilterRequest):
+async def filter_products(request: FilterRequest, current_user: User = Depends(get_current_user)):
     """
     Filter a list of products by relevance.
     
@@ -122,7 +125,8 @@ async def filter_products(request: FilterRequest):
 
 @router.get("/optimize-query")
 async def optimize_query(
-    query: str = Query(..., description="Search query to optimize")
+    query: str = Query(..., description="Search query to optimize"),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Optimize a search query by removing noise words.
@@ -142,7 +146,7 @@ async def optimize_query(
 
 
 @router.get("/test")
-async def test_relevance_filter():
+async def test_relevance_filter(current_user: User = Depends(get_current_user)):
     """
     Test the relevance filter with example data.
     
@@ -222,7 +226,7 @@ async def test_relevance_filter():
 
 
 @router.get("/categories")
-async def get_category_patterns():
+async def get_category_patterns(current_user: User = Depends(get_current_user)):
     """
     Get the category detection patterns used by the filter.
     """

@@ -93,7 +93,7 @@ export function OiChat() {
         user_tier: user?.tier 
       });
       
-      console.log('Oi response:', response);
+      // console.log('Oi response:', response);
       
       // Extract message from various response formats
       let aiContent = response.message 

@@ -2,7 +2,7 @@
 [BRAIN] AI PRODUCT ANALYZER - Claude-Powered COO Analysis
 ====================================================
 
-This is THE MISSING PIECE that transforms Ospra from 
+This is THE MISSING PIECE that transforms Ospra from
 "hot products dashboard" into "AI e-commerce COO".
 
 Takes validated products from discovery engine and generates:
@@ -15,17 +15,24 @@ Takes validated products from discovery engine and generates:
 
 Uses Claude for reasoning - the best at complex analysis.
 
+CACHING: v2.0 adds analysis caching for:
+- Consistency: Same product = same analysis (until cache expires)
+- Cost reduction: Avoid duplicate API calls
+- Speed: Instant response for cached products
+
 Author: OspraOS
 Date: December 2024
+Updated: v2.0 with caching support
 """
 
 import os
 import json
 import asyncio
 import logging
+import hashlib
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -41,16 +48,16 @@ except ImportError:
 @dataclass
 class COOAnalysis:
     """Complete COO-level product analysis from Claude"""
-    
+
     # Product identification
     product_id: str
     product_name: str
     niche: str
-    
+
     # Scores (from discovery engine)
     ospra_score: float
     confidence: float
-    
+
     # Claude-generated analysis
     executive_summary: str          # 2-3 sentence overview
     market_timing_analysis: str     # Why now? Window of opportunity
@@ -59,26 +66,31 @@ class COOAnalysis:
     profit_strategy: str            # Pricing and margin recommendations
     risk_assessment: str            # What could go wrong
     execution_plan: str             # Step-by-step action items
-    
+
     # Structured recommendations
     recommendation: str             # DEPLOY_NOW, DEPLOY_SOON, MONITOR, SKIP
     urgency: str                    # CRITICAL, HIGH, MEDIUM, LOW
     confidence_level: str           # HIGH, MEDIUM, LOW
-    
+
     # Key metrics extracted
     estimated_monthly_profit: float
     suggested_price: float
     competition_level: str          # LOW, MEDIUM, HIGH, SATURATED
     trend_stage: str                # EMERGING, GROWING, PEAK, DECLINING
     first_mover_window_days: int    # Days until market saturates
-    
+
     # Action items
     immediate_actions: List[str]
     watch_triggers: List[str]       # What would change recommendation
-    
+
+    # DATA TRANSPARENCY - NEW
+    data_sources_cited: str = ""    # Which sources were used in analysis
+    sources_validated: List[str] = field(default_factory=list)  # List of validated sources
+    score_breakdown: Dict[str, Any] = field(default_factory=dict)  # Detailed score components
+
     # Metadata
     analyzed_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
-    analysis_version: str = "v1.0"
+    analysis_version: str = "v2.0"  # Updated version
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -104,20 +116,134 @@ class COOAnalysis:
             "first_mover_window_days": self.first_mover_window_days,
             "immediate_actions": self.immediate_actions,
             "watch_triggers": self.watch_triggers,
+            # DATA TRANSPARENCY
+            "data_sources_cited": self.data_sources_cited,
+            "sources_validated": self.sources_validated,
+            "score_breakdown": self.score_breakdown,
             "analyzed_at": self.analyzed_at,
             "analysis_version": self.analysis_version,
         }
 
 
+class AnalysisCache:
+    """
+    In-memory cache for AI analysis results.
+
+    Provides:
+    - TTL-based expiration (default 4 hours)
+    - Consistent results for same product
+    - Reduced API costs
+    """
+
+    def __init__(self, default_ttl_hours: float = 4.0):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._default_ttl = timedelta(hours=default_ttl_hours)
+        self._stats = {"hits": 0, "misses": 0, "evictions": 0}
+
+    def _generate_key(self, product: Dict[str, Any], store_context: Optional[Dict] = None) -> str:
+        """
+        Generate cache key from product and store context.
+
+        The key is intentionally coarse — product_id + store_name only. Previously
+        it included oi_score and confidence, which meant every tiny score wobble
+        from a fresh discovery (±1-2 points from shifted supplier data) busted the
+        cache and triggered a new Claude call with fresh variance. That was the
+        root cause of the >10% drift users saw between refreshes.
+
+        If a user genuinely wants a fresh take after material score changes, the
+        "Refresh Analysis" button calls analyze_product(force_refresh=True) which
+        bypasses this cache entirely.
+        """
+        product_id = product.get("id") or product.get("product_id", "")
+        store_name = (store_context or {}).get("store_name", "default")
+
+        key_string = f"{product_id}|{store_name}"
+        return hashlib.sha256(key_string.encode()).hexdigest()[:16]
+
+    def get(self, product: Dict[str, Any], store_context: Optional[Dict] = None) -> Optional[Dict[str, Any]]:
+        """Get cached analysis if fresh."""
+        key = self._generate_key(product, store_context)
+
+        if key not in self._cache:
+            self._stats["misses"] += 1
+            return None
+
+        entry = self._cache[key]
+        cached_at = entry.get("cached_at")
+        ttl = entry.get("ttl", self._default_ttl)
+
+        # Check if expired
+        if datetime.utcnow() - cached_at > ttl:
+            del self._cache[key]
+            self._stats["evictions"] += 1
+            self._stats["misses"] += 1
+            return None
+
+        self._stats["hits"] += 1
+        return entry.get("analysis")
+
+    def set(
+        self,
+        product: Dict[str, Any],
+        analysis: Dict[str, Any],
+        store_context: Optional[Dict] = None,
+        ttl: Optional[timedelta] = None
+    ):
+        """Cache an analysis result."""
+        key = self._generate_key(product, store_context)
+        self._cache[key] = {
+            "analysis": analysis,
+            "cached_at": datetime.utcnow(),
+            "ttl": ttl or self._default_ttl,
+            "product_id": product.get("id") or product.get("product_id"),
+        }
+
+    def get_stats(self) -> Dict[str, int]:
+        """Get cache statistics."""
+        return {
+            **self._stats,
+            "cached_count": len(self._cache),
+            "hit_rate": round(self._stats["hits"] / max(1, self._stats["hits"] + self._stats["misses"]) * 100, 1)
+        }
+
+    def clear(self):
+        """Clear all cached entries."""
+        count = len(self._cache)
+        self._cache.clear()
+        return count
+
+    def cleanup_expired(self) -> int:
+        """Remove expired entries."""
+        now = datetime.utcnow()
+        expired_keys = []
+
+        for key, entry in self._cache.items():
+            cached_at = entry.get("cached_at")
+            ttl = entry.get("ttl", self._default_ttl)
+            if now - cached_at > ttl:
+                expired_keys.append(key)
+
+        for key in expired_keys:
+            del self._cache[key]
+            self._stats["evictions"] += 1
+
+        return len(expired_keys)
+
+
 class AIProductAnalyzer:
     """
     Claude-powered product analyzer for COO-level insights.
-    
+
     This transforms raw scores into actionable business intelligence.
+
+    v2.0 Features:
+    - Analysis caching for consistency and cost reduction
+    - Data source transparency
+    - Score breakdown integration
     """
     
-    # Analysis prompt template
-    COO_ANALYSIS_PROMPT = """You are a veteran e-commerce COO with 15+ years experience in dropshipping, 
+    # Analysis prompt template - UPDATED with source transparency
+    COO_ANALYSIS_PROMPT = """You are a veteran e-commerce COO with 15+ years experience in dropshipping,
 market analysis, and scaling online stores. You're analyzing a product opportunity for deployment.
 
 ## PRODUCT DATA
@@ -127,6 +253,7 @@ Supplier Cost: ${cost:.2f}
 Suggested Retail: ${selling_price:.2f}
 Profit per Sale: ${profit:.2f}
 Profit Margin: {margin:.1f}%
+Product Tier: {tier}
 
 ## CROSS-REFERENCED SCORES (0-100 scale)
 - Google Trends Score: {google_score}/100 (Trend Direction: {trend_direction})
@@ -135,12 +262,22 @@ Profit Margin: {margin:.1f}%
 - AliExpress Orders Score: {order_score}/100 ({orders:,} orders)
 - Amazon Rank Score: {amazon_score}/100
 - Reddit Sentiment: {reddit_score}/100 ({reddit_mentions} mentions)
-- Supplier Rating: {supplier_score}/100 ({rating})
+- Supplier Rating: {supplier_score}/100 ({rating} stars)
+
+## COMPONENT SCORES (Used in OI calculation)
+- Demand Score: {demand_score}/100 (Sales volume, views, BSR)
+- Trend Score: {trend_score_component}/100 (Google Trends, virality)
+- Sentiment Score: {sentiment_score}/100 (Social proof, mentions)
+- Profit Score: {profit_score}/100 (Margin analysis)
+- Sourcing Score: {sourcing_score}/100 (Cross-reference, warehouse)
 
 ## COMPOSITE SCORE
-OSPRA Score: {ospra_score}/10
+OSPRA OI Score: {ospra_score}/100
 Confidence: {confidence}%
-Sources Validated: {sources_count} ({sources_list})
+Sources Validated: {sources_count}/6 ({sources_list})
+
+## DATA SOURCE TRANSPARENCY
+{data_source_details}
 
 ## STORE CONTEXT
 Store Name: {store_name}
@@ -153,18 +290,26 @@ Historical Conversion Rate: {conversion_rate:.2f}%
 Provide a comprehensive COO-level analysis. Be specific, actionable, and data-driven.
 Don't hedge - make clear recommendations based on the data.
 
+IMPORTANT: Your confidence_level MUST match the confidence percentage above:
+- 70%+ confidence = HIGH confidence_level
+- 40-69% confidence = MEDIUM confidence_level
+- <40% confidence = LOW confidence_level
+
+Reference the specific data sources in your analysis (e.g., "Based on {orders:,} AliExpress orders..." or "Google Trends shows {trend_direction} momentum...").
+
 Respond in this EXACT JSON format:
 {{
-    "executive_summary": "2-3 sentence overview of the opportunity",
-    "market_timing_analysis": "Detailed analysis of WHY NOW. Include trend velocity, market stage, and window of opportunity.",
+    "executive_summary": "2-3 sentence overview referencing key data points",
+    "market_timing_analysis": "Detailed analysis of WHY NOW. Reference trend direction ({trend_direction}) and specific metrics.",
     "competitive_position": "Analysis of competition level, saturation risk, and differentiation strategy",
-    "store_fit_analysis": "Why this product fits (or doesn't fit) THIS specific store",
-    "profit_strategy": "Specific pricing recommendation with rationale. Include competitor pricing context.",
-    "risk_assessment": "Top 3 risks and how to mitigate each",
-    "execution_plan": "Step-by-step plan if deploying (or what to monitor if waiting)",
+    "store_fit_analysis": "Why this product fits (or doesn't fit) THIS specific store ({store_name})",
+    "profit_strategy": "Specific pricing recommendation. Cost: ${cost:.2f}, Suggested: ${selling_price:.2f}, Margin: {margin:.1f}%",
+    "risk_assessment": "Top 3 risks with specific mitigation strategies",
+    "execution_plan": "Step-by-step plan based on {tier} tier classification",
+    "data_sources_cited": "List of data sources used: {sources_list}",
     "recommendation": "DEPLOY_NOW | DEPLOY_SOON | MONITOR | SKIP",
     "urgency": "CRITICAL | HIGH | MEDIUM | LOW",
-    "confidence_level": "HIGH | MEDIUM | LOW",
+    "confidence_level": "HIGH | MEDIUM | LOW (must match {confidence}% confidence)",
     "estimated_monthly_profit": <number>,
     "suggested_price": <number>,
     "competition_level": "LOW | MEDIUM | HIGH | SATURATED",
@@ -174,85 +319,153 @@ Respond in this EXACT JSON format:
     "watch_triggers": ["trigger that would change recommendation 1", "trigger 2"]
 }}
 
-Be a COO, not a chatbot. Make the call."""
+Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
 
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize with Claude API key."""
+    def __init__(self, api_key: Optional[str] = None, cache_ttl_hours: float = 4.0):
+        """
+        Initialize with Claude API key and caching.
+
+        Args:
+            api_key: Anthropic API key (defaults to env var)
+            cache_ttl_hours: How long to cache analyses (default 4 hours)
+        """
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.ai_provider = None
         self._initialized = False
-        
+
+        # Initialize analysis cache
+        self._cache = AnalysisCache(default_ttl_hours=cache_ttl_hours)
+        self._cache_enabled = True
+
         if not AI_AVAILABLE:
             logger.error("AI Factory not available - cannot initialize analyzer")
             return
-            
+
         if not self.api_key:
             logger.error("ANTHROPIC_API_KEY not set - cannot initialize analyzer")
             return
-        
+
         try:
             self.ai_provider = AIFactory.get_provider("claude", self.api_key)
             self._initialized = True
-            logger.info("[SUCCESS] AI Product Analyzer initialized with Claude")
+            logger.info(f"[SUCCESS] AI Product Analyzer initialized with Claude (cache TTL: {cache_ttl_hours}h)")
         except Exception as e:
             logger.error(f"Failed to initialize Claude: {e}")
     
     def is_available(self) -> bool:
         """Check if analyzer is ready."""
         return self._initialized and self.ai_provider is not None
+
+    def enable_cache(self, enabled: bool = True):
+        """Enable or disable caching."""
+        self._cache_enabled = enabled
+        logger.info(f"Analysis cache {'enabled' if enabled else 'disabled'}")
+
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics."""
+        return self._cache.get_stats()
+
+    def clear_cache(self) -> int:
+        """Clear all cached analyses."""
+        return self._cache.clear()
     
     async def analyze_product(
         self,
         product: Dict[str, Any],
-        store_context: Optional[Dict[str, Any]] = None
+        store_context: Optional[Dict[str, Any]] = None,
+        force_refresh: bool = False
     ) -> Optional[COOAnalysis]:
         """
         Generate COO-level analysis for a product.
-        
+
         Args:
             product: Validated product from discovery engine
             store_context: Information about the user's store
-            
+            force_refresh: If True, bypass cache and generate fresh analysis
+
         Returns:
             COOAnalysis with comprehensive strategic assessment
+
+        Caching:
+            - Analyses are cached for 4 hours by default
+            - Cache key includes product ID, OI score, and store name
+            - Set force_refresh=True to bypass cache
         """
         if not self.is_available():
             logger.error("Analyzer not available")
             return None
-        
-        # Extract product data
-        product_name = product.get("name", "Unknown Product")
+
+        # Check cache first (unless force_refresh)
+        if self._cache_enabled and not force_refresh:
+            cached = self._cache.get(product, store_context)
+            if cached:
+                product_name = product.get("name") or product.get("title", "Unknown")
+                logger.info(f"[CACHE HIT] Returning cached analysis for: {product_name[:40]}...")
+                # Return cached COOAnalysis
+                return COOAnalysis(**cached) if isinstance(cached, dict) else cached
+
+        # Extract product data - handle multiple field name formats
+        product_name = product.get("name") or product.get("title", "Unknown Product")
         niche = product.get("niche", "general")
-        
-        # Pricing
-        cost = float(product.get("cost", 0))
-        selling_price = float(product.get("selling_price", product.get("price", 0)))
+
+        # Pricing - handle multiple field names
+        cost = float(product.get("cost") or product.get("cost_price") or product.get("supplier_cost") or 0)
+        selling_price = float(product.get("selling_price") or product.get("suggested_price") or product.get("price") or 0)
+        if selling_price == 0 and cost > 0:
+            selling_price = cost * 2.5  # Default markup
         profit = float(product.get("profit", selling_price - cost))
-        margin = float(product.get("profit_margin", (profit / selling_price * 100) if selling_price > 0 else 0))
-        
-        # Scores
+        margin = float(product.get("profit_margin") or product.get("profit_margin_pct") or ((profit / selling_price * 100) if selling_price > 0 else 0))
+
+        # Get score_breakdown (now populated by fixed scoring algorithm)
         score_breakdown = product.get("score_breakdown", {})
-        google_score = score_breakdown.get("google_trends", 50)
-        tiktok_score = score_breakdown.get("tiktok_viral", 50)
-        twitter_score = score_breakdown.get("twitter_sentiment", 50)
-        order_score = score_breakdown.get("aliexpress_orders", 50)
+
+        # Extract individual scores from score_breakdown
+        google_score = score_breakdown.get("google_trends", 40)
+        tiktok_score = score_breakdown.get("tiktok_viral", 40)
+        twitter_score = score_breakdown.get("twitter_sentiment", 40)
+        order_score = score_breakdown.get("aliexpress_orders", 40)
         amazon_score = score_breakdown.get("amazon_rank", 50)
-        reddit_score = score_breakdown.get("reddit_sentiment", 50)
+        reddit_score = score_breakdown.get("reddit_sentiment", 40)
         supplier_score = score_breakdown.get("supplier_rating", 50)
-        
-        # Social proof
-        social_proof = product.get("social_proof", {})
-        twitter_mentions = social_proof.get("twitter_mentions", 0)
-        reddit_mentions = social_proof.get("reddit_mentions", 0)
-        
-        # Other metrics
-        orders = int(product.get("orders", 0))
-        rating = float(product.get("rating", 4.0))
-        ospra_score = float(product.get("score", product.get("ospra_score", 0)))
-        confidence = float(product.get("confidence", 50))
-        trend_direction = product.get("trend_direction", "stable")
+
+        # Component scores (from scoring algorithm)
+        demand_score = product.get("demand_score", 40)
+        trend_score_component = product.get("trend_score", 40)
+        sentiment_score = product.get("sentiment_score", 40)
+        profit_score = product.get("profit_score", 40)
+        sourcing_score = product.get("sourcing_score", 35)
+
+        # Tier from scoring
+        tier = product.get("tier", "FAIR")
+
+        # Social proof - extract from data_sources or direct fields
+        data_sources = product.get("data_sources", {})
+        twitter_data = data_sources.get("x_twitter", {})
+        reddit_data = data_sources.get("reddit", {})
+        ali_data = data_sources.get("aliexpress", {})
+
+        twitter_mentions = twitter_data.get("mentions", 0) or product.get("twitter_mentions", 0)
+        reddit_mentions = reddit_data.get("mentions", 0) or product.get("reddit_mentions", 0)
+
+        # Order count from AliExpress
+        orders = int(ali_data.get("orders", 0) or product.get("sales_count") or product.get("orders", 0))
+
+        # Rating
+        rating = float(product.get("rating") or ali_data.get("rating") or 4.0)
+
+        # Composite score (now 0-100 from scoring algorithm)
+        ospra_score = float(product.get("oi_score") or product.get("score") or product.get("ospra_score") or 50)
+
+        # Confidence (based on sources validated)
         sources_validated = product.get("sources_validated", [])
-        
+        confidence = float(product.get("confidence") or (len(sources_validated) / 6 * 100) or 50)
+
+        # Trend direction
+        trend_direction = product.get("trend_direction", "stable")
+
+        # Build data source transparency section
+        data_source_details = self._build_data_source_details(product, data_sources, sources_validated)
+
         # Store context (defaults if not provided)
         store_context = store_context or {}
         store_name = store_context.get("store_name", "Your Store")
@@ -260,8 +473,8 @@ Be a COO, not a chatbot. Make the call."""
         best_sellers = store_context.get("best_sellers", "Not enough data yet")
         aov = float(store_context.get("avg_order_value", 35.00))
         conversion_rate = float(store_context.get("conversion_rate", 2.0))
-        
-        # Build prompt
+
+        # Build prompt with all the new fields
         prompt = self.COO_ANALYSIS_PROMPT.format(
             product_name=product_name,
             niche=niche,
@@ -269,6 +482,7 @@ Be a COO, not a chatbot. Make the call."""
             selling_price=selling_price,
             profit=profit,
             margin=margin,
+            tier=tier,
             google_score=google_score,
             tiktok_score=tiktok_score,
             twitter_score=twitter_score,
@@ -280,11 +494,17 @@ Be a COO, not a chatbot. Make the call."""
             reddit_mentions=reddit_mentions,
             supplier_score=supplier_score,
             rating=rating,
+            demand_score=demand_score,
+            trend_score_component=trend_score_component,
+            sentiment_score=sentiment_score,
+            profit_score=profit_score,
+            sourcing_score=sourcing_score,
             trend_direction=trend_direction,
             ospra_score=ospra_score,
             confidence=confidence,
             sources_count=len(sources_validated),
-            sources_list=", ".join(sources_validated),
+            sources_list=", ".join(sources_validated) if sources_validated else "limited data",
+            data_source_details=data_source_details,
             store_name=store_name,
             store_niche=store_niche,
             best_sellers=best_sellers,
@@ -295,10 +515,19 @@ Be a COO, not a chatbot. Make the call."""
         try:
             logger.info(f"[BRAIN] Analyzing: {product_name[:50]}...")
             
-            # Call Claude
+            # Call Claude with LOW TEMPERATURE for consistency.
+            # Anthropic's API defaults to temperature=1.0 which was producing
+            # >10% drift between refreshes on the same product. 0.2 is low enough
+            # to be near-deterministic for structured JSON output while still
+            # allowing Claude to pick the most natural phrasing. (Anthropic's API
+            # doesn't support a `seed` parameter — unlike OpenAI — so we can't
+            # make it strictly deterministic.)
             response = await self.ai_provider.chat(
                 message=prompt,
-                context={"system_prompt": "You are a veteran e-commerce COO. Respond only with valid JSON."}
+                context={
+                    "system_prompt": "You are a veteran e-commerce COO. Respond only with valid JSON.",
+                    "temperature": 0.2,
+                }
             )
             
             # Parse response
@@ -308,9 +537,9 @@ Be a COO, not a chatbot. Make the call."""
                 logger.error(f"Failed to parse Claude response for {product_name}")
                 return None
             
-            # Build COOAnalysis
-            return COOAnalysis(
-                product_id=product.get("id", ""),
+            # Build COOAnalysis with data transparency
+            analysis = COOAnalysis(
+                product_id=product.get("id") or product.get("product_id", ""),
                 product_name=product_name,
                 niche=niche,
                 ospra_score=ospra_score,
@@ -332,12 +561,94 @@ Be a COO, not a chatbot. Make the call."""
                 first_mover_window_days=int(analysis_data.get("first_mover_window_days", 30)),
                 immediate_actions=analysis_data.get("immediate_actions", []),
                 watch_triggers=analysis_data.get("watch_triggers", []),
+                # DATA TRANSPARENCY - NEW
+                data_sources_cited=analysis_data.get("data_sources_cited", ", ".join(sources_validated)),
+                sources_validated=sources_validated,
+                score_breakdown=score_breakdown,
             )
-            
+
+            # Cache the analysis for future requests
+            if self._cache_enabled:
+                self._cache.set(product, analysis.to_dict(), store_context)
+                logger.info(f"[CACHE STORED] Analysis cached for: {product_name[:40]}...")
+
+            return analysis
+
         except Exception as e:
             logger.error(f"Claude analysis failed: {e}")
             return None
     
+    def _build_data_source_details(
+        self,
+        product: Dict[str, Any],
+        data_sources: Dict[str, Any],
+        sources_validated: List[str]
+    ) -> str:
+        """Build a transparency section showing which data sources contributed."""
+        lines = []
+
+        # AliExpress data
+        ali_data = data_sources.get("aliexpress", {})
+        if "aliexpress" in sources_validated or ali_data.get("available"):
+            orders = ali_data.get("orders", 0) or product.get("sales_count", 0)
+            commission = ali_data.get("commission", "0%")
+            lines.append(f"✅ AliExpress: {orders:,} orders, {commission} commission")
+        else:
+            lines.append("❌ AliExpress: No data available")
+
+        # CJ Dropshipping
+        cj_data = data_sources.get("cj_dropshipping", {})
+        if "cj_dropshipping" in sources_validated or cj_data.get("available"):
+            warehouse = cj_data.get("warehouse", "CN")
+            lines.append(f"✅ CJ Dropshipping: Available ({warehouse} warehouse)")
+        else:
+            lines.append("❌ CJ Dropshipping: Not available or not connected")
+
+        # Google Trends
+        google_data = data_sources.get("google_trends", {})
+        if "google_trends" in sources_validated or google_data.get("available"):
+            direction = google_data.get("direction", product.get("trend_direction", "stable"))
+            lines.append(f"✅ Google Trends: {direction.upper()} trend detected")
+        else:
+            lines.append("❌ Google Trends: No trend data available")
+
+        # TikTok
+        tiktok_data = data_sources.get("tiktok", {})
+        if "tiktok" in sources_validated or tiktok_data.get("available"):
+            views = tiktok_data.get("views", 0)
+            lines.append(f"✅ TikTok: {views:,} views on related content")
+        else:
+            lines.append("❌ TikTok: No viral data available")
+
+        # Twitter/X
+        twitter_data = data_sources.get("x_twitter", {})
+        if "twitter" in sources_validated or twitter_data.get("available"):
+            sentiment = twitter_data.get("sentiment", "neutral")
+            buzz = twitter_data.get("buzz", "low")
+            lines.append(f"✅ Twitter/X: {sentiment} sentiment, {buzz} buzz level")
+        else:
+            lines.append("❌ Twitter/X: No sentiment data available")
+
+        # Reddit
+        reddit_data = data_sources.get("reddit", {})
+        if "reddit" in sources_validated or reddit_data.get("available"):
+            mentions = reddit_data.get("mentions", 0) or product.get("reddit_mentions", 0)
+            subreddit = reddit_data.get("subreddit", "unknown")
+            lines.append(f"✅ Reddit: {mentions} mentions in r/{subreddit}")
+        else:
+            lines.append("❌ Reddit: No community data available")
+
+        # Summary
+        validated_count = len(sources_validated)
+        if validated_count >= 4:
+            lines.append(f"\n📊 Data Quality: HIGH ({validated_count}/6 sources validated)")
+        elif validated_count >= 2:
+            lines.append(f"\n📊 Data Quality: MEDIUM ({validated_count}/6 sources validated)")
+        else:
+            lines.append(f"\n📊 Data Quality: LOW ({validated_count}/6 sources validated)")
+
+        return "\n".join(lines)
+
     def _parse_response(self, response: str) -> Optional[Dict[str, Any]]:
         """Parse Claude's JSON response, handling code blocks."""
         import re

@@ -1083,7 +1083,7 @@ async def find_opportunities(
         for opp in opportunities:
             print(f"{opp.product_name}: {opp.opportunity_score}")
     """
-    from ospra_os.intelligence.unified_product_discovery import get_discovery_engine
+    from ospra_os.intelligence.product_discovery import get_discovery_engine
     
     # Discover products
     discovery = get_discovery_engine()

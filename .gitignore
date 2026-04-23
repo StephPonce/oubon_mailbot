@@ -46,4 +46,11 @@ Thumbs.db
 logs/
 .aider*
 .claude/settings.local.json
-.claude/settings.local.json
+
+# Runtime-generated assets and state (not code)
+data/images/
+data/processed_images/
+data/*.bak
+coverage.json
+.coverage
+htmlcov/

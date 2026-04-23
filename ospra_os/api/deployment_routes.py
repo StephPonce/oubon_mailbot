@@ -33,27 +33,58 @@ router = APIRouter(
 # Initialize deployer (singleton)
 deployer = ProductDeployer()
 
-# Background job storage (in production, use Redis/database)
-deployment_jobs = {}
+# Database-backed job storage (replaces in-memory dict for production reliability)
+# Falls back to in-memory dict if database connection fails
+try:
+    from ospra_os.database.job_models import JobStorage, Job
+    from ospra_os.database import get_db
+
+    # Create job storage with database session factory
+    deployment_jobs = JobStorage(get_db)
+    logger.info("[SUCCESS] Using database-backed job storage for deployments")
+except Exception as e:
+    logger.warning(f"Database job storage unavailable, using in-memory: {e}")
+    deployment_jobs = {}  # Fallback to in-memory
 
 
 # ============================================================================
 # REQUEST/RESPONSE MODELS
 # ============================================================================
 
-class AliExpressProduct(BaseModel):
-    """AliExpress product data"""
+class SourceProduct(BaseModel):
+    """
+    Source product data (any supplier).
+
+    Task #21: was previously named AliExpressProduct and required a
+    `category` string, which CJ-sourced products don't always have. Renamed
+    and relaxed so CJ-only products can be deployed without a validation
+    error. AliExpressProduct alias is kept at the bottom of this file for
+    back-compat with any external callers.
+
+    Supplier-source metadata (source, cj_pid, warehouse, etc.) flows
+    through via `model_config = extra='allow'` so downstream code can read it.
+    """
+    model_config = {"extra": "allow"}  # allow CJ-specific fields like cj_pid, warehouse
+
     title: str = Field(..., description="Product title")
     description: Optional[str] = Field(None, description="Product description")
     features: List[str] = Field(default_factory=list, description="Product features")
-    category: str = Field(..., description="Product category")
-    price: float = Field(..., gt=0, description="Cost price from AliExpress")
+    category: Optional[str] = Field(None, description="Product category (optional for CJ products)")
+    price: float = Field(..., gt=0, description="Cost price from supplier")
     images: List[str] = Field(default_factory=list, description="Product image URLs")
+    # Source tag so the deployer can build the right SKU prefix and supplier link.
+    source: Optional[str] = Field(None, description="Supplier source ('aliexpress', 'cj_dropshipping', etc.)")
+    # CJ's image field name — accept so the deployer can fall back to it.
+    all_images: Optional[List[str]] = Field(None, description="Alternative images list (CJ uses this key)")
+
+
+# Back-compat alias — old integrations may still import AliExpressProduct.
+AliExpressProduct = SourceProduct
 
 
 class PrepareProductRequest(BaseModel):
     """Request to prepare product for deployment"""
-    product: AliExpressProduct
+    product: SourceProduct
     niche: str = Field(..., description="Product niche (smart_home, fitness, etc.)")
     auto_enhance_images: bool = Field(default=True, description="Enhance images with AI")
     auto_generate_content: bool = Field(default=True, description="Generate content with AI")
@@ -61,7 +92,7 @@ class PrepareProductRequest(BaseModel):
 
 class DeployProductRequest(BaseModel):
     """Request to deploy product to Shopify"""
-    product: AliExpressProduct
+    product: SourceProduct
     niche: str = Field(..., description="Product niche")
     shopify_store_id: Optional[str] = Field(None, description="Specific Shopify store ID")
     options: Optional[Dict] = Field(
@@ -72,7 +103,7 @@ class DeployProductRequest(BaseModel):
 
 class BulkDeployRequest(BaseModel):
     """Request to deploy multiple products"""
-    products: List[AliExpressProduct] = Field(..., min_items=1, max_items=20, description="Products to deploy (max 20)")
+    products: List[SourceProduct] = Field(..., min_items=1, max_items=20, description="Products to deploy (max 20)")
     niche: str = Field(..., description="Product niche")
     options: Optional[Dict] = Field(default_factory=dict, description="Deployment options")
     async_mode: bool = Field(default=False, description="Run in background (returns job_id)")
@@ -80,7 +111,7 @@ class BulkDeployRequest(BaseModel):
 
 class PreviewRequest(BaseModel):
     """Request to preview deployment"""
-    product: AliExpressProduct
+    product: SourceProduct
     niche: str = Field(..., description="Product niche")
 
 
@@ -168,8 +199,10 @@ async def prepare_product(
     try:
         logger.info(f"[PACKAGE] Preparing product: {request.product.title[:50]}")
 
+        # Task #21: use source_product= for consistency with deploy_product route.
+        # The deployer accepts both kwargs for back-compat.
         result = await deployer.prepare_product(
-            aliexpress_product=request.product.dict(),
+            source_product=request.product.dict(),
             niche=request.niche,
             auto_enhance_images=request.auto_enhance_images,
             auto_generate_content=request.auto_generate_content
@@ -228,7 +261,7 @@ async def deploy_product(
         logger.info(f"[START] Deploying product: {request.product.title[:50]}")
 
         result = await deployer.deploy_product(
-            aliexpress_product=request.product.dict(),
+            source_product=request.product.dict(),
             niche=request.niche,
             shopify_store_id=request.shopify_store_id,
             options=request.options

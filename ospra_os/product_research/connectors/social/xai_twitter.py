@@ -804,27 +804,57 @@ IMPORTANT: Only include products that are ACTUALLY trending on Twitter right now
     ) -> Dict[str, Any]:
         """
         Get Twitter sentiment for a specific product.
+
+        HALLUCINATION-RESISTANT prompt: the model is required to set
+        found_real_tweets=false and return null scores when it cannot
+        find actual tweets about this product. This is the honest path.
+        Verified by scripts/audit_sentiment.py (April 2026): eliminates
+        fabrication on nonsense and generic products.
         """
         if not self.is_available():
-            return {"error": "xAI not available", "sentiment_score": 0}
-        
+            return {"error": "xAI not available", "found_real_tweets": False, "sentiment_score": None}
+
         print(f" Analyzing Twitter sentiment: {product_name}")
-        
+
         prompt = f"""Analyze Twitter/X sentiment for this product: "{product_name}"
 
-Search recent tweets mentioning this product and provide:
-1. Overall sentiment (positive/negative/neutral/mixed)
-2. Sentiment score (-1.0 to 1.0)
-3. Total tweet count (approximate)
-4. Engagement metrics (likes, retweets, replies)
-5. Common praise (what people love)
-6. Common complaints (what people hate)
-7. Purchase intent signals (people who bought it, want to buy, or recommending)
-8. Comparison to competitors if mentioned
+TWO-TIER SEARCH STRATEGY:
+1. First try to find tweets about this EXACT product (by brand + SKU).
+2. If no product-specific tweets exist, search for tweets about the PRODUCT CATEGORY
+   (e.g., "smart plug", "led strip lights", "wireless carplay adapter"). Extract
+   the product category from the title yourself.
+3. Report which level you used in `search_level`.
 
-RESPOND IN JSON FORMAT:
+CRITICAL HONESTY RULES - READ CAREFULLY:
+- Paraphrase REAL tweets only. Do not invent tweets or engagement numbers.
+- If you cannot find tweets at EITHER level, set search_level="none", found_real_tweets=false,
+  sentiment_score=null, tweet_count=0, empty arrays.
+- For the CATEGORY branch: be careful about disambiguation. If a word can refer to
+  both a physical product AND software/a game/an idiom (e.g., "blender" the appliance
+  vs Blender the 3D software, "switch" the smart switch vs Nintendo Switch), you MUST
+  filter to tweets about the PHYSICAL CONSUMER PRODUCT only.
+- Generic/unbranded products with no category signal = search_level="none". That's
+  the correct honest answer.
+
+If you find tweets, provide:
+1. search_level: "product" if tweets are about this exact product, "category" if
+   they're about the product category/type, "none" if no tweets found.
+2. category_searched: the category phrase you used (e.g., "smart wifi plug"),
+   or null if search_level="product" or "none".
+3. Overall sentiment (positive/negative/neutral/mixed)
+4. Sentiment score (-1.0 to 1.0)
+5. Approximate tweet count
+6. Approximate engagement (likes, retweets, replies)
+7. 3-5 paraphrased sample tweets
+8. Common praise / complaints
+9. Purchase intent signals
+
+RESPOND IN THIS EXACT JSON FORMAT:
 {{
     "product": "{product_name}",
+    "search_level": "product",
+    "category_searched": null,
+    "found_real_tweets": true,
     "sentiment": "positive",
     "sentiment_score": 0.75,
     "tweet_count": 500,
@@ -833,39 +863,99 @@ RESPOND IN JSON FORMAT:
         "total_retweets": 2000,
         "total_replies": 800
     }},
-    "common_praise": ["fast shipping", "great quality", "worth the price"],
+    "sample_tweets": [
+        "Paraphrased tweet..."
+    ],
+    "common_praise": ["fast shipping", "great quality"],
     "common_complaints": ["battery life could be better"],
     "purchase_intent": {{
         "bought_it": 45,
         "want_to_buy": 120,
         "recommending": 85
     }},
-    "competitor_comparison": "Often compared to [X], generally preferred because [reason]",
     "recommendation": "BUY/SKIP/CONSIDER with reason"
+}}
+
+CATEGORY-LEVEL EXAMPLE (when product-specific is not available):
+{{
+    "product": "{product_name}",
+    "search_level": "category",
+    "category_searched": "smart wifi plug",
+    "found_real_tweets": true,
+    "sentiment": "mixed",
+    ...
+}}
+
+IF NO TWEETS AT EITHER LEVEL, RETURN:
+{{
+    "product": "{product_name}",
+    "search_level": "none",
+    "category_searched": null,
+    "found_real_tweets": false,
+    "sentiment": null,
+    "sentiment_score": null,
+    "tweet_count": 0,
+    "engagement": {{"total_likes": 0, "total_retweets": 0, "total_replies": 0}},
+    "sample_tweets": [],
+    "common_praise": [],
+    "common_complaints": [],
+    "purchase_intent": {{"bought_it": 0, "want_to_buy": 0, "recommending": 0}},
+    "recommendation": "INSUFFICIENT_DATA",
+    "note": "No real tweets found at product or category level."
 }}"""
 
         try:
             response = await self.client.chat.completions.create(
                 model="grok-3",
                 messages=[
-                    {"role": "system", "content": "You are Grok with real-time Twitter access."},
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Grok. Be rigorously honest: if you cannot find real tweets "
+                            "about the specific product asked about, return found_real_tweets=false "
+                            "and null/zero values. Fabricating data is a serious error. Generic "
+                            "products, unbranded items, and unknown SKUs almost always have no "
+                            "tweet data - that is the correct answer, not a failure."
+                        )
+                    },
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
+                temperature=0.2,
                 max_tokens=1500
             )
-            
+
             content = response.choices[0].message.content
-            
+
             import re
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
-                return json.loads(json_match.group())
-            
-            return {"product": product_name, "raw_analysis": content}
-            
+                parsed = json.loads(json_match.group())
+                # Ensure required fields are present even if the model
+                # returned a partial response
+                parsed.setdefault("found_real_tweets", False)
+                parsed.setdefault("sample_tweets", [])
+                parsed.setdefault("tweet_count", 0)
+                parsed.setdefault("engagement", {"total_likes": 0, "total_retweets": 0, "total_replies": 0})
+                return parsed
+
+            return {
+                "product": product_name,
+                "found_real_tweets": False,
+                "sentiment_score": None,
+                "tweet_count": 0,
+                "sample_tweets": [],
+                "raw_analysis": content,
+                "note": "Could not parse JSON from response"
+            }
+
         except Exception as e:
-            return {"error": str(e), "sentiment_score": 0}
+            return {
+                "error": str(e),
+                "found_real_tweets": False,
+                "sentiment_score": None,
+                "tweet_count": 0,
+                "sample_tweets": []
+            }
     
     async def find_trending_hashtags(
         self, 
