@@ -1,7 +1,7 @@
 [project]
-name = "oubon_mailbot"
+name = "ospra_os"
 version = "0.1.0"
-description = "Oubon MailBot: FastAPI Gmail automation with AI replies, routing, and alerts."
+description = "Ospra OS: AI-powered e-commerce automation — product discovery, social sentiment, AI grading, Shopify deployment, and Gmail customer support."
 readme = "README.md"
 requires-python = ">=3.10"
 

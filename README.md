@@ -1,426 +1,198 @@
-# Ospra Intelligence
+# Ospra OS
 
-**AI-Powered E-Commerce Automation Platform**
+**AI-powered e-commerce automation for dropshipping.** Product discovery, social-sentiment scoring, AI grading, automated Shopify deployment, and Gmail-based customer support automation — all in one FastAPI app.
 
-Complete dropshipping automation with intelligent product discovery, performance tracking, and AI-driven decision making.
+The reference storefront running on this stack is **Oubon Shop** (`oubonshop.com`).
 
 ---
 
-## Quick Start
+## Quick start
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (uses uv, not pip)
 uv sync
 
 # 2. Configure environment
 cp .env.example .env
 # Edit .env with your API keys
 
-# 3. Start the platform
-uv run uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001 --reload
+# 3. Initialize database
+uv run python scripts/init_db.py
 
-# 4. Access the platform
-# API: http://localhost:8001
-# Docs: http://localhost:8001/docs
+# 4. Start backend + frontend
+./scripts/run.sh start
+
+# Backend → http://localhost:8001  (docs at /docs)
+# Frontend → http://localhost:5173
 ```
+
+`./scripts/run.sh` is the single consolidated dev script (`start | stop | restart | backend | frontend | status | logs | clean`).
 
 ---
 
-## Features
+## What it does
 
-### Level 1: Data Collection
-- **AliExpress Integration**: Direct API access for product discovery
-- **Multi-Niche Support**: Smart Home, Fitness, Beauty, Pet Care, Kitchen, Gaming
-- **Real-Time Data**: Live product metrics, pricing, and inventory
+1. **Product discovery** — pulls candidate products from CJ Dropshipping, AliExpress (official affiliate API), Amazon, and Apify-driven trend feeds (Google Trends, TikTok). Discovery is the priority feature.
 
-### Level 2: AI Analysis
-- **Claude-Powered Research**: Deep market analysis using Anthropic's Claude API
-- **Product Scoring**: Intelligent ranking based on 10+ factors
-- **Trend Detection**: Identify rising products before they peak
-- **Competitive Analysis**: Track market positioning and opportunities
+2. **Social-sentiment scoring** — three-tier signal:
+   - **Amazon reviews via Apify** (primary, weight 88) — real-world buyer sentiment
+   - **AliExpress reviews** (weight capped at 78) — supplier-side proof
+   - **CJ supplier-quality proxy** (weight 70) — for CJ-only products with no review data
 
-### Level 3: Autonomous Intelligence (NEW)
-- **Background Monitoring**: Automated 24/7 product performance tracking
-- **AI Alerts**: Proactive notifications for underperformers and opportunities
-- **Scheduled Analysis**: Automatic jobs for products, competitors, trends, and reports
-- **Smart Recommendations**: AI-generated action items with predicted outcomes
+3. **AI grading** — Claude/GPT-4o/Gemini ensemble scores each product 0–100 on opportunity (margin, trend, saturation, sentiment). Variance is locked across refreshes (verified by `scripts/test_ai_analysis_variance.py`).
 
-### Dashboard & Analytics
-- **Real-Time Metrics**: Live product performance data
-- **Niche Overview**: Category-level insights and trends
-- **Product Discovery**: Find winning products in any niche
-- **Velocity Tracking**: Monitor product momentum and growth
+4. **Automated Shopify deployment** — push approved products to Shopify with AI-generated titles, descriptions, and Stability-enhanced images.
 
-### Integrations
-- **Shopify**: Direct store management and order tracking
-- **Gmail**: Email automation and customer support
-- **TikTok**: Social media integration (in development)
+5. **Gmail email automation** — Gmail OAuth + AI auto-reply with rule-based classification (orders / VIP / important / routine), template substitution, and Shopify order lookup for "where's my order" replies.
 
----
-
-## API Endpoints
-
-### Product Intelligence
-
-```bash
-# Get all niches
-GET /api/dashboard/v2/niches
-
-# Get products by niche
-GET /api/dashboard/v2/products?niche=smart_home&page=1&per_page=20
-
-# Get niche overview
-GET /api/dashboard/v2/overview?niche=fitness
-
-# Discover new products
-POST /api/intelligence/discover
-```
-
-### Level 3 AI - Scheduler & Alerts
-
-```bash
-# Get AI-generated alerts
-GET /api/dashboard/v2/intelligence/alerts?limit=50&severity=warning
-
-# Clear all alerts
-DELETE /api/dashboard/v2/intelligence/alerts
-
-# Get scheduler status
-GET /api/dashboard/v2/intelligence/scheduler/status
-
-# Start background jobs
-POST /api/dashboard/v2/intelligence/scheduler/start
-
-# Stop background jobs
-POST /api/dashboard/v2/intelligence/scheduler/stop
-
-# Manually trigger job
-POST /api/dashboard/v2/intelligence/scheduler/run-now/{job_name}
-# Valid jobs: analyze_products, monitor_competitors, track_trends, weekly_report
-```
-
-### Shopify Integration
-
-```bash
-# Get store info
-GET /api/dashboard/shopify
-
-# Import products to Shopify
-POST /api/dashboard/shopify/import
-```
-
----
-
-## Configuration
-
-### Environment Variables
-
-Create `.env` file with:
-
-```bash
-# AI & Intelligence
-ANTHROPIC_API_KEY=sk-ant-...          # Claude API for Level 2 & 3 AI
-
-# AliExpress Integration
-ALIEXPRESS_APP_KEY=...                # AliExpress API credentials
-ALIEXPRESS_APP_SECRET=...
-ALIEXPRESS_SESSION_KEY=...
-
-# Shopify Integration
-SHOPIFY_STORE=yourstore.myshopify.com
-SHOPIFY_API_TOKEN=shpat_...
-
-# Gmail Integration (Legacy MailBot)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-
-# OpenAI (Legacy MailBot)
-OPENAI_API_KEY=sk-...
-
-# Database
-DATABASE_URL=sqlite:///./data/ospra.db
-```
-
-### Directory Structure
-
-```
-ospra_os/
-├── main.py                    # Application entry point
-├── core/
-│   └── settings.py           # Configuration management
-├── intelligence/
-│   ├── ai_research_agent.py  # Level 2 AI - Claude integration
-│   ├── background_jobs.py    # Level 3 AI - Autonomous monitoring
-│   ├── product_intelligence_v3.py  # Product discovery engine
-│   └── product_discovery_REALTIME.py
-├── dashboard/
-│   └── routes_v2_REALTIME.py # API endpoints
-├── integrations/
-│   ├── aliexpress_api.py     # AliExpress client
-│   └── shopify_client.py     # Shopify client
-└── database/
-    ├── db.py                 # Database session management
-    └── models.py             # SQLAlchemy models
-
-app/                          # Legacy MailBot
-├── gmail_client.py           # Gmail API wrapper
-├── ai_reply.py               # OpenAI reply drafting
-└── rules.py                  # Email classification
-
-frontend/                     # React Dashboard (separate)
-scripts/                      # Utility scripts
-tests/                        # Test files
-docs/                         # Documentation
-```
-
----
-
-## Testing
-
-### Test Level 3 AI System
-
-```bash
-# Comprehensive test script
-bash scripts/TEST_LEVEL3_AI.sh
-
-# Manual testing
-curl http://localhost:8001/api/dashboard/v2/intelligence/scheduler/status
-curl -X POST http://localhost:8001/api/dashboard/v2/intelligence/scheduler/start
-curl http://localhost:8001/api/dashboard/v2/intelligence/alerts
-```
-
-### Test Product Discovery
-
-```bash
-# Test multi-niche discovery
-bash scripts/TEST_PRODUCTS.sh
-
-# Test specific niche
-curl "http://localhost:8001/api/dashboard/v2/products?niche=smart_home&page=1"
-```
-
-### Run Unit Tests
-
-```bash
-uv run pytest
-```
-
----
-
-## Level 3 AI - Background Jobs
-
-The autonomous intelligence system runs 4 scheduled jobs:
-
-| Job | Schedule | Function |
-|-----|----------|----------|
-| `analyze_products` | Every 6 hours | Analyzes product performance, identifies underperformers and top performers, generates AI recommendations |
-| `monitor_competitors` | Every 12 hours | Tracks competitor pricing and market changes, alerts on significant shifts |
-| `track_trends` | Daily at 9am | Monitors market trends, identifies emerging niches and seasonal patterns |
-| `weekly_report` | Sundays at 6pm | Generates comprehensive weekly performance summary with strategic recommendations |
-
-### Alert System
-
-Alerts are categorized by severity:
-
-- **Critical**: Scheduler errors, system failures
-- **Warning**: Underperforming products requiring intervention
-- **Info**: Top performers, trend updates, reports
-
-Access alerts via API:
-```bash
-# Get all alerts
-curl http://localhost:8001/api/dashboard/v2/intelligence/alerts
-
-# Get only warnings
-curl "http://localhost:8001/api/dashboard/v2/intelligence/alerts?severity=warning&limit=10"
-```
-
----
-
-## Development
-
-### Start Development Servers
-
-```bash
-# Backend (OspraOS)
-uv run uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001 --reload
-
-# Frontend (React Dashboard)
-cd frontend
-npm run dev
-
-# Legacy MailBot (if needed)
-uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-### Code Quality
-
-```bash
-# Lint and format
-uv run ruff check .
-uv run ruff format .
-
-# Type checking
-uv run mypy ospra_os/
-```
+6. **Feedback loop (G4)** — tracks per-product performance after deployment and feeds outcomes back into AI scoring weights, both globally and per-user.
 
 ---
 
 ## Architecture
 
-### Three-Tier Intelligence System
+```
+ospra_os/                  # the FastAPI app
+├── main.py                # entry point
+├── celery_app.py          # background scheduler
+├── intelligence/          # product discovery, scoring, AI analysis
+├── api/                   # FastAPI routes (~50 modules)
+├── product_research/      # source connectors (Amazon, AliExpress, Reddit, Apify)
+├── integrations/          # Shopify, CJ Dropshipping, Stability, AI providers
+├── database/              # SQLAlchemy models, alembic migrations
+├── email_automation/      # Gmail-based customer support
+├── learning/              # G4 feedback loop
+├── payments/              # LemonSqueezy billing
+└── ...
+frontend/                  # React + Vite dashboard
+scripts/                   # run.sh + utilities
+tests/                     # pytest
+docs/                      # live docs (see docs/archive/ for historical)
+```
 
-**Level 1: Data Collection**
-- Real-time product data from AliExpress API
-- Multi-source integration (AliExpress, Shopify, TikTok)
-- Structured data storage in SQLite/PostgreSQL
-
-**Level 2: AI Analysis**
-- On-demand deep analysis using Claude API
-- Product failure diagnosis with recommendations
-- Market research and competitor analysis
-- Confidence scoring and improvement predictions
-
-**Level 3: Autonomous Operations**
-- Background job scheduler using `schedule` library
-- Thread-based execution for non-blocking operation
-- Singleton pattern for scheduler instance management
-- Deque-based alert storage (last 1000 alerts)
-- Graceful degradation when AI unavailable
-
-### Integration Points
-
-- **AliExpress**: OAuth-based product discovery with intelligent fallbacks
-- **Shopify**: Admin API for store management and order tracking
-- **Claude API**: Advanced AI analysis and recommendations
-- **Gmail**: OAuth 2.0 flow for email automation (legacy)
+See `CLAUDE.md` for a fuller architecture breakdown.
 
 ---
 
-## Production Deployment
+## Configuration
 
-### Render.com Deployment
+Required environment variables (see `.env.example`):
 
-The platform is deployed at: `https://oubon-mailbot.onrender.com`
+```bash
+# AI providers
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...                  # for AI ensemble + email auto-reply
 
-### Environment Setup
+# Discovery sources
+APIFY_TOKEN=apify_api_...              # Amazon reviews, Google Trends, TikTok
+ALIEXPRESS_APP_KEY=...                 # affiliate API
+ALIEXPRESS_APP_SECRET=...
+ALIEXPRESS_SESSION_KEY=...
+CJ_DROPSHIPPING_API_TOKEN=...          # must have product-access scope
+STABILITY_API_KEY=sk-...               # background cleanup for product images
 
-1. Set all environment variables in Render dashboard
-2. Ensure `ANTHROPIC_API_KEY` is set for Level 3 AI
-3. Configure health check endpoint: `/health`
-4. Set build command: `uv sync`
-5. Set start command: `uv run uvicorn ospra_os.main:app --host 0.0.0.0 --port $PORT`
+# Shopify
+SHOPIFY_STORE=yourstore.myshopify.com
+SHOPIFY_API_TOKEN=shpat_...
 
-### Monitoring
+# Gmail (email automation)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
 
-- **Health Check**: `GET /health`
-- **API Docs**: `GET /docs`
-- **Scheduler Status**: `GET /api/dashboard/v2/intelligence/scheduler/status`
-- **Logs**: View in Render dashboard or via `tail -f logs/`
+# Database
+DATABASE_URL=postgresql://...          # or sqlite:///./data/ospra.db for local
 
----
+# Billing (LemonSqueezy)
+LEMONSQUEEZY_API_KEY=...
+LEMONSQUEEZY_WEBHOOK_SECRET=...
+LEMONSQUEEZY_STORE_ID=...
+LEMONSQUEEZY_VARIANT_FLIGHT_MONTHLY=...
+LEMONSQUEEZY_VARIANT_FLIGHT_YEARLY=...
+LEMONSQUEEZY_VARIANT_SOAR_MONTHLY=...
+LEMONSQUEEZY_VARIANT_SOAR_YEARLY=...
+LEMONSQUEEZY_VARIANT_STRATOSPHERE_MONTHLY=...
+LEMONSQUEEZY_VARIANT_STRATOSPHERE_YEARLY=...
+```
 
-## Troubleshooting
-
-### Level 3 AI Not Starting
-
-1. Check logs for startup messages: `grep "Level 3" /tmp/level3_test.log`
-2. Verify `ANTHROPIC_API_KEY` is set (optional but recommended)
-3. Ensure `schedule` library is installed: `uv pip list | grep schedule`
-4. Manually start: `POST /api/dashboard/v2/intelligence/scheduler/start`
-
-### Products Not Loading
-
-1. Check AliExpress API credentials in `.env`
-2. Test API connection: `curl http://localhost:8001/api/dashboard/v2/niches`
-3. Review logs for API errors
-4. Verify database exists: `ls -la data/ospra.db`
-
-### Frontend Blank Page
-
-1. Check backend is running: `curl http://localhost:8001/health`
-2. Verify CORS settings in `main.py`
-3. Check browser console for errors (F12)
-4. Ensure frontend env variables are set
-
-### Frontend Development Issues
-
-**Common fixes documented:**
-
-- **Runtime Errors (undefined data)**: See `RUNTIME_ERROR_FIXES_COMPLETE.md`
-  - Undefined stores.map() errors
-  - Missing safety checks
-  - Prop name mismatches
-
-- **Import Errors (lucide-react)**: See `LUCIDE_ICON_FIX_COMPLETE.md`
-  - LucideIcon doesn't exist in lucide-react
-  - Use React.ComponentType<{ className?: string }> for icon props
-
-- **Data Structure Mismatch**: See `DATA_STRUCTURE_FIX_COMPLETE.md`
-  - Backend uses snake_case (store_name, monthly_revenue)
-  - Frontend must match backend format
-  - No camelCase transformation layer
+Setup guides for each integration live in `docs/` — see the index below.
 
 ---
 
-## Current Status
+## Documentation index
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| Level 1 - Data Collection | ✅ Production | AliExpress API integrated with OAuth |
-| Level 2 - AI Analysis | ✅ Production | Claude API integration complete |
-| Level 3 - Autonomous AI | ✅ Production | Background jobs operational |
-| Dashboard V2 API | ✅ Production | All endpoints functional |
-| React Frontend | ✅ Production | Real-time data display |
-| Shopify Integration | ✅ Production | Store management active |
-| Gmail Integration | ⚠️ Legacy | Original MailBot (port 8000) |
-| TikTok Integration | 🚧 Development | Placeholder routes |
+### Setup & deployment
+- `docs/DEPLOYMENT_GUIDE.md` — production deployment (Render)
+- `docs/DEPLOYMENT_ENV_SETUP.md` — env vars for unified product deployment
+- `docs/DATABASE_DEPLOYMENT.md` — database setup (SQLite → Postgres)
+- `docs/SHOPIFY_SETUP_GUIDE.md` — Shopify integration
 
----
+### Architecture & features
+- `docs/DATA_SOURCES.md` — every data source the app touches
+- `docs/DISCOVERY_PIPELINE_ARCHITECTURE.md` — discovery internals
+- `docs/SATURATION_SCORING.md` — how saturation is computed
+- `docs/AUTO_DEPLOYMENT_SERVICE.md` + `docs/FRONTEND_AUTO_DEPLOYMENT_INTEGRATION.md`
+- `docs/SHOPIFY_AI_INTEGRATION.md` — AI-powered Shopify flow
+- `docs/PRODUCT_CONTENT_GENERATOR.md` — AI titles/descriptions
+- `docs/IMAGE_ENHANCEMENT_INTEGRATION.md` — Stability image cleanup
+- `docs/PLATFORM_BADGES_USAGE.md` — supplier/warehouse badges + filter chips
+- `docs/SECURITY_FUTUREPROOFING.md` — auth, encryption, multi-tenancy
 
-## Documentation
+### API & integrations
+- `docs/API_DOCUMENTATION.md` — REST API surface
+- `docs/ALIEXPRESS_API_STATUS.md` — affiliate API state
+- `docs/X_TWITTER_SENTIMENT_API.md` — Grok-based Twitter sentiment
+- `docs/dropshipping_apis.md` — supplier API comparison
+- `docs/guides/AFFILIATE_API_GUIDE.md` — AliExpress deep-dive
+- `docs/guides/SHOPIFY_OAUTH_SETUP_GUIDE.md`
+- `docs/guides/SHOPIFY_OPTIMIZATION_GUIDE.md`
+- `docs/guides/AI_PROVIDER_BASE_GUIDE.md` — adding a new AI provider
+- `docs/guides/AD_AUTOMATION_SYSTEM_GUIDE.md` — Meta/Google/TikTok ads
+- `docs/guides/TIKTOK_SETUP_GUIDE.md`
 
-### Platform Documentation
-- **Level 3 AI Status**: `LEVEL3_AI_STATUS.md`
-- **Quick Start Guide**: `QUICK_START.md`
-- **Deployment Guide**: `DEPLOYMENT_GUIDE.md`
-- **API Documentation**: `API_DOCUMENTATION.md`
+### Operations
+- `docs/TESTING_GUIDE.md` — multi-store testing
+- `docs/SHOPIFY_SEO_CHECKLIST.md` — Oubon storefront SEO checklist
 
-### Integration Guides
-- **AliExpress Integration**: `AFFILIATE_API_GUIDE.md`
-- **TikTok Integration**: `TIKTOK_INTEGRATION_COMPLETE.md`
-- **Shopify Setup**: `WEBSITE_COMPLETE.md`
-
-### Frontend Development Fixes
-- **Runtime Error Fixes**: `RUNTIME_ERROR_FIXES_COMPLETE.md`
-  - Handling undefined data
-  - Safety checks and optional props
-  - Loading and error states
-
-- **Lucide Icon Fix**: `LUCIDE_ICON_FIX_COMPLETE.md`
-  - Correct icon prop types
-  - Import best practices
-
-- **Data Structure Fix**: `DATA_STRUCTURE_FIX_COMPLETE.md`
-  - snake_case vs camelCase alignment
-  - API-to-UI mapping
+### Cleanup history (operational record)
+- `docs/CLEANUP_INVENTORY.md` — Pass 0: full repo classification
+- `docs/CLEANUP_PASS2.md` — dead-module / orphan-route removal
+- `docs/archive/` — completed/dated docs (G4 phases, T2 migration, audits)
 
 ---
 
-## Contributing
+## Testing
 
-This is a private project for Oubon e-commerce automation. For issues or feature requests, contact the development team.
+```bash
+uv run pytest                          # full suite
+uv run pytest -k "discovery"           # filter by keyword
+bash scripts/run_tests.sh              # convenience wrapper
+
+# Targeted scripts (live-data smoke tests)
+uv run python scripts/test_ai_analysis_variance.py     # grading lock
+uv run python scripts/test_aliexpress_signal.py        # AE sentiment
+uv run python scripts/test_full_discovery.py           # end-to-end discovery
+uv run python scripts/diagnose_cj.py                   # CJ token health
+uv run python scripts/smoke_test_deployment.py         # Shopify deploy
+```
+
+---
+
+## Project status
+
+| Component | Status |
+|---|---|
+| Product discovery (CJ + AliExpress + Amazon + Apify) | Live |
+| Social sentiment (Amazon reviews via Apify) | Live |
+| AI grading (Claude + GPT-4o + Gemini ensemble) | Live, variance-locked |
+| Shopify deployment | Live |
+| Gmail email automation | Live |
+| LemonSqueezy billing | Wired up; needs env vars + dashboard config to activate |
+| Frontend (React) | Live |
+| G4 feedback loop | Live |
+| TikTok integration | Partial — used as sentiment source, not for posting |
 
 ---
 
 ## License
 
-Proprietary - All rights reserved
-
----
-
-**Built with**: FastAPI, React, Claude AI, AliExpress API, Shopify API, SQLAlchemy
-
-**Maintained by**: Oubon Development Team
-
-**Last Updated**: November 14, 2025
+Proprietary — all rights reserved.

@@ -1,143 +1,122 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repository.
 
 ## Project Overview
 
-**Oubon MailBot** is a FastAPI-based Gmail automation service for Oubon e-commerce. It handles email classification, auto-replies (using OpenAI), priority alerts, and order tracking integration.
+**Ospra OS** is an AI-powered e-commerce automation SaaS for dropshipping. It does product discovery (AliExpress + CJ Dropshipping + Amazon + Apify-driven trend signals), social-sentiment scoring, AI grading, automated Shopify deployment, and Gmail-based customer support automation.
 
-The repository contains two separate FastAPI applications:
-1. **Legacy app** (`main.py`) - Original MailBot implementation
-2. **OspraOS** (`ospra_os/main.py`) - Newer modular architecture with Gmail OAuth and TikTok integration
+The product the user actually uses on the live storefront is **Oubon Shop** (`oubonshop.com`). Anything matching `oubon` / `Oubon` / `OUBON` is preserved across all cleanup work.
 
-## Development Commands
+The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a legacy `app/` directory or root-level `main.py`; both were consolidated during the December 2025 migration (see `docs/archive/T2_MIGRATION_COMPLETE.md`).
 
-### Setup and Installation
+## Standing rules (carry across sessions)
+
+- **Push back honestly.** The user is non-technical ("im not the coder i had ai do it ALL for me beleive it or not so i need you to help me decide"). Don't sugarcoat — if a change is risky, say so plainly.
+- **Product discovery is priority #1.** Anything that touches the discovery pipeline gets extra scrutiny.
+- **Social sentiment is the differentiator.** Amazon reviews (Apify) → AliExpress reviews → CJ supplier-quality proxy. Don't gut any tier.
+- **Never delete `ospra_os/email_automation/` files.** Email automation is a core feature even when individual files look orphaned. The active chain is `api/email_automation_routes.py` → `email_automation/email_processor.py` → `gmail_client.py` etc.
+- **Preserve all Oubon references.** They tie real production data to the user's storefront.
+- **Run tests before deleting.** `uv run pytest` (or `bash scripts/run_tests.sh`). If a deletion would break a test, stop and ask.
+- **Never use computer-use** for this project. The user has explicitly disabled it.
+
+## Development commands
+
 ```bash
-# Install dependencies using uv
+# Install / sync dependencies (uv, not pip)
 uv sync
 
-# Create required directories
-mkdir -p .secrets data
-
-# Copy environment template and configure
-cp .env.example .env
-```
-
-### Running the Applications
-
-```bash
-# Run legacy MailBot (default on port 8000)
-uv run uvicorn main:app --reload --host 127.0.0.1 --port 8000
-
-# Run OspraOS application
-uv run uvicorn ospra_os.main:app --reload --host 127.0.0.1 --port 8001
-```
-
-### Testing and Code Quality
-
-```bash
-# Run tests with pytest
-uv run pytest
-
-# Lint and format with ruff
+# Lint + format
 uv run ruff check .
 uv run ruff format .
+
+# Tests
+uv run pytest                      # full suite
+uv run pytest -k "discovery"       # filter by keyword
+bash scripts/run_tests.sh          # convenience wrapper
+
+# Run servers (consolidated into one script)
+./scripts/run.sh start             # backend + frontend
+./scripts/run.sh backend           # backend only (port 8001)
+./scripts/run.sh frontend          # frontend only (port 5173)
+./scripts/run.sh stop              # kill both
+./scripts/run.sh status            # what's listening
+./scripts/run.sh logs              # tail both logs
+
+# Direct uvicorn (matches Render production)
+uv run uvicorn ospra_os.main:app --host 0.0.0.0 --port 8001 --reload
+
+# Celery worker (background jobs / scheduled discovery)
+uv run celery -A ospra_os.celery_app worker --loglevel=info
+bash scripts/start_g4_celery.sh    # convenience wrapper
 ```
 
-## Architecture Overview
+## Architecture
 
-### Dual Application Structure
+### Top-level layout
 
-The codebase maintains two separate FastAPI applications that serve different purposes:
+```
+ospra_os/                         # the FastAPI app
+├── main.py                       # entry point — registers ~65 routers via include_router
+├── celery_app.py                 # Celery worker config (auto-discovers tasks/)
+├── core/                         # settings, config
+├── intelligence/                 # discovery, scoring, AI analysis (53 files)
+├── api/                          # FastAPI route modules (50 files)
+├── product_research/             # source connectors (Amazon, AliExpress, Reddit, etc.)
+├── integrations/                 # Shopify, CJ, Stability, AI providers
+├── database/                     # SQLAlchemy models, alembic migrations
+├── email_automation/             # PROTECTED — core feature, never delete
+├── gmail/                        # PROTECTED — Gmail OAuth integration
+├── services/                     # product_deployer, image_processor
+├── ai/                           # AI provider abstraction (Claude, GPT-4o, Gemini)
+├── learning/                     # G4 feedback loop (RLHF-style learning)
+├── tasks/                        # Celery tasks
+├── tenancy/                      # multi-tenant isolation (SaaS)
+├── payments/                     # LemonSqueezy billing
+├── auth/                         # JWT, sessions
+└── ...
+frontend/                         # React + Vite dashboard (port 5173)
+scripts/                          # run.sh, init_db.py, test_*.py, etc.
+tests/                            # pytest suite
+docs/                             # live docs (see archive/ for historical)
+alembic/                          # migrations
+```
 
-**Legacy MailBot (`main.py`)**: Monolithic application with all features in a single file. Contains the complete email processing pipeline including:
-- Gmail OAuth flow (`/auth/url`, `/oauth2callback`)
-- Email ingestion and sending (`/gmail/ingest`, `/gmail/send-demo`)
-- Rule-based classification and auto-reply (`/gmail/process-inbox`, `/gmail/process-inbox2`)
-- Template and rules management (`/templates/*`, `/rules/*`)
-- AI-powered reply drafting (`/ai/reply-draft`)
+### Routing pattern
 
-**OspraOS (`ospra_os/main.py`)**: Modular router-based architecture designed for expansion. Uses optional routers that fail gracefully if unavailable:
-- `ospra_os/gmail/routes.py` - Gmail OAuth integration with state management
-- `ospra_os/tiktok/routes.py` - TikTok integration (placeholder/disabled)
-- Shared settings in `ospra_os/core/settings.py`
+`main.py` does a bunch of `try: import …router … include_router(…)` blocks. Routers that fail to import log a warning instead of crashing the app — this is intentional graceful degradation for optional integrations. **Side-effect:** static analysis tools see "unused imports" but they're really conditional registrations.
 
-### Core Components (`app/` directory)
+### Discovery pipeline (the heart of the app)
 
-**`app/settings.py`**: Centralized configuration using pydantic-settings. Loads from `.env` file and supports:
-- Google OAuth credentials and scopes
-- OpenAI API keys for AI replies
-- Database URLs (SQLite/PostgreSQL)
-- Slack webhooks for alerts
-- Shopify API integration (token, store URL, mode)
+`ospra_os/intelligence/product_discovery.py` orchestrates:
+1. Pull candidate products from per-niche sources (CJ, AliExpress, Amazon, Apify trend feeds).
+2. Score each with `opportunity_scorer.py` (margin, trend, saturation, sentiment).
+3. Enrich with social sentiment via `product_research/connectors/social/*` (Amazon reviews via Apify is the primary signal; AliExpress reviews second; CJ proxy for CJ-only products).
+4. Rank and return.
 
-**`app/gmail_client.py`**: Gmail API wrapper class that handles:
-- OAuth flow (authorization URL generation, token exchange)
-- Credential persistence (`.secrets/gmail_token.json`)
-- Service client creation with automatic credential loading
-- Thread fetching and simple email sending
+The active grading lock is verified by `scripts/test_ai_analysis_variance.py`. Don't loosen variance bounds without re-running it.
 
-**`app/rules.py`**: Message classification engine using keyword matching:
-- Classifies into: VIP, Orders, Important, Routine
-- Priority order: VIP > Orders > Important > Routine
-- Returns auto-reply rules and label assignments
+### Background work
 
-**`app/ai_reply.py`**: OpenAI-powered response drafting:
-- Uses GPT-4o-mini with custom system prompt
-- Fallback to template-based reply if API key unavailable
-- Configured for Oubon's support tone (warm, professional, modern)
+- **Celery** (`ospra_os/celery_app.py`) runs scheduled tasks listed in its `include=[...]`. To add a new periodic task, add the module path to that list.
+- The `schedule`-library based scheduler in `ospra_os/intelligence/intelligence_scheduler.py` was removed in cleanup Pass 2 (it was orphaned). Celery is now the only scheduler.
 
-**`app/db.py`**: Async database session manager:
-- Supports both SQLite (aiosqlite) and PostgreSQL (asyncpg)
-- SQLAlchemy async engine with session factory
-- Database URL configurable via settings
+### Billing
 
-### Email Processing Pipeline
+LemonSqueezy infrastructure was wired up in cleanup Pass 2 (it had been silently dead-coded — webhooks were dropping). Routers:
+- `ospra_os/payments/routes.py` → `/api/payments/*`
+- `ospra_os/api/subscription_routes.py` → `/api/subscription/*`
+- `ospra_os/api/webhook_routes.py` → `/api/webhooks/lemonsqueezy/subscription` and `/order`
+- `ospra_os/api/user_routes.py` → `/api/users/*`
 
-The main processing logic (`/gmail/process-inbox` and `/gmail/process-inbox2`) follows this flow:
+These require env vars: `LEMONSQUEEZY_API_KEY`, `LEMONSQUEEZY_WEBHOOK_SECRET`, `LEMONSQUEEZY_STORE_ID`, plus six variant IDs (Flight/Soar/Stratosphere × monthly/yearly).
 
-1. **Fetch messages**: Query Gmail API for unread/order-related messages
-2. **Parse headers**: Extract subject, from, body from Gmail API response
-3. **Classify**: Match message against rules (keywords in `data/rules.json`)
-4. **Label**: Create/apply Gmail labels based on classification
-5. **Auto-reply** (if enabled):
-   - For "Orders" label: Parse order ID, lookup via Shopify API, send status update
-   - For other labels: Use template from `data/templates.json`, replace variables
+## Cleanup history
 
-### Data Files
+Recent systematic cleanup is documented in `docs/CLEANUP_INVENTORY.md` (Pass 0 inventory) and `docs/CLEANUP_PASS2.md` (dead-module removal). Read those before doing more deletions — they explain which files have non-zero references but live in dead chains and need per-file inspection.
 
-- `data/rules.json`: Classification rules (if_any keywords, apply_label, auto_reply_template)
-- `data/templates.json`: Email templates with subject/body and variable substitution ({{name}}, {{ticket_id}}, {{order_id}})
-- `data/orders.json`: Local order lookup (being replaced by Shopify API integration)
+## Testing notes
 
-### Shopify Integration
-
-Order lookup function (`lookup_order()` in `main.py:211-231`) queries Shopify Admin API:
-- Requires `SHOPIFY_API_TOKEN` and `SHOPIFY_STORE` env vars
-- Returns order status, carrier, tracking number, last update
-- Used to provide real-time order information in auto-replies
-
-## Google OAuth Setup
-
-1. Create Google Cloud project and enable Gmail API
-2. Create OAuth 2.0 Web Application credentials with redirect URI: `http://localhost:8000/oauth2callback`
-3. Download client JSON and save to `.secrets/credentials.json`
-4. Start app and visit `/auth/url` to get consent URL
-5. Complete OAuth flow to generate `.secrets/gmail_token.json`
-
-## Key Design Patterns
-
-**Settings injection**: Use `Depends(get_settings)` in route handlers to access configuration
-**Lazy service initialization**: GmailClient loads credentials on first service access
-**Template-based replies**: Jinja2-style variable substitution ({{var_name}})
-**Graceful degradation**: AI replies fall back to templates if OpenAI unavailable
-**Dynamic label creation**: Labels are created on-demand if they don't exist
-
-## Development Notes
-
-- The repo uses `uv` for dependency management (modern pip replacement)
-- Two separate entry points exist; determine which to modify based on feature scope
-- OspraOS routers print loading status to console on startup
-- Email bodies are base64-encoded in Gmail API responses
-- The `/gmail/process-inbox2` endpoint is a refactored version fixing the `from_hdr` bug
+- `tests/` uses pytest fixtures defined in `tests/conftest.py`.
+- Some tests have pre-existing failures unrelated to cleanup work: bcrypt 72-byte limit in `test_security.py`, missing `groq` module in `test_differentiation.py`, sqlalchemy fixture issues in `test_actions_routes.py`. These are environment issues, not regressions.
+- Before deleting any file, search for both Python imports AND string references (SQLAlchemy table names, Celery task names, dynamic imports). Pass 2's import-graph walker (`/tmp/orphan_walker_v2.py`) does this — adapt it if you need to re-run.
