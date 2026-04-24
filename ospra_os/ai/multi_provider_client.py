@@ -1,21 +1,39 @@
 """Multi-provider AI client supporting OpenAI and Claude.
 
-Brand parameterization (Cleanup Pass 4 SaaS refactor):
+Brand parameterization (Cleanup Pass 4 + Pass 4b SaaS refactor):
   The system prompt, user prompts, and template fallback all read the
   brand name from `self.brand_name` (set in `__init__`, defaults to
   "Oubon Shop"). Signatures are rendered as "— {brand_name} Support".
   Oubon's single-tenant deployment is unchanged because the defaults
   match the previous hardcoded strings.
 
+  Pass 4b also threads `support_email` / `website` / `tracking_url`
+  through to the `policies` module so the AI-fed policy context
+  quotes the tenant's email + tracking URL, not Oubon's. Default
+  values remain Oubon's, so single-tenant behavior is identical.
+
   For multi-tenant email automation, `SmartReplySystem`/`EmailProcessor`
-  are responsible for passing the per-tenant `brand_name` +
-  `brand_descriptor` when they construct the client.
+  are responsible for passing the per-tenant `brand_name`,
+  `brand_descriptor`, `support_email`, `website`, and `tracking_url`
+  when they construct the client.
 """
 from typing import Optional, Tuple
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
-from ospra_os.email_automation.policies import get_policy_context
+from ospra_os.email_automation.policies import (
+    get_policy_context,
+    render_faq,
+    render_refund_policy,
+    render_return_policy,
+    render_shipping_policy,
+)
 from ospra_os.ai.response_cache import get_cached_response, cache_response
-from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
+from ospra_os.tenancy.brand import (
+    DEFAULT_BRAND_DESCRIPTOR,
+    DEFAULT_BRAND_NAME,
+    DEFAULT_SUPPORT_EMAIL,
+    DEFAULT_TRACKING_URL,
+    DEFAULT_WEBSITE,
+)
 import time
 
 
@@ -31,10 +49,16 @@ class AIClient:
         settings: Settings,
         brand_name: str = DEFAULT_BRAND_NAME,
         brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+        support_email: str = DEFAULT_SUPPORT_EMAIL,
+        website: str = DEFAULT_WEBSITE,
+        tracking_url: str = DEFAULT_TRACKING_URL,
     ):
         self.settings = settings
         self.brand_name = brand_name
         self.brand_descriptor = brand_descriptor
+        self.support_email = support_email
+        self.website = website
+        self.tracking_url = tracking_url
         self.signature = f"— {brand_name} Support"
         self.system_prompt = f"""
 You are {brand_name}'s helpful, calm, and concise support agent.
@@ -190,29 +214,47 @@ Reference our company policies as needed:
         return message.content[0].text.strip(), total_tokens
 
     def _get_relevant_policy(self, subject: str, body: str) -> str:
-        """Get only relevant policy sections to reduce token usage."""
-        from ospra_os.email_automation.policies import REFUND_POLICY, RETURN_POLICY, SHIPPING_POLICY, FAQ
+        """Get only relevant policy sections to reduce token usage.
 
+        Pass 4b: each section is rendered with this client's tenant brand
+        context (support_email / tracking_url) so the AI quotes the
+        correct brand's contact info, not Oubon's.
+        """
         text = f"{subject} {body}".lower()
-
-        # Start with basic info
         relevant_sections = []
 
         # Check what's relevant
         if any(word in text for word in ["refund", "money back", "return my money"]):
-            relevant_sections.append(REFUND_POLICY)
+            relevant_sections.append(render_refund_policy(support_email=self.support_email))
 
         if any(word in text for word in ["return", "send back", "ship back"]):
-            relevant_sections.append(RETURN_POLICY)
+            relevant_sections.append(render_return_policy(support_email=self.support_email))
 
         if any(word in text for word in ["shipping", "delivery", "tracking", "where is", "when will arrive"]):
-            relevant_sections.append(SHIPPING_POLICY)
+            relevant_sections.append(
+                render_shipping_policy(
+                    support_email=self.support_email,
+                    tracking_url=self.tracking_url,
+                )
+            )
 
         # If nothing specific, include FAQ highlights
         if not relevant_sections:
-            relevant_sections.append("## Common Questions\n" + "\n".join(f"Q: {q}\nA: {a}\n" for q, a in list(FAQ.items())[:3]))
+            faq = render_faq(tracking_url=self.tracking_url)
+            relevant_sections.append(
+                "## Common Questions\n" + "\n".join(f"Q: {q}\nA: {a}\n" for q, a in list(faq.items())[:3])
+            )
 
-        return "\n\n".join(relevant_sections) if relevant_sections else get_policy_context()
+        if relevant_sections:
+            return "\n\n".join(relevant_sections)
+
+        # Final fallback: full policy context with tenant brand values.
+        return get_policy_context(
+            brand_name=self.brand_name,
+            website=self.website,
+            support_email=self.support_email,
+            tracking_url=self.tracking_url,
+        )
 
     def _openai_reply(self, subject: str, body: str) -> Tuple[str, int]:
         """Generate reply using OpenAI with smart context. Returns (response, tokens)."""

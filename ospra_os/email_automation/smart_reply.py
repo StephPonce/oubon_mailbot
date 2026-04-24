@@ -6,7 +6,14 @@ from ospra_os.integrations.shopify.client import ShopifyClient
 from ospra_os.email_automation.refund_processor import RefundProcessor
 from ospra_os.ai.multi_provider_client import AIClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
-from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
+from ospra_os.tenancy.brand import (
+    DEFAULT_BRAND_DESCRIPTOR,
+    DEFAULT_BRAND_NAME,
+    DEFAULT_SUPPORT_EMAIL,
+    DEFAULT_TIMEZONE,
+    DEFAULT_TRACKING_URL,
+    DEFAULT_WEBSITE,
+)
 import re
 
 
@@ -24,21 +31,35 @@ class SmartReplySystem:
         settings: Settings,
         brand_name: str = DEFAULT_BRAND_NAME,
         brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+        support_email: str = DEFAULT_SUPPORT_EMAIL,
+        website: str = DEFAULT_WEBSITE,
+        tracking_url: str = DEFAULT_TRACKING_URL,
+        timezone: str = DEFAULT_TIMEZONE,
     ):
         self.settings = settings
         self.brand_name = brand_name
         self.brand_descriptor = brand_descriptor
+        self.support_email = support_email
+        self.website = website
+        self.tracking_url = tracking_url
+        self.timezone = timezone
+        # Pass 4b: tz defaults to America/New_York (Oubon's) but tenants
+        # in other time zones pass their own IANA tz name here so
+        # business-hours classification matches their working day.
         self.business_hours = BusinessHours(
             weekday_start=datetime.strptime("07:00", "%H:%M").time(),
             weekday_end=datetime.strptime("21:00", "%H:%M").time(),
             weekend_start=datetime.strptime("10:00", "%H:%M").time(),
             weekend_end=datetime.strptime("19:00", "%H:%M").time(),
-            timezone="America/New_York",  # EST/EDT for Oubon
+            timezone=timezone,
         )
         self.ai_client = AIClient(
             settings,
             brand_name=brand_name,
             brand_descriptor=brand_descriptor,
+            support_email=support_email,
+            website=website,
+            tracking_url=tracking_url,
         )
 
         # Initialize Shopify client if configured

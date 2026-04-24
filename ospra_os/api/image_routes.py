@@ -5,7 +5,7 @@ This module has been replaced by the cleaner image_generation_routes.py
 
 The new approach uses:
 - Stability AI background removal (reliable)
-- Custom background compositing (Oubon Shop aesthetic)
+- Custom background compositing (brand-neutral aesthetic)
 - Simpler API: /api/images/enhance
 
 This file kept for backwards compatibility but routes are disabled.

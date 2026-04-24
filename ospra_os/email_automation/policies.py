@@ -1,20 +1,84 @@
 """
-Oubon Shop - Company Policies and Guidelines
-This file is used by AI agents to understand company policies and provide accurate customer support.
+Customer-support company policies and guidelines
+=================================================
+
+The content here is fed into the email-AI system prompt (see
+`ai/multi_provider_client.AIClient._get_relevant_policy`) so the LLM
+can accurately quote refund rules, shipping windows, support email,
+and tracking URLs when drafting customer replies.
+
+Pass 4b SaaS refactor
+---------------------
+Previously everything in this file was hardcoded to Oubon Shop — the
+company name, hello@oubonshop.com, oubonshop.com/track, EST timezone,
+etc. That meant a second tenant would have gotten an AI draft that
+signed as "Acme Support" but quoted Oubon's email and tracking URL in
+the body.
+
+Every policy is now a render function that accepts a brand context
+(name / website / support_email / tracking_url / timezone / descriptor)
+and returns the policy string with those values substituted in. Oubon's
+values are the defaults, so the single-tenant production behavior is
+unchanged when callers omit the kwargs.
+
+Backward-compat shims (`REFUND_POLICY`, `RETURN_POLICY`, `FAQ`, etc.)
+are preserved as module-level constants rendered with Oubon defaults.
+Existing imports in downstream code keep working; new multi-tenant
+callers should use the `render_*` functions instead.
 """
 
-COMPANY_INFO = {
-    "name": "Oubon Shop",
-    "website": "oubonshop.com",
-    "support_email": "hello@oubonshop.com",
-    "operating_hours": {
-        "weekday": "Monday-Friday, 7 AM - 9 PM EST",
-        "weekend": "Saturday-Sunday, 10 AM - 7 PM EST",
-        "timezone": "America/New_York (EST/EDT)"
-    }
-}
+from __future__ import annotations
 
-REFUND_POLICY = """
+from typing import Dict
+
+from ospra_os.tenancy.brand import (
+    DEFAULT_BRAND_NAME,
+    DEFAULT_SUPPORT_EMAIL,
+    DEFAULT_TIMEZONE,
+    DEFAULT_TRACKING_URL,
+    DEFAULT_WEBSITE,
+)
+
+
+# ============================================================================
+# COMPANY INFO
+# ============================================================================
+
+def render_company_info(
+    brand_name: str = DEFAULT_BRAND_NAME,
+    website: str = DEFAULT_WEBSITE,
+    support_email: str = DEFAULT_SUPPORT_EMAIL,
+    timezone: str = DEFAULT_TIMEZONE,
+) -> Dict:
+    """Return the company-info dict with tenant brand values substituted.
+
+    `timezone` is a short human label appended after the IANA tz name in
+    parens. For Oubon's America/New_York that renders as
+    "America/New_York (EST/EDT)" — matching the previous hardcoded
+    string. For an arbitrary tenant tz we just show the IANA name.
+    """
+    tz_display = timezone
+    if timezone == "America/New_York":
+        tz_display = "America/New_York (EST/EDT)"
+
+    return {
+        "name": brand_name,
+        "website": website,
+        "support_email": support_email,
+        "operating_hours": {
+            "weekday": "Monday-Friday, 7 AM - 9 PM",
+            "weekend": "Saturday-Sunday, 10 AM - 7 PM",
+            "timezone": tz_display,
+        },
+    }
+
+
+# ============================================================================
+# POLICIES
+# ============================================================================
+
+def render_refund_policy(support_email: str = DEFAULT_SUPPORT_EMAIL) -> str:
+    return f"""
 ## Refund Policy
 
 ### Automatic Refunds (Processed Immediately)
@@ -32,7 +96,7 @@ Orders requiring manual review (24-48 hour response time):
 - Customer has not confirmed they will ship item back
 
 ### How to Request a Refund
-1. Email us at hello@oubonshop.com with your order number
+1. Email us at {support_email} with your order number
 2. Describe the issue with the product
 3. Confirm that you will ship the item back to us
 4. We'll process eligible refunds within 24 hours
@@ -44,7 +108,9 @@ Orders requiring manual review (24-48 hour response time):
 - Keep your tracking number for reference
 """
 
-RETURN_POLICY = """
+
+def render_return_policy(support_email: str = DEFAULT_SUPPORT_EMAIL) -> str:
+    return f"""
 ## Return Policy
 
 ### Return Window
@@ -58,13 +124,18 @@ RETURN_POLICY = """
 - Hygiene products that have been opened
 
 ### Return Process
-1. Email hello@oubonshop.com with order number
+1. Email {support_email} with order number
 2. We'll provide return shipping instructions
 3. Ship item back with tracking
 4. Refund processed within 5 business days of receiving return
 """
 
-SHIPPING_POLICY = """
+
+def render_shipping_policy(
+    support_email: str = DEFAULT_SUPPORT_EMAIL,
+    tracking_url: str = DEFAULT_TRACKING_URL,
+) -> str:
+    return f"""
 ## Shipping Policy
 
 ### Domestic Shipping (United States)
@@ -79,14 +150,16 @@ SHIPPING_POLICY = """
 
 ### Tracking
 - Tracking numbers sent via email within 24 hours of shipment
-- Track packages at: oubonshop.com/track or via carrier website
+- Track packages at: {tracking_url} or via carrier website
 
 ### Lost or Damaged Packages
-- Contact us immediately at hello@oubonshop.com
+- Contact us immediately at {support_email}
 - Include order number and photo of damage (if applicable)
 - We'll work with carrier to resolve or send replacement
 """
 
+
+# These two are brand-agnostic — no substitution needed.
 ORDER_STATUS_INFO = """
 ## Order Status Guide
 
@@ -141,6 +214,7 @@ CUSTOMER_SERVICE_APPROACH = """
 - Offer to help with anything else
 """
 
+# Brand-agnostic scenario playbook.
 COMMON_SCENARIOS = {
     "damaged_product": {
         "response_approach": "Apologize, verify order is within 15 days and under $100, process automatic refund if eligible, otherwise escalate to manual review",
@@ -164,59 +238,102 @@ COMMON_SCENARIOS = {
     },
 }
 
-FAQ = {
-    "How long does shipping take?": "Standard shipping takes 5-7 business days. Express shipping is 2-3 business days. You'll receive a tracking number within 24 hours of your order shipping.",
 
-    "Do you ship internationally?": "Yes, we ship to select countries. International shipping takes 10-21 business days. Note that customers are responsible for any customs fees.",
+# ============================================================================
+# FAQ
+# ============================================================================
 
-    "What's your refund policy?": "We offer refunds within 15 days for quality issues (damaged, defective, wrong item). Orders $100 or less are processed automatically. Just email us with your order number and confirm you'll ship the item back.",
+def render_faq(tracking_url: str = DEFAULT_TRACKING_URL) -> Dict[str, str]:
+    """FAQ entries with the tenant tracking URL substituted where relevant."""
+    return {
+        "How long does shipping take?": "Standard shipping takes 5-7 business days. Express shipping is 2-3 business days. You'll receive a tracking number within 24 hours of your order shipping.",
 
-    "How do I track my order?": "We'll email you a tracking number within 24 hours of shipping. You can track at oubonshop.com/track or directly on the carrier's website.",
+        "Do you ship internationally?": "Yes, we ship to select countries. International shipping takes 10-21 business days. Note that customers are responsible for any customs fees.",
 
-    "Can I change my shipping address?": "If your order hasn't shipped yet, we can update the address. Contact us immediately with your order number and new address.",
+        "What's your refund policy?": "We offer refunds within 15 days for quality issues (damaged, defective, wrong item). Orders $100 or less are processed automatically. Just email us with your order number and confirm you'll ship the item back.",
 
-    "Do you offer exchanges?": "We don't offer direct exchanges, but you can return the original item for a refund and place a new order for the item you'd like.",
-}
+        "How do I track my order?": f"We'll email you a tracking number within 24 hours of shipping. You can track at {tracking_url} or directly on the carrier's website.",
+
+        "Can I change my shipping address?": "If your order hasn't shipped yet, we can update the address. Contact us immediately with your order number and new address.",
+
+        "Do you offer exchanges?": "We don't offer direct exchanges, but you can return the original item for a refund and place a new order for the item you'd like.",
+    }
 
 
-def get_policy_context() -> str:
+# ============================================================================
+# POLICY CONTEXT — what gets fed to the AI prompt
+# ============================================================================
+
+def get_policy_context(
+    brand_name: str = DEFAULT_BRAND_NAME,
+    website: str = DEFAULT_WEBSITE,
+    support_email: str = DEFAULT_SUPPORT_EMAIL,
+    tracking_url: str = DEFAULT_TRACKING_URL,
+    timezone: str = DEFAULT_TIMEZONE,
+) -> str:
     """
     Get formatted policy context for AI to reference.
-    Returns a string with all relevant policies.
+
+    Kwargs default to Oubon Shop for the single-tenant deployment.
+    Multi-tenant callers (SmartReplySystem / EmailProcessor via
+    AIClient) pass per-tenant values.
     """
-    context = f"""
-# Oubon Shop Customer Support Policies
+    info = render_company_info(
+        brand_name=brand_name,
+        website=website,
+        support_email=support_email,
+        timezone=timezone,
+    )
+
+    return f"""
+# {info['name']} Customer Support Policies
 
 ## Company Information
-{COMPANY_INFO['name']}
-Support: {COMPANY_INFO['support_email']}
+{info['name']}
+Support: {info['support_email']}
 Operating Hours:
-- Weekdays: {COMPANY_INFO['operating_hours']['weekday']}
-- Weekends: {COMPANY_INFO['operating_hours']['weekend']}
+- Weekdays: {info['operating_hours']['weekday']}
+- Weekends: {info['operating_hours']['weekend']}
 
-{REFUND_POLICY}
+{render_refund_policy(support_email=support_email)}
 
-{RETURN_POLICY}
+{render_return_policy(support_email=support_email)}
 
-{SHIPPING_POLICY}
+{render_shipping_policy(support_email=support_email, tracking_url=tracking_url)}
 
 {ORDER_STATUS_INFO}
 
 {CUSTOMER_SERVICE_APPROACH}
 """
-    return context
 
 
 def get_scenario_guidance(scenario_type: str) -> dict:
-    """Get specific guidance for common scenarios."""
+    """Get specific guidance for common scenarios. Brand-agnostic."""
     return COMMON_SCENARIOS.get(scenario_type, {})
 
 
-def get_faq_answer(question: str) -> str:
-    """Get answer to common questions."""
-    # Simple keyword matching for FAQs
+def get_faq_answer(
+    question: str,
+    tracking_url: str = DEFAULT_TRACKING_URL,
+) -> str:
+    """Get answer to common questions. Tracking URL is tenant-aware."""
+    faq = render_faq(tracking_url=tracking_url)
     question_lower = question.lower()
-    for faq_q, faq_a in FAQ.items():
+    for faq_q, faq_a in faq.items():
         if any(word in question_lower for word in faq_q.lower().split()):
             return faq_a
     return ""
+
+
+# ============================================================================
+# BACKWARD-COMPAT SHIMS
+# ============================================================================
+# Pre-Pass-4b callers imported these as module-level constants. Rendered
+# here with Oubon defaults so nothing breaks. New code should call the
+# `render_*` functions directly with a tenant brand context.
+
+COMPANY_INFO = render_company_info()
+REFUND_POLICY = render_refund_policy()
+RETURN_POLICY = render_return_policy()
+SHIPPING_POLICY = render_shipping_policy()
+FAQ = render_faq()

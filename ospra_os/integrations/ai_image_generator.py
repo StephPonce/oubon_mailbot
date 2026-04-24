@@ -1,17 +1,17 @@
 """
-AI Image Enhancer for Oubon Shop
-=================================
+AI Image Enhancer
+=================
 Single Purpose: Remove ugly backgrounds, add clean professional ones.
 
 HOW IT WORKS:
 1. Stability AI removes the background (returns transparent PNG)
-2. We composite onto Oubon Shop branded background
+2. We composite onto a clean brand-neutral background
 3. Product stays EXACTLY the same - only background changes
 
 Cost: ~6 credits per image (~$0.06)
 Time: ~3-5 seconds
 
-OUBON SHOP AESTHETIC:
+AESTHETIC:
 - Clean white or soft gradient backgrounds
 - Minimalist, premium feel
 - Professional e-commerce ready
@@ -152,7 +152,7 @@ def check_enhanced_image_exists(original_url: str) -> Optional[str]:
 
     return None
 
-# Oubon Shop brand backgrounds - MORE DISTINCT STYLES
+# Brand-neutral background styles - MORE DISTINCT STYLES
 BACKGROUND_STYLES = {
     "clean_white": {
         "name": "Clean White",
@@ -211,8 +211,8 @@ NICHE_BACKGROUNDS = {
 
 class AIImageEnhancer:
     """
-    Product image enhancer for Oubon Shop.
-    
+    Product image enhancer.
+
     Single responsibility: Remove ugly supplier backgrounds,
     add clean professional backgrounds. Product stays intact.
     """

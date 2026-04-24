@@ -37,6 +37,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_BRAND_NAME = "Oubon Shop"
 DEFAULT_BRAND_DESCRIPTOR = "a premium smart home and lifestyle store"
 
+# Pass 4b: additional defaults consumed by policies.py (fed into the
+# customer-support AI prompt) and smart_reply.py (business-hours TZ).
+# These are the literal strings Oubon hardcoded before Pass 4b. They do
+# not yet have matching columns on `users` — tenants override them by
+# passing explicit values to the consuming functions for now. Columns
+# can be added in a follow-up migration once multi-tenant rollout lands.
+DEFAULT_SUPPORT_EMAIL = "hello@oubonshop.com"
+DEFAULT_WEBSITE = "oubonshop.com"
+DEFAULT_TRACKING_URL = "oubonshop.com/track"
+DEFAULT_TIMEZONE = "America/New_York"  # IANA tz name for business_hours
+
 
 def get_tenant_brand(db=None, fallback: str = DEFAULT_BRAND_NAME) -> str:
     """Return the brand name for the current tenant.

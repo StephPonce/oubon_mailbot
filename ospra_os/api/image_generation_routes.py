@@ -208,7 +208,7 @@ async def enhance_image(
     Enhance a single product image WITH FILE-BASED CACHING.
 
     Removes the ugly supplier background and adds a clean,
-    professional background matching Oubon Shop aesthetic.
+    professional brand-neutral background.
 
     **File-Based Caching:** Enhanced images are saved to disk.
     If this image was enhanced before, returns cached file URL instantly (FREE).

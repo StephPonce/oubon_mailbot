@@ -6,7 +6,14 @@ from ospra_os.email_automation.gmail_client import GmailClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from ospra_os.database import EmailFollowup, get_followup_session
 from ospra_os.analytics.email_analytics import Analytics
-from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
+from ospra_os.tenancy.brand import (
+    DEFAULT_BRAND_DESCRIPTOR,
+    DEFAULT_BRAND_NAME,
+    DEFAULT_SUPPORT_EMAIL,
+    DEFAULT_TIMEZONE,
+    DEFAULT_TRACKING_URL,
+    DEFAULT_WEBSITE,
+)
 import base64
 import re
 import time
@@ -29,17 +36,29 @@ class EmailProcessor:
         settings: Settings,
         brand_name: str = DEFAULT_BRAND_NAME,
         brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+        support_email: str = DEFAULT_SUPPORT_EMAIL,
+        website: str = DEFAULT_WEBSITE,
+        tracking_url: str = DEFAULT_TRACKING_URL,
+        timezone: str = DEFAULT_TIMEZONE,
         user_id: Optional[int] = None,
     ):
         self.settings = settings
         self.brand_name = brand_name
         self.brand_descriptor = brand_descriptor
+        self.support_email = support_email
+        self.website = website
+        self.tracking_url = tracking_url
+        self.timezone = timezone
         self.user_id = user_id
         self.gmail_client = GmailClient(settings)
         self.smart_reply = SmartReplySystem(
             settings,
             brand_name=brand_name,
             brand_descriptor=brand_descriptor,
+            support_email=support_email,
+            website=website,
+            tracking_url=tracking_url,
+            timezone=timezone,
         )
         self.analytics = Analytics(settings.database_url)
 
