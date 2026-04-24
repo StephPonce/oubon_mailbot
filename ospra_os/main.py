@@ -767,6 +767,48 @@ except Exception as e:
     rankings_router = None
     _HAS_RANKINGS = False
 
+# ============================================================================
+# BILLING / SUBSCRIPTION ROUTERS (LemonSqueezy)
+# Wired up in Pass 2 cleanup — these route files existed but weren't included.
+# Without them: /api/subscription/upgrade, /api/webhooks/lemonsqueezy/* etc.
+# return 404 and LemonSqueezy webhooks silently drop.
+# ============================================================================
+try:
+    from ospra_os.payments.routes import router as payments_router  # type: ignore
+    _HAS_PAYMENTS = True
+    logger.info("Payments router loaded successfully")
+except Exception as e:
+    logger.warning(f"Payments router not loaded: {e}")
+    payments_router = None
+    _HAS_PAYMENTS = False
+
+try:
+    from ospra_os.api.subscription_routes import router as subscription_router  # type: ignore
+    _HAS_SUBSCRIPTION = True
+    logger.info("Subscription router loaded successfully")
+except Exception as e:
+    logger.warning(f"Subscription router not loaded: {e}")
+    subscription_router = None
+    _HAS_SUBSCRIPTION = False
+
+try:
+    from ospra_os.api.webhook_routes import router as webhook_router  # type: ignore
+    _HAS_WEBHOOKS = True
+    logger.info("Webhook router loaded successfully (LemonSqueezy + Shopify + CJ)")
+except Exception as e:
+    logger.warning(f"Webhook router not loaded: {e}")
+    webhook_router = None
+    _HAS_WEBHOOKS = False
+
+try:
+    from ospra_os.api.user_routes import router as user_router  # type: ignore
+    _HAS_USER_ROUTES = True
+    logger.info("User routes loaded successfully")
+except Exception as e:
+    logger.warning(f"User routes not loaded: {e}")
+    user_router = None
+    _HAS_USER_ROUTES = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -1628,6 +1670,16 @@ if _HAS_TRENDS and trends_router:
 # Rankings routes (extracted from main.py for better organization)
 if _HAS_RANKINGS and rankings_router:
     app.include_router(rankings_router)  # exposes /api/rankings/*
+
+# Billing / subscription routers (LemonSqueezy) — wired up in Pass 2 cleanup
+if _HAS_PAYMENTS and payments_router:
+    app.include_router(payments_router)  # exposes /api/payments/*
+if _HAS_SUBSCRIPTION and subscription_router:
+    app.include_router(subscription_router)  # exposes /api/subscription/*
+if _HAS_WEBHOOKS and webhook_router:
+    app.include_router(webhook_router)  # exposes /api/webhooks/* (LemonSqueezy + Shopify + CJ)
+if _HAS_USER_ROUTES and user_router:
+    app.include_router(user_router)  # exposes /api/users/*
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)

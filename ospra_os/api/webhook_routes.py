@@ -17,7 +17,7 @@ Date: December 2024
 import json
 import logging
 from typing import Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, Header
 from pydantic import BaseModel
 
 from ospra_os.security.webhook_verification import (
