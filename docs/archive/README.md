@@ -20,6 +20,7 @@ The G4 feedback loop is live. Code lives in `ospra_os/learning/`, `ospra_os/data
 ### app/ → ospra_os/ migration — completed Dec 2025
 - `T2_MIGRATION_COMPLETE.md` — migration report
 - `app_migration_plan.md` — original plan
+- `project_structure.md` — Dec 2025 project layout (still references `app/` and root `main.py`; superseded by current `README.md` + `CLAUDE.md`)
 
 The legacy `app/` directory no longer exists. All code is under `ospra_os/`.
 

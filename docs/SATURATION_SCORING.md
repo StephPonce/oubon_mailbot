@@ -392,7 +392,7 @@ Reasons:
 
 ## Related Documentation
 
-- [APIFY_CLEANUP.md](./APIFY_CLEANUP.md) - Why we removed Shopify Competitor scraper
+- [archive/APIFY_CLEANUP.md](./archive/APIFY_CLEANUP.md) - Why we removed Shopify Competitor scraper (historical)
 - [DATA_SOURCES.md](./DATA_SOURCES.md) - All data sources (Amazon Bestsellers included)
 - [DISCOVERY_PIPELINE_ARCHITECTURE.md](./DISCOVERY_PIPELINE_ARCHITECTURE.md) - Full discovery pipeline
 

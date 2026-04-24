@@ -2289,7 +2289,7 @@ wheels = [
 ]
 
 [[package]]
-name = "oubon-mailbot"
+name = "ospra-os"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

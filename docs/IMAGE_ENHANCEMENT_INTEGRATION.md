@@ -383,7 +383,7 @@ curl -X POST http://localhost:8001/api/images/batch-enhance \
 
 ### Related Documentation
 
-- `/docs/DEPLOYMENT_AI_AUDIT.md` - Complete AI features audit
+- `/docs/archive/DEPLOYMENT_AI_AUDIT.md` - Complete AI features audit (historical, Dec 2025)
 - `/ospra_os/services/image_processor.py` - Image processor implementation
 - `/ospra_os/services/image_storage.py` - Storage implementation
 - `/ospra_os/api/image_routes.py` - API endpoints

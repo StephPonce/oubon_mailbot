@@ -930,7 +930,7 @@ TIKTOK_APP_SECRET=your_app_secret
 
 - [DISCOVERY_PIPELINE_ARCHITECTURE.md](./DISCOVERY_PIPELINE_ARCHITECTURE.md) - Complete discovery pipeline details
 - [X_TWITTER_SENTIMENT_API.md](./X_TWITTER_SENTIMENT_API.md) - X/Twitter sentiment integration guide
-- [APIFY_CLEANUP.md](./APIFY_CLEANUP.md) - Apify scraper cleanup details
+- [archive/APIFY_CLEANUP.md](./archive/APIFY_CLEANUP.md) - Apify scraper cleanup details (historical)
 - [ALIEXPRESS_API_STATUS.md](./ALIEXPRESS_API_STATUS.md) - AliExpress integration status
 
 ---

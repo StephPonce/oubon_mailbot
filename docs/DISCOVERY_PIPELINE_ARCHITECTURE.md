@@ -498,9 +498,8 @@ The discovery engine supports 40+ curated niches across 13 categories:
 
 ## Related Documentation
 
-- [APIFY_CLEANUP.md](./APIFY_CLEANUP.md) - Apify scraper cleanup details
+- [archive/APIFY_CLEANUP.md](./archive/APIFY_CLEANUP.md) - Apify scraper cleanup details (historical)
 - [ALIEXPRESS_API_STATUS.md](./ALIEXPRESS_API_STATUS.md) - AliExpress API integration status
-- [DISCOVERY_SYSTEM_STATUS.md](./DISCOVERY_SYSTEM_STATUS.md) - Overall discovery system health
 
 ---
 
