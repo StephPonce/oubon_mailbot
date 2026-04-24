@@ -222,14 +222,17 @@ class StoreContextMiddleware(BaseHTTPMiddleware):
 
         # Update tenant context with store_id
         if store_id:
-            # Create new context with store_id
+            # Create new context with store_id (preserve brand fields so lazy
+            # lookups populated earlier in the request are not discarded)
             updated_tenant = TenantContext(
                 tenant_id=tenant.tenant_id,
                 user_id=tenant.user_id,
                 store_id=store_id,
                 is_admin=tenant.is_admin,
                 is_superuser=tenant.is_superuser,
-                subscription_tier=tenant.subscription_tier
+                subscription_tier=tenant.subscription_tier,
+                brand_name=tenant.brand_name,
+                brand_descriptor=tenant.brand_descriptor,
             )
             set_current_tenant(updated_tenant)
 

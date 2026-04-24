@@ -3,6 +3,26 @@ Tenant-Scoped Query Helpers - GROK RECOMMENDATION #14
 
 Automatic tenant-scoping for all database queries.
 Every query is filtered to current tenant, preventing cross-tenant data access.
+
+IMPLEMENTATION NOTE (Cleanup Pass 4):
+This module previously had two bugs that made it unusable:
+  1. It filtered `model.tenant_id` but every tenant-scoped model in the
+     codebase uses `user_id` as the ownership column (there is no
+     `tenant_id` field anywhere).
+  2. It only categorized 6 of 63 models, so queries against any other model
+     raised TenantQueryError.
+
+Both are now fixed:
+  - All tenant-scoped filtering uses `user_id = tenant.user_id`
+  - USER_SCOPED_MODELS is expanded to cover every model with a `user_id`
+    column identified by scripts/tenancy_audit.py
+  - STORE_SCOPED_MODELS covers models that filter by `store_id`
+  - INDIRECT_TENANT_MODELS documents models whose isolation flows through
+    a parent FK (audit-time notation — the wrapper does not auto-join)
+
+Models NOT in any set fall through to `raise TenantQueryError` which is the
+fail-safe behavior: if you query something uncategorized, you get an error
+instead of silently leaking cross-tenant data.
 """
 
 from typing import Any, List, Optional, Type, TypeVar
@@ -12,12 +32,35 @@ from fastapi import HTTPException, status
 
 from ospra_os.tenancy.context import get_current_tenant, require_tenant, TenantContext
 from ospra_os.database import (
+    # User / identity
     User,
+    # Tenant-scoped (have user_id column)
     Store,
     Product,
+    ProductDeployment,
     AdCampaign,
     EmailTemplate,
-    ABTest
+    Email,
+    EmailAutomationRule,
+    EmailLabel,
+    UserEmailAccount,
+    UserSettings,
+    UserProductRecommendation,
+    ABTest,
+    Action,
+    ActionLog,
+    AutoPilotLog,
+    AmazonAccount,
+    AmazonListing,
+    AmazonOrder,
+    FBAShipment,
+    AIUsage,
+    ProductPerformance,
+    RecommendationOutcome,
+    AILearningEvent,
+    ConfidenceCalibration,
+    NicheLearning,
+    PersonalLearningWeights,
 )
 
 T = TypeVar('T')
@@ -32,27 +75,60 @@ class TenantQueryError(Exception):
 
 # ==================== MODEL CATEGORIZATION ====================
 
-# Models directly scoped to tenant_id (user_id)
-DIRECT_TENANT_MODELS = {
+# Models scoped through user_id field (the canonical tenant ownership column).
+# Add to this set when a new user-scoped model is introduced.
+#
+# `None` values are filtered out so that optional models (e.g. Amazon SP-API
+# models which are only available when credential_encryption is wired up) do
+# not leak into the set if they fail to import.
+USER_SCOPED_MODELS = {m for m in {
     Store,
+    Product,
+    ProductDeployment,
+    AdCampaign,
     EmailTemplate,
+    Email,
+    EmailAutomationRule,
+    EmailLabel,
+    UserEmailAccount,
+    UserSettings,
+    UserProductRecommendation,
     ABTest,
-    AdCampaign
-}
+    Action,
+    ActionLog,
+    AutoPilotLog,
+    AmazonAccount,
+    AmazonListing,
+    AmazonOrder,
+    FBAShipment,
+    AIUsage,
+    ProductPerformance,
+    RecommendationOutcome,
+    AILearningEvent,
+    ConfidenceCalibration,
+    NicheLearning,
+    PersonalLearningWeights,
+} if m is not None}
 
-# Models scoped through user_id field
-USER_SCOPED_MODELS = {
-    Product
-}
+# Legacy alias kept for backward compatibility with dependencies.py imports
+# and any external callers. Previously this set was supposed to filter by
+# `tenant_id`, but no model has that column — they all use `user_id`. The
+# two sets are now equivalent; `USER_SCOPED_MODELS` is the canonical name.
+DIRECT_TENANT_MODELS = USER_SCOPED_MODELS
 
-# Models that are store-scoped (require store_id)
+# Models that have a store_id column (operate at the per-store granularity).
+# Filtering by user_id still applies (every Product belongs to a user AND a
+# store); store filter is layered on top via TenantContext.store_id.
 STORE_SCOPED_MODELS = {
-    Product
+    Product,
+    ProductDeployment,
+    ABTest,
 }
 
-# Models that don't require tenant scoping (system-level)
+# Models that do NOT require tenant scoping (users table itself, or tables
+# that are intentionally global — e.g. niches, caches).
 UNSCOPED_MODELS = {
-    User  # Users are tenants themselves
+    User,  # The user row is the tenant itself
 }
 
 
@@ -117,30 +193,22 @@ class TenantScopedSession:
         if model in UNSCOPED_MODELS:
             return query
 
-        # Apply tenant filtering
-        if model in DIRECT_TENANT_MODELS:
-            # Models with tenant_id field
-            if hasattr(model, 'tenant_id'):
-                query = query.filter(model.tenant_id == self._tenant.tenant_id)
-            else:
-                raise TenantQueryError(
-                    f"Model {model.__name__} is marked as DIRECT_TENANT but has no tenant_id field"
-                )
-
-        elif model in USER_SCOPED_MODELS:
-            # Models with user_id field
+        # Apply tenant filtering. All user-scoped models filter by user_id;
+        # every model in USER_SCOPED_MODELS is guaranteed to have that column.
+        if model in USER_SCOPED_MODELS:
             if hasattr(model, 'user_id'):
                 query = query.filter(model.user_id == self._tenant.user_id)
             else:
                 raise TenantQueryError(
-                    f"Model {model.__name__} is marked as USER_SCOPED but has no user_id field"
+                    f"Model {model.__name__} is in USER_SCOPED_MODELS but has no user_id field. "
+                    f"Remove it from the set or add a user_id column."
                 )
-
         else:
-            # Unknown model - fail safe
+            # Unknown model - fail safe (better to error than silently leak)
             raise TenantQueryError(
                 f"Model {model.__name__} is not categorized for tenant scoping. "
-                f"Add to DIRECT_TENANT_MODELS, USER_SCOPED_MODELS, or UNSCOPED_MODELS."
+                f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
+                f"ospra_os/tenancy/queries.py."
             )
 
         return query
@@ -169,17 +237,18 @@ class TenantScopedSession:
         if model in UNSCOPED_MODELS:
             return instance
 
-        elif model in DIRECT_TENANT_MODELS:
-            if hasattr(instance, 'tenant_id'):
-                if instance.tenant_id != self._tenant.tenant_id:
-                    return None  # Not owned by this tenant
-
-        elif model in USER_SCOPED_MODELS:
+        if model in USER_SCOPED_MODELS:
             if hasattr(instance, 'user_id'):
                 if instance.user_id != self._tenant.user_id:
                     return None  # Not owned by this user
+            return instance
 
-        return instance
+        # Uncategorized model - fail safe (same policy as query())
+        raise TenantQueryError(
+            f"Model {model.__name__} is not categorized for tenant scoping. "
+            f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
+            f"ospra_os/tenancy/queries.py."
+        )
 
     def get_or_404(self, model: Type[T], ident: Any, detail: Optional[str] = None) -> T:
         """
@@ -215,16 +284,13 @@ class TenantScopedSession:
         """
         model = type(instance)
 
-        # Set tenant fields automatically
-        if model in DIRECT_TENANT_MODELS:
-            if hasattr(instance, 'tenant_id') and instance.tenant_id is None:
-                instance.tenant_id = self._tenant.tenant_id
-
-        if model in USER_SCOPED_MODELS or model in STORE_SCOPED_MODELS:
+        # Auto-populate user_id on any user-scoped insert
+        if model in USER_SCOPED_MODELS:
             if hasattr(instance, 'user_id') and instance.user_id is None:
                 instance.user_id = self._tenant.user_id
 
-        # Set store_id if in context
+        # Auto-populate store_id if the model is store-scoped AND the request
+        # has a store_id in context (set via ?store_id=X or X-Store-ID header)
         if model in STORE_SCOPED_MODELS:
             if hasattr(instance, 'store_id') and instance.store_id is None:
                 if self._tenant.store_id:
@@ -250,23 +316,27 @@ class TenantScopedSession:
             return
 
         # Verify ownership before delete
-        if model in DIRECT_TENANT_MODELS:
-            if hasattr(instance, 'tenant_id'):
-                if instance.tenant_id != self._tenant.tenant_id:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Cannot delete resource from another tenant"
-                    )
-
-        elif model in USER_SCOPED_MODELS:
+        if model in USER_SCOPED_MODELS:
             if hasattr(instance, 'user_id'):
                 if instance.user_id != self._tenant.user_id:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="Cannot delete resource from another user"
+                        detail="Cannot delete resource owned by another user"
                     )
+            self._db.delete(instance)
+            return
 
-        self._db.delete(instance)
+        if model in UNSCOPED_MODELS:
+            self._db.delete(instance)
+            return
+
+        # Uncategorized model - fail safe
+        raise TenantQueryError(
+            f"Model {model.__name__} is not categorized for tenant scoping. "
+            f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
+            f"ospra_os/tenancy/queries.py before deleting through a "
+            f"TenantScopedSession."
+        )
 
     def bulk_update_mappings(self, model: Type[T], mappings: List[dict]) -> None:
         """
@@ -276,12 +346,8 @@ class TenantScopedSession:
             model: SQLAlchemy model class
             mappings: List of dicts with update data
         """
-        # Add tenant fields to all mappings
+        # Add user_id to all mappings that don't already set it
         for mapping in mappings:
-            if model in DIRECT_TENANT_MODELS:
-                if 'tenant_id' not in mapping:
-                    mapping['tenant_id'] = self._tenant.tenant_id
-
             if model in USER_SCOPED_MODELS:
                 if 'user_id' not in mapping:
                     mapping['user_id'] = self._tenant.user_id
@@ -296,12 +362,8 @@ class TenantScopedSession:
             model: SQLAlchemy model class
             mappings: List of dicts with insert data
         """
-        # Add tenant fields to all mappings
+        # Add user_id to all mappings that don't already set it
         for mapping in mappings:
-            if model in DIRECT_TENANT_MODELS:
-                if 'tenant_id' not in mapping:
-                    mapping['tenant_id'] = self._tenant.tenant_id
-
             if model in USER_SCOPED_MODELS:
                 if 'user_id' not in mapping:
                     mapping['user_id'] = self._tenant.user_id

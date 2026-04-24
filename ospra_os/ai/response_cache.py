@@ -1,8 +1,18 @@
-"""Smart response caching to reduce AI costs."""
+"""Smart response caching to reduce AI costs.
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  FAQ templates use a `{signature}` placeholder. `get_faq_response` fills
+  it at render time with the caller-supplied brand signature (default
+  "— Oubon Shop Support"). Oubon's deployment renders identically to
+  before; multi-tenant callers pass their own `brand_name` to get
+  tenant-specific signatures.
+"""
 from typing import Optional, Dict
 from datetime import datetime, timedelta
 import hashlib
 import json
+
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME
 
 
 class ResponseCache:
@@ -84,19 +94,25 @@ class ResponseCache:
         }
 
 
-# FAQ responses that should always be cached
+# Default tracking hostname (Oubon's). Multi-tenant callers can override
+# via `tracking_host` when calling `get_faq_response` or `get_cached_response`.
+DEFAULT_TRACKING_HOST = "oubonshop.com/track"
+
+# FAQ response templates. `{signature}` and `{tracking_host}` are filled at
+# render time by `get_faq_response`. The templates are intentionally static
+# at module load so they can be hashed/cached, then formatted per-request.
 FAQ_CACHE = {
     "refund_policy": """We offer refunds within 15 days for quality issues (damaged, defective, wrong item, not as described). Orders $100 or less are processed automatically when you confirm you'll ship the item back. For orders over $100 or older than 15 days, our team will review within 24-48 hours.
 
 Refunds typically appear in 5-7 business days on your original payment method.
 
-— Oubon Shop Support""",
+{signature}""",
 
     "shipping_time": """Our standard shipping takes 5-7 business days within the United States. Express shipping is available for 2-3 business day delivery.
 
-You'll receive a tracking number within 24 hours of your order shipping, and you can track your package at oubonshop.com/track or directly on the carrier's website.
+You'll receive a tracking number within 24 hours of your order shipping, and you can track your package at {tracking_host} or directly on the carrier's website.
 
-— Oubon Shop Support""",
+{signature}""",
 
     "return_process": """Returns are accepted within 30 days of delivery. To start a return:
 
@@ -107,44 +123,65 @@ You'll receive a tracking number within 24 hours of your order shipping, and you
 
 Items must be in original condition with tags attached.
 
-— Oubon Shop Support""",
+{signature}""",
 
     "international_shipping": """Yes, we ship to select countries internationally! International shipping typically takes 10-21 business days depending on the destination.
 
 Please note that customers are responsible for any customs fees or duties that may apply.
 
-— Oubon Shop Support""",
+{signature}""",
 
     "order_tracking": """You can track your order in two ways:
 
-1. Visit oubonshop.com/track and enter your order number
+1. Visit {tracking_host} and enter your order number
 2. Use the tracking number from your shipping confirmation email on the carrier's website
 
 If you need help finding your order number, please reply with the email address you used at checkout.
 
-— Oubon Shop Support""",
+{signature}""",
 }
 
 
-def get_faq_response(subject: str, body: str) -> Optional[str]:
-    """Check if this matches a common FAQ."""
+def _render_faq(
+    template_key: str,
+    brand_name: str,
+    tracking_host: str,
+) -> str:
+    """Fill a FAQ template with the given brand signature + tracking host."""
+    template = FAQ_CACHE[template_key]
+    return template.format(
+        signature=f"— {brand_name} Support",
+        tracking_host=tracking_host,
+    )
+
+
+def get_faq_response(
+    subject: str,
+    body: str,
+    brand_name: str = DEFAULT_BRAND_NAME,
+    tracking_host: str = DEFAULT_TRACKING_HOST,
+) -> Optional[str]:
+    """Check if this matches a common FAQ; render with the caller's brand."""
     text = f"{subject} {body}".lower()
+
+    def _render(key: str) -> str:
+        return _render_faq(key, brand_name=brand_name, tracking_host=tracking_host)
 
     # Check for FAQ patterns
     if any(word in text for word in ["refund policy", "refund process", "how to refund", "can i get refund"]):
-        return FAQ_CACHE["refund_policy"]
+        return _render("refund_policy")
 
     if any(word in text for word in ["how long shipping", "shipping time", "when will arrive", "delivery time"]):
-        return FAQ_CACHE["shipping_time"]
+        return _render("shipping_time")
 
     if any(word in text for word in ["how to return", "return process", "send back"]):
-        return FAQ_CACHE["return_process"]
+        return _render("return_process")
 
     if any(word in text for word in ["international shipping", "ship internationally", "ship to"]):
-        return FAQ_CACHE["international_shipping"]
+        return _render("international_shipping")
 
     if any(word in text for word in ["track order", "track my order", "tracking", "where is"]):
-        return FAQ_CACHE["order_tracking"]
+        return _render("order_tracking")
 
     return None
 
@@ -153,10 +190,19 @@ def get_faq_response(subject: str, body: str) -> Optional[str]:
 _cache = ResponseCache(ttl_hours=24)
 
 
-def get_cached_response(subject: str, body: str) -> Optional[str]:
-    """Try to get a cached or FAQ response."""
+def get_cached_response(
+    subject: str,
+    body: str,
+    brand_name: str = DEFAULT_BRAND_NAME,
+    tracking_host: str = DEFAULT_TRACKING_HOST,
+) -> Optional[str]:
+    """Try to get a cached or FAQ response.
+
+    `brand_name` / `tracking_host` are used only for FAQ template rendering
+    — the AI response cache is keyed on the email content, not the brand.
+    """
     # Check FAQ first (instant)
-    faq = get_faq_response(subject, body)
+    faq = get_faq_response(subject, body, brand_name=brand_name, tracking_host=tracking_host)
     if faq:
         print(" FAQ response used (instant, no AI cost)")
         return faq

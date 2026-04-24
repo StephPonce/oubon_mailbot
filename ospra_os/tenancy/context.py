@@ -35,6 +35,10 @@ class TenantContext:
     # Subscription info
     subscription_tier: str = "nest"
 
+    # Tenant branding (populated lazily by ospra_os.tenancy.brand.get_tenant_brand)
+    brand_name: Optional[str] = None
+    brand_descriptor: Optional[str] = None
+
     def can_access_tenant(self, tenant_id: int) -> bool:
         """Check if current context can access a specific tenant"""
         if self.is_superuser:

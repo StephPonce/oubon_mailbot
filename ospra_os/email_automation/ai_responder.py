@@ -243,7 +243,7 @@ class AIEmailResponder:
         try:
             if self.router:
                 from ospra_os.ai.model_router import ai_email_response
-                
+
                 response = await ai_email_response(
                     customer_name=context.from_name or "Valued Customer",
                     category=context.category.value,
@@ -251,7 +251,8 @@ class AIEmailResponder:
                     subject=context.subject,
                     body=context.body[:500],
                     order_number=context.order_number,
-                    response_type=response_type
+                    response_type=response_type,
+                    brand_name=context.store_name,
                 )
                 
                 if response and len(response) > 20:

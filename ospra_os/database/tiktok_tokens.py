@@ -3,6 +3,16 @@ TikTok Token Storage in Database
 
 Stores OAuth tokens in PostgreSQL to survive deployments.
 SECURITY: Tokens are never exposed to API responses.
+
+NOTE(saas-launch): This table is INTENTIONALLY platform-wide (no user_id).
+TikTok Ads API, TikTok Shop Open Platform, and TikTok Commerce Partner all
+require each advertiser/seller to have their own approved TikTok developer
+account — SaaS tenants cannot simply OAuth into TikTok like they can with
+Gmail. Oubon's platform-wide TikTok credentials are used to pull trending-
+product / hashtag signals from TikTok into the discovery pipeline for all
+tenants. Ad automation and TikTok Shop deployment remain Oubon-only
+features. Do not tenantize this without first re-evaluating whether other
+tenants can actually get TikTok API access. See docs/CLEANUP_PASS4.md.
 """
 from sqlalchemy import Column, Integer, String, DateTime, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base

@@ -6,18 +6,41 @@ from ospra_os.email_automation.gmail_client import GmailClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from ospra_os.database import EmailFollowup, get_followup_session
 from ospra_os.analytics.email_analytics import Analytics
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
 import base64
 import re
 import time
 
 
 class EmailProcessor:
-    """Process emails with smart auto-replies."""
+    """Process emails with smart auto-replies.
 
-    def __init__(self, settings: Settings):
+    For multi-tenant email automation (a paid-tier feature): callers that
+    process a given tenant's inbox should construct the processor with
+    that tenant's `brand_name` / `brand_descriptor` so support replies
+    sign with the right brand, and the tenant's `user_id` so follow-up
+    records are scoped correctly. Defaults are Oubon's values for the
+    single-tenant Oubon deployment (user_id=None keeps existing rows
+    working without migration).
+    """
+
+    def __init__(
+        self,
+        settings: Settings,
+        brand_name: str = DEFAULT_BRAND_NAME,
+        brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+        user_id: Optional[int] = None,
+    ):
         self.settings = settings
+        self.brand_name = brand_name
+        self.brand_descriptor = brand_descriptor
+        self.user_id = user_id
         self.gmail_client = GmailClient(settings)
-        self.smart_reply = SmartReplySystem(settings)
+        self.smart_reply = SmartReplySystem(
+            settings,
+            brand_name=brand_name,
+            brand_descriptor=brand_descriptor,
+        )
         self.analytics = Analytics(settings.database_url)
 
     def process_inbox(
@@ -191,11 +214,18 @@ class EmailProcessor:
             else:
                 # Check if we need a follow-up (previous reply was template during quiet hours)
                 session = get_followup_session(self.settings.database_url)
-                followup = session.query(EmailFollowup).filter_by(
-                    message_id=message_id,
+                q = session.query(EmailFollowup).filter_by(
+                    gmail_message_id=message_id,
                     needs_followup=True,
-                    followup_sent=False
-                ).first()
+                    followup_sent=False,
+                )
+                # Tenant scoping: when running for a specific tenant, only
+                # consider follow-ups owned by that tenant. When unset
+                # (single-tenant Oubon mode) fall back to the old global
+                # lookup so existing rows are still visible.
+                if self.user_id is not None:
+                    q = q.filter(EmailFollowup.user_id == self.user_id)
+                followup = q.first()
                 session.close()
 
                 # Only allow reply if this is a follow-up to a quiet hours template
@@ -391,7 +421,14 @@ class EmailProcessor:
         body: str,
         label: str,
     ):
-        """Save email to database for AI follow-up during operating hours."""
+        """Save email to database for AI follow-up during operating hours.
+
+        New rows are tagged with `self.user_id` when the processor was
+        constructed for a specific tenant. Existing rows (Oubon's rows
+        created before the SaaS refactor) keep `user_id=None` and
+        continue to work because the later lookup treats NULL user_id
+        as "global" for single-tenant mode.
+        """
         try:
             session = get_followup_session(self.settings.database_url)
 
@@ -404,10 +441,15 @@ class EmailProcessor:
                 # Update existing record
                 existing.needs_followup = True
                 existing.template_sent_at = datetime.utcnow()
+                # Backfill user_id if the row was created pre-refactor and
+                # we now know which tenant owns it.
+                if existing.user_id is None and self.user_id is not None:
+                    existing.user_id = self.user_id
             else:
                 # Create new record
                 followup = EmailFollowup(
                     gmail_message_id=message_id,
+                    user_id=self.user_id,
                     customer_email=from_email,
                     customer_name=from_name,
                     subject=subject,

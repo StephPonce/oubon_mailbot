@@ -1,8 +1,21 @@
-"""Multi-provider AI client supporting OpenAI and Claude."""
+"""Multi-provider AI client supporting OpenAI and Claude.
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  The system prompt, user prompts, and template fallback all read the
+  brand name from `self.brand_name` (set in `__init__`, defaults to
+  "Oubon Shop"). Signatures are rendered as "— {brand_name} Support".
+  Oubon's single-tenant deployment is unchanged because the defaults
+  match the previous hardcoded strings.
+
+  For multi-tenant email automation, `SmartReplySystem`/`EmailProcessor`
+  are responsible for passing the per-tenant `brand_name` +
+  `brand_descriptor` when they construct the client.
+"""
 from typing import Optional, Tuple
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from ospra_os.email_automation.policies import get_policy_context
 from ospra_os.ai.response_cache import get_cached_response, cache_response
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
 import time
 
 
@@ -13,10 +26,18 @@ class AIClient:
     - Anthropic Claude (Claude 3.5 Sonnet, etc.)
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        brand_name: str = DEFAULT_BRAND_NAME,
+        brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+    ):
         self.settings = settings
-        self.system_prompt = """
-You are Oubon Shop's helpful, calm, and concise support agent.
+        self.brand_name = brand_name
+        self.brand_descriptor = brand_descriptor
+        self.signature = f"— {brand_name} Support"
+        self.system_prompt = f"""
+You are {brand_name}'s helpful, calm, and concise support agent.
 
 CRITICAL SECURITY RULES (NEVER violate these):
 1. ONLY discuss the customer's own order using THEIR provided order number and email
@@ -32,7 +53,7 @@ RESPONSE BOUNDARIES:
 - Do not speculate or invent data - only use information from provided policies
 
 TONE: warm, professional, modern, concise (2-3 paragraphs max)
-SIGNATURE: Always end with "— Oubon Shop Support"
+SIGNATURE: Always end with "{self.signature}"
 """
 
     def draft_reply(self, subject: str, body: str) -> Tuple[str, dict]:
@@ -57,7 +78,7 @@ SIGNATURE: Always end with "— Oubon Shop Support"
         }
 
         # Check cache first
-        cached = get_cached_response(subject, body)
+        cached = get_cached_response(subject, body, brand_name=self.brand_name)
         if cached:
             metrics["provider"] = "cache"
             metrics["cache_hit"] = True
@@ -145,7 +166,7 @@ Please draft a helpful, professional reply that:
 2. Provides helpful next steps based on our policies below
 3. Asks for any missing information (like order number)
 4. Is warm and reassuring
-5. Ends with "— Oubon Shop Support"
+5. Ends with "{self.signature}"
 
 Keep it concise (2-3 short paragraphs max).
 
@@ -217,7 +238,7 @@ Please draft a helpful, professional reply that:
 2. Provides helpful next steps based on our policies below
 3. Asks for any missing information (like order number)
 4. Is warm and reassuring
-5. Ends with "— Oubon Shop Support"
+5. Ends with "{self.signature}"
 
 Keep it concise (2-3 short paragraphs max).
 
@@ -242,11 +263,11 @@ Reference our company policies as needed:
     def _template_fallback(self, subject: str) -> str:
         """Fallback response when no AI is available."""
         return (
-            "Thanks for reaching out to Oubon Shop.\n\n"
+            f"Thanks for reaching out to {self.brand_name}.\n\n"
             f"We received your message about: '{subject}'.\n"
             "A support specialist will follow up shortly. "
             "If this is about an order, please include your order number and the email used at checkout.\n\n"
-            "— Oubon Shop Support"
+            f"{self.signature}"
         )
 
     def get_provider_name(self) -> str:

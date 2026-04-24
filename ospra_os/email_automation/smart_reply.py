@@ -6,6 +6,7 @@ from ospra_os.integrations.shopify.client import ShopifyClient
 from ospra_os.email_automation.refund_processor import RefundProcessor
 from ospra_os.ai.multi_provider_client import AIClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
 import re
 
 
@@ -18,8 +19,15 @@ class SmartReplySystem:
     - Personalizes responses based on email content
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        settings: Settings,
+        brand_name: str = DEFAULT_BRAND_NAME,
+        brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+    ):
         self.settings = settings
+        self.brand_name = brand_name
+        self.brand_descriptor = brand_descriptor
         self.business_hours = BusinessHours(
             weekday_start=datetime.strptime("07:00", "%H:%M").time(),
             weekday_end=datetime.strptime("21:00", "%H:%M").time(),
@@ -27,7 +35,11 @@ class SmartReplySystem:
             weekend_end=datetime.strptime("19:00", "%H:%M").time(),
             timezone="America/New_York",  # EST/EDT for Oubon
         )
-        self.ai_client = AIClient(settings)
+        self.ai_client = AIClient(
+            settings,
+            brand_name=brand_name,
+            brand_descriptor=brand_descriptor,
+        )
 
         # Initialize Shopify client if configured
         self.shopify = None
@@ -173,6 +185,7 @@ class SmartReplySystem:
                     customer_name,
                     order_id,
                     refund_decision,
+                    brand_name=self.brand_name,
                 )
 
                 # Actually process the refund if approved

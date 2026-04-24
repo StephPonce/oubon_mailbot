@@ -47,6 +47,7 @@ from .action_models import (
     Action,
     AIActionType,
     AIActionStatus,
+    ActionLog,
     AutoPilotLog,  # Consolidated from actions_models.py
 )
 
@@ -96,6 +97,23 @@ from .testing_models import (
     ABTestEvent,
     ABTestAssignment,
 )
+
+# Amazon Models (SP-API integration)
+try:
+    from .amazon_models import (
+        AmazonAccount,
+        AmazonListing,
+        AmazonOrder,
+        FBAShipment,
+    )
+except ImportError:
+    # Amazon models import depends on ospra_os.security.credential_encryption
+    # being importable at package init time; fall back to None if the package
+    # isn't wired up yet in this environment.
+    AmazonAccount = None
+    AmazonListing = None
+    AmazonOrder = None
+    FBAShipment = None
 
 # Core Models
 from .core_models import (
@@ -183,6 +201,7 @@ __all__ = [
     "Action",
     "AIActionType",
     "AIActionStatus",
+    "ActionLog",
     "AutoPilotLog",
 
     # Advertising Models
@@ -199,6 +218,12 @@ __all__ = [
     "ABTest",
     "ABTestEvent",
     "ABTestAssignment",
+
+    # Amazon Models
+    "AmazonAccount",
+    "AmazonListing",
+    "AmazonOrder",
+    "FBAShipment",
 
     # Core Models
     "AIUsage",

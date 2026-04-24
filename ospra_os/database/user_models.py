@@ -24,7 +24,14 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    
+
+    # Tenant branding (used in AI prompts, email signatures, FAQ templates)
+    # Nullable - callers fall back to the platform default ("Oubon Shop" /
+    # "a premium smart home and lifestyle store") when these are not set.
+    # See ospra_os/tenancy/brand.py for the read-path helpers.
+    brand_name = Column(String(255), nullable=True)
+    brand_descriptor = Column(String(500), nullable=True)
+
     # Authentication
     password_hash = Column(String(255), nullable=True)  # Nullable for existing users
 

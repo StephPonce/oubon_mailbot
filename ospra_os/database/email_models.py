@@ -375,11 +375,27 @@ if __name__ == "__main__":
 # 
 
 class EmailFollowup(Base):
-    """Track emails that need AI follow-up during operating hours."""
+    """Track emails that need AI follow-up during operating hours.
+
+    Tenant scoping (Cleanup Pass 4 SaaS refactor):
+      `user_id` is nullable so existing Oubon rows keep working without a
+      data backfill (the single-tenant deployment is unchanged). New rows
+      inserted by `EmailProcessor` include the tenant's `user_id`, and
+      queries filter by it when provided. Gmail message IDs are globally
+      unique per Gmail account, so keeping `gmail_message_id` as the PK
+      is safe even across tenants — the `user_id` column exists for
+      *query scoping* so Tenant A never sees Tenant B's follow-ups.
+    """
 
     __tablename__ = "email_followups"
 
     gmail_message_id = Column(String, primary_key=True)  # Gmail message ID
+
+    # Tenant scoping — nullable for backward compatibility with pre-refactor
+    # Oubon rows. New inserts from EmailProcessor populate this from the
+    # tenant's user_id.
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+
     customer_email = Column(String, nullable=False)
     customer_name = Column(String)
     subject = Column(String)
@@ -395,6 +411,10 @@ class EmailFollowup(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_email_followup_user_needs', 'user_id', 'needs_followup', 'followup_sent'),
+    )
 
     def __repr__(self):
         return f"<EmailFollowup {self.gmail_message_id} - {self.customer_email}>"

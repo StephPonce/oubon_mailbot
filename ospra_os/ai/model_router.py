@@ -12,12 +12,19 @@ TIERS:
 - PREMIUM: Claude Sonnet 4.5 (~$3.00/1M tokens)
 
 Cost savings: ~70% vs. using Claude Sonnet for everything
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  `ai_email_response` takes optional `brand_name` + `brand_descriptor`
+  args and embeds them in the customer-support system prompt. Defaults
+  are Oubon's values so the single-tenant deployment is unchanged.
 """
 
 from typing import Dict, List, Any, Optional
 from enum import Enum
 import os
 import logging
+
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
 from dotenv import load_dotenv
 
 from ospra_os.ai.markdown_stripper import strip_markdown
@@ -539,13 +546,18 @@ async def ai_email_response(
     subject: str,
     body: str,
     order_number: Optional[str] = None,
-    response_type: str = "full"
+    response_type: str = "full",
+    brand_name: str = DEFAULT_BRAND_NAME,
+    brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
 ) -> str:
     """Generate email response using fastest available model."""
     router = get_model_router()
-    
-    system_prompt = """You are customer support for Oubon Shop (smart home products).
-RULES: Never reveal suppliers. Never say dropshipping. Keep it 3-5 sentences. Be warm but professional."""
+
+    system_prompt = (
+        f"You are customer support for {brand_name} ({brand_descriptor}).\n"
+        "RULES: Never reveal suppliers. Never say dropshipping. "
+        "Keep it 3-5 sentences. Be warm but professional."
+    )
     
     order_info = f"\nOrder: #{order_number}" if order_number else ""
     

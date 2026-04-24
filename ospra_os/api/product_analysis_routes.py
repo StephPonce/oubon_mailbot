@@ -6,6 +6,13 @@ AI-powered analysis and Shopify-ready caption generation.
 Routes:
 - POST /api/oi/analyze-product - Full AI analysis
 - POST /api/oi/generate-caption - Generate Shopify caption
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  Prompts read the tenant's brand name + descriptor from
+  ospra_os.tenancy.brand.get_tenant_brand{,_descriptor}. These default to
+  "Oubon Shop" / "a premium smart home and lifestyle store" so Oubon's
+  single-tenant deployment is unchanged. New tenants can override by
+  setting users.brand_name / users.brand_descriptor.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -20,6 +27,12 @@ import httpx
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.tenancy.brand import (
+    get_tenant_brand,
+    get_tenant_brand_descriptor,
+    DEFAULT_BRAND_NAME,
+    DEFAULT_BRAND_DESCRIPTOR,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,19 +64,26 @@ def _round_num(v, decimals: int = 2):
         return v
 
 
-def _analysis_cache_key(title: str, product: dict) -> str:
+def _analysis_cache_key(
+    title: str, product: dict, brand_name: str = DEFAULT_BRAND_NAME
+) -> str:
     """
     Build a stable cache key so two refreshes of the same product — with
     identical signals — hit the cache instead of firing a fresh API call.
 
     We SORT keys, ROUND floats, and JSON-dump with sort_keys=True so the
     hash is byte-identical across runs, regardless of dict insertion order.
+
+    `brand_name` is part of the key so two tenants asking about the same
+    product don't share each other's cached analyses (the prompt embeds
+    the brand, so the output legitimately differs).
     """
     # Only include fields that actually influence the analysis. Others
     # (e.g. a changing 'refreshed_at' timestamp) would invalidate the cache
     # on every call and defeat the purpose.
     relevant = {
         'title': title.strip() if title else '',
+        'brand_name': brand_name,
         'niche': product.get('niche', 'general'),
         'cost_price': _round_num(product.get('cost_price', 0)),
         'suggested_price': _round_num(product.get('suggested_price', 0)),
@@ -129,16 +149,28 @@ async def analyze_product(request: ProductAnalysisRequest, current_user: User = 
     Uses Claude (Anthropic) or falls back to rule-based analysis.
     """
     product = request.product_data
-    
+
+    # Resolve tenant brand from the authenticated user (Oubon defaults apply
+    # when the user has not set a custom brand_name / brand_descriptor).
+    brand_name = (getattr(current_user, "brand_name", None) or DEFAULT_BRAND_NAME)
+    brand_descriptor = (
+        getattr(current_user, "brand_descriptor", None) or DEFAULT_BRAND_DESCRIPTOR
+    )
+
     # Try Claude API
     if ANTHROPIC_API_KEY:
         try:
-            analysis = await _analyze_with_claude(request.product_title, product)
+            analysis = await _analyze_with_claude(
+                request.product_title,
+                product,
+                brand_name=brand_name,
+                brand_descriptor=brand_descriptor,
+            )
             if analysis:
                 return {"success": True, "analysis": analysis, "source": "claude"}
         except Exception as e:
             logger.warning(f"Claude analysis failed: {e}")
-    
+
     # Fallback to rule-based analysis
     analysis = _generate_fallback_analysis(request.product_title, product)
     return {"success": True, "analysis": analysis, "source": "fallback"}
@@ -169,6 +201,11 @@ async def generate_caption(request: CaptionRequest, current_user: User = Depends
     Generate Shopify-ready product caption.
     Professional, clean copy - NO emojis, NO hashtags.
     """
+    brand_name = (getattr(current_user, "brand_name", None) or DEFAULT_BRAND_NAME)
+    brand_descriptor = (
+        getattr(current_user, "brand_descriptor", None) or DEFAULT_BRAND_DESCRIPTOR
+    )
+
     # Try Claude API
     if ANTHROPIC_API_KEY:
         try:
@@ -176,13 +213,15 @@ async def generate_caption(request: CaptionRequest, current_user: User = Depends
                 request.product_title,
                 request.product_niche,
                 request.price,
-                request.tags
+                request.tags,
+                brand_name=brand_name,
+                brand_descriptor=brand_descriptor,
             )
             if caption:
                 return {"success": True, "caption": caption, "source": "claude"}
         except Exception as e:
             logger.warning(f"Claude caption failed: {e}")
-    
+
     # Fallback to template
     caption = _generate_template_caption(
         request.product_title,
@@ -197,18 +236,26 @@ async def generate_caption(request: CaptionRequest, current_user: User = Depends
 # CLAUDE API INTEGRATION
 # ============================================================================
 
-def _build_analysis_prompt(title: str, product: dict) -> str:
+def _build_analysis_prompt(
+    title: str,
+    product: dict,
+    brand_name: str = DEFAULT_BRAND_NAME,
+    brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+) -> str:
     """
     Task #11: Build a BYTE-STABLE analysis prompt.
 
     Every field is explicitly formatted (rounded floats, sorted lists) so
     two calls with identical product data produce identical prompts. This
     is a prerequisite for caching and for reducing the non-sampling variance
-    the user was hitting.
+    the user was hitting. `brand_name` / `brand_descriptor` are part of
+    the prompt bytes on purpose; the cache key must incorporate them when
+    tenants have different brands (today the cache key already covers it
+    via `user_id`).
     """
     ds_keys = sorted((product.get('data_sources') or {}).keys())
     return (
-        "You are an e-commerce analyst for Oubon Shop, a premium smart home and lifestyle store.\n\n"
+        f"You are an e-commerce analyst for {brand_name}, {brand_descriptor}.\n\n"
         "Analyze this product for dropshipping potential:\n\n"
         f"Product: {title}\n"
         f"Niche: {product.get('niche', 'general')}\n"
@@ -241,7 +288,12 @@ def _build_analysis_prompt(title: str, product: dict) -> str:
     )
 
 
-async def _analyze_with_claude(title: str, product: dict) -> Optional[dict]:
+async def _analyze_with_claude(
+    title: str,
+    product: dict,
+    brand_name: str = DEFAULT_BRAND_NAME,
+    brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+) -> Optional[dict]:
     """
     Generate analysis using Claude API.
 
@@ -252,13 +304,14 @@ async def _analyze_with_claude(title: str, product: dict) -> Optional[dict]:
         burning API tokens and producing drifting analyses.
     """
     # Cache check FIRST — same signals, same analysis.
-    cache_key = _analysis_cache_key(title, product)
+    # Brand is part of the cache key so different tenants don't share cache entries.
+    cache_key = _analysis_cache_key(title, product, brand_name=brand_name)
     cached = _cache_get(cache_key)
     if cached is not None:
         logger.debug(f"[AI-ANALYSIS] Cache hit for {title[:40]!r} (key={cache_key[:8]})")
         return cached
 
-    prompt = _build_analysis_prompt(title, product)
+    prompt = _build_analysis_prompt(title, product, brand_name, brand_descriptor)
 
     async with httpx.AsyncClient() as client:
         response = await client.post(
@@ -299,7 +352,14 @@ async def _analyze_with_claude(title: str, product: dict) -> Optional[dict]:
             return None
 
 
-async def _generate_caption_with_claude(title: str, niche: str, price: float, tags: list) -> Optional[str]:
+async def _generate_caption_with_claude(
+    title: str,
+    niche: str,
+    price: float,
+    tags: list,
+    brand_name: str = DEFAULT_BRAND_NAME,
+    brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+) -> Optional[str]:
     """
     Generate PROFESSIONAL Shopify product caption.
 
@@ -331,7 +391,7 @@ async def _generate_caption_with_claude(title: str, niche: str, price: float, ta
     else:
         price_tier = f"premium tier (${price:.2f})"
 
-    prompt = f"""You are a senior copywriter for Oubon Shop, a premium smart home and lifestyle e-commerce store.
+    prompt = f"""You are a senior copywriter for {brand_name}, {brand_descriptor}.
 
 Write a Shopify product description for THIS SPECIFIC product. Do NOT reuse generic niche-level copy.
 
@@ -352,7 +412,7 @@ STRICT REQUIREMENTS:
 - NO emojis whatsoever
 - NO hashtags
 - Max 1 exclamation mark in the whole piece
-- Professional, clean, premium tone (Oubon Shop brand: sophisticated, modern, trustworthy)
+- Professional, clean, premium tone ({brand_name} brand: sophisticated, modern, trustworthy)
 - Focus on how it fits into real life, not a spec sheet
 - Subtle urgency, never salesy
 - 80-120 words total

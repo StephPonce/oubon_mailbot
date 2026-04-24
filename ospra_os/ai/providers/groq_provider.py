@@ -11,6 +11,13 @@ Models:
 
 Author: OspraOS
 Date: December 2025
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  `generate_email_response` accepts optional `brand_name` / `brand_descriptor`
+  arguments so callers can render per-tenant support prompts and signatures.
+  Defaults preserve Oubon's single-tenant deployment ("Oubon Shop" /
+  "a premium smart home and lifestyle store"). Multi-tenant callers thread
+  the tenant's brand via `ospra_os.tenancy.brand.get_tenant_brand*`.
 """
 
 from typing import Dict, Any, Optional
@@ -27,6 +34,7 @@ from ospra_os.ai.providers.base import (
     InvalidResponseError
 )
 from ospra_os.ai.markdown_stripper import strip_markdown
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
 from ospra_os.constants import (
     ANALYSIS_MAX_TOKENS,
     DESCRIPTION_MAX_TOKENS,
@@ -202,30 +210,39 @@ class GroqProvider(AIProvider):
         subject: str,
         body: str,
         order_number: Optional[str] = None,
-        response_type: str = "full"
+        response_type: str = "full",
+        brand_name: str = DEFAULT_BRAND_NAME,
+        brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
     ) -> str:
         """
         Generate customer support email response - FAST!
-        
+
         This is optimized for email automation - uses 8b model for speed.
+
+        Args:
+            brand_name: Tenant brand name for signature (default Oubon Shop).
+            brand_descriptor: Short descriptor injected into system prompt,
+                e.g. "a premium smart home and lifestyle store".
         """
         # Use fastest model for emails
         email_model = "llama-3.1-8b-instant"
-        
-        system_prompt = """You are a customer support agent for Oubon Shop (smart home products).
 
-STRICT RULES:
-- NEVER reveal suppliers (AliExpress, CJ Dropshipping)
-- NEVER say "dropshipping"
-- Keep responses 3-5 sentences MAX
-- Be warm but professional
-- Sign as "Oubon Shop Support"
+        signature = f"{brand_name} Support"
 
-RESPONSE STRUCTURE:
-1. Greeting with name
-2. Address their concern directly
-3. Provide next steps if needed
-4. Professional sign-off"""
+        system_prompt = (
+            f"You are a customer support agent for {brand_name} ({brand_descriptor}).\n\n"
+            "STRICT RULES:\n"
+            "- NEVER reveal suppliers (AliExpress, CJ Dropshipping)\n"
+            "- NEVER say \"dropshipping\"\n"
+            "- Keep responses 3-5 sentences MAX\n"
+            "- Be warm but professional\n"
+            f"- Sign as \"{signature}\"\n\n"
+            "RESPONSE STRUCTURE:\n"
+            "1. Greeting with name\n"
+            "2. Address their concern directly\n"
+            "3. Provide next steps if needed\n"
+            "4. Professional sign-off"
+        )
 
         if response_type == "acknowledgment":
             user_prompt = f"""Write a 2-sentence acknowledgment email.
@@ -256,18 +273,19 @@ Address their concern directly. Be helpful and concise."""
                 max_tokens=300,
                 temperature=0.3  # Low temp for consistency
             )
-            
+
             return response.choices[0].message.content.strip()
-            
+
         except Exception as e:
             logger.error(f"Groq email generation failed: {e}")
             # Return fallback
-            return f"""Hi {customer_name},
-
-Thank you for contacting Oubon Shop! We've received your message and will get back to you shortly.
-
-Best regards,
-Oubon Shop Support"""
+            return (
+                f"Hi {customer_name},\n\n"
+                f"Thank you for contacting {brand_name}! We've received your message "
+                "and will get back to you shortly.\n\n"
+                "Best regards,\n"
+                f"{signature}"
+            )
     
     async def optimize_pricing(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
         """Optimize pricing using Groq."""

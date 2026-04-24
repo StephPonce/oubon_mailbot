@@ -1,7 +1,17 @@
-"""Automated refund processing with safety parameters."""
+"""Automated refund processing with safety parameters.
+
+Brand parameterization (Cleanup Pass 4 SaaS refactor):
+  `generate_refund_response` accepts an optional `brand_name` (default
+  "Oubon Shop") and renders the email signature as
+  "— {brand_name} Support". Oubon's single-tenant deployment is unchanged
+  because the default matches the previous hardcoded string. Multi-tenant
+  callers should pass the tenant's brand.
+"""
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import re
+
+from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME
 
 
 class RefundProcessor:
@@ -146,8 +156,16 @@ class RefundProcessor:
         customer_name: str,
         order_id: str,
         refund_decision: Dict[str, Any],
+        brand_name: str = DEFAULT_BRAND_NAME,
     ) -> str:
-        """Generate email response based on refund decision."""
+        """Generate email response based on refund decision.
+
+        Args:
+            brand_name: Tenant brand, used to render the signature line.
+                Defaults to Oubon Shop for the single-tenant deployment.
+        """
+        signature = f"— {brand_name} Support"
+
         if refund_decision["action"] == "auto_refund":
             return f"""<p>Hi {customer_name},</p>
 
@@ -159,7 +177,7 @@ You should see it within 5-7 business days.</p>
 
 <p>If you have any other questions, please don't hesitate to reach out.</p>
 
-<p>— Oubon Shop Support</p>"""
+<p>{signature}</p>"""
 
         elif refund_decision["action"] == "manual_review":
             return f"""<p>Hi {customer_name},</p>
@@ -171,7 +189,7 @@ and will respond within 24 hours with a resolution.</p>
 
 <p><strong>Reason:</strong> {refund_decision['reason']}</p>
 
-<p>— Oubon Shop Support</p>"""
+<p>{signature}</p>"""
 
         else:  # reject
             return f"""<p>Hi {customer_name},</p>
@@ -184,4 +202,4 @@ and will respond within 24 hours with a resolution.</p>
 <p>If you believe this is an error, please reply with additional details
 and we'll be happy to take another look.</p>
 
-<p>— Oubon Shop Support</p>"""
+<p>{signature}</p>"""
