@@ -13,7 +13,7 @@ Rate limits:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 from collections import defaultdict
 import json
@@ -74,7 +74,7 @@ class TierRateLimiter:
         
     def _get_today(self) -> str:
         """Get today's date string for daily reset tracking."""
-        return datetime.utcnow().strftime("%Y-%m-%d")
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
     
     def _reset_if_new_day(self, user_id: int):
         """Reset daily count if it's a new day."""
@@ -108,7 +108,7 @@ class TierRateLimiter:
         max_per_day = limits["max_per_day"]
         
         if max_per_day != -1 and daily_count >= max_per_day:
-            hours_until_reset = 24 - datetime.utcnow().hour
+            hours_until_reset = 24 - datetime.now(timezone.utc).hour
             return False, f"Daily limit reached ({max_per_day}/{max_per_day}). Resets in {hours_until_reset} hours.", hours_until_reset * 60
         
         # Check interval limit
@@ -116,7 +116,7 @@ class TierRateLimiter:
         min_interval = timedelta(minutes=limits["min_interval_minutes"])
         
         if last_request:
-            time_since_last = datetime.utcnow() - last_request
+            time_since_last = datetime.now(timezone.utc) - last_request
             if time_since_last < min_interval:
                 remaining = min_interval - time_since_last
                 remaining_minutes = int(remaining.total_seconds() / 60) + 1
@@ -127,7 +127,7 @@ class TierRateLimiter:
     def record_request(self, user_id: int, action: str = "discovery"):
         """Record that a request was made."""
         self._reset_if_new_day(user_id)
-        self._last_request[user_id] = datetime.utcnow()
+        self._last_request[user_id] = datetime.now(timezone.utc)
         self._daily_counts[user_id]["count"] += 1
         
         logger.info(f"[STATS] User {user_id} {action}: {self._daily_counts[user_id]['count']} today")
@@ -146,7 +146,7 @@ class TierRateLimiter:
         if last_request:
             min_interval = timedelta(minutes=limits["min_interval_minutes"])
             next_time = last_request + min_interval
-            if next_time > datetime.utcnow():
+            if next_time > datetime.now(timezone.utc):
                 next_available = next_time.isoformat()
         
         return {

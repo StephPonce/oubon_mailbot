@@ -12,7 +12,7 @@ Author: Ospra Intelligence
 
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -110,7 +110,7 @@ async def run_daily_learning_cycle():
         
         try:
             # Get sales events from the last 24 hours
-            yesterday = datetime.utcnow() - timedelta(days=1)
+            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             
             events = db.query(AILearningEvent).filter(
                 AILearningEvent.event_type == "sale",
@@ -179,7 +179,7 @@ async def run_weekly_learning_update():
         
         try:
             # Get sales events from the last 7 days
-            last_week = datetime.utcnow() - timedelta(days=7)
+            last_week = datetime.now(timezone.utc) - timedelta(days=7)
             
             sales_events = db.query(AILearningEvent).filter(
                 AILearningEvent.event_type == "sale",
@@ -321,7 +321,7 @@ async def cleanup_old_learning_data():
 
         db = SessionLocal()
         try:
-            cutoff = datetime.utcnow() - timedelta(days=LEARNING_DATA_RETENTION_DAYS)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=LEARNING_DATA_RETENTION_DAYS)
             
             deleted = db.query(AILearningEvent).filter(
                 AILearningEvent.timestamp < cutoff
@@ -351,7 +351,7 @@ async def update_learning_json(engine):
         
         json_data = {
             "version": weights.get("version", "1.0"),
-            "last_updated": datetime.utcnow().isoformat(),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
             "total_learning_cycles": weights.get("learning_cycles", 0),
             "scoring_weights": weights.get("scoring_weights", {}),
             "niche_confidence": weights.get("niche_confidence", {}),
@@ -426,8 +426,8 @@ async def get_learning_status():
         
         # Count recent events
         try:
-            last_24h = datetime.utcnow() - timedelta(days=1)
-            last_7d = datetime.utcnow() - timedelta(days=7)
+            last_24h = datetime.now(timezone.utc) - timedelta(days=1)
+            last_7d = datetime.now(timezone.utc) - timedelta(days=7)
             
             events_24h = db.query(AILearningEvent).filter(
                 AILearningEvent.timestamp >= last_24h

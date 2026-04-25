@@ -15,7 +15,7 @@ Migration:
 import warnings
 import logging
 from typing import Dict, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -168,7 +168,7 @@ class TierManager:
                 return 'nest'
             
             # Check expiration
-            if settings.tier_expires_at and settings.tier_expires_at < datetime.utcnow():
+            if settings.tier_expires_at and settings.tier_expires_at < datetime.now(timezone.utc):
                 settings.subscription_tier = 'nest'
                 settings.max_stores = 1
                 settings.max_products_per_week = 10
@@ -206,8 +206,8 @@ class TierManager:
             
             old_tier = settings.subscription_tier or 'nest'
             settings.subscription_tier = new_tier
-            settings.tier_started_at = datetime.utcnow()
-            settings.tier_expires_at = datetime.utcnow() + timedelta(days=duration_days)
+            settings.tier_started_at = datetime.now(timezone.utc)
+            settings.tier_expires_at = datetime.now(timezone.utc) + timedelta(days=duration_days)
             
             tier_config = TIER_FEATURES[new_tier]
             settings.max_stores = tier_config['max_stores']

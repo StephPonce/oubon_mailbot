@@ -24,7 +24,7 @@ import os
 import json
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from dataclasses import dataclass
@@ -578,7 +578,7 @@ Phone: {shipping_address.get('phone', 'N/A')}
                 "shipping_address": formatted_address,
                 "shipping_address_raw": shipping_address,
                 "status": FulfillmentStatus.MANUAL_REQUIRED.value,
-                "created_at": datetime.utcnow().isoformat()
+                "created_at": datetime.now(timezone.utc).isoformat()
             }
             
             await self._save_fulfillment_record(**fulfillment_record)
@@ -880,7 +880,7 @@ Phone: {shipping_address.get('phone', 'N/A')}
                             order['status'] = FulfillmentStatus.SHIPPED.value
                             order['tracking_number'] = tracking_number
                             order['carrier'] = carrier
-                            order['fulfilled_at'] = datetime.utcnow().isoformat()
+                            order['fulfilled_at'] = datetime.now(timezone.utc).isoformat()
                     
                     with open(queue_file, 'w') as f:
                         json.dump(queue, f, indent=2)

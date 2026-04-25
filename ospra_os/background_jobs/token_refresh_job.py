@@ -15,7 +15,7 @@ Author: OspraOS
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List, Any
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -120,7 +120,7 @@ class TokenRefreshJob:
         """
         logger.info("[TOKEN] Starting OAuth token refresh check...")
 
-        self.stats["last_run"] = datetime.utcnow()
+        self.stats["last_run"] = datetime.now(timezone.utc)
         self.stats["total_runs"] += 1
 
         refreshed = 0
@@ -146,7 +146,7 @@ class TokenRefreshJob:
                 "success": True,
                 "tokens_refreshed": refreshed,
                 "tokens_failed": failed,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         except Exception as e:
@@ -154,7 +154,7 @@ class TokenRefreshJob:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
     def _refresh_aliexpress_tokens(self) -> Dict[str, int]:
@@ -181,7 +181,7 @@ class TokenRefreshJob:
             session = get_multi_store_session(self.database_url)
 
             # Calculate threshold: tokens expiring within buffer period
-            expiry_threshold = datetime.utcnow() + timedelta(days=ALIEXPRESS_REFRESH_BUFFER_DAYS)
+            expiry_threshold = datetime.now(timezone.utc) + timedelta(days=ALIEXPRESS_REFRESH_BUFFER_DAYS)
 
             # Find tokens approaching expiry (limit to prevent memory issues)
             expiring_tokens = session.query(AliExpressToken).filter(
@@ -241,7 +241,7 @@ class TokenRefreshJob:
         """
         try:
             session = get_multi_store_session(self.database_url)
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # AliExpress tokens (limit for performance)
             ae_tokens = session.query(AliExpressToken).filter(

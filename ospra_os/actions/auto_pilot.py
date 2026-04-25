@@ -5,7 +5,7 @@ Automatically executes high-confidence AI actions based on user settings.
 Implements GROK RECOMMENDATION #7: Auto-Pilot Mode Toggle.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -120,7 +120,7 @@ class AutoPilotEngine:
     def _check_daily_limit(self) -> bool:
         """Check if daily auto-execution limit has been reached"""
 
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         today_count = self.db.query(func.count(AutoPilotLog.id)).filter(
             AutoPilotLog.user_id == self.user_id,
@@ -140,7 +140,7 @@ class AutoPilotEngine:
             return True
 
         # Calculate today's auto-executed spend
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         today_actions = self.db.query(Action).join(AutoPilotLog).filter(
             AutoPilotLog.user_id == self.user_id,
@@ -213,7 +213,7 @@ class AutoPilotEngine:
     def get_stats(self) -> Dict[str, Any]:
         """Get auto-pilot statistics"""
 
-        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         week_start = today_start - timedelta(days=7)
 
         # Today's stats

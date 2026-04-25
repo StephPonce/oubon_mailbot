@@ -17,7 +17,7 @@ Author: OspraOS
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 
 from ospra_os.routers import RouterRegistry
@@ -39,7 +39,7 @@ async def trigger_learning(current_user: User = Depends(get_current_user)):
     return {
         "status": "ok",
         "message": "Learning endpoint - full implementation in main.py",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "user_id": current_user.id
     }
 

@@ -12,7 +12,7 @@ Date: November 2025
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import asyncio
 import json
@@ -478,7 +478,7 @@ class AmazonAdapter(PlatformAdapter):
         try:
             # Default to last 30 days if not specified
             if not since:
-                since = datetime.utcnow() - timedelta(days=30)
+                since = datetime.now(timezone.utc) - timedelta(days=30)
 
             # Map status to Amazon order statuses
             order_statuses = []
@@ -645,7 +645,7 @@ class AmazonAdapter(PlatformAdapter):
         try:
             # Default to last 30 days
             if not since:
-                since = datetime.utcnow() - timedelta(days=30)
+                since = datetime.now(timezone.utc) - timedelta(days=30)
 
             # Fetch all orders
             result = await self.get_orders(limit=100, status="any", since=since)
@@ -659,7 +659,7 @@ class AmazonAdapter(PlatformAdapter):
             total_revenue = sum(float(order.get("total_price", 0)) for order in orders)
             avg_order_value = total_revenue / len(orders) if orders else 0
 
-            sync_time = datetime.utcnow().isoformat()
+            sync_time = datetime.now(timezone.utc).isoformat()
 
             logger.info(
                 f"Synced {len(orders)} Amazon orders. "

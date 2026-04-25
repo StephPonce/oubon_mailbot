@@ -14,7 +14,7 @@ Returns same data format as pytrends for compatibility.
 import os
 import asyncio
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass
 import logging
 from .base_apify import ApifyClient
@@ -86,7 +86,7 @@ class ApifyGoogleTrends:
         if key not in self._cache:
             return False
         cached_time, _ = self._cache[key]
-        return (datetime.utcnow() - cached_time).seconds < self._cache_ttl
+        return (datetime.now(timezone.utc) - cached_time).seconds < self._cache_ttl
 
     def _get_cached(self, key: str):
         """Get cached data."""
@@ -97,7 +97,7 @@ class ApifyGoogleTrends:
 
     def _set_cache(self, key: str, data):
         """Cache data."""
-        self._cache[key] = (datetime.utcnow(), data)
+        self._cache[key] = (datetime.now(timezone.utc), data)
 
     async def get_interest(
         self,
@@ -285,7 +285,7 @@ class ApifyGoogleTrends:
                 interest_over_time=interest_over_time,
                 geo=geo,
                 timeframe=timeframe,
-                fetched_at=datetime.utcnow().isoformat(),
+                fetched_at=datetime.now(timezone.utc).isoformat(),
                 prediction=prediction
             )
 
@@ -308,7 +308,7 @@ class ApifyGoogleTrends:
             interest_over_time=[],
             geo=geo,
             timeframe=timeframe,
-            fetched_at=datetime.utcnow().isoformat(),
+            fetched_at=datetime.now(timezone.utc).isoformat(),
             prediction=None
         )
 

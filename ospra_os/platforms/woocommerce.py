@@ -11,7 +11,7 @@ Date: November 2025
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import asyncio
 import json
@@ -245,11 +245,11 @@ class WooCommerceAdapter(PlatformAdapter):
     async def _enforce_rate_limit(self):
         """Enforce rate limiting between requests"""
         if self._last_request_time:
-            elapsed = (datetime.utcnow() - self._last_request_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - self._last_request_time).total_seconds()
             if elapsed < self.RATE_LIMIT_DELAY:
                 await asyncio.sleep(self.RATE_LIMIT_DELAY - elapsed)
 
-        self._last_request_time = datetime.utcnow()
+        self._last_request_time = datetime.now(timezone.utc)
 
     # ========================================================================
     # ABSTRACT METHOD IMPLEMENTATIONS
@@ -662,7 +662,7 @@ class WooCommerceAdapter(PlatformAdapter):
         try:
             # Default to last 30 days
             if not since:
-                since = datetime.utcnow() - timedelta(days=30)
+                since = datetime.now(timezone.utc) - timedelta(days=30)
 
             # Fetch all orders
             result = await self.get_orders(limit=100, status="any", since=since)
@@ -682,7 +682,7 @@ class WooCommerceAdapter(PlatformAdapter):
                 status = order.get("status", "unknown")
                 status_counts[status] = status_counts.get(status, 0) + 1
 
-            sync_time = datetime.utcnow().isoformat()
+            sync_time = datetime.now(timezone.utc).isoformat()
 
             logger.info(
                 f"Synced {len(orders)} WooCommerce orders. "

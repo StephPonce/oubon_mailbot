@@ -5,7 +5,7 @@ Allows users to undo recently executed actions within a time window.
 Builds trust by making AI decisions reversible.
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
@@ -59,13 +59,13 @@ class UndoManager:
         # Check time window
         if action.executed_at:
             deadline = action.executed_at + timedelta(hours=undo_window)
-            if datetime.utcnow() > deadline:
+            if datetime.now(timezone.utc) > deadline:
                 return {
                     "can_undo": False,
                     "reason": f"Undo window expired ({undo_window}h after execution)"
                 }
 
-            time_remaining = deadline - datetime.utcnow()
+            time_remaining = deadline - datetime.now(timezone.utc)
             hours_remaining = time_remaining.total_seconds() / 3600
 
             return {
@@ -105,7 +105,7 @@ class UndoManager:
 
             if result["success"]:
                 # Mark as undone
-                action.undone_at = datetime.utcnow()
+                action.undone_at = datetime.now(timezone.utc)
                 action.undone_by = "user"
                 action.status = AIActionStatus.UNDONE
 

@@ -12,7 +12,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from ospra_os.celery_app import celery_app
@@ -68,7 +68,7 @@ def check_ad_performance(self) -> Dict[str, Any]:
             "campaigns_checked": 0,
             "low_roas_count": low_roas_count,
             "recommendations": recommendations_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -99,7 +99,7 @@ def check_product_performance(self) -> Dict[str, Any]:
     logger.info("Starting product performance check")
 
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
 
         # Get all active products
         products = self.db.query(Product).filter(
@@ -132,7 +132,7 @@ def check_product_performance(self) -> Dict[str, Any]:
             "zero_sales": zero_sales_count,
             "declining": declining_count,
             "trending": trending_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -163,7 +163,7 @@ def cleanup_old_data(self) -> Dict[str, Any]:
     logger.info("Starting data cleanup")
 
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=90)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
 
         # TODO: Delete old logs
         # deleted_logs = self.db.query(Log).filter(
@@ -188,7 +188,7 @@ def cleanup_old_data(self) -> Dict[str, Any]:
             "deleted_logs": deleted_logs,
             "deleted_actions": deleted_actions,
             "cutoff_date": cutoff_date.isoformat(),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -260,7 +260,7 @@ def generate_analytics_report(
         return {
             "status": "success",
             "report": report_data,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -324,7 +324,7 @@ def calculate_roi(
         return {
             "status": "success",
             "roi": roi_data,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

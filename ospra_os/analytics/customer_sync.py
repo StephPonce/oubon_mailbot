@@ -7,7 +7,7 @@ Syncs customer data from Shopify and calculates analytics metrics:
 - Updates customer database with latest metrics
 - Handles incremental sync (only changed customers)
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Tuple
 import logging
 import httpx
@@ -346,7 +346,7 @@ class CustomerSync:
             "purchase_frequency_days": customer_profile.get('purchase_frequency_days'),
             "churn_probability": customer_profile.get('churn_probability'),
             "risk_level": customer_profile.get('risk_level'),
-            "metrics_updated_at": datetime.utcnow()
+            "metrics_updated_at": datetime.now(timezone.utc)
         }
 
         if existing_customer:
@@ -355,7 +355,7 @@ class CustomerSync:
                 if key != 'customer_id':  # Don't update primary key
                     setattr(existing_customer, key, value)
 
-            existing_customer.updated_at = datetime.utcnow()
+            existing_customer.updated_at = datetime.now(timezone.utc)
             logger.info(f"[SUCCESS] Updated existing customer: {customer_id}")
             return existing_customer
 

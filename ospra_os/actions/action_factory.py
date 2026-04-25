@@ -13,7 +13,7 @@ Now with Auto-Pilot integration (GROK RECOMMENDATION #7):
 - User-configurable thresholds and safety limits
 - Complete audit trail of auto-execution decisions
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
@@ -69,7 +69,7 @@ class ActionFactory:
             payload=payload,
             estimated_impact=estimated_impact,
             product_image=product_image,
-            expires_at=datetime.utcnow() + timedelta(hours=expires_in_hours),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=expires_in_hours),
             status=AIActionStatus.PENDING
         )
 
@@ -115,7 +115,7 @@ class ActionFactory:
             # If approved, mark action as auto-approved
             if can_execute:
                 action.status = AIActionStatus.APPROVED
-                action.approved_at = datetime.utcnow()
+                action.approved_at = datetime.now(timezone.utc)
                 action.approved_by = "auto_pilot"
                 # Note: Actual execution would happen in a separate executor service
 

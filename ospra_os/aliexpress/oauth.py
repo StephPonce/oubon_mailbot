@@ -6,7 +6,7 @@ Reference: https://openservice.aliexpress.com/doc/api.htm (Seller Authorization)
 """
 
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import requests
 import hmac
@@ -172,7 +172,7 @@ class AliExpressOAuth:
                 }
 
             # Calculate expiry
-            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
             # Store token if database is initialized
             if self.database_url:
@@ -229,7 +229,7 @@ class AliExpressOAuth:
             return None
 
         # Check if expired
-        if datetime.utcnow() >= token.expires_at:
+        if datetime.now(timezone.utc) >= token.expires_at:
             print("[WARNING]  Token expired, attempting refresh...")
             # Try to refresh
             if token.refresh_token:
@@ -281,7 +281,7 @@ class AliExpressOAuth:
             access_token = data.get("access_token")
             new_refresh_token = data.get("refresh_token", refresh_token)
             expires_in = data.get("expires_in", 3600)
-            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
             # Store new token
             self._store_token(access_token, new_refresh_token, expires_at)
@@ -317,7 +317,7 @@ class AliExpressOAuth:
                 "message": "No valid token found. Please authorize the app."
             }
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expires_in = (token.expires_at - now).total_seconds()
 
         if expires_in <= 0:

@@ -7,7 +7,7 @@ Endpoints for managing automation rules, email templates, and custom labels.
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ospra_os.database import (
@@ -216,7 +216,7 @@ def update_automation_rule(
         if rule_data.priority is not None:
             rule.priority = rule_data.priority
 
-        rule.updated_at = datetime.utcnow()
+        rule.updated_at = datetime.now(timezone.utc)
 
         session.commit()
 
@@ -394,7 +394,7 @@ def update_email_template(
         if template_data.variables is not None:
             template.variables = template_data.variables
 
-        template.updated_at = datetime.utcnow()
+        template.updated_at = datetime.now(timezone.utc)
 
         session.commit()
 
@@ -576,7 +576,7 @@ def update_email_label(
         if label_data.color is not None:
             label.color = label_data.color
 
-        label.updated_at = datetime.utcnow()
+        label.updated_at = datetime.now(timezone.utc)
 
         session.commit()
 

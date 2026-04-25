@@ -22,7 +22,7 @@ from sqlalchemy import (
     ForeignKey, Index, JSON, Date, UniqueConstraint
 )
 from sqlalchemy.orm import relationship, Session
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from enum import Enum
 import logging
@@ -231,7 +231,7 @@ class UsageTracker:
         Returns dict with current usage counts.
         """
         today = date.today()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         week_start = self.get_week_start(today)
         
         try:

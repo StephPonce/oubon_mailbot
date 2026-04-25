@@ -18,7 +18,7 @@ Date: November 2025
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,7 +88,7 @@ class AdIntelligence:
             'primary_angles': marketing_angles,
             'estimated_monthly_spend': competitor.estimated_ad_spend,
             'estimated_campaigns': estimated_campaigns,
-            'analysis_date': datetime.utcnow().isoformat()
+            'analysis_date': datetime.now(timezone.utc).isoformat()
         }
 
     async def estimate_ad_spend(self, competitor_id: str) -> dict:
@@ -295,7 +295,7 @@ class AdIntelligence:
             'average_monthly_spend': round(avg_spend, 2),
             'insights': insights,
             'recommendations': recommendations,
-            'analyzed_at': datetime.utcnow().isoformat()
+            'analyzed_at': datetime.now(timezone.utc).isoformat()
         }
 
     async def search_facebook_ads(self, competitor_name: str) -> dict:
@@ -366,5 +366,5 @@ class AdIntelligence:
             'ad_platforms': platforms,
             'marketing_angles': marketing_angles,
             'estimated_spend': estimated_spend,
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }

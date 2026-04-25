@@ -8,7 +8,7 @@ from sqlalchemy import (
     ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum
 )
 from sqlalchemy.orm import relationship, Session, sessionmaker
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import (
     Base,
@@ -320,7 +320,7 @@ def get_user_monthly_ai_usage(session: Session, user_id: int) -> float:
     from datetime import datetime
     from sqlalchemy import func
 
-    start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    start_of_month = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     total_cost = session.query(func.sum(AIUsage.estimated_cost))\
         .filter(AIUsage.user_id == user_id)\

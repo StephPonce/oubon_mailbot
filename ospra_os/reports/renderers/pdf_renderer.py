@@ -18,7 +18,7 @@ from reportlab.platypus import (
 )
 from reportlab.platypus.flowables import HRFlowable
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT, TA_JUSTIFY
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import io
 import logging
@@ -182,7 +182,7 @@ class PDFRenderer:
 
         # Generated date
         generated_para = Paragraph(
-            f"<b>Generated:</b> {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p UTC')}",
+            f"<b>Generated:</b> {datetime.now(timezone.utc).strftime('%B %d, %Y at %I:%M %p UTC')}",
             self.styles['CustomNormal']
         )
         elements.append(generated_para)

@@ -13,7 +13,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Request
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel
 from typing import Optional
 
@@ -48,6 +48,15 @@ try:
     from ospra_os.services.email_service import send_welcome_email
 except ImportError:
     send_welcome_email = None
+
+# PostHog activation funnel (task #38) — optional. The posthog_client module is
+# always importable because every public function is a no-op when PostHog is
+# unconfigured, so we don't need a try/except here.
+from ospra_os.observability.posthog_client import (
+    capture as posthog_capture,
+    identify as posthog_identify,
+    FunnelEvent,
+)
 
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -104,6 +113,22 @@ async def register(
             user_name=user.name
         )
 
+    # PostHog activation funnel (task #38) — fire SIGNUP and seed identify()
+    # with cohort-friendly properties. Both calls are no-ops when PostHog is
+    # disabled, so they never break registration.
+    posthog_identify(
+        user.id,
+        properties={
+            "plan": getattr(user, "subscription_tier", "nest"),
+            "signup_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    posthog_capture(
+        user.id,
+        FunnelEvent.SIGNUP,
+        properties={"plan": getattr(user, "subscription_tier", "nest")},
+    )
+
     # Generate tokens
     return generate_tokens(user)
 
@@ -141,7 +166,7 @@ async def login(
 
     # Update last login
     try:
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.commit()
     except Exception as e:
         db.rollback()
@@ -310,7 +335,7 @@ async def change_password(
     # Update password
     try:
         user.password_hash = hash_password(request.new_password)
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(timezone.utc)
         db.commit()
     except Exception as e:
         db.rollback()

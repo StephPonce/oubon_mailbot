@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum
 )
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import (
     Base,
@@ -248,7 +248,7 @@ class PasswordResetToken(Base):
     @property
     def is_expired(self) -> bool:
         """Check if token has expired"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def is_valid(self) -> bool:

@@ -11,7 +11,7 @@ Date: December 2024
 import logging
 import os
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class ContextBuilder:
         """
         context = {
             "data_status": "real",  # Flag that this is real data
-            "built_at": datetime.utcnow().isoformat(),
+            "built_at": datetime.now(timezone.utc).isoformat(),
         }
         
         # Gather from real sources - each returns None if unavailable
@@ -102,7 +102,7 @@ class ContextBuilder:
         """Build minimal context with just essential real data."""
         return {
             "data_status": "real",
-            "built_at": datetime.utcnow().isoformat(),
+            "built_at": datetime.now(timezone.utc).isoformat(),
             "user": await self._get_user_context(),
             "stores": await self._get_stores_context(),
             "store_metrics": await self._get_store_metrics()

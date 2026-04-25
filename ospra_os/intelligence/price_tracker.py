@@ -9,7 +9,7 @@ Date: November 2025
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from sqlalchemy import select, and_, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -60,7 +60,7 @@ class PriceTracker:
             original_price=original_price,
             discount_percent=round(discount_percent, 2),
             in_stock=in_stock,
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(timezone.utc)
         )
 
         self.db.add(price_snapshot)
@@ -94,7 +94,7 @@ class PriceTracker:
         """
         from ospra_os.models.competitor import CompetitorPriceHistory
 
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         query = select(CompetitorPriceHistory).where(
             and_(
@@ -186,7 +186,7 @@ class PriceTracker:
         """
         from ospra_os.models.competitor import CompetitorProduct
 
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         # Get products with recent price changes
         query = select(CompetitorProduct).where(
@@ -446,7 +446,7 @@ class PriceTracker:
         """
         from ospra_os.models.competitor import CompetitorProduct, Competitor
 
-        cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         query = select(CompetitorProduct, Competitor).join(
             Competitor,

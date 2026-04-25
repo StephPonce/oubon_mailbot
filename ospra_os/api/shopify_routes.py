@@ -12,7 +12,7 @@ import hmac
 import re
 import logging
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlencode, quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -36,20 +36,32 @@ router = APIRouter(prefix="/api/shopify", tags=["Shopify"])
 
 SHOPIFY_API_VERSION = os.getenv("SHOPIFY_API_VERSION", "2024-10")
 
+# Minimum-viable OAuth scope set (14 scopes). Mirror of
+# ospra_os/api/shopify_oauth_routes.py::SHOPIFY_SCOPES — both routers
+# expose an OAuth flow and Shopify's app reviewer will hit whichever
+# one our Partner-dashboard URL points at. Keep them in lock-step.
+# See docs/guides/SHOPIFY_PARTNER_APP_APPROVAL_READINESS.md §1 for the
+# justification matrix (1 scope per visible feature, no speculative
+# permissions).
 REQUIRED_SCOPES = [
     "read_products", "write_products",
     "read_inventory", "write_inventory",
-    "read_orders", "write_orders",
+    "read_locations",
+    "read_orders",
     "read_fulfillments", "write_fulfillments",
     "read_customers",
     "read_analytics",
-    "read_locations",
-    "read_price_rules", "read_discounts",
-    "read_shipping",
+    "read_content", "write_content",
+    "read_price_rules", "write_price_rules",
 ]
 
-# OAuth state storage
-_oauth_states: Dict[str, Dict[str, Any]] = {}
+# OAuth state — DB-backed via ``ospra_os.security.oauth_state``. See
+# audit fix #8 in that module's docstring. The provider tag is distinct
+# from ``shopify_partner`` (the new Partner App OAuth flow) so a leaked
+# nonce can't cross between flows.
+from ospra_os.security.oauth_state import put_state, pop_state
+
+_OAUTH_PROVIDER = "shopify_legacy"
 
 # Connected stores (in production, use database)
 _connected_stores: Dict[str, Dict[str, Any]] = {}
@@ -196,10 +208,14 @@ async def connect_store(
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
     
-    _oauth_states[state] = {
-        "shop_domain": shop_normalized,
-        "created_at": datetime.utcnow().isoformat(),
-    }
+    put_state(
+        _OAUTH_PROVIDER,
+        state,
+        {
+            "shop_domain": shop_normalized,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
     
     # Build OAuth URL
     params = {
@@ -229,11 +245,11 @@ async def oauth_callback(
     config = get_oauth_config()
     frontend_url = config["app_url"]
     
-    # Verify state
-    if state not in _oauth_states:
+    # Verify state — atomic pop, replay-safe, multi-worker-safe.
+    state_data = pop_state(_OAUTH_PROVIDER, state)
+    if state_data is None:
         return RedirectResponse(url=f"{frontend_url}?error=Invalid+or+expired+state")
-    
-    state_data = _oauth_states.pop(state)
+
     shop_normalized = normalize_domain(shop)
     
     try:
@@ -270,7 +286,7 @@ async def oauth_callback(
             "currency": shop_info.get("currency", "USD"),
             "access_token": access_token,
             "scope": scope,
-            "connected_at": datetime.utcnow().isoformat(),
+            "connected_at": datetime.now(timezone.utc).isoformat(),
         }
         
         return RedirectResponse(url=f"{frontend_url}?store_connected=true")
@@ -314,7 +330,7 @@ async def get_store_stats(
         customers = await client.get_customers_count()
         orders = await client.get_orders(limit=100)
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         rev_7d = rev_30d = 0.0
         ord_7d = ord_30d = 0
         

@@ -10,7 +10,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from ospra_os.celery_app import celery_app
@@ -67,7 +67,7 @@ def send_email(
             "status": "sent",
             "to": to,
             "subject": subject,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -110,7 +110,7 @@ def send_daily_briefs(self) -> Dict[str, Any]:
         return {
             "status": "success",
             "briefs_queued": queued_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -160,7 +160,7 @@ def send_daily_brief_to_user(self, user_id: int) -> Dict[str, Any]:
         # Send email
         # send_email.delay(
         #     to=user.email,
-        #     subject=f"Your Daily Brief - {datetime.utcnow().strftime('%B %d, %Y')}",
+        #     subject=f"Your Daily Brief - {datetime.now(timezone.utc).strftime('%B %d, %Y')}",
         #     body=brief.text,
         #     html=brief.html,
         #     user_id=user.id
@@ -171,7 +171,7 @@ def send_daily_brief_to_user(self, user_id: int) -> Dict[str, Any]:
         return {
             "status": "sent",
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -232,7 +232,7 @@ def process_customer_email(self, email_id: int, user_id: int) -> Dict[str, Any]:
             "email_id": email_id,
             "classification": "support",  # or "order", "feedback", etc.
             "needs_reply": True,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -297,7 +297,7 @@ def send_campaign_email(
             "status": "sent",
             "campaign_id": campaign_id,
             "recipient_id": recipient_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

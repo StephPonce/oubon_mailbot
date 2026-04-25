@@ -10,7 +10,7 @@ Date: November 2025
 
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -500,7 +500,7 @@ class PlatformAdapter(ABC):
         This method should be called by adapters after each API request.
         """
         self._request_count += 1
-        self._last_request_time = datetime.utcnow()
+        self._last_request_time = datetime.now(timezone.utc)
 
     def get_request_stats(self) -> dict:
         """

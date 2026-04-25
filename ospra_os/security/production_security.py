@@ -19,7 +19,7 @@ import re
 import time
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Any, Callable
 from collections import defaultdict
 from functools import wraps
@@ -493,7 +493,7 @@ class AuditLogger:
     ):
         """Log a security event."""
         event = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": event_type,
             "user_id": user_id,
             "ip_address": ip_address,

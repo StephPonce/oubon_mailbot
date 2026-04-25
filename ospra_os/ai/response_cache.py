@@ -8,7 +8,7 @@ Brand parameterization (Cleanup Pass 4 SaaS refactor):
   tenant-specific signatures.
 """
 from typing import Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 
@@ -47,7 +47,7 @@ class ResponseCache:
             cached = self.cache[key]
             expires_at = cached["expires_at"]
 
-            if datetime.utcnow() < expires_at:
+            if datetime.now(timezone.utc) < expires_at:
                 print(f" Cache hit! Saved AI call")
                 return cached["response"]
             else:
@@ -59,19 +59,19 @@ class ResponseCache:
     def set(self, subject: str, body: str, response: str):
         """Cache a response."""
         key = self._generate_key(subject, body)
-        expires_at = datetime.utcnow() + timedelta(hours=self.ttl_hours)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=self.ttl_hours)
 
         self.cache[key] = {
             "response": response,
             "expires_at": expires_at,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
         }
 
         print(f" Cached response (expires in {self.ttl_hours}h)")
 
     def clear_expired(self):
         """Remove expired entries from cache."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_keys = [
             key for key, value in self.cache.items()
             if value["expires_at"] < now

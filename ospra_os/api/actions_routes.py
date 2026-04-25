@@ -22,9 +22,9 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import get_db
@@ -85,8 +85,8 @@ class ActionResponse(BaseModel):
     description: Optional[str]
     confidence: float
     rationale: str
-    factors: List[Dict[str, Any]]
-    payload: Dict[str, Any]
+    factors: List[Dict[str, Any]] = Field(default_factory=list)
+    payload: Dict[str, Any] = Field(default_factory=dict)
     status: str
     estimated_impact: Optional[str]
     product_image: Optional[str]
@@ -94,8 +94,17 @@ class ActionResponse(BaseModel):
     executed_at: Optional[datetime]
     expires_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+    # ``factors`` and ``payload`` are nullable JSON columns in the DB —
+    # treat NULL as the empty default so the response always presents the
+    # documented shape.
+    @field_validator("factors", "payload", mode="before")
+    @classmethod
+    def _coerce_none_to_default(cls, value, info):
+        if value is None:
+            return [] if info.field_name == "factors" else {}
+        return value
 
 
 class ActionStatsResponse(BaseModel):
@@ -285,7 +294,7 @@ async def get_actions(
 
     # Filter out expired actions
     query = query.filter(
-        (Action.expires_at.is_(None)) | (Action.expires_at > datetime.utcnow())
+        (Action.expires_at.is_(None)) | (Action.expires_at > datetime.now(timezone.utc))
     )
 
     # Get total count for pagination
@@ -523,7 +532,7 @@ async def approve_action(
         undo_manager = UndoManager(db)
         undo_window_hours = undo_manager.UNDO_WINDOWS.get(action.action_type)
         if undo_window_hours and undo_window_hours > 0:
-            action.undo_deadline = datetime.utcnow() + timedelta(hours=undo_window_hours)
+            action.undo_deadline = datetime.now(timezone.utc) + timedelta(hours=undo_window_hours)
             action.is_undoable = True
         else:
             action.undo_deadline = None
@@ -536,7 +545,7 @@ async def approve_action(
 
         if result.get("success"):
             action.status = AIActionStatus.EXECUTED
-            action.executed_at = datetime.utcnow()
+            action.executed_at = datetime.now(timezone.utc)
             action.execution_result = result
         else:
             action.status = AIActionStatus.FAILED
@@ -651,7 +660,7 @@ async def update_action(
     if updates.description:
         action.description = updates.description
 
-    action.updated_at = datetime.utcnow()
+    action.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(action)
 
@@ -685,7 +694,7 @@ async def approve_all_high_confidence(
         Action.user_id == current_user.id,
         Action.status == AIActionStatus.PENDING,
         Action.confidence >= confidence_threshold,
-        (Action.expires_at.is_(None)) | (Action.expires_at > datetime.utcnow())
+        (Action.expires_at.is_(None)) | (Action.expires_at > datetime.now(timezone.utc))
     ).all()
 
     approved_ids = []
@@ -712,7 +721,7 @@ async def approve_all_high_confidence(
             undo_manager_bulk = UndoManager(db)
             undo_window_hours = undo_manager_bulk.UNDO_WINDOWS.get(action.action_type)
             if undo_window_hours and undo_window_hours > 0:
-                action.undo_deadline = datetime.utcnow() + timedelta(hours=undo_window_hours)
+                action.undo_deadline = datetime.now(timezone.utc) + timedelta(hours=undo_window_hours)
                 action.is_undoable = True
             else:
                 action.undo_deadline = None
@@ -725,7 +734,7 @@ async def approve_all_high_confidence(
 
             if result.get("success"):
                 action.status = AIActionStatus.EXECUTED
-                action.executed_at = datetime.utcnow()
+                action.executed_at = datetime.now(timezone.utc)
                 action.execution_result = result
             else:
                 action.status = AIActionStatus.FAILED

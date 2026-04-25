@@ -9,7 +9,7 @@ Run nightly via background job to keep summaries fresh.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from typing import Dict, List, Any, Optional
 
@@ -121,14 +121,14 @@ def generate_daily_summaries(user_id: int, db: Session = None) -> Dict[str, Any]
         # Save or update summary
         existing_summary = db.query(LearningSummary).filter(
             LearningSummary.user_id == user_id,
-            func.date(LearningSummary.summary_date) == datetime.utcnow().date()
+            func.date(LearningSummary.summary_date) == datetime.now(timezone.utc).date()
         ).first()
 
         if existing_summary:
             # Update existing
             for key, value in summary_data.items():
                 setattr(existing_summary, key, value)
-            existing_summary.updated_at = datetime.utcnow()
+            existing_summary.updated_at = datetime.now(timezone.utc)
         else:
             # Create new
             new_summary = LearningSummary(
@@ -492,7 +492,7 @@ def _update_niche_performance(db: Session, user_id: int, niche: str, stats: Dict
         niche_perf.total_ad_spend = stats["ad_spend"]
         niche_perf.total_ad_revenue = stats["ad_revenue"]
         niche_perf.avg_roas = stats["roas"]
-        niche_perf.updated_at = datetime.utcnow()
+        niche_perf.updated_at = datetime.now(timezone.utc)
     else:
         new_niche_perf = NichePerformance(
             user_id=user_id,

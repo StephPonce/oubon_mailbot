@@ -12,7 +12,7 @@ These jobs should be scheduled to run:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from typing import List, Dict, Any
 
@@ -179,7 +179,7 @@ async def calculate_global_patterns():
             global_weights.total_users_contributing = len(unique_users)
             global_weights.total_sales_analyzed = len([e for e in events if e.event_type in ["sale", "historical_sale"]])
             global_weights.total_revenue_analyzed = total_revenue
-            global_weights.updated_at = datetime.utcnow()
+            global_weights.updated_at = datetime.now(timezone.utc)
 
         db.commit()
 
@@ -307,7 +307,7 @@ async def calculate_personal_patterns(user_id: int):
             personal.optimal_price_range = optimal_price_range
             personal.sales_analyzed = sales_count
             personal.revenue_analyzed = total_revenue
-            personal.updated_at = datetime.utcnow()
+            personal.updated_at = datetime.now(timezone.utc)
 
         db.commit()
 
@@ -364,7 +364,7 @@ async def cleanup_old_events(days_to_keep: int = 90):
 
     db = SessionLocal()
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days_to_keep)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
 
         deleted_count = db.query(LearningEvent).filter(
             LearningEvent.timestamp < cutoff_date

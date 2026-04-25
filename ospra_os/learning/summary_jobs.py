@@ -7,7 +7,7 @@ Runs at 3 AM UTC to compress unlimited raw events into token-efficient summaries
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -61,7 +61,7 @@ async def nightly_summary_job():
                 # Save to database
                 summary = LearningSummary(
                     user_id=user_id,
-                    summary_date=datetime.utcnow(),
+                    summary_date=datetime.now(timezone.utc),
                     overall_performance=summary_data['overall_performance'],
                     niche_insights=summary_data['niche_insights'],
                     top_products=summary_data['top_products'],
@@ -294,7 +294,7 @@ def _update_time_series(user_id: int, db: SessionLocal):
     # This is a simplified version - in production you'd want more sophisticated rollup logic
     from datetime import timedelta
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Get events from last month
     month_ago = now - timedelta(days=30)

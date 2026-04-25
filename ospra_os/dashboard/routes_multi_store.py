@@ -4,9 +4,9 @@ Manage multiple e-commerce stores across platforms
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 import logging
@@ -59,7 +59,8 @@ class AddStoreRequest(BaseModel):
     target_market: str = Field(default="US", max_length=100)
     currency: str = Field(default="USD", max_length=10)
 
-    @validator('platform')
+    @field_validator('platform')
+    @classmethod
     def validate_platform(cls, v):
         valid_platforms = ['shopify', 'amazon', 'woocommerce', 'etsy', 'ebay']
         if v.lower() not in valid_platforms:
@@ -97,8 +98,7 @@ class StoreResponse(BaseModel):
     last_sync: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RankedStoreResponse(BaseModel):
@@ -899,7 +899,7 @@ async def sync_store(
                 revenue_updated=0.0,
                 store_info={},
                 error=sync_result.get("error", "Sync failed"),
-                last_sync_time=datetime.utcnow()
+                last_sync_time=datetime.now(timezone.utc)
             )
 
         # Get updated store info
@@ -915,7 +915,7 @@ async def sync_store(
         store.total_orders += orders_synced
         store.total_revenue += revenue
         store.monthly_revenue = revenue  # This should be filtered by month in production
-        store.last_sync = datetime.utcnow()
+        store.last_sync = datetime.now(timezone.utc)
 
         db.commit()
         db.refresh(store)
@@ -944,7 +944,7 @@ async def sync_store(
             revenue_updated=0.0,
             store_info={},
             error=f"Rate limit exceeded. Please try again in a few moments.",
-            last_sync_time=datetime.utcnow()
+            last_sync_time=datetime.now(timezone.utc)
         )
 
     except AuthenticationError as e:
@@ -955,7 +955,7 @@ async def sync_store(
             revenue_updated=0.0,
             store_info={},
             error="Authentication failed. Please reconnect your store.",
-            last_sync_time=datetime.utcnow()
+            last_sync_time=datetime.now(timezone.utc)
         )
 
     except Exception as e:
@@ -967,7 +967,7 @@ async def sync_store(
             revenue_updated=0.0,
             store_info={},
             error="Sync failed. Please try again later.",
-            last_sync_time=datetime.utcnow()
+            last_sync_time=datetime.now(timezone.utc)
         )
 
 
@@ -1209,7 +1209,7 @@ async def deploy_product_to_store(
                 store_id=store_id,
                 platform_product_id=result.get("platform_product_id", ""),
                 platform_url=result.get("platform_url", ""),
-                deployed_at=datetime.utcnow()
+                deployed_at=datetime.now(timezone.utc)
             )
 
             db.add(deployment)

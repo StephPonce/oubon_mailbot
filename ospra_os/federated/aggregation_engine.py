@@ -20,7 +20,7 @@ How it works:
 
 import logging
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -92,7 +92,7 @@ class AggregationEngine:
 
         # Create insights from patterns that meet thresholds
         insights = []
-        batch_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        batch_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
         for pattern_key, contrib_list in patterns.items():
             insight = self._create_product_insight(pattern_key, contrib_list, batch_id)
@@ -135,7 +135,7 @@ class AggregationEngine:
 
         patterns = self._group_pricing_contributions(contributions)
         insights = []
-        batch_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        batch_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
         for pattern_key, contrib_list in patterns.items():
             insight = self._create_pricing_insight(pattern_key, contrib_list, batch_id)
@@ -183,7 +183,7 @@ class AggregationEngine:
 
         patterns = self._group_ad_contributions(contributions)
         insights = []
-        batch_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        batch_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
         for pattern_key, contrib_list in patterns.items():
             insight = self._create_ad_insight(pattern_key, contrib_list, batch_id)

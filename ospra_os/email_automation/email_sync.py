@@ -5,7 +5,7 @@ Syncs emails from Gmail (OAuth), Outlook (Graph API), and IMAP providers.
 """
 
 from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import base64
 import json
 import imaplib
@@ -89,7 +89,7 @@ class EmailSyncService:
 
             # Update account sync status
             if result['success']:
-                account.last_synced = datetime.utcnow()
+                account.last_synced = datetime.now(timezone.utc)
                 account.sync_status = 'active'
                 account.sync_error = None
             else:
@@ -273,7 +273,7 @@ class EmailSyncService:
                     is_starred='STARRED' in full_msg.get('labelIds', []),
                     is_important='IMPORTANT' in full_msg.get('labelIds', []),
                     has_attachments=any('filename' in part for part in full_msg['payload'].get('parts', [])),
-                    synced_at=datetime.utcnow(),
+                    synced_at=datetime.now(timezone.utc),
                     raw_data=full_msg
                 )
 
@@ -394,7 +394,7 @@ class EmailSyncService:
                     is_starred=msg.get('flag', {}).get('flagStatus') == 'flagged',
                     is_important=msg.get('importance') == 'high',
                     has_attachments=msg.get('hasAttachments', False),
-                    synced_at=datetime.utcnow(),
+                    synced_at=datetime.now(timezone.utc),
                     raw_data=msg
                 )
 
@@ -549,7 +549,7 @@ class EmailSyncService:
                 try:
                     received_at = email.utils.parsedate_to_datetime(date_header)
                 except (ValueError, TypeError):
-                    received_at = datetime.utcnow()  # Default to now if date parsing fails
+                    received_at = datetime.now(timezone.utc)  # Default to now if date parsing fails
 
                 # Create email record
                 email_record = Email(
@@ -570,7 +570,7 @@ class EmailSyncService:
                     is_starred=False,
                     is_important=False,
                     has_attachments=email_message.is_multipart(),
-                    synced_at=datetime.utcnow(),
+                    synced_at=datetime.now(timezone.utc),
                     raw_data=None  # Don't store raw email to save space
                 )
 

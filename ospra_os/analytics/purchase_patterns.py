@@ -10,7 +10,7 @@ Analyzes customer purchase patterns to identify:
 - Cross-sell opportunities
 - Product affinity (what products are bought together)
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict, Counter
 import logging
@@ -722,7 +722,7 @@ class PurchasePatternAnalyzer:
             "discount_sensitivity": discounts,
             "category_flow": category_flow,
             "cross_sell_opportunities": cross_sell,
-            "analyzed_at": datetime.utcnow().isoformat()
+            "analyzed_at": datetime.now(timezone.utc).isoformat()
         }
 
         logger.info(f"[SUCCESS] Complete pattern profile generated")

@@ -6,7 +6,7 @@ Supports price tests, content tests, and ad creative tests.
 """
 
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
 import random
@@ -106,7 +106,7 @@ class ABTestEngine:
 
         # Determine initial status
         status = TestStatus.DRAFT
-        if scheduled_start and scheduled_start <= datetime.utcnow():
+        if scheduled_start and scheduled_start <= datetime.now(timezone.utc):
             status = TestStatus.RUNNING
         elif scheduled_start:
             status = TestStatus.SCHEDULED
@@ -315,7 +315,7 @@ class ABTestEngine:
             raise ValueError(f"Cannot start test in status: {test.status}")
 
         test.status = TestStatus.RUNNING.value
-        test.started_at = datetime.utcnow()
+        test.started_at = datetime.now(timezone.utc)
 
         self.db.commit()
         self.db.refresh(test)
@@ -395,7 +395,7 @@ class ABTestEngine:
             winner_variant_id = self.determine_winner(test_id)
 
         test.status = TestStatus.ENDED.value
-        test.ended_at = datetime.utcnow()
+        test.ended_at = datetime.now(timezone.utc)
         test.winner_variant_id = winner_variant_id
 
         self.db.commit()
@@ -475,7 +475,7 @@ class ABTestEngine:
             test_id=test_id,
             variant_id=selected_variant.id,
             visitor_id=visitor_id,
-            assigned_at=datetime.utcnow()
+            assigned_at=datetime.now(timezone.utc)
         )
         self.db.add(new_assignment)
         self.db.commit()
@@ -496,7 +496,7 @@ class ABTestEngine:
             visitor_id=visitor_id,
             event_type=EventType.IMPRESSION.value,
             metadata=metadata or {},
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(event)
 
@@ -526,7 +526,7 @@ class ABTestEngine:
             event_type=EventType.PURCHASE.value,
             revenue=revenue,
             metadata=metadata or {},
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(event)
 
@@ -678,7 +678,7 @@ class ABTestEngine:
 
         # Store implementation metadata
         test.test_metadata = test.test_metadata or {}
-        test.test_metadata["implemented_at"] = datetime.utcnow().isoformat()
+        test.test_metadata["implemented_at"] = datetime.now(timezone.utc).isoformat()
         test.test_metadata["winning_config"] = variant.config
 
         self.db.commit()

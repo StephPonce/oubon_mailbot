@@ -10,7 +10,7 @@ Author: OspraOS
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from enum import Enum
 from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SQLEnum
@@ -77,7 +77,7 @@ class Job(Base):
         """Set job result."""
         self.result_data = json.dumps(result)
         self.status = JobStatus.COMPLETED
-        self.completed_at = datetime.utcnow()
+        self.completed_at = datetime.now(timezone.utc)
 
     def get_result(self) -> Optional[Dict[str, Any]]:
         """Get result as dictionary."""
@@ -87,7 +87,7 @@ class Job(Base):
         """Set job error."""
         self.error_message = error
         self.status = JobStatus.FAILED
-        self.completed_at = datetime.utcnow()
+        self.completed_at = datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""
@@ -171,7 +171,7 @@ class JobStorage:
         return self.update_job(
             job_id,
             status=JobStatus.RUNNING,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(timezone.utc)
         )
 
     def complete_job(self, job_id: str, result: dict) -> Optional[Job]:
@@ -237,7 +237,7 @@ class JobStorage:
 
         session = self._get_session()
         try:
-            cutoff = datetime.utcnow() - timedelta(days=days)
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
             deleted = session.query(Job).filter(
                 Job.completed_at < cutoff
             ).delete()

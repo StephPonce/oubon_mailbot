@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Request
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import os
 import secrets
@@ -170,7 +170,7 @@ def _create_user(db: Session, email: str, password_hash: str, name: Optional[str
         password_hash=password_hash,
         name=user_name,
         subscription_tier=subscription_tier,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
         # Note: is_active column doesn't exist in User model - removed
     )
     
@@ -294,7 +294,7 @@ async def login(request: LoginRequest, req: Request, db: Session = Depends(get_d
     reset_sensitive_attempts("login", req)
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
 
     logger.info(f"User logged in: {user.email} (ID: {user.id})")
@@ -478,7 +478,7 @@ async def forgot_password(request: ForgotPasswordRequest, req: Request, db: Sess
     if user:
         # Generate secure token
         token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
         
         # Delete any existing tokens for this email
         db.query(PasswordResetToken).filter(

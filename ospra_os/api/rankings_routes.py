@@ -9,7 +9,7 @@ Author: OspraOS
 
 import logging
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from ospra_os.core.settings import Settings, get_settings
 
@@ -109,8 +109,8 @@ async def get_top_rankings(
             "success": True,
             "rankings": rankings,
             "total_count": len(rankings),
-            "last_updated": datetime.utcnow().isoformat(),
-            "next_update": (datetime.utcnow() + timedelta(hours=1)).isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "next_update": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         }
 
     except Exception as e:
@@ -227,7 +227,7 @@ async def get_product_rank_history(
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
 
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         history = session.query(RankingHistory).filter(
             RankingHistory.product_id == product_id,
@@ -286,7 +286,7 @@ async def get_new_entries(
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
 
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         new_entries = session.query(RankingHistory).filter(
             and_(
@@ -339,7 +339,7 @@ async def get_fallen_products(
         db_url = settings.database_url or "sqlite:///./oubon_store.db"
         session = get_multi_store_session(db_url)
 
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         yesterday = today - timedelta(days=1)
 
         yesterday_top_20 = session.query(RankingHistory.product_id).filter(

@@ -6,7 +6,7 @@ Tracks all executed actions for audit trail and undo capability.
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Boolean, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -165,7 +165,7 @@ class ActionHistory:
                 return True
 
             action_log.status = "undone"
-            action_log.undone_at = datetime.utcnow()
+            action_log.undone_at = datetime.now(timezone.utc)
 
             db.commit()
             logger.info(f"[SUCCESS] Action marked as undone: {action_id}")
@@ -231,7 +231,7 @@ class ActionHistory:
         db = self.SessionLocal()
 
         try:
-            cutoff_date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            cutoff_date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
             cutoff_date = cutoff_date.replace(day=cutoff_date.day - days)
 
             deleted = db.query(ActionLog).filter(ActionLog.created_at < cutoff_date).delete()

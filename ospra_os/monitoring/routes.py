@@ -65,7 +65,7 @@ async def get_overall_health():
 
     response = {
         "status": overall_status,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "uptime_since": health_monitor.uptime_start.isoformat(),
         "services": services
     }

@@ -13,7 +13,7 @@ Date: November 2025
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy import select, func, and_, desc, or_
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -187,7 +187,7 @@ class NicheAnalyzer:
             analysis = {
                 "niche_id": niche_id,
                 "niche_name": niche.name,
-                "analyzed_at": datetime.utcnow().isoformat(),
+                "analyzed_at": datetime.now(timezone.utc).isoformat(),
 
                 # Core scores
                 "health_score": round(health_score, 2),
@@ -263,7 +263,7 @@ class NicheAnalyzer:
             niche.current_health_score = health_score
             niche.current_lifecycle_stage = lifecycle_stage
             niche.current_entry_timing = entry_data["timing"]
-            niche.updated_at = datetime.utcnow()
+            niche.updated_at = datetime.now(timezone.utc)
             await session.commit()
 
             logger.info(f"Niche analysis complete: {niche_id} - Health: {health_score:.1f}, Stage: {lifecycle_stage.value}")
@@ -412,7 +412,7 @@ class NicheAnalyzer:
         """
         async with self.async_session() as session:
             # Get niches with recent snapshots showing positive change
-            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
             stmt = select(NicheSnapshot).where(
                 NicheSnapshot.snapshot_date >= seven_days_ago
@@ -449,7 +449,7 @@ class NicheAnalyzer:
         """
         async with self.async_session() as session:
             # Get niches with recent negative health score changes
-            seven_days_ago = datetime.utcnow() - timedelta(days=7)
+            seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
             stmt = select(NicheSnapshot).where(
                 and_(
@@ -547,7 +547,7 @@ class NicheAnalyzer:
                     "niche_id": best_entry_timing["niche_id"],
                     "entry_score": best_entry_timing["entry_timing"]["score"]
                 },
-                "compared_at": datetime.utcnow().isoformat()
+                "compared_at": datetime.now(timezone.utc).isoformat()
             }
 
         return {"niches": [], "comparison_count": 0}
@@ -564,7 +564,7 @@ class NicheAnalyzer:
             List of historical snapshots
         """
         async with self.async_session() as session:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             stmt = select(NicheSnapshot).where(
                 and_(
@@ -647,7 +647,7 @@ class NicheAnalyzer:
             "trend_direction": "up" if avg_change_per_day > 0 else "down",
             "predictions": predictions,
             "based_on_days": len(history),
-            "predicted_at": datetime.utcnow().isoformat()
+            "predicted_at": datetime.now(timezone.utc).isoformat()
         }
 
     async def get_subcategories(self, niche_id: str) -> List[Dict]:
@@ -694,7 +694,7 @@ class NicheAnalyzer:
                 niche_id=niche_id,
                 name=niche_id.replace("_", " ").title(),
                 is_active=True,
-                tracked_since=datetime.utcnow()
+                tracked_since=datetime.now(timezone.utc)
             )
             session.add(niche)
             await session.commit()
@@ -1240,7 +1240,7 @@ class NicheAnalyzer:
             # Full analysis
             full_analysis=analysis,
 
-            snapshot_date=datetime.utcnow()
+            snapshot_date=datetime.now(timezone.utc)
         )
 
         session.add(snapshot)

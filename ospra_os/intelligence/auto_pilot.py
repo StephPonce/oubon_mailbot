@@ -22,7 +22,7 @@ Example:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -158,7 +158,7 @@ class AutoPilotAction:
     def _within_undo_window(self) -> bool:
         if not self.undo_deadline:
             return False
-        return datetime.utcnow() < self.undo_deadline
+        return datetime.now(timezone.utc) < self.undo_deadline
 
 
 class AutoPilotEngine:
@@ -278,7 +278,7 @@ class AutoPilotEngine:
                     if hasattr(action_config, key):
                         setattr(action_config, key, value)
         
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(timezone.utc)
         logger.info(f"[AI] Auto-pilot config updated for user {user_id}")
         
         return config
@@ -287,7 +287,7 @@ class AutoPilotEngine:
         """Enable auto-pilot for user."""
         config = self.get_config(user_id)
         config.status = AutoPilotStatus.ENABLED
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(timezone.utc)
         logger.info(f"[START] Auto-pilot ENABLED for user {user_id}")
         return config
     
@@ -295,7 +295,7 @@ class AutoPilotEngine:
         """Disable auto-pilot for user."""
         config = self.get_config(user_id)
         config.status = AutoPilotStatus.DISABLED
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(timezone.utc)
         logger.info(f"[STOP] Auto-pilot DISABLED for user {user_id}")
         return config
     
@@ -303,7 +303,7 @@ class AutoPilotEngine:
         """Temporarily pause auto-pilot."""
         config = self.get_config(user_id)
         config.status = AutoPilotStatus.PAUSED
-        config.updated_at = datetime.utcnow()
+        config.updated_at = datetime.now(timezone.utc)
         logger.info(f"[PAUSE] Auto-pilot PAUSED for user {user_id}")
         return config
     
@@ -364,7 +364,7 @@ class AutoPilotEngine:
         # Check cooldown
         last_of_type = stats["last_by_type"].get(action_type)
         if last_of_type:
-            elapsed = (datetime.utcnow() - last_of_type).total_seconds() / 60
+            elapsed = (datetime.now(timezone.utc) - last_of_type).total_seconds() / 60
             if elapsed < action_config.cooldown_minutes:
                 remaining = action_config.cooldown_minutes - elapsed
                 return False, f"Cooldown: {remaining:.0f} minutes remaining"
@@ -410,7 +410,7 @@ class AutoPilotEngine:
             parameters=parameters,
             confidence=confidence,
             monetary_value=monetary_value,
-            undo_deadline=datetime.utcnow() + timedelta(hours=config.undo_window_hours)
+            undo_deadline=datetime.now(timezone.utc) + timedelta(hours=config.undo_window_hours)
         )
         
         # Execute the action
@@ -437,7 +437,7 @@ class AutoPilotEngine:
         self._update_daily_stats(user_id, action_type, monetary_value)
         
         # Update config timestamp
-        config.last_action_at = datetime.utcnow()
+        config.last_action_at = datetime.now(timezone.utc)
         
         return action
     
@@ -459,12 +459,12 @@ class AutoPilotEngine:
         if not action.can_undo:
             return False, "Action cannot be undone"
         
-        if action.undo_deadline and datetime.utcnow() > action.undo_deadline:
+        if action.undo_deadline and datetime.now(timezone.utc) > action.undo_deadline:
             return False, "Undo window has expired"
         
         # Mark as undone
         action.undone = True
-        action.undone_at = datetime.utcnow()
+        action.undone_at = datetime.now(timezone.utc)
         action.undo_reason = reason
         
         # TODO: Actually reverse the action (call appropriate undo function)
@@ -496,7 +496,7 @@ class AutoPilotEngine:
         stats = self._get_daily_stats(user_id)
         
         # Get today's actions
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         todays_actions = [
             a for a in self._actions.values()
             if a.user_id == user_id and a.executed_at.date() == today
@@ -527,7 +527,7 @@ class AutoPilotEngine:
     
     def _get_daily_stats(self, user_id: int) -> Dict[str, Any]:
         """Get or initialize daily stats for user."""
-        today = datetime.utcnow().date().isoformat()
+        today = datetime.now(timezone.utc).date().isoformat()
         
         if user_id not in self._daily_stats:
             self._daily_stats[user_id] = {}
@@ -554,7 +554,7 @@ class AutoPilotEngine:
         stats["total_actions"] += 1
         stats["total_spend"] += monetary_value
         stats["by_type"][action_type] = stats["by_type"].get(action_type, 0) + 1
-        stats["last_by_type"][action_type] = datetime.utcnow()
+        stats["last_by_type"][action_type] = datetime.now(timezone.utc)
 
 
 # Singleton instance

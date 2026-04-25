@@ -9,7 +9,7 @@ Date: November 2025
 """
 
 from typing import Dict, List, Optional, Callable, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 import logging
 
@@ -114,7 +114,7 @@ class AICostTracker:
                 estimated_cost=estimated_cost,
                 store_id=store_id,
                 product_id=product_id,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(timezone.utc)
             )
 
             session.add(usage)
@@ -160,7 +160,7 @@ class AICostTracker:
 
         try:
             # Calculate date threshold
-            since_date = datetime.utcnow() - timedelta(days=days)
+            since_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Get all usage for user in period
             usage_records = session.query(AIUsage).filter(
@@ -265,7 +265,7 @@ class AICostTracker:
             most_common_task = max(task_counts.items(), key=lambda x: x[1])[0] if task_counts else None
 
             # Recent activity (last 7 days)
-            recent_date = datetime.utcnow() - timedelta(days=7)
+            recent_date = datetime.now(timezone.utc) - timedelta(days=7)
             recent_usage = [r for r in all_usage if r.created_at >= recent_date]
 
             return {

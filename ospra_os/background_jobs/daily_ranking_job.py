@@ -14,7 +14,7 @@ Date: November 2025
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -106,7 +106,7 @@ class DailyRankingJob:
             current_rankings = await engine.generate_daily_rankings()
 
             # Get previous rankings (yesterday)
-            yesterday = datetime.utcnow() - timedelta(days=1)
+            yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             previous_rankings = self._get_previous_rankings(session, yesterday)
 
             # Store rankings in history
@@ -121,7 +121,7 @@ class DailyRankingJob:
             return {
                 "success": True,
                 "products_ranked": len(current_rankings),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         except Exception as e:
@@ -129,7 +129,7 @@ class DailyRankingJob:
             return {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
     def _get_previous_rankings(self, session, date) -> Dict[int, int]:
@@ -174,7 +174,7 @@ class DailyRankingJob:
             previous_rankings: Dict of previous ranks by product_id
         """
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Track products that need notifications
             top_10_entries = []
@@ -315,7 +315,7 @@ class DailyRankingJob:
         """
         try:
             session = get_multi_store_session(self.database_url)
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             total_snapshots = session.query(RankingHistory).filter(
                 RankingHistory.snapshot_date >= cutoff_date

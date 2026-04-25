@@ -29,7 +29,7 @@ Author: OspraOS
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
@@ -62,7 +62,7 @@ class APIResponse(BaseModel):
 
     def __init__(self, **data):
         if "timestamp" not in data or data["timestamp"] is None:
-            data["timestamp"] = datetime.utcnow().isoformat()
+            data["timestamp"] = datetime.now(timezone.utc).isoformat()
         super().__init__(**data)
 
 
@@ -90,7 +90,7 @@ def success_response(
     """
     response = {
         "success": True,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     if message:
@@ -145,7 +145,7 @@ def error_response(
 
     response = {
         "success": False,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "error": {
             "message": message,
             "error_id": error_id,
@@ -194,7 +194,7 @@ def paginated_response(
 
     response = {
         "success": True,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "data": items,
         "pagination": {
             "page": page,

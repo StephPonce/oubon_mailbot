@@ -21,7 +21,7 @@ All actions:
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 from sqlalchemy.orm import Session
@@ -183,7 +183,7 @@ class ActionExecutor:
             "result": result,
             "log_id": action_log.id,
             "undo_available": result.get("undo_available", False),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     async def undo_action(self, action_id: str) -> Dict[str, Any]:
@@ -209,21 +209,21 @@ class ActionExecutor:
             return {
                 "success": False,
                 "message": f"Action not found: {action_id}",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         if not action_log.undo_available:
             return {
                 "success": False,
                 "message": "Action cannot be undone",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         if action_log.status == "undone":
             return {
                 "success": False,
                 "message": "Action already undone",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         # Execute undo based on action type
@@ -248,7 +248,7 @@ class ActionExecutor:
             return {
                 "success": True,
                 "message": "Action undone successfully",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
         except Exception as e:
@@ -256,7 +256,7 @@ class ActionExecutor:
             return {
                 "success": False,
                 "message": f"Failed to undo action: {str(e)}",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
 
     # ========================================================================
@@ -407,7 +407,7 @@ class ActionExecutor:
 
         # Update status
         product.status = ProductStatus.QUEUED
-        product.queued_at = datetime.utcnow()
+        product.queued_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -448,7 +448,7 @@ class ActionExecutor:
             raise ValueError(f"Product {product_id} not found")
 
         product.status = ProductStatus.DISCONTINUED
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -476,7 +476,7 @@ class ActionExecutor:
 
         old_price = product.price
         product.price = new_price
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(timezone.utc)
 
         self.db.commit()
 

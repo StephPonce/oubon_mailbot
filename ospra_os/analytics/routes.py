@@ -9,7 +9,7 @@ from the verified token, NOT from query parameters.
 from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 import csv
 import io
@@ -273,7 +273,7 @@ async def export_csv(
         # Write KPIs section
         writer.writerow(['ANALYTICS REPORT'])
         writer.writerow(['Date Range:', date_range])
-        writer.writerow(['Generated:', datetime.utcnow().isoformat()])
+        writer.writerow(['Generated:', datetime.now(timezone.utc).isoformat()])
         writer.writerow([])
 
         writer.writerow(['REVENUE METRICS'])

@@ -12,7 +12,7 @@ Key Capabilities:
 - Customer acquisition metrics
 - Cohort analysis
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, desc
@@ -105,7 +105,7 @@ class CustomerAnalytics:
                 "recommended_products": ["prod_789", "prod_012"]
             },
 
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
 
         return profile
@@ -138,7 +138,7 @@ class CustomerAnalytics:
             "monetary": 5,     # High spend
             "combined_score": 14,
             "segment": self._get_rfm_segment(5, 4, 5),
-            "calculated_at": datetime.utcnow().isoformat()
+            "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return rfm
@@ -281,7 +281,7 @@ class CustomerAnalytics:
                     "churn_rate": 0.0
                 }
             ],
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return breakdown
@@ -414,7 +414,7 @@ class CustomerAnalytics:
                 "aov_trend": "increasing",
                 "churn_risk": "low"
             },
-            "calculated_at": datetime.utcnow().isoformat()
+            "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return ltv_data
@@ -443,7 +443,7 @@ class CustomerAnalytics:
                 "p75": 285.00,
                 "p90": 520.00
             },
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return distribution
@@ -537,7 +537,7 @@ class CustomerAnalytics:
             "averages": [100, 49, 35, 30, 26, 23],
             "best_cohort": "2025-10",
             "worst_cohort": "2025-08",
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return cohorts
@@ -579,7 +579,7 @@ class CustomerAnalytics:
                 "median_days_between": 25,
                 "trend": "stable"
             },
-            "analyzed_at": datetime.utcnow().isoformat()
+            "analyzed_at": datetime.now(timezone.utc).isoformat()
         }
 
         return patterns
@@ -651,7 +651,7 @@ class CustomerAnalytics:
                     "ltv_to_cac": 33.0
                 }
             },
-            "calculated_at": datetime.utcnow().isoformat()
+            "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return metrics
@@ -718,7 +718,7 @@ class CustomerAnalytics:
             "total_customers": 610,
             "total_revenue": 74300.00,
             "date_range": date_range,
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
 
         return breakdown

@@ -12,7 +12,7 @@ import hmac
 import hashlib
 import logging
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 
 # Import tiers from single source of truth
@@ -67,7 +67,7 @@ async def update_user_subscription(
             user.subscription_tier = new_tier
             user.lemonsqueezy_subscription_id = subscription_id
             user.lemonsqueezy_customer_id = customer_id
-            user.subscription_updated_at = datetime.utcnow()
+            user.subscription_updated_at = datetime.now(timezone.utc)
 
             db.commit()
 
@@ -101,7 +101,7 @@ async def downgrade_user_to_nest(subscription_id: str) -> bool:
 
             old_tier = user.subscription_tier
             user.subscription_tier = SubscriptionTier.NEST
-            user.subscription_updated_at = datetime.utcnow()
+            user.subscription_updated_at = datetime.now(timezone.utc)
 
             db.commit()
 
@@ -541,7 +541,7 @@ async def handle_webhook_event(event: Dict) -> Dict:
                 ).first()
                 if user:
                     user.subscription_tier = tier
-                    user.subscription_updated_at = datetime.utcnow()
+                    user.subscription_updated_at = datetime.now(timezone.utc)
                     db.commit()
                     result["database_updated"] = True
                     logger.info(f"[PAYMENT] Updated user {user.id} tier to {tier.value}")

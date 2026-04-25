@@ -17,7 +17,7 @@ import base64
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Tuple
 from fastapi import Request, HTTPException
 
@@ -245,9 +245,9 @@ async def record_learning_event(
                 details={
                     **details,
                     "store_id": store_id,
-                    "recorded_at": datetime.utcnow().isoformat(),
+                    "recorded_at": datetime.now(timezone.utc).isoformat(),
                 },
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(timezone.utc)
             )
             db.add(event)
             db.commit()

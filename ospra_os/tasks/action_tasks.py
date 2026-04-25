@@ -14,7 +14,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from ospra_os.celery_app import celery_app
@@ -76,7 +76,7 @@ def execute_action(self, action_id: int, user_id: int) -> Dict[str, Any]:
             "status": "success",
             "action_id": action_id,
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -134,7 +134,7 @@ def process_auto_pilot(self, action_id: int, user_id: int) -> Dict[str, Any]:
             "action_id": action_id,
             "decision": "execute",  # or "defer", "cancel"
             "confidence": 0.85,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -163,7 +163,7 @@ def expire_old_actions(self) -> Dict[str, Any]:
     logger.info("Starting expired action cleanup")
 
     try:
-        cutoff_time = datetime.utcnow() - timedelta(hours=24)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24)
 
         # TODO: Query and update expired actions
         # expired_actions = self.db.query(ScheduledAction).filter(
@@ -173,7 +173,7 @@ def expire_old_actions(self) -> Dict[str, Any]:
 
         # for action in expired_actions:
         #     action.status = "expired"
-        #     action.updated_at = datetime.utcnow()
+        #     action.updated_at = datetime.now(timezone.utc)
 
         # self.db.commit()
 
@@ -185,7 +185,7 @@ def expire_old_actions(self) -> Dict[str, Any]:
             "status": "success",
             "expired_count": expired_count,
             "cutoff_time": cutoff_time.isoformat(),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -238,7 +238,7 @@ def batch_execute_actions(self, action_ids: List[int], user_id: int) -> Dict[str
             "status": "success",
             "actions_queued": queued_count,
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -284,8 +284,8 @@ def schedule_delayed_action(self, action_id: int, user_id: int, delay_seconds: i
         return {
             "status": "scheduled",
             "action_id": action_id,
-            "execute_at": (datetime.utcnow() + timedelta(seconds=delay_seconds)).isoformat(),
-            "timestamp": datetime.utcnow().isoformat()
+            "execute_at": (datetime.now(timezone.utc) + timedelta(seconds=delay_seconds)).isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

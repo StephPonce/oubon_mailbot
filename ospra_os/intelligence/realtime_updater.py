@@ -7,7 +7,7 @@ Fetches latest product data, calculates momentum, and caches results.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import json
 
@@ -111,11 +111,11 @@ class RealtimeUpdater:
                 'movers_down': movers_down,
                 'breakouts': breakouts,
                 'falling': falling,
-                'last_updated': datetime.utcnow().isoformat() + 'Z',
+                'last_updated': datetime.now(timezone.utc).isoformat() + 'Z',
                 'total_products': len(trending)
             }
 
-            self.last_update = datetime.utcnow()
+            self.last_update = datetime.now(timezone.utc)
 
             logger.info(
                 f"[SUCCESS] Momentum updated: {len(trending)} products, "
@@ -241,7 +241,7 @@ class RealtimeUpdater:
         if not self.last_update:
             return None
 
-        age = (datetime.utcnow() - self.last_update).total_seconds()
+        age = (datetime.now(timezone.utc) - self.last_update).total_seconds()
         return int(age)
 
     def is_cache_fresh(self, max_age: int = 300) -> bool:

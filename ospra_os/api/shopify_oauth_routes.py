@@ -25,7 +25,7 @@ import secrets
 import logging
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from urllib.parse import urlencode, parse_qs
 from pydantic import BaseModel
@@ -48,52 +48,58 @@ router = APIRouter(prefix="/api/shopify/oauth", tags=["Shopify OAuth"])
 # CONFIGURATION
 # ============================================================================
 
-# Required scopes for full Ospra functionality
+# Minimum-viable OAuth scope set for Ospra's launch feature surface (14
+# scopes). Shopify App Review rejects apps that ask for more scopes than
+# they demonstrably use, and every scope must have a visible justification
+# inside the merchant UI within one week of install. The justification
+# matrix lives in docs/guides/SHOPIFY_PARTNER_APP_APPROVAL_READINESS.md §1.
+#
+# Pass 4d-followup: trimmed from 24 → 14. The dropped scopes
+# (write_orders, write_customers, read_marketing_events,
+# write_marketing_events, read_themes, read_draft_orders,
+# write_draft_orders, read_checkouts, write_checkouts, read_shipping,
+# write_shipping, read_discounts, write_discounts) are not currently
+# wired into any user-visible feature. Re-request them incrementally —
+# AFTER the corresponding feature ships and is documented — via a
+# subsequent OAuth grant rather than asking for them up front.
 SHOPIFY_SCOPES = [
-    # Products
+    # Products — discovery → deploy to merchant store
     "read_products",
     "write_products",
-    # Orders
+    # Orders — pipeline analytics + performance learning (read-only:
+    # we never mutate orders; that surface belongs to Shopify Admin).
     "read_orders",
-    "write_orders",
-    # Customers
+    # Customers — email automation recipient resolution (read-only:
+    # customer writes belong to Shopify's email + SMS surfaces we don't
+    # own).
     "read_customers",
-    "write_customers",
-    # Inventory
+    # Inventory — stock sync for products we deployed
     "read_inventory",
     "write_inventory",
     "read_locations",
-    # Fulfillment
+    # Fulfillment — order status tracking + fulfillment write-back
+    # for the supplier-routed orders Ospra creates.
     "read_fulfillments",
     "write_fulfillments",
-    "read_shipping",
-    "write_shipping",
-    # Analytics
+    # Analytics — store dashboard metrics
     "read_analytics",
-    # Content
+    # Content — AI-generated blog + collection copy (pages, blog posts,
+    # collection descriptions).
     "read_content",
     "write_content",
-    # Pricing
+    # Pricing — auto-pricing optimization via price rules
     "read_price_rules",
     "write_price_rules",
-    "read_discounts",
-    "write_discounts",
-    # Marketing
-    "read_marketing_events",
-    "write_marketing_events",
-    # Themes (for branding)
-    "read_themes",
-    # Draft Orders (for B2B)
-    "read_draft_orders",
-    "write_draft_orders",
-    # Checkouts
-    "read_checkouts",
-    "write_checkouts",
 ]
 
-# In-memory nonce storage (use Redis in production for multi-instance)
-# Maps nonce -> {shop, user_id, created_at}
-_oauth_states: Dict[str, Dict[str, Any]] = {}
+# OAuth nonces persist via ``ospra_os.security.oauth_state`` — a tiny
+# DB-backed table with TTL. The previous module-level dict broke across
+# multi-worker / rolling-deploy boundaries because the worker that
+# stored the nonce wasn't necessarily the one that handled the callback,
+# so the CSRF check failed randomly. Audit fix #8.
+from ospra_os.security.oauth_state import put_state, pop_state
+
+_OAUTH_PROVIDER = "shopify_partner"
 
 
 def get_shopify_credentials():
@@ -194,12 +200,16 @@ async def initiate_oauth(
     # Generate secure nonce for CSRF protection
     nonce = secrets.token_urlsafe(32)
 
-    # Store nonce with metadata - user_id from JWT token
-    _oauth_states[nonce] = {
-        "shop": shop_domain,
-        "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat(),
-    }
+    # Persist the nonce + metadata via the DB-backed state store.
+    put_state(
+        _OAUTH_PROVIDER,
+        nonce,
+        {
+            "shop": shop_domain,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     # Build authorization URL
     redirect_uri = get_oauth_redirect_uri()
@@ -249,11 +259,15 @@ async def authorize_redirect(
     
     # Generate nonce
     nonce = secrets.token_urlsafe(32)
-    _oauth_states[nonce] = {
-        "shop": shop_domain,
-        "user_id": user_id,
-        "created_at": datetime.utcnow().isoformat(),
-    }
+    put_state(
+        _OAUTH_PROVIDER,
+        nonce,
+        {
+            "shop": shop_domain,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
     
     # Build authorization URL
     redirect_uri = get_oauth_redirect_uri()
@@ -336,13 +350,14 @@ async def oauth_callback(
     # ==========================================================
     # STEP 2: Verify state nonce (CSRF protection)
     # ==========================================================
-    if state not in _oauth_states:
+    # ``pop_state`` returns None for unknown / expired / wrong-provider
+    # nonces and atomically deletes the row on success — replay-safe.
+    state_data = pop_state(_OAUTH_PROVIDER, state)
+    if state_data is None:
         logger.error("❌ Invalid or expired state nonce")
         return RedirectResponse(
             url=f"{get_frontend_url()}/settings/stores?error=invalid_state"
         )
-    
-    state_data = _oauth_states.pop(state)  # Remove used nonce
     user_id = state_data.get("user_id")
     
     # Normalize shop domain
@@ -637,7 +652,7 @@ async def save_store_credentials(
                 "webhook_secret": webhook_secret,
                 "scopes": scopes,
                 "api_version": os.getenv("SHOPIFY_API_VERSION", "2024-10"),
-                "connected_at": datetime.utcnow().isoformat(),
+                "connected_at": datetime.now(timezone.utc).isoformat(),
             }
             
             if existing:
@@ -647,7 +662,7 @@ async def save_store_credentials(
                 existing.status = StoreStatus.ACTIVE
                 existing.is_active = True
                 existing.currency = currency
-                existing.last_sync = datetime.utcnow()
+                existing.last_sync = datetime.now(timezone.utc)
                 existing.sync_error = None
 
                 if user_id and not existing.user_id:
@@ -678,8 +693,8 @@ async def save_store_credentials(
                     currency=currency,
                     status=StoreStatus.ACTIVE,
                     is_active=True,
-                    created_at=datetime.utcnow(),
-                    last_sync=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    last_sync=datetime.now(timezone.utc),
                 )
                 db.add(new_store)
                 db.commit()

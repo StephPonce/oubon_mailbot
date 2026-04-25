@@ -6,7 +6,7 @@ Calculates historical and predicted LTV using multiple methods:
 2. Average LTV: AOV × Frequency × Lifespan
 3. Predictive LTV: ML-based future value prediction
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import logging
 import statistics
@@ -161,7 +161,7 @@ class LTVCalculator:
                 "churn_risk": "low" if churn_probability < 0.3 else "medium" if churn_probability < 0.6 else "high",
                 "segment": segment
             },
-            "calculated_at": datetime.utcnow().isoformat()
+            "calculated_at": datetime.now(timezone.utc).isoformat()
         }
 
         logger.info(f"[SUCCESS] Predicted LTV: ${predicted_total_ltv:.2f} (confidence: {confidence:.0%})")
@@ -273,7 +273,7 @@ class LTVCalculator:
         if isinstance(acquisition_date, str):
             acquisition_date = datetime.fromisoformat(acquisition_date.replace('Z', '+00:00')).date()
 
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         delta = today - acquisition_date
 
         return delta.days

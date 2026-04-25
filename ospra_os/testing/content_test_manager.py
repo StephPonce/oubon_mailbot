@@ -8,7 +8,7 @@ Specialized manager for testing product content variations:
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -91,7 +91,7 @@ class ContentTestManager:
                 }
             })
 
-        scheduled_end = datetime.utcnow() + timedelta(days=duration_days)
+        scheduled_end = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
         test = self.engine.create_test(
             name=test_name,
@@ -177,7 +177,7 @@ class ContentTestManager:
                 }
             })
 
-        scheduled_end = datetime.utcnow() + timedelta(days=duration_days)
+        scheduled_end = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
         test = self.engine.create_test(
             name=test_name,
@@ -253,7 +253,7 @@ class ContentTestManager:
                 }
             })
 
-        scheduled_end = datetime.utcnow() + timedelta(days=duration_days)
+        scheduled_end = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
         test = self.engine.create_test(
             name=test_name,
@@ -350,9 +350,9 @@ class ContentTestManager:
         # Update test
         test.winner_variant_id = winner_variant_id
         test.status = "ended"
-        test.ended_at = datetime.utcnow()
+        test.ended_at = datetime.now(timezone.utc)
         test.test_metadata = test.test_metadata or {}
-        test.test_metadata["implemented_at"] = datetime.utcnow().isoformat()
+        test.test_metadata["implemented_at"] = datetime.now(timezone.utc).isoformat()
         test.test_metadata["winning_content"] = winning_content
 
         self.db.commit()

@@ -19,7 +19,7 @@ leading to market saturation and reduced profitability.
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional, Tuple
 import logging
 
@@ -96,8 +96,8 @@ class SaturationTracker:
 
             if product:
                 # Update existing product
-                product.last_recommended_at = datetime.utcnow()
-                product.updated_at = datetime.utcnow()
+                product.last_recommended_at = datetime.now(timezone.utc)
+                product.updated_at = datetime.now(timezone.utc)
                 logger.info(f"Updated existing product: {product_name}")
             else:
                 # Create new product
@@ -107,7 +107,7 @@ class SaturationTracker:
                     source_product_id=source_product_id,
                     niche=niche,
                     saturation_threshold=saturation_threshold,
-                    first_discovered_at=datetime.utcnow()
+                    first_discovered_at=datetime.now(timezone.utc)
                 )
                 session.add(product)
                 logger.info(f"Tracked new product discovery: {product_name}")
@@ -166,7 +166,7 @@ class SaturationTracker:
                 product_saturation_id=product_saturation_id,
                 recommendation_score=recommendation_score,
                 was_deployed=was_deployed,
-                deployed_at=datetime.utcnow() if was_deployed else None
+                deployed_at=datetime.now(timezone.utc) if was_deployed else None
             )
             session.add(recommendation)
 
@@ -174,8 +174,8 @@ class SaturationTracker:
             product.total_users_count += 1
             if was_deployed:
                 product.active_users_count += 1
-            product.last_recommended_at = datetime.utcnow()
-            product.updated_at = datetime.utcnow()
+            product.last_recommended_at = datetime.now(timezone.utc)
+            product.updated_at = datetime.now(timezone.utc)
 
             # Check if product is now saturated
             if product.total_users_count >= product.saturation_threshold:
@@ -404,7 +404,7 @@ class SaturationTracker:
 
                 # Calculate total revenue
                 product.total_revenue_generated = sum(r.total_revenue for r in all_recommendations)
-                product.updated_at = datetime.utcnow()
+                product.updated_at = datetime.now(timezone.utc)
 
             await session.commit()
             logger.info(f"Updated performance for product {product_saturation_id}, user {user_id}")
@@ -478,7 +478,7 @@ class SaturationTracker:
             List of products recommended for rotation
         """
         async with self.async_session() as session:
-            cutoff_date = datetime.utcnow() - timedelta(days=days_old)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
 
             stmt = select(ProductSaturation).where(
                 ProductSaturation.niche == niche,

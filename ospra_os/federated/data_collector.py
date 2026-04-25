@@ -13,7 +13,7 @@ Key Privacy Principles:
 
 import logging
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ospra_os.database.federated_models import UserContribution, PrivacyConsent
@@ -98,7 +98,7 @@ class PrivacyPreservingCollector:
             "margin_bucket": self._bucket_margin(margin) if margin else "unknown",
             "rating_bucket": self._bucket_rating(rating) if rating else "unknown",
             "velocity_bucket": self._bucket_velocity(velocity) if velocity else "unknown",
-            "contributed_at": datetime.utcnow().strftime("%Y-%m")  # Month only
+            "contributed_at": datetime.now(timezone.utc).strftime("%Y-%m")  # Month only
         }
 
         # Create contribution record
@@ -138,7 +138,7 @@ class PrivacyPreservingCollector:
             "change_direction": "increase" if change_pct > 0 else "decrease",
             "change_magnitude": self._bucket_change(abs(change_pct)),
             "outcome": outcome,
-            "contributed_at": datetime.utcnow().strftime("%Y-%m")
+            "contributed_at": datetime.now(timezone.utc).strftime("%Y-%m")
         }
 
         contribution = UserContribution(
@@ -175,7 +175,7 @@ class PrivacyPreservingCollector:
             "ctr_bucket": self._bucket_ctr(ctr) if ctr else "unknown",
             "budget_bucket": self._bucket_budget(budget) if budget else "unknown",
             "outcome": outcome,
-            "contributed_at": datetime.utcnow().strftime("%Y-%m")
+            "contributed_at": datetime.now(timezone.utc).strftime("%Y-%m")
         }
 
         contribution = UserContribution(

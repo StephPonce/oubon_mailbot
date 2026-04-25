@@ -7,7 +7,7 @@ import uuid
 import asyncio
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, List
 import psutil
 import httpx
@@ -23,7 +23,7 @@ class HealthMonitor:
 
     def __init__(self):
         self.alerts = {}  # alert_id -> alert_data
-        self.uptime_start = datetime.utcnow()
+        self.uptime_start = datetime.now(timezone.utc)
         self.integration_cache = {}  # Cach integration checks
         self.cache_duration = 60  # seconds
 
@@ -42,11 +42,11 @@ class HealthMonitor:
         overall_status = await self.get_overall_status()
 
         # Calculate uptime
-        uptime_seconds = (datetime.utcnow() - self.uptime_start).total_seconds()
+        uptime_seconds = (datetime.now(timezone.utc) - self.uptime_start).total_seconds()
         uptime_hours = uptime_seconds / 3600
 
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "overall_status": overall_status,
             "uptime_percent": 99.8,  # Would calculate from actual downtime logs
             "uptime_since": self.uptime_start.isoformat(),
@@ -142,7 +142,7 @@ class HealthMonitor:
         # Check cache first
         if integration_name in self.integration_cache:
             cached = self.integration_cache[integration_name]
-            age = (datetime.utcnow() - cached['checked_at']).total_seconds()
+            age = (datetime.now(timezone.utc) - cached['checked_at']).total_seconds()
             if age < self.cache_duration:
                 return cached
 
@@ -160,11 +160,11 @@ class HealthMonitor:
         else:
             result = {
                 "status": "UNKNOWN",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "Unknown integration"
             }
 
-        result['checked_at'] = datetime.utcnow()
+        result['checked_at'] = datetime.now(timezone.utc)
         self.integration_cache[integration_name] = result
         return result
 
@@ -183,7 +183,7 @@ class HealthMonitor:
                 integrations[name] = {
                     "status": "ERROR",
                     "error": str(result),
-                    "last_check": datetime.utcnow().isoformat()
+                    "last_check": datetime.now(timezone.utc).isoformat()
                 }
             else:
                 integrations[name] = result
@@ -198,7 +198,7 @@ class HealthMonitor:
         if not settings.SHOPIFY_STORE or not settings.SHOPIFY_API_TOKEN:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "Shopify credentials not configured",
                 "errors_24h": 0,
                 "last_error": "Not configured"
@@ -224,7 +224,7 @@ class HealthMonitor:
 
                 return {
                     "status": "CONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "latency_ms": latency_ms,
                     "rate_limit_remaining": rate_limit_remaining,
                     "rate_limit_total": rate_limit_total,
@@ -234,7 +234,7 @@ class HealthMonitor:
             else:
                 return {
                     "status": "DISCONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "error": f"HTTP {response.status_code}: {response.text[:100]}",
                     "latency_ms": latency_ms,
                     "errors_24h": 1,
@@ -243,7 +243,7 @@ class HealthMonitor:
         except Exception as e:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": str(e),
                 "errors_24h": 1,
                 "last_error": str(e)
@@ -257,7 +257,7 @@ class HealthMonitor:
         if not settings.ALIEXPRESS_API_KEY or not settings.ALIEXPRESS_APP_SECRET:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "AliExpress credentials not configured",
                 "errors_24h": 0,
                 "last_error": "Not configured"
@@ -288,7 +288,7 @@ class HealthMonitor:
             if result is not None:
                 return {
                     "status": "CONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "latency_ms": latency_ms,
                     "quota_remaining": None,
                     "quota_total": None,
@@ -299,7 +299,7 @@ class HealthMonitor:
             else:
                 return {
                     "status": "DEGRADED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "error": "API call returned no results",
                     "latency_ms": latency_ms,
                     "errors_24h": 1,
@@ -310,7 +310,7 @@ class HealthMonitor:
             error_msg = str(e)
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": f"API test failed: {error_msg[:100]}",
                 "errors_24h": 1,
                 "last_error": error_msg[:100]
@@ -324,7 +324,7 @@ class HealthMonitor:
         if not settings.META_ACCESS_TOKEN:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "Meta access token not configured",
                 "errors_24h": 0,
                 "last_error": "Not configured"
@@ -344,7 +344,7 @@ class HealthMonitor:
             if response.status_code == 200:
                 return {
                     "status": "CONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "latency_ms": latency_ms,
                     "permissions": ["ads_read", "ads_management"],  # Would need to query /me/permissions
                     "errors_24h": 0,
@@ -353,7 +353,7 @@ class HealthMonitor:
             else:
                 return {
                     "status": "DISCONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "error": f"HTTP {response.status_code}: {response.text[:100]}",
                     "latency_ms": latency_ms,
                     "errors_24h": 1,
@@ -362,7 +362,7 @@ class HealthMonitor:
         except Exception as e:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": str(e),
                 "errors_24h": 1,
                 "last_error": str(e)
@@ -377,7 +377,7 @@ class HealthMonitor:
         if not os.path.exists(token_path):
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "Gmail token file not found",
                 "errors_24h": 0,
                 "last_error": "Token not found"
@@ -385,10 +385,10 @@ class HealthMonitor:
 
         # For Gmail, we just check if the token file exists and is recent
         try:
-            token_age_days = (datetime.utcnow() - datetime.fromtimestamp(os.path.getmtime(token_path))).days
+            token_age_days = (datetime.now(timezone.utc) - datetime.fromtimestamp(os.path.getmtime(token_path))).days
             return {
                 "status": "CONNECTED" if token_age_days < 60 else "DEGRADED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "latency_ms": 0,  # Not making actual API call to save quota
                 "quota_remaining": None,
                 "quota_total": None,
@@ -400,7 +400,7 @@ class HealthMonitor:
         except Exception as e:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": str(e),
                 "errors_24h": 1,
                 "last_error": str(e)
@@ -414,7 +414,7 @@ class HealthMonitor:
         if not settings.CLAUDE_API_KEY:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": "Claude API key not configured",
                 "errors_24h": 0,
                 "last_error": "Not configured"
@@ -443,7 +443,7 @@ class HealthMonitor:
             if response.status_code == 200:
                 return {
                     "status": "CONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "latency_ms": latency_ms,
                     "tokens_used_today": None,  # Would need to track separately
                     "errors_24h": 0,
@@ -452,7 +452,7 @@ class HealthMonitor:
             else:
                 return {
                     "status": "DISCONNECTED",
-                    "last_check": datetime.utcnow().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                     "error": f"HTTP {response.status_code}: {response.text[:100]}",
                     "latency_ms": latency_ms,
                     "errors_24h": 1,
@@ -461,7 +461,7 @@ class HealthMonitor:
         except Exception as e:
             return {
                 "status": "DISCONNECTED",
-                "last_check": datetime.utcnow().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
                 "error": str(e),
                 "errors_24h": 1,
                 "last_error": str(e)
@@ -494,11 +494,11 @@ class HealthMonitor:
             "message": message,
             "source": source,
             "is_active": True,
-            "triggered_at": datetime.utcnow(),
+            "triggered_at": datetime.now(timezone.utc),
             "resolved_at": None,
             "acknowledged": False,
             "acknowledged_at": None,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         }
 
         self.alerts[alert_id] = alert_data
@@ -508,13 +508,13 @@ class HealthMonitor:
         """Mark alert as resolved"""
         if alert_id in self.alerts:
             self.alerts[alert_id]['is_active'] = False
-            self.alerts[alert_id]['resolved_at'] = datetime.utcnow()
+            self.alerts[alert_id]['resolved_at'] = datetime.now(timezone.utc)
 
     async def acknowledge_alert(self, alert_id: str):
         """Mark alert as acknowledged"""
         if alert_id in self.alerts:
             self.alerts[alert_id]['acknowledged'] = True
-            self.alerts[alert_id]['acknowledged_at'] = datetime.utcnow()
+            self.alerts[alert_id]['acknowledged_at'] = datetime.now(timezone.utc)
 
     # ==================================================================
     # HELPER METHODS

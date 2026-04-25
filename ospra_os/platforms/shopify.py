@@ -9,7 +9,7 @@ Date: November 2025
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 import asyncio
 import httpx
@@ -130,7 +130,7 @@ class ShopifyAdapter(PlatformAdapter):
 
                 # Track request
                 self.track_request()
-                self._last_request_time = datetime.utcnow()
+                self._last_request_time = datetime.now(timezone.utc)
 
                 # Check rate limit header
                 rate_limit_header = response.headers.get("X-Shopify-Shop-Api-Call-Limit")
@@ -186,7 +186,7 @@ class ShopifyAdapter(PlatformAdapter):
     async def _enforce_rate_limit(self):
         """Enforce Shopify's 2 requests/second rate limit"""
         if self._last_request_time:
-            elapsed = (datetime.utcnow() - self._last_request_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - self._last_request_time).total_seconds()
             if elapsed < self.RATE_LIMIT_DELAY:
                 await asyncio.sleep(self.RATE_LIMIT_DELAY - elapsed)
 
@@ -626,7 +626,7 @@ class ShopifyAdapter(PlatformAdapter):
         try:
             # Default to last 30 days if not specified
             if not since:
-                since = datetime.utcnow() - timedelta(days=30)
+                since = datetime.now(timezone.utc) - timedelta(days=30)
 
             # Fetch orders
             result = await self.get_orders(limit=250, status="any", since=since)
@@ -640,7 +640,7 @@ class ShopifyAdapter(PlatformAdapter):
             total_revenue = sum(float(order.get("total_price", 0)) for order in orders)
             avg_order_value = total_revenue / len(orders) if orders else 0
 
-            sync_time = datetime.utcnow().isoformat()
+            sync_time = datetime.now(timezone.utc).isoformat()
 
             logger.info(
                 f"Synced {len(orders)} Shopify orders. "

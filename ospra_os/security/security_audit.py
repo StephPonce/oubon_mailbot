@@ -25,7 +25,7 @@ Date: January 2025
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from enum import Enum
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, Boolean, Index
@@ -531,7 +531,7 @@ def get_failed_logins_by_ip(
     """Get failed login attempts from an IP address."""
     from datetime import timedelta
 
-    since = datetime.utcnow() - timedelta(hours=since_hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=since_hours)
 
     return db.query(SecurityAuditLog).filter(
         SecurityAuditLog.ip_address == ip_address,
@@ -548,7 +548,7 @@ def get_suspicious_events(
     """Get recent suspicious security events."""
     from datetime import timedelta
 
-    since = datetime.utcnow() - timedelta(hours=since_hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=since_hours)
 
     return db.query(SecurityAuditLog).filter(
         SecurityAuditLog.is_suspicious == True,

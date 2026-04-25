@@ -6,7 +6,7 @@ rank changes, and breakout detection for live trends dashboard.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 import logging
 
@@ -158,7 +158,7 @@ class MomentumTracker:
             "percentage_change": f"{'+' if overall_velocity >= 0 else ''}{overall_velocity:.1f}%",
             "metrics": metrics_breakdown,
             "breakout_detected": breakout_detected,
-            "last_updated": datetime.utcnow().isoformat() + "Z"
+            "last_updated": datetime.now(timezone.utc).isoformat() + "Z"
         }
 
     async def get_trending_products(
@@ -330,7 +330,7 @@ class MomentumTracker:
             "grid": grid,
             "rows": rows,
             "cols": cols,
-            "last_updated": datetime.utcnow().isoformat() + "Z"
+            "last_updated": datetime.now(timezone.utc).isoformat() + "Z"
         }
 
 

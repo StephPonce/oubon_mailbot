@@ -19,7 +19,7 @@ Uses:
 
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
 
@@ -166,7 +166,7 @@ class AmazonService:
             client = self._get_client(account)
             if client.test_connection():
                 account.status = "active"
-                account.last_sync_at = datetime.utcnow()
+                account.last_sync_at = datetime.now(timezone.utc)
                 logger.info("[SUCCESS] Amazon account connected successfully")
             else:
                 account.status = "error"
@@ -593,7 +593,7 @@ class AmazonService:
         # For now, just update last_sync timestamp
         # Full implementation would use Reports API to get all listings
 
-        account.last_sync_at = datetime.utcnow()
+        account.last_sync_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info("Listings sync complete")
@@ -629,7 +629,7 @@ class AmazonService:
 
         # Default date range
         if not created_after:
-            created_after = (datetime.utcnow() - timedelta(days=days_back)).isoformat() + "Z"
+            created_after = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat() + "Z"
 
         logger.info(f"Syncing orders since {created_after}")
 
@@ -677,7 +677,7 @@ class AmazonService:
 
             self.db.commit()
 
-            account.last_sync_at = datetime.utcnow()
+            account.last_sync_at = datetime.now(timezone.utc)
             self.db.commit()
 
             logger.info(f"[SUCCESS] Synced {synced_count} orders")
@@ -780,7 +780,7 @@ class AmazonService:
         ).count()
 
         # Count orders (last 30 days)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         recent_orders = self.db.query(AmazonOrder).filter(
             and_(
                 AmazonOrder.account_id == account_id,

@@ -17,7 +17,7 @@ tenants can actually get TikTok API access. See docs/CLEANUP_PASS4.md.
 from sqlalchemy import Column, Integer, String, DateTime, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import logging
 
@@ -44,13 +44,13 @@ class TikTokToken(Base):
     @property
     def is_expired(self):
         """Check if token is expired"""
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(timezone.utc) >= self.expires_at
 
     @property
     def needs_refresh(self):
         """Check if token needs refresh (7 days before expiry)"""
         refresh_threshold = self.expires_at - timedelta(days=7)
-        return datetime.utcnow() >= refresh_threshold
+        return datetime.now(timezone.utc) >= refresh_threshold
 
 
 # Database connection
@@ -93,7 +93,7 @@ def save_token(access_token: str, refresh_token: str, expires_in: int):
             # Update existing token
             existing.access_token = access_token
             existing.refresh_token = refresh_token
-            existing.obtained_at = datetime.utcnow()
+            existing.obtained_at = datetime.now(timezone.utc)
             existing.expires_in = expires_in
         else:
             # Create new token
@@ -185,7 +185,7 @@ def get_token_status() -> dict:
         }
 
     expires_at = datetime.fromisoformat(token_data["expires_at"])
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     expires_in_seconds = int((expires_at - now).total_seconds())
     expires_in_days = expires_in_seconds / 86400

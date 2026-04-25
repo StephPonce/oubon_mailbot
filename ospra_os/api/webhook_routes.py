@@ -53,157 +53,27 @@ async def webhook_configuration_status(current_user: User = Depends(get_current_
 # =============================================================================
 # SHOPIFY WEBHOOKS
 # =============================================================================
-
-@router.post("/shopify/orders/create")
-async def shopify_order_created(
-    background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
-):
-    """
-    Handle Shopify order creation webhook.
-    
-    [SECURE] Verified with X-Shopify-Hmac-SHA256
-    """
-    try:
-        data = json.loads(body)
-        order_id = data.get("id")
-        order_number = data.get("order_number")
-        total_price = data.get("total_price")
-        
-        logger.info(f"[PACKAGE] Shopify order created: #{order_number} (${total_price})")
-        
-        # TODO: Process order in background
-        # background_tasks.add_task(process_new_order, data)
-        
-        return {
-            "success": True,
-            "order_id": order_id,
-            "message": f"Order #{order_number} received"
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@router.post("/shopify/orders/updated")
-async def shopify_order_updated(
-    background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
-):
-    """
-    Handle Shopify order update webhook.
-    
-    [SECURE] Verified with X-Shopify-Hmac-SHA256
-    """
-    try:
-        data = json.loads(body)
-        order_id = data.get("id")
-        financial_status = data.get("financial_status")
-        fulfillment_status = data.get("fulfillment_status")
-        
-        logger.info(f"[NOTE] Shopify order updated: {order_id} - {financial_status}/{fulfillment_status}")
-        
-        return {
-            "success": True,
-            "order_id": order_id,
-            "financial_status": financial_status,
-            "fulfillment_status": fulfillment_status
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@router.post("/shopify/orders/cancelled")
-async def shopify_order_cancelled(
-    background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
-):
-    """
-    Handle Shopify order cancellation webhook.
-    
-    [SECURE] Verified with X-Shopify-Hmac-SHA256
-    """
-    try:
-        data = json.loads(body)
-        order_id = data.get("id")
-        order_number = data.get("order_number")
-        cancel_reason = data.get("cancel_reason")
-        
-        logger.warning(f"[ERROR] Shopify order cancelled: #{order_number} - {cancel_reason}")
-        
-        # TODO: Handle refunds, update inventory
-        
-        return {
-            "success": True,
-            "order_id": order_id,
-            "cancel_reason": cancel_reason
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@router.post("/shopify/products/update")
-async def shopify_product_updated(
-    background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
-):
-    """
-    Handle Shopify product update webhook.
-    
-    [SECURE] Verified with X-Shopify-Hmac-SHA256
-    """
-    try:
-        data = json.loads(body)
-        product_id = data.get("id")
-        title = data.get("title")
-        
-        logger.info(f"[PACKAGE] Shopify product updated: {title} ({product_id})")
-        
-        return {
-            "success": True,
-            "product_id": product_id,
-            "title": title
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
-
-@router.post("/shopify/inventory/update")
-async def shopify_inventory_updated(
-    background_tasks: BackgroundTasks,
-    _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
-):
-    """
-    Handle Shopify inventory level update webhook.
-    
-    [SECURE] Verified with X-Shopify-Hmac-SHA256
-    """
-    try:
-        data = json.loads(body)
-        inventory_item_id = data.get("inventory_item_id")
-        available = data.get("available")
-        
-        logger.info(f"[STATS] Inventory updated: {inventory_item_id} -> {available} units")
-        
-        # TODO: Check for low stock alerts
-        
-        return {
-            "success": True,
-            "inventory_item_id": inventory_item_id,
-            "available": available
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
-
+#
+# Audit fix (#50, 2026-04): the order/products/inventory handlers that
+# previously lived here were TODO stubs that returned 200 OK without doing
+# any work. The CANONICAL Shopify webhook router lives in
+# ``ospra_os/webhooks/shopify_webhooks.py`` (mounted at ``/webhooks/shopify/*``)
+# and has 24 fully-implemented handlers + HMAC verification.
+#
+# Having two parallel registrations was actively dangerous: if Shopify's
+# Partner-dashboard URL drifted to ``/api/webhooks/shopify/orders/create``
+# instead of ``/webhooks/shopify/orders/create``, every order silently
+# disappeared with a 200 OK. We now keep the silent stubs DELETED so a
+# URL drift surfaces as a hard 404 — Shopify retries failures and emails
+# the partner, which is a lot louder than a forever-200 stub.
+#
+# What's still in this file:
+#   - GDPR handlers (``/shopify/gdpr/*``) — kept as a parallel route. Both
+#     these and the corresponding routes in ``webhooks/shopify_webhooks.py``
+#     now delegate to the same canonical processors in
+#     ``ospra_os/security/gdpr.py``, so the Partner-dashboard URL can
+#     point at either path safely.
+#   - LemonSqueezy & CJ Dropshipping handlers — those are real and live.
 
 # =============================================================================
 # LEMONSQUEEZY WEBHOOKS (Payments/Subscriptions)
@@ -229,8 +99,8 @@ async def upgrade_user_tier(user_id: int, tier: str, db_session=None):
         user = session.query(User).filter(User.id == user_id).first()
         if user:
             user.subscription_tier = tier_map.get(tier.lower(), SubscriptionTier.NEST)
-            user.subscription_started = datetime.utcnow()
-            user.updated_at = datetime.utcnow()
+            user.subscription_started = datetime.now(timezone.utc)
+            user.updated_at = datetime.now(timezone.utc)
             session.commit()
             logger.info(f"[SUCCESS] User {user_id} upgraded to {tier}")
             return True
@@ -478,95 +348,182 @@ async def cj_shipment_update(
 # GDPR WEBHOOKS (Required for Shopify Apps)
 # =============================================================================
 
+# ----------------------------------------------------------------------------
+# GDPR background-task wrappers
+# ----------------------------------------------------------------------------
+# Shopify requires these webhooks return 200 within 5 seconds, so we accept
+# the payload, queue the actual data work, and return immediately. The real
+# implementations live in ``ospra_os.security.gdpr`` so the same code path
+# powers Settings → Data & Privacy in the frontend.
+
+def _run_gdpr_export(customer_email: str, shop_domain: str, data_request_id: str) -> None:
+    """Background task: gather customer data + write an audit-log row."""
+    from ospra_os.database.connection import get_session
+    from ospra_os.security.gdpr import export_customer_data
+
+    session = get_session()
+    try:
+        export_customer_data(
+            session,
+            customer_email=customer_email,
+            shop_domain=shop_domain,
+            data_request_id=data_request_id,
+        )
+        # Persistence / delivery of the exported payload to the merchant
+        # is intentionally not done here: Shopify's spec is silent on
+        # transport (we have 30 days), and our merchant-facing flow is
+        # via Settings → Data & Privacy. The audit log carries the
+        # record count so support can reproduce the export on demand.
+    finally:
+        session.close()
+
+
+def _run_gdpr_customer_redact(customer_email: str, shop_domain: str) -> None:
+    """Background task: delete customer rows + write an audit-log row."""
+    from ospra_os.database.connection import get_session
+    from ospra_os.security.gdpr import redact_customer_data
+
+    session = get_session()
+    try:
+        redact_customer_data(session, customer_email=customer_email, shop_domain=shop_domain)
+    finally:
+        session.close()
+
+
+def _run_gdpr_shop_redact(shop_domain: str) -> None:
+    """Background task: wipe a shop's data + write an audit-log row."""
+    from ospra_os.database.connection import get_session
+    from ospra_os.security.gdpr import redact_shop_data
+
+    session = get_session()
+    try:
+        redact_shop_data(session, shop_domain=shop_domain)
+    finally:
+        session.close()
+
+
 @router.post("/shopify/gdpr/customers/redact")
 async def gdpr_customers_redact(
+    background_tasks: BackgroundTasks,
     _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
+    body: bytes = Depends(verify_shopify_webhook),
 ):
     """
-    Handle GDPR customer data erasure request.
-    
-    Required for Shopify apps - must remove all customer data.
-    
+    Handle GDPR ``customers/redact`` webhook.
+
+    Shopify pings this when a merchant (or the customer themselves) asks
+    us to delete a specific customer's data. We must:
+      1. ACK 200 within 5s (Shopify retries otherwise).
+      2. Verify HMAC — done via ``verify_shopify_webhook`` dep.
+      3. Actually delete the data — queued to BackgroundTasks.
+
     [SECURE] Verified with X-Shopify-Hmac-SHA256
     """
     try:
         data = json.loads(body)
-        shop_domain = data.get("shop_domain")
-        customer = data.get("customer", {})
-        customer_email = customer.get("email")
-        
-        logger.warning(f"[LOCKED] GDPR customer redact: {customer_email} from {shop_domain}")
-        
-        # TODO: Delete all customer data
-        # await delete_customer_data(customer_email)
-        
-        return {"success": True, "message": "Customer data scheduled for deletion"}
-        
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    shop_domain = data.get("shop_domain") or ""
+    customer = data.get("customer") or {}
+    customer_email = (customer.get("email") or "").strip()
+
+    if not customer_email:
+        # No email = nothing for us to redact (we don't index by Shopify
+        # customer_id). Still ack 200 so Shopify doesn't retry.
+        logger.warning(
+            "[GDPR] customers/redact received with no customer email (shop=%s)",
+            shop_domain,
+        )
+        return {"success": True, "message": "No matching customer data"}
+
+    logger.warning(
+        f"[GDPR] customers/redact accepted for {customer_email} (shop={shop_domain})"
+    )
+    background_tasks.add_task(_run_gdpr_customer_redact, customer_email, shop_domain)
+    return {"success": True, "message": "Customer data deletion queued"}
 
 
 @router.post("/shopify/gdpr/shop/redact")
 async def gdpr_shop_redact(
+    background_tasks: BackgroundTasks,
     _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
+    body: bytes = Depends(verify_shopify_webhook),
 ):
     """
-    Handle GDPR shop data erasure request.
-    
-    Required for Shopify apps - must remove all shop data after uninstall.
-    
+    Handle GDPR ``shop/redact`` webhook.
+
+    Fired 48h after a merchant uninstalls our app. We must drop every
+    record tied to that shop — products we deployed, OAuth credentials,
+    sync history. Done in the background so the 5s SLA holds.
+
     [SECURE] Verified with X-Shopify-Hmac-SHA256
     """
     try:
         data = json.loads(body)
-        shop_domain = data.get("shop_domain")
-        shop_id = data.get("shop_id")
-        
-        logger.warning(f"[LOCKED] GDPR shop redact: {shop_domain} ({shop_id})")
-        
-        # TODO: Delete all shop data
-        # await delete_shop_data(shop_id)
-        
-        return {"success": True, "message": "Shop data scheduled for deletion"}
-        
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    shop_domain = data.get("shop_domain") or ""
+    shop_id = data.get("shop_id")
+
+    if not shop_domain:
+        logger.warning("[GDPR] shop/redact received with no shop_domain (id=%s)", shop_id)
+        return {"success": True, "message": "No matching shop"}
+
+    logger.warning(f"[GDPR] shop/redact accepted for {shop_domain} (id={shop_id})")
+    background_tasks.add_task(_run_gdpr_shop_redact, shop_domain)
+    return {"success": True, "message": "Shop data deletion queued"}
 
 
 @router.post("/shopify/gdpr/customers/data_request")
 async def gdpr_data_request(
+    background_tasks: BackgroundTasks,
     _: None = Depends(webhook_rate_limit),
-    body: bytes = Depends(verify_shopify_webhook)
+    body: bytes = Depends(verify_shopify_webhook),
 ):
     """
-    Handle GDPR customer data request.
-    
-    Required for Shopify apps - must provide all customer data.
-    
+    Handle GDPR ``customers/data_request`` webhook.
+
+    Shopify forwards customer-driven data export requests. We have 30 days
+    to fulfil; the actual payload assembly happens in the background and
+    is logged to ``security_audit_logs`` for the support team to retrieve.
+
     [SECURE] Verified with X-Shopify-Hmac-SHA256
     """
     try:
         data = json.loads(body)
-        shop_domain = data.get("shop_domain")
-        customer = data.get("customer", {})
-        customer_email = customer.get("email")
-        data_request = data.get("data_request", {})
-        
-        logger.info(f"[LIST] GDPR data request: {customer_email} from {shop_domain}")
-        
-        # TODO: Gather and return all customer data
-        # customer_data = await get_customer_data(customer_email)
-        
-        return {
-            "success": True,
-            "message": "Data request received",
-            "data_request_id": data_request.get("id")
-        }
-        
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    shop_domain = data.get("shop_domain") or ""
+    customer = data.get("customer") or {}
+    customer_email = (customer.get("email") or "").strip()
+    data_request = data.get("data_request") or {}
+    data_request_id = str(data_request.get("id") or "")
+
+    if not customer_email:
+        logger.info(
+            "[GDPR] data_request received with no customer email (shop=%s, id=%s)",
+            shop_domain, data_request_id,
+        )
+        return {
+            "success": True,
+            "message": "No matching customer data",
+            "data_request_id": data_request_id,
+        }
+
+    logger.info(
+        f"[GDPR] data_request accepted: {customer_email} from {shop_domain} (id={data_request_id})"
+    )
+    background_tasks.add_task(
+        _run_gdpr_export, customer_email, shop_domain, data_request_id
+    )
+    return {
+        "success": True,
+        "message": "Data request received",
+        "data_request_id": data_request_id,
+    }
 
 
 # =============================================================================

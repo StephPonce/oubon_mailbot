@@ -10,7 +10,7 @@ Continuously improves recommendations based on what works vs. what doesn't.
 """
 
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import json
@@ -336,7 +336,7 @@ FORMATTING REQUIREMENTS:
                 "sample_size": pattern_dict.get('sample_size', len(products))
             },
             outcome_metrics=outcome_metrics,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
 
     def _calculate_competitor_performance_score(

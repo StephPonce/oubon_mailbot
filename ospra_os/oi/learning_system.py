@@ -12,7 +12,7 @@ import logging
 import json
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 import os
 
@@ -35,7 +35,7 @@ class ConversationFeedback:
     helpful: bool
     comment: Optional[str]
     context: Dict[str, Any]
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 @dataclass
@@ -124,10 +124,10 @@ class OiLearningSystem:
         user_id: str = "default"
     ) -> str:
         """Record an Oi conversation exchange. Returns message_id for feedback."""
-        message_id = f"msg_{datetime.utcnow().timestamp()}"
+        message_id = f"msg_{datetime.now(timezone.utc).timestamp()}"
         
         interaction = UserInteraction(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             type="oi_query",
             data={
                 "message_id": message_id,
@@ -255,7 +255,7 @@ class OiLearningSystem:
             
             if existing:
                 existing.occurrences += 1
-                existing.last_seen = datetime.utcnow().isoformat()
+                existing.last_seen = datetime.now(timezone.utc).isoformat()
                 existing.confidence = min(1.0, existing.occurrences / 10)
             else:
                 patterns.append(LearnedPattern(
@@ -263,8 +263,8 @@ class OiLearningSystem:
                     pattern_data={"sequence": seq_str},
                     confidence=0.1,
                     occurrences=1,
-                    last_seen=datetime.utcnow().isoformat(),
-                    first_seen=datetime.utcnow().isoformat()
+                    last_seen=datetime.now(timezone.utc).isoformat(),
+                    first_seen=datetime.now(timezone.utc).isoformat()
                 ))
     
     # ========================================================================
@@ -415,11 +415,11 @@ class OiLearningSystem:
         """Get or create user profile."""
         if user_id not in self._user_profiles:
             self._user_profiles[user_id] = {
-                "created_at": datetime.utcnow().isoformat(),
-                "last_active": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_active": datetime.now(timezone.utc).isoformat(),
             }
         else:
-            self._user_profiles[user_id]["last_active"] = datetime.utcnow().isoformat()
+            self._user_profiles[user_id]["last_active"] = datetime.now(timezone.utc).isoformat()
         return self._user_profiles[user_id]
     
     def _update_user_profile(self, interaction: UserInteraction) -> None:

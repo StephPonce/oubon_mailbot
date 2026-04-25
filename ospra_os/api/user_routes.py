@@ -12,7 +12,7 @@ Endpoints for user profile and subscription management:
 
 import os
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -108,7 +108,7 @@ async def update_profile(
             )
         user.name = update.name.strip()
     
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(user)
     
@@ -157,8 +157,8 @@ async def set_tier(
     
     new_tier = tier_map[tier_lower]
     user.subscription_tier = new_tier
-    user.subscription_started = datetime.utcnow()
-    user.updated_at = datetime.utcnow()
+    user.subscription_started = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(user)
@@ -254,8 +254,8 @@ async def upgrade_subscription(
     
     new_tier = tier_map[tier_lower]
     user.subscription_tier = new_tier
-    user.subscription_started = datetime.utcnow()
-    user.updated_at = datetime.utcnow()
+    user.subscription_started = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc)
     
     db.commit()
     db.refresh(user)
@@ -302,7 +302,7 @@ async def generate_api_key(
         user.custom_ai_keys = {}
     
     user.custom_ai_keys['ospra_api_key'] = api_key[:10] + "..." # Store only prefix for reference
-    user.custom_ai_keys['ospra_api_key_created'] = datetime.utcnow().isoformat()
+    user.custom_ai_keys['ospra_api_key_created'] = datetime.now(timezone.utc).isoformat()
     
     db.commit()
     
@@ -310,7 +310,7 @@ async def generate_api_key(
         "success": True,
         "api_key": api_key,
         "message": "API key generated. Save it now - it won't be shown again.",
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -377,7 +377,7 @@ async def update_settings(
         if field in updates:
             setattr(settings, field, updates[field])
     
-    settings.updated_at = datetime.utcnow()
+    settings.updated_at = datetime.now(timezone.utc)
     db.commit()
     
     return {

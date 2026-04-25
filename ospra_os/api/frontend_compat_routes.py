@@ -600,7 +600,7 @@ async def ignore_email(
                 SET status = 'ignored',
                     updated_at = ?
                 WHERE id = ? OR message_id = ?
-            """, (datetime.utcnow().isoformat(), message_id, message_id))
+            """, (datetime.now(timezone.utc).isoformat(), message_id, message_id))
 
             conn.commit()
             rows_affected = cursor.rowcount
@@ -643,23 +643,52 @@ async def analyze_product_intelligence(
     """
     POST /api/intelligence/analyze/product/{id} → AI product analysis.
 
-    Returns AI-powered insights about product viability, competition, trends.
-    Requires authentication.
+    Audit fix: previously imported ``ospra_os.intelligence.ai_factory``
+    which doesn't exist (the canonical path is
+    ``ospra_os.ai.factory.AIFactory``) — every call returned 500. Now
+    delegates to ``AIProductAnalyzer``, the same Claude-powered "veteran
+    COO" path that backs ``POST /api/oi/analyze-product``. Caller passes
+    a product_id, we fetch the product row, hand it to the analyzer.
     """
-    from ospra_os.intelligence.ai_factory import ai_factory
-
     try:
-        # Use the AI factory to generate product analysis
-        analysis = await ai_factory.analyze_product(product_id)
+        # Resolve the product. Tolerate both numeric ids and slugs.
+        from ospra_os.database import Product, get_session
+        session = get_session()
+        try:
+            product_row = (
+                session.query(Product).filter(Product.id == product_id).first()
+                if product_id.isdigit()
+                else None
+            )
+            if product_row is None:
+                # Slug / external-id form — fall through to a stub payload
+                # rather than 500'ing on unknown ids.
+                return {
+                    "success": False,
+                    "product_id": product_id,
+                    "error": "product not found",
+                }
+            product_payload = {
+                "title": product_row.product_name,
+                "niche": getattr(product_row, "niche", "general"),
+                "cost_price": getattr(product_row, "supplier_cost", 0),
+                "suggested_price": getattr(product_row, "suggested_price", 0),
+            }
+        finally:
+            session.close()
+
+        from ospra_os.intelligence.ai_product_analyzer import AIProductAnalyzer
+        analyzer = AIProductAnalyzer()
+        analysis = await analyzer.analyze_product(product_payload, store_context={})
 
         return {
             "success": True,
             "product_id": product_id,
-            "analysis": analysis if analysis else {
-                "summary": "AI analysis in progress",
+            "analysis": analysis or {
+                "summary": "AI analysis unavailable",
                 "score": 0,
-                "recommendations": []
-            }
+                "recommendations": [],
+            },
         }
     except Exception as e:
         logger.error(f"Failed to analyze product {product_id}: {e}")

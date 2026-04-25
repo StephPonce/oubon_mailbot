@@ -8,7 +8,7 @@ import secrets
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ospra_os.database.whitelabel_models import (
     WhiteLabelPartner, WhiteLabelBranding, WhiteLabelDomain,
@@ -127,7 +127,7 @@ class WhiteLabelService:
             raise ValueError("Partner not found")
 
         partner.status = "active"
-        partner.activated_at = datetime.utcnow()
+        partner.activated_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info(f"Activated partner: {partner.company_name}")
@@ -304,10 +304,10 @@ class WhiteLabelService:
         # Update status
         if results["cname_verified"] and results["txt_verified"]:
             wl_domain.dns_verified = True
-            wl_domain.dns_verified_at = datetime.utcnow()
+            wl_domain.dns_verified_at = datetime.now(timezone.utc)
             wl_domain.status = "active"
             wl_domain.ssl_status = "active"  # Mock SSL provisioning
-            wl_domain.ssl_provisioned_at = datetime.utcnow()
+            wl_domain.ssl_provisioned_at = datetime.now(timezone.utc)
 
         self.db.commit()
 

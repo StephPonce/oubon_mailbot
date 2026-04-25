@@ -1,5 +1,5 @@
 """Analytics and metrics tracking for email automation."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -98,7 +98,7 @@ class Analytics:
     ):
         """Track individual email processing."""
         metric = EmailMetric(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             message_id=message_id,
             customer_email=customer_email,
             subject=subject,
@@ -121,7 +121,7 @@ class Analytics:
     def get_daily_stats(self, date: datetime = None) -> Dict[str, Any]:
         """Get statistics for a specific day."""
         if date is None:
-            date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         next_day = date + timedelta(days=1)
 
@@ -163,13 +163,13 @@ class Analytics:
         """Get last 7 days of statistics."""
         stats = []
         for i in range(7):
-            date = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
+            date = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=i)
             stats.append(self.get_daily_stats(date))
         return list(reversed(stats))
 
     def get_top_labels(self, days: int = 7) -> List[Dict[str, Any]]:
         """Get most common email categories."""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         metrics = self.session.query(EmailMetric).filter(
             EmailMetric.timestamp >= start_date
@@ -186,7 +186,7 @@ class Analytics:
 
     def get_cost_breakdown(self, days: int = 30) -> Dict[str, Any]:
         """Get AI cost breakdown."""
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         metrics = self.session.query(EmailMetric).filter(
             EmailMetric.timestamp >= start_date,

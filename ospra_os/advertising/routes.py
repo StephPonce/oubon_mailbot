@@ -5,15 +5,28 @@ Unified API endpoints for managing ad campaigns across Meta, TikTok, and Google 
 
 Author: OspraOS
 Date: November 2025
+
+Audit fixes (2026-04):
+  - All endpoints now require ``Depends(get_current_user)``.
+  - ``user_id`` is derived from the JWT, never accepted as a query param.
+    The previous ``?user_id=N`` form let any caller read any tenant's
+    campaigns and analytics — that's now impossible.
+  - ``POST /create`` no longer hard-codes ``user_id=1``; it uses the
+    authenticated user's id.
+  - Per-campaign endpoints (``pause``, ``activate``, ``detail``) check
+    that the campaign actually belongs to the calling user before acting,
+    so a leaked campaign_id from another tenant can't be used to mutate
+    or read someone else's campaign.
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ospra_os.advertising.scheduler import AdScheduler
-from ospra_os.database import AdCampaign, get_multi_store_session
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import AdCampaign, User, get_multi_store_session
 from ospra_os.core.settings import get_settings
 
 # Create router
@@ -106,27 +119,19 @@ async def shutdown_advertising():
 # ============================================================================
 
 @router.post("/create", response_model=dict)
-async def create_campaign(request: CreateCampaignRequest, background_tasks: BackgroundTasks):
+async def create_campaign(
+    request: CreateCampaignRequest,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+):
     """
     Create multi-platform ad campaigns for a product.
 
     This endpoint:
     - Generates AI-powered ad copy for each platform
     - Creates campaigns on Meta, TikTok, and/or Google Ads
-    - Tracks campaigns in database
+    - Tracks campaigns in database (owned by the authenticated user)
     - Optionally auto-launches campaigns
-
-    Example:
-        POST /api/ads/create
-        {
-            "product_id": 123,
-            "product_name": "Smart LED Bulbs",
-            "product_description": "WiFi-enabled color changing bulbs",
-            "product_url": "https://shop.example.com/led-bulbs",
-            "platforms": ["meta", "tiktok"],
-            "daily_budget": 20.0,
-            "auto_launch": false
-        }
     """
     if not ad_scheduler:
         raise HTTPException(status_code=503, detail="Ad scheduler not available")
@@ -146,14 +151,16 @@ async def create_campaign(request: CreateCampaignRequest, background_tasks: Back
             auto_launch=request.auto_launch
         )
 
-        # Save campaigns to database
+        # Save campaigns to database — ownership comes from the JWT, not
+        # from anything in the request body. Audit fix: this used to write
+        # ``user_id=1`` for every tenant.
         session = get_multi_store_session()
 
         try:
             for platform, campaign_data in result['campaigns'].items():
                 if campaign_data.get('success'):
                     db_campaign = AdCampaign(
-                        user_id=1,  # TODO: Get from auth
+                        user_id=current_user.id,
                         product_id=request.product_id,
                         campaign_id=campaign_data['campaign_id'],
                         platform=platform,
@@ -178,30 +185,28 @@ async def create_campaign(request: CreateCampaignRequest, background_tasks: Back
 
 @router.get("/campaigns", response_model=List[CampaignResponse])
 async def get_campaigns(
-    user_id: Optional[int] = None,
     platform: Optional[str] = None,
     status: Optional[str] = None,
-    limit: int = 50
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
 ):
     """
-    List all ad campaigns with optional filters.
+    List the calling user's ad campaigns.
+
+    Audit fix: the previous form accepted ``?user_id=N`` as a query
+    parameter and had no auth dependency, so anyone could read any
+    tenant's campaigns. ``user_id`` is now derived from the JWT and is
+    not overridable.
 
     Query Parameters:
-    - user_id: Filter by user ID
     - platform: Filter by platform (meta, tiktok, google)
     - status: Filter by status (active, paused, ended)
     - limit: Maximum number of results (default: 50)
-
-    Example:
-        GET /api/ads/campaigns?platform=meta&status=active
     """
     session = get_multi_store_session()
 
     try:
-        query = session.query(AdCampaign)
-
-        if user_id:
-            query = query.filter(AdCampaign.user_id == user_id)
+        query = session.query(AdCampaign).filter(AdCampaign.user_id == current_user.id)
         if platform:
             query = query.filter(AdCampaign.platform == platform)
         if status:
@@ -231,12 +236,16 @@ async def get_campaigns(
 
 
 @router.post("/campaigns/{campaign_id}/pause")
-async def pause_campaign(campaign_id: str):
+async def pause_campaign(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """
-    Pause a specific campaign.
+    Pause a specific campaign owned by the calling user.
 
-    Example:
-        POST /api/ads/campaigns/123456789/pause
+    Audit fix: now requires JWT and verifies the campaign belongs to the
+    caller. Previously any caller could pause any tenant's campaign by
+    knowing the campaign_id.
     """
     if not ad_scheduler:
         raise HTTPException(status_code=503, detail="Ad scheduler not available")
@@ -244,9 +253,12 @@ async def pause_campaign(campaign_id: str):
     session = get_multi_store_session()
 
     try:
-        # Find campaign in database
+        # Find campaign — scoped to the calling user. A 404 here covers
+        # both "doesn't exist" and "exists but belongs to another tenant"
+        # so we don't leak campaign-id existence across tenants.
         campaign = session.query(AdCampaign).filter(
-            AdCampaign.campaign_id == campaign_id
+            AdCampaign.campaign_id == campaign_id,
+            AdCampaign.user_id == current_user.id,
         ).first()
 
         if not campaign:
@@ -258,7 +270,7 @@ async def pause_campaign(campaign_id: str):
         if success:
             # Update database
             campaign.status = 'paused'
-            campaign.paused_at = datetime.utcnow()
+            campaign.paused_at = datetime.now(timezone.utc)
             session.commit()
 
             return {
@@ -275,12 +287,14 @@ async def pause_campaign(campaign_id: str):
 
 
 @router.post("/campaigns/{campaign_id}/activate")
-async def activate_campaign(campaign_id: str):
+async def activate_campaign(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """
-    Activate a paused campaign.
+    Activate a paused campaign owned by the calling user.
 
-    Example:
-        POST /api/ads/campaigns/123456789/activate
+    See ``pause_campaign`` for the rationale on the user_id filter.
     """
     if not ad_scheduler:
         raise HTTPException(status_code=503, detail="Ad scheduler not available")
@@ -288,9 +302,9 @@ async def activate_campaign(campaign_id: str):
     session = get_multi_store_session()
 
     try:
-        # Find campaign in database
         campaign = session.query(AdCampaign).filter(
-            AdCampaign.campaign_id == campaign_id
+            AdCampaign.campaign_id == campaign_id,
+            AdCampaign.user_id == current_user.id,
         ).first()
 
         if not campaign:
@@ -302,7 +316,7 @@ async def activate_campaign(campaign_id: str):
         if success:
             # Update database
             campaign.status = 'active'
-            campaign.activated_at = datetime.utcnow()
+            campaign.activated_at = datetime.now(timezone.utc)
             session.commit()
 
             return {
@@ -320,20 +334,20 @@ async def activate_campaign(campaign_id: str):
 
 @router.get("/analytics", response_model=AnalyticsResponse)
 async def get_analytics(
-    user_id: Optional[int] = None,
     days: int = 30,
-    platform: Optional[str] = None
+    platform: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Get aggregate analytics across all campaigns.
+    Get aggregate analytics for the calling user's campaigns.
+
+    Audit fix: previously accepted ``?user_id=N`` and had no auth, so any
+    caller could read any tenant's spend / revenue / ROAS by guessing
+    user_ids. ``user_id`` is now derived from the JWT.
 
     Query Parameters:
-    - user_id: Filter by user ID
     - days: Number of days to include (default: 30)
     - platform: Filter by specific platform
-
-    Example:
-        GET /api/ads/analytics?user_id=1&days=7
     """
     session = get_multi_store_session()
 
@@ -341,16 +355,12 @@ async def get_analytics(
         from datetime import timedelta
         from sqlalchemy import func
 
-        # Date filter
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
-        # Base query
         query = session.query(AdCampaign).filter(
-            AdCampaign.created_at >= cutoff_date
+            AdCampaign.user_id == current_user.id,
+            AdCampaign.created_at >= cutoff_date,
         )
-
-        if user_id:
-            query = query.filter(AdCampaign.user_id == user_id)
         if platform:
             query = query.filter(AdCampaign.platform == platform)
 
@@ -404,18 +414,22 @@ async def get_analytics(
 
 
 @router.get("/campaigns/{campaign_id}")
-async def get_campaign_detail(campaign_id: str):
+async def get_campaign_detail(
+    campaign_id: str,
+    current_user: User = Depends(get_current_user),
+):
     """
-    Get detailed information about a specific campaign.
+    Get detailed information about a campaign owned by the calling user.
 
-    Example:
-        GET /api/ads/campaigns/123456789
+    Audit fix: previously had no auth and no tenant scoping. Anyone with
+    a campaign_id could read the campaign's full performance numbers.
     """
     session = get_multi_store_session()
 
     try:
         campaign = session.query(AdCampaign).filter(
-            AdCampaign.campaign_id == campaign_id
+            AdCampaign.campaign_id == campaign_id,
+            AdCampaign.user_id == current_user.id,
         ).first()
 
         if not campaign:
@@ -428,12 +442,10 @@ async def get_campaign_detail(campaign_id: str):
 
 
 @router.get("/scheduler/status")
-async def get_scheduler_status():
+async def get_scheduler_status(current_user: User = Depends(get_current_user)):
     """
-    Get status of the ad automation scheduler.
-
-    Example:
-        GET /api/ads/scheduler/status
+    Get status of the ad automation scheduler. JWT-protected to avoid
+    leaking how many campaigns the platform is managing in aggregate.
     """
     if not ad_scheduler:
         return {
@@ -463,9 +475,13 @@ class GenerateAdCopyRequest(BaseModel):
 
 
 @router.post("/generate-copy")
-async def generate_ad_copy(request: GenerateAdCopyRequest):
+async def generate_ad_copy(
+    request: GenerateAdCopyRequest,
+    current_user: User = Depends(get_current_user),
+):
     """
-    Generate AI-powered ad copy for a product.
+    Generate AI-powered ad copy for a product. JWT-protected so anonymous
+    callers can't burn the platform's AI quota.
 
     Parameters:
     - product_id: Product ID

@@ -43,6 +43,23 @@ def health_check_immediate():
     }
 
 
+@router.get("/health/features")
+def health_features():
+    """
+    Feature-flag snapshot: which integrations are actually usable given the
+    env vars present. Handy for deploy-time verification without leaking
+    secrets — only returns booleans.
+    """
+    from ospra_os.core.settings import get_settings
+    settings = get_settings()
+    return {
+        "status": "ok",
+        "environment": settings.ENV,
+        "brand_name": settings.BRAND_NAME,
+        "features": settings.feature_summary(),
+    }
+
+
 @router.get("/health/celery")
 def celery_health():
     """
@@ -104,7 +121,7 @@ async def detailed_health_check():
 
     health_status = {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": {}
     }
 

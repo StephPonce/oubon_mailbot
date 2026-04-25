@@ -19,7 +19,7 @@ Author: OspraOS
 
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -54,7 +54,7 @@ async def dashboard_overview(current_user: User = Depends(get_current_user)):
     return {
         "status": "ok",
         "message": "Dashboard overview endpoint - implementation in main.py",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "user_id": current_user.id
     }
 
@@ -118,7 +118,7 @@ async def dashboard_api_status(current_user: User = Depends(get_current_user)):
     - Payment providers
     """
     status = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "services": {},
         "user_id": current_user.id
     }

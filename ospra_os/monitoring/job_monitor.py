@@ -4,7 +4,7 @@ Monitor background job status and history
 """
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 import statistics
 
@@ -77,7 +77,7 @@ class JobMonitor:
             last_run = self.job_runs.get(last_run_id)
 
         # Calculate stats from last 7 days
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
         recent_runs = [
             self.job_runs[rid] for rid in runs
             if self.job_runs.get(rid) and self.job_runs[rid]['started_at'] > week_ago
@@ -147,7 +147,7 @@ class JobMonitor:
             "run_id": run_id,
             "job_name": job_name,
             "status": "RUNNING",
-            "started_at": datetime.utcnow(),
+            "started_at": datetime.now(timezone.utc),
             "completed_at": None,
             "duration_seconds": None,
             "items_processed": 0,
@@ -177,7 +177,7 @@ class JobMonitor:
 
         run = self.job_runs[run_id]
         run['status'] = status
-        run['completed_at'] = datetime.utcnow()
+        run['completed_at'] = datetime.now(timezone.utc)
         run['duration_seconds'] = (run['completed_at'] - run['started_at']).total_seconds()
         run['items_processed'] = items_processed
         run['errors_count'] = errors
@@ -196,7 +196,7 @@ class JobMonitor:
 
         run = self.job_runs[run_id]
         run['status'] = 'FAILED'
-        run['completed_at'] = datetime.utcnow()
+        run['completed_at'] = datetime.now(timezone.utc)
         run['duration_seconds'] = (run['completed_at'] - run['started_at']).total_seconds()
         run['error_message'] = error
 
@@ -207,7 +207,7 @@ class JobMonitor:
 
     async def get_job_history(self, job_name: str, days: int = 7) -> List[dict]:
         """Get run history for job"""
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         runs = self.runs_by_job.get(job_name, [])
         history = [
@@ -257,7 +257,7 @@ class JobMonitor:
         for job_name, run_id in self.running_jobs.items():
             run = self.job_runs.get(run_id)
             if run:
-                duration = (datetime.utcnow() - run['started_at']).total_seconds()
+                duration = (datetime.now(timezone.utc) - run['started_at']).total_seconds()
                 running.append({
                     "job_name": job_name,
                     "run_id": run_id,
@@ -276,7 +276,7 @@ class JobMonitor:
                 continue
 
             timeout_seconds = self.JOBS[job_name]['timeout_minutes'] * 60
-            duration = (datetime.utcnow() - run['started_at']).total_seconds()
+            duration = (datetime.now(timezone.utc) - run['started_at']).total_seconds()
 
             if duration > timeout_seconds:
                 stalled.append({

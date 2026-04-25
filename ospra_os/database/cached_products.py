@@ -7,7 +7,7 @@ Implements hybrid caching strategy for optimal performance and accuracy.
 
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, Index
 from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 import json
 
@@ -74,14 +74,14 @@ class CachedAliExpressProduct(Base):
         """Check if metadata cache is still fresh"""
         if not self.metadata_cached_at:
             return False
-        age = datetime.utcnow() - self.metadata_cached_at
+        age = datetime.now(timezone.utc) - self.metadata_cached_at
         return age < timedelta(hours=ttl_hours)
 
     def needs_price_refresh(self, ttl_minutes: int = 60) -> bool:
         """Check if price should be refreshed"""
         if not self.last_price_check:
             return True
-        age = datetime.utcnow() - self.last_price_check
+        age = datetime.now(timezone.utc) - self.last_price_check
         return age > timedelta(minutes=ttl_minutes)
 
     def update_tier(self):
@@ -125,7 +125,7 @@ class CachedAliExpressProduct(Base):
 
             # Cache metadata
             "cached_at": self.metadata_cached_at.isoformat() if self.metadata_cached_at else None,
-            "cache_age_minutes": int((datetime.utcnow() - self.metadata_cached_at).total_seconds() / 60) if self.metadata_cached_at else None,
+            "cache_age_minutes": int((datetime.now(timezone.utc) - self.metadata_cached_at).total_seconds() / 60) if self.metadata_cached_at else None,
         }
 
 
@@ -163,11 +163,11 @@ class ProductSearchCache(Base):
     hits = Column(Integer, default=0)  # Track cache hit count
 
     def __repr__(self):
-        return f"<SearchCache(keywords={self.keywords}, results={self.total_results}, age={(datetime.utcnow() - self.cached_at).seconds}s)>"
+        return f"<SearchCache(keywords={self.keywords}, results={self.total_results}, age={(datetime.now(timezone.utc) - self.cached_at).seconds}s)>"
 
     def is_fresh(self, ttl_hours: int = 2) -> bool:
         """Check if search cache is still fresh"""
-        age = datetime.utcnow() - self.cached_at
+        age = datetime.now(timezone.utc) - self.cached_at
         return age < timedelta(hours=ttl_hours)
 
     def get_product_ids(self) -> List[str]:

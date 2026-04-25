@@ -11,7 +11,7 @@ This enables unlimited memory without hitting token limits.
 """
 
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 
@@ -281,7 +281,7 @@ def get_niche_analysis(user_id: int, db: Session) -> str:
             context += f"- Avg ROAS: {niche.avg_roas:.2f}x\n"
 
         if niche.last_sale_date:
-            days_since_sale = (datetime.utcnow() - niche.last_sale_date).days
+            days_since_sale = (datetime.now(timezone.utc) - niche.last_sale_date).days
             context += f"- Last Sale: {days_since_sale} days ago\n"
 
         context += "\n"
@@ -339,7 +339,7 @@ def get_time_series_data(user_id: int, period_type: str, db: Session) -> str:
 
 def _get_timeframe_date(timeframe: str) -> datetime:
     """Convert timeframe string to datetime."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     if timeframe == 'last_day':
         return now - timedelta(days=1)

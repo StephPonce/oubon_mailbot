@@ -19,7 +19,7 @@ Date: December 2025
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -160,7 +160,7 @@ class AutoDeployer:
                 settings.last_run = self.settings.get("last_run")
                 settings.total_deployed = self.settings.get("total_deployed", 0)
                 settings.total_cost = self.settings.get("total_cost", 0.0)
-                settings.updated_at = datetime.utcnow()
+                settings.updated_at = datetime.now(timezone.utc)
                 db.commit()
                 logger.info("[SUCCESS] Auto-deploy settings saved")
         finally:
@@ -187,7 +187,7 @@ class AutoDeployer:
 
         try:
             # Update last run time
-            self.settings["last_run"] = datetime.utcnow()
+            self.settings["last_run"] = datetime.now(timezone.utc)
             self._save_settings()
 
             # Check daily limits
@@ -509,7 +509,7 @@ class AutoDeployer:
         db = self.SessionLocal()
         try:
             # Count deployments in last 24 hours
-            since = datetime.utcnow() - timedelta(hours=24)
+            since = datetime.now(timezone.utc) - timedelta(hours=24)
             count = db.query(AutoDeployment).filter(
                 AutoDeployment.deployed_at >= since,
                 AutoDeployment.success == True
@@ -543,7 +543,7 @@ class AutoDeployer:
         """Get remaining deployment quota for today"""
         db = self.SessionLocal()
         try:
-            since = datetime.utcnow() - timedelta(hours=24)
+            since = datetime.now(timezone.utc) - timedelta(hours=24)
             count = db.query(AutoDeployment).filter(
                 AutoDeployment.deployed_at >= since,
                 AutoDeployment.success == True

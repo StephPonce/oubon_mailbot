@@ -13,7 +13,7 @@ Date: November 2025
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,7 +167,7 @@ class MarketShareEstimator:
                 'total_social_followers': total_followers,
                 'catalog_size': catalog_size
             },
-            'estimated_at': datetime.utcnow().isoformat()
+            'estimated_at': datetime.now(timezone.utc).isoformat()
         }
 
     async def calculate_market_share(self, niche: str) -> dict:
@@ -252,7 +252,7 @@ class MarketShareEstimator:
                 }
                 for c in competitor_revenues[:10]  # Top 10
             ],
-            'calculated_at': datetime.utcnow().isoformat()
+            'calculated_at': datetime.now(timezone.utc).isoformat()
         }
 
     def _get_rank_suffix(self, rank: int) -> str:
@@ -321,7 +321,7 @@ class MarketShareEstimator:
                 'product_count': round(avg_products, 0)
             },
             'competitive_pressure': 'HIGH' if threat_distribution['HIGH'] > 3 else 'MEDIUM' if threat_distribution['HIGH'] > 1 else 'LOW',
-            'analyzed_at': datetime.utcnow().isoformat()
+            'analyzed_at': datetime.now(timezone.utc).isoformat()
         }
 
     async def identify_market_leaders(self, niche: str, top_n: int = 5) -> List[dict]:
@@ -373,7 +373,7 @@ class MarketShareEstimator:
 
         return [
             {
-                'date': datetime.utcnow().isoformat(),
+                'date': datetime.now(timezone.utc).isoformat(),
                 'niche': niche,
                 'total_market': current_share.get('total_estimated_market'),
                 'our_share': current_share.get('our_position', {}).get('share_percent'),

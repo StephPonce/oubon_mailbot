@@ -4,9 +4,18 @@ Provides custom event tracking for business metrics and operational monitoring.
 """
 
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
-import sentry_sdk
+
+# Sentry SDK is optional — degrade gracefully when not installed (e.g. in
+# lean test environments). Every helper that calls sentry_sdk should guard
+# on HAS_SENTRY first.
+try:
+    import sentry_sdk  # type: ignore
+    HAS_SENTRY = True
+except ImportError:
+    sentry_sdk = None  # type: ignore
+    HAS_SENTRY = False
 
 
 class Events(str, Enum):
@@ -82,7 +91,9 @@ class MetricsClient:
     """
 
     def __init__(self):
-        self.enabled = True
+        # Auto-disable when sentry_sdk isn't installed so every track/incr
+        # becomes a no-op instead of raising.
+        self.enabled = HAS_SENTRY
 
     def track_event(
         self,
@@ -116,7 +127,7 @@ class MetricsClient:
             return
 
         properties = properties or {}
-        timestamp = timestamp or datetime.utcnow()
+        timestamp = timestamp or datetime.now(timezone.utc)
 
         # Add metadata
         properties["timestamp"] = timestamp.isoformat()

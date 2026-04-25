@@ -6,7 +6,7 @@ Each action type has a dedicated executor that interfaces with platform APIs.
 
 import logging
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from abc import ABC, abstractmethod
 from sqlalchemy.orm import Session
 
@@ -132,7 +132,7 @@ class DeployProductExecutor(BaseActionExecutor):
                 if hasattr(product, 'platform_url'):
                     product.platform_url = result.get("platform_url")
                 if hasattr(product, 'deployed_at'):
-                    product.deployed_at = datetime.utcnow()
+                    product.deployed_at = datetime.now(timezone.utc)
                 self.db.commit()
 
                 # Capture after state

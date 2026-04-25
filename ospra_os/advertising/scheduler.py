@@ -10,7 +10,7 @@ Date: November 2025
 
 from typing import Dict, List, Optional
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -164,7 +164,7 @@ class AdScheduler:
             'product_id': product_id,
             'product_name': product_name,
             'campaigns': {},
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.now(timezone.utc).isoformat(),
             'status': 'pending'
         }
 
@@ -213,7 +213,7 @@ class AdScheduler:
                         'campaign_id': campaign_result['campaign_id'],
                         'daily_budget': daily_budget,
                         'status': 'paused' if not auto_launch else 'active',
-                        'created_at': datetime.utcnow()
+                        'created_at': datetime.now(timezone.utc)
                     }
 
                 logger.info(f"[SUCCESS] {platform} campaign created: {campaign_result['campaign_id']}")
@@ -307,7 +307,7 @@ class AdScheduler:
         logger.info("[STATS] Running daily performance check...")
 
         report = {
-            'date': datetime.utcnow().isoformat(),
+            'date': datetime.now(timezone.utc).isoformat(),
             'campaigns_checked': 0,
             'platforms': {
                 'meta': [],
@@ -471,7 +471,7 @@ class AdScheduler:
                     # Update tracking
                     campaign_data['status'] = 'paused'
                     campaign_data['pause_reason'] = pause_reason
-                    campaign_data['paused_at'] = datetime.utcnow()
+                    campaign_data['paused_at'] = datetime.now(timezone.utc)
 
                     paused_count += 1
 
@@ -528,7 +528,7 @@ class AdScheduler:
                 campaign_key = f"{platform}_{campaign_id}"
                 if campaign_key in self.active_campaigns:
                     self.active_campaigns[campaign_key]['status'] = 'active'
-                    self.active_campaigns[campaign_key]['activated_at'] = datetime.utcnow()
+                    self.active_campaigns[campaign_key]['activated_at'] = datetime.now(timezone.utc)
 
                 logger.info(f"  Activated {platform} campaign: {campaign_id}")
 

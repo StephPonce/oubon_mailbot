@@ -21,7 +21,7 @@ from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
         If the request takes longer than timeout_seconds, it will be cancelled
         and return a 504 Gateway Timeout error.
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             # Wrap the request processing with asyncio.wait_for timeout
@@ -54,7 +54,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
 
         except asyncio.TimeoutError:
             # Log the timeout event
-            elapsed = (datetime.utcnow() - start_time).total_seconds()
+            elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
             logger.warning(
                 f"[TIMEOUT] Request timed out after {elapsed:.2f}s: "
                 f"{request.method} {request.url.path}"

@@ -3,7 +3,7 @@ Schedule Manager - Handle ad scheduling and automation
 """
 import uuid
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from ospra_os.models.ad_schedule import AdSchedule, ScheduleLog, ScheduleStatus, Base
@@ -123,7 +123,7 @@ class ScheduleManager:
         try:
             session = self._get_session()
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Get schedules that should start now
             pending = session.query(AdSchedule).filter(
@@ -193,7 +193,7 @@ class ScheduleManager:
                 schedule.campaign_id = campaign_result['campaign_id']
                 schedule.campaign_data = campaign_result
                 schedule.status = ScheduleStatus.ACTIVE
-                schedule.activated_at = datetime.utcnow()
+                schedule.activated_at = datetime.now(timezone.utc)
 
                 # Log activation
                 log = ScheduleLog(
@@ -243,7 +243,7 @@ class ScheduleManager:
         try:
             session = self._get_session()
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Get active schedules past end date
             expired = session.query(AdSchedule).filter(
@@ -291,7 +291,7 @@ class ScheduleManager:
                 )
 
             schedule.status = ScheduleStatus.COMPLETED
-            schedule.completed_at = datetime.utcnow()
+            schedule.completed_at = datetime.now(timezone.utc)
 
             log = ScheduleLog(
                 id=str(uuid.uuid4()),

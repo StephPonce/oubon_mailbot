@@ -16,7 +16,7 @@ import traceback
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from ospra_os.oi.oi_service import OiService, OiResponse, oi_sessions
@@ -703,7 +703,7 @@ async def execute_quick_action(
         
         learning = get_learning_system()
         learning.record_interaction(UserInteraction(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             type="action",
             data={"action": request.action, "status": result.status.value},
             user_id=user_id
@@ -893,5 +893,5 @@ async def oi_health():
             "enabled": True,
             "layers": ["dashboard", "user_memory", "universal"]
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }

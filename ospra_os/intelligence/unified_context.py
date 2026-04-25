@@ -19,7 +19,7 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_
@@ -66,7 +66,7 @@ class UnifiedContextBuilder:
 
         # Check cache
         if not force_refresh and cache_key in self._cache:
-            age = datetime.utcnow() - self._cache_timestamp.get(cache_key, datetime.min)
+            age = datetime.now(timezone.utc) - self._cache_timestamp.get(cache_key, datetime.min)
             if age.total_seconds() < self._cache_duration:
                 logger.info(f"Using cached context (age: {age.total_seconds():.1f}s)")
                 return self._cache[cache_key]
@@ -100,7 +100,7 @@ class UnifiedContextBuilder:
 
         # Build unified context
         context = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "user_id": user_id,
             "store_id": store_id,
             "products": product_data,
@@ -118,7 +118,7 @@ class UnifiedContextBuilder:
 
         # Cache it
         self._cache[cache_key] = context
-        self._cache_timestamp[cache_key] = datetime.utcnow()
+        self._cache_timestamp[cache_key] = datetime.now(timezone.utc)
 
         logger.info(f"Unified context built: {len(correlations)} correlations detected")
 
@@ -179,7 +179,7 @@ class UnifiedContextBuilder:
                         "id": p.id,
                         "title": p.title,
                         "sales": p.total_sales,
-                        "days_active": (datetime.utcnow() - p.deployed_at).days if p.deployed_at else 0
+                        "days_active": (datetime.now(timezone.utc) - p.deployed_at).days if p.deployed_at else 0
                     }
                     for p in worst_products[:10]
                 ]
@@ -315,10 +315,15 @@ class UnifiedContextBuilder:
             # - Recommendations
             # - Predictions
 
-            from ospra_os.intelligence.self_learning import SelfLearningEngine
+            # Pass 4d: migrated off the deprecated `ospra_os.intelligence.self_learning`
+            # shim to the canonical `ospra_os.learning.hybrid_learning_engine`. The old
+            # `analyze_product_patterns(days=30)` method has no direct equivalent on the
+            # new engine; `get_learning_report(user_id=...)` returns a structurally
+            # richer summary, so we adapt the caller below.
+            from ospra_os.learning.hybrid_learning_engine import get_learning_engine
 
-            learning_engine = SelfLearningEngine(self.db)
-            patterns = learning_engine.analyze_product_patterns(days=30)
+            learning_engine = get_learning_engine(self.db)
+            patterns = learning_engine.get_global_weights()
 
             return {
                 "patterns": patterns,

@@ -7,7 +7,7 @@ Predicts which customers are likely to stop buying based on:
 - Engagement: Email opens, site visits
 - Trends: Declining behavior patterns
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Tuple
 import logging
 import statistics
@@ -315,7 +315,7 @@ class ChurnPredictor:
             "risk_level": risk_level,
             "factors": factors,
             "recommended_actions": recommendations,
-            "analyzed_at": datetime.utcnow().isoformat()
+            "analyzed_at": datetime.now(timezone.utc).isoformat()
         }
 
         return result
@@ -428,7 +428,7 @@ class ChurnPredictor:
         base_rate = 0.08
 
         for i in range(periods):
-            month_date = datetime.utcnow() - timedelta(days=30 * (periods - i - 1))
+            month_date = datetime.now(timezone.utc) - timedelta(days=30 * (periods - i - 1))
 
             # Add some variance
             import random

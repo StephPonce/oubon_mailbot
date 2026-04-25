@@ -5,7 +5,7 @@ Stores AI-generated actions (deploy product, adjust price, pause ad, etc.)
 that require user approval before execution.
 """
 import enum
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlalchemy import (
     Column, Integer, String, Float, Text, DateTime,
@@ -111,7 +111,7 @@ class Action(Base):
         """Check if action has expired"""
         if not self.expires_at:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     def is_actionable(self) -> bool:
         """Check if action can be approved/skipped"""
@@ -119,7 +119,7 @@ class Action(Base):
 
     def set_default_expiration(self, hours: int = 72):
         """Set expiration time (default 72 hours from now)"""
-        self.expires_at = datetime.utcnow() + timedelta(hours=hours)
+        self.expires_at = datetime.now(timezone.utc) + timedelta(hours=hours)
 
 
 class ActionLog(Base):

@@ -15,7 +15,7 @@ import json
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ospra_os.ai.factory import AIFactory
 from ospra_os.oi.prompts import OI_SYSTEM_PROMPT, build_context_prompt
@@ -41,7 +41,7 @@ class OiResponse:
     suggestions: List[str] = field(default_factory=list)
     context_used: Dict[str, Any] = field(default_factory=dict)
     tokens_used: int = 0
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     data_disclaimer: Optional[str] = None  # Added: data source disclaimer
     validation_warnings: List[str] = field(default_factory=list)  # Added: validation issues
 
@@ -51,7 +51,7 @@ class ConversationMessage:
     """A single message in the conversation."""
     role: str  # "user" or "assistant"
     content: str
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class OiService:
@@ -178,17 +178,23 @@ class OiService:
             ConversationMessage(role="user", content=message)
         )
         
-        # Build system prompt with context (now includes intelligence)
-        system_prompt = self._build_system_prompt()
-        
+        # Build system prompt with context (now includes intelligence). We
+        # split it into a static chunk (OI_SYSTEM_PROMPT, never changes) and a
+        # dynamic chunk (per-user context + timestamp). ClaudeProvider.chat
+        # recognises the dict form and emits the static chunk as a cached
+        # block (5-minute ephemeral TTL), which bills repeat calls at ~10% of
+        # normal input-token cost. Non-Claude providers receive the joined
+        # string via the `__str__` fallback below.
+        system_prompt_split = self._build_system_prompt_split()
+
         # Generate disclaimer based on what data is available
         data_disclaimer = self._generate_data_disclaimer()
-        
+
         try:
             # Call AI provider
             response_text = await self.ai_provider.chat(
                 message=message,
-                context={"system_prompt": system_prompt, **self.context}
+                context={"system_prompt": system_prompt_split, **self.context}
             )
             
             # VALIDATION: Check response for potential hallucinations
@@ -304,16 +310,38 @@ class OiService:
         return warning_prefix + original_response
     
     def _build_system_prompt(self) -> str:
-        """Build system prompt with context."""
+        """Build system prompt with context (flat string form)."""
         prompt = OI_SYSTEM_PROMPT
-        
+
         if self.context:
             context_prompt = build_context_prompt(self.context)
             prompt += f"\n\n{context_prompt}"
-        
-        prompt += f"\n\nCurrent date/time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
-        
+
+        prompt += f"\n\nCurrent date/time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+
         return prompt
+
+    def _build_system_prompt_split(self) -> Dict[str, str]:
+        """
+        Build the system prompt as a split static/dynamic dict, for the
+        prompt-caching path in ClaudeProvider.chat. The ``static`` half is
+        OI_SYSTEM_PROMPT (>1k tokens, stable across users and sessions); the
+        ``dynamic`` half is per-user context + current timestamp.
+
+        Providers that don't recognise the dict form must join these with a
+        blank line — see the ``__str__``-like behaviour in
+        ClaudeProvider._build_cached_system_param.
+        """
+        static = OI_SYSTEM_PROMPT
+
+        dynamic_parts: List[str] = []
+        if self.context:
+            dynamic_parts.append(build_context_prompt(self.context))
+        dynamic_parts.append(
+            f"Current date/time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+        )
+
+        return {"static": static, "dynamic": "\n\n".join(dynamic_parts)}
     
     def _trim_history(self) -> None:
         """Keep conversation history manageable."""

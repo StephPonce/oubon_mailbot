@@ -10,7 +10,7 @@ vulnerabilities where attackers could access other users' data.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ospra_os.core.tiers import (
@@ -155,7 +155,7 @@ async def get_current_tier(
         "price": tier_def["price"],
         "subscription_started": user.subscription_started.isoformat() if user.subscription_started else None,
         "subscription_expires": user.subscription_expires.isoformat() if user.subscription_expires else None,
-        "is_active": user.subscription_expires is None or user.subscription_expires > datetime.utcnow(),
+        "is_active": user.subscription_expires is None or user.subscription_expires > datetime.now(timezone.utc),
         "features": tier_def["features"],
         "limitations": tier_def.get("limitations", []),
         "next_tier": next_tier_info,

@@ -2,7 +2,7 @@
 Background job for processing ad schedules
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from ospra_os.services.schedule_manager import ScheduleManager
 from ospra_os.core.settings import get_settings
 
@@ -13,7 +13,7 @@ async def process_schedules():
     Activates pending schedules and completes expired ones
     """
     print(f"\n{'='*70}")
-    print(f"[ALARM] SCHEDULE PROCESSOR - {datetime.utcnow().isoformat()}")
+    print(f"[ALARM] SCHEDULE PROCESSOR - {datetime.now(timezone.utc).isoformat()}")
     print(f"{'='*70}\n")
 
     settings = get_settings()

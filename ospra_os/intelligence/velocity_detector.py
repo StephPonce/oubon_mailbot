@@ -12,7 +12,7 @@ Higher tier users get access to products in earlier phases.
 """
 
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -198,7 +198,11 @@ class VelocityDetector:
                 logger.error(f"ProductSaturation {product_saturation_id} not found")
                 return velocity
 
-            age_days = (datetime.utcnow() - saturation.first_discovered_at).days
+            # ProductSaturation.first_discovered_at is a naive Column(DateTime),
+            # so use naive UTC for the subtraction.
+            age_days = (
+                datetime.now(timezone.utc).replace(tzinfo=None) - saturation.first_discovered_at
+            ).days
 
             # Calculate velocity score
             velocity_score = self.calculate_velocity_score(
@@ -226,7 +230,7 @@ class VelocityDetector:
             velocity.viral_coefficient = velocity_score
             velocity.phase = phase
             velocity.phase_age_days = age_days
-            velocity.last_analyzed_at = datetime.utcnow()
+            velocity.last_analyzed_at = datetime.now(timezone.utc)
 
             await session.commit()
             await session.refresh(velocity)

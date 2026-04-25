@@ -1,6 +1,6 @@
 """Email processor that integrates smart reply system with Gmail."""
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from ospra_os.email_automation.smart_reply import SmartReplySystem
 from ospra_os.email_automation.gmail_client import GmailClient
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
@@ -459,7 +459,7 @@ class EmailProcessor:
             if existing:
                 # Update existing record
                 existing.needs_followup = True
-                existing.template_sent_at = datetime.utcnow()
+                existing.template_sent_at = datetime.now(timezone.utc)
                 # Backfill user_id if the row was created pre-refactor and
                 # we now know which tenant owns it.
                 if existing.user_id is None and self.user_id is not None:
@@ -476,8 +476,8 @@ class EmailProcessor:
                     label=label,
                     needs_followup=True,
                     followup_sent=False,
-                    received_at=datetime.utcnow(),
-                    template_sent_at=datetime.utcnow(),
+                    received_at=datetime.now(timezone.utc),
+                    template_sent_at=datetime.now(timezone.utc),
                 )
                 session.add(followup)
 

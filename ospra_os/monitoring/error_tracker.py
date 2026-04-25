@@ -6,7 +6,7 @@ Track and categorize system errors
 import uuid
 import traceback
 from functools import wraps
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from collections import defaultdict
 
@@ -62,8 +62,8 @@ class ErrorTracker:
             "resolved": False,
             "resolved_at": None,
             "resolution": None,
-            "occurred_at": datetime.utcnow(),
-            "created_at": datetime.utcnow()
+            "occurred_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(timezone.utc)
         }
 
         self.errors[error_id] = error_data
@@ -79,7 +79,7 @@ class ErrorTracker:
         limit: int = 100
     ) -> List[dict]:
         """Get recent errors with filters"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         filtered_errors = []
         for error in self.errors.values():
@@ -108,7 +108,7 @@ class ErrorTracker:
 
     async def get_error_counts(self, hours: int = 24) -> dict:
         """Get error counts by category"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         recent_errors = [
             e for e in self.errors.values()
@@ -133,7 +133,7 @@ class ErrorTracker:
         daily_counts = []
 
         for day_offset in range(days):
-            day_start = datetime.utcnow().replace(
+            day_start = datetime.now(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) - timedelta(days=day_offset)
             day_end = day_start + timedelta(days=1)
@@ -156,7 +156,7 @@ class ErrorTracker:
         """Mark error as acknowledged"""
         if error_id in self.errors:
             self.errors[error_id]['acknowledged'] = True
-            self.errors[error_id]['acknowledged_at'] = datetime.utcnow()
+            self.errors[error_id]['acknowledged_at'] = datetime.now(timezone.utc)
             self.errors[error_id]['acknowledged_by'] = user
             if notes:
                 self.errors[error_id]['details']['ack_notes'] = notes
@@ -165,12 +165,12 @@ class ErrorTracker:
         """Mark error as resolved"""
         if error_id in self.errors:
             self.errors[error_id]['resolved'] = True
-            self.errors[error_id]['resolved_at'] = datetime.utcnow()
+            self.errors[error_id]['resolved_at'] = datetime.now(timezone.utc)
             self.errors[error_id]['resolution'] = resolution
 
     async def get_recurring_errors(self, hours: int = 24, min_count: int = 3) -> List[dict]:
         """Find errors that occur repeatedly"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         # Group by message
         message_counts = defaultdict(list)

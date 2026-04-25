@@ -6,7 +6,7 @@ Uses ScraperAPI/proxy rotation to bypass rate limits.
 """
 
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ..base import BaseConnector, ProductCandidate
 import asyncio
 import logging
@@ -66,7 +66,7 @@ class GoogleTrendsConnector(BaseConnector):
         if key not in self._cache:
             return False
         cached_time, _ = self._cache[key]
-        return (datetime.utcnow() - cached_time).seconds < self._cache_ttl
+        return (datetime.now(timezone.utc) - cached_time).seconds < self._cache_ttl
 
     def _get_cached(self, key: str):
         """Get cached data."""
@@ -77,7 +77,7 @@ class GoogleTrendsConnector(BaseConnector):
 
     def _set_cache(self, key: str, data):
         """Cache data."""
-        self._cache[key] = (datetime.utcnow(), data)
+        self._cache[key] = (datetime.now(timezone.utc), data)
 
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
         """
@@ -192,7 +192,7 @@ class GoogleTrendsConnector(BaseConnector):
                         "avg_interest": avg_value,
                         "timeframe": timeframe,
                         "geo": geo,
-                        "fetched_at": datetime.utcnow().isoformat()
+                        "fetched_at": datetime.now(timezone.utc).isoformat()
                     }
                 )
             ]

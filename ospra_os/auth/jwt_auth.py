@@ -9,16 +9,17 @@ Provides:
 - Session-based user identification (replaces user_id query params)
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+import hashlib
 import os
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel, EmailStr
+import bcrypt as _bcrypt
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 # Import from correct modular architecture (NOT legacy multi_store_models!)
 from ospra_os.database import User, SubscriptionTier, get_db
@@ -63,17 +64,82 @@ REFRESH_TOKEN_EXPIRE_DAYS = 30
 # PASSWORD HASHING
 # ============================================================================
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# =============================================================================
+# bcrypt directly — no passlib
+# =============================================================================
+#
+# We previously used ``passlib.context.CryptContext(schemes=["bcrypt"])``,
+# but passlib 1.7.4 runs an internal self-test the first time the bcrypt
+# backend is loaded. That self-test sends a >72-byte secret through
+# bcrypt to detect a long-truncation behaviour. bcrypt 4.x and 5.x raise
+# ``ValueError`` on >72-byte input instead of truncating, so the
+# self-test crashes before any of our code can run. The result is every
+# login/registration call dies with
+#   ``password cannot be longer than 72 bytes`` — even for a 17-char
+# password — purely because passlib never finishes initialising.
+#
+# Calling the bcrypt library directly avoids the broken self-test and
+# also lets us pre-hash with SHA-256 to lift the 72-byte ceiling for end
+# users. The on-disk hash format is unchanged ($2b$…), so existing
+# bcrypt-only hashes from before this migration still verify via the
+# legacy fallback in ``verify_password``.
+#
+# bcrypt cost factor — 12 is the OWASP 2024 recommendation; raise to
+# 13/14 if a CPU upgrade makes 12 too cheap.
+_BCRYPT_ROUNDS = 12
+
+
+def _pre_hash(password: str) -> bytes:
+    """Pre-hash the password to a fixed 64-byte hex string before bcrypt.
+
+    bcrypt has a hard 72-byte input limit. bcrypt>=4 (we're on 5.0)
+    raises ``ValueError`` when handed anything longer; older versions
+    silently truncated. The industry-standard mitigation — used by
+    Dropbox, AWS Cognito, and others — is to SHA-256 the password first
+    so the input to bcrypt is always exactly 64 hex chars regardless of
+    how long the user's password is. This:
+
+      • lifts the 72-byte ceiling (users can paste passphrases)
+      • keeps bcrypt's slow-hash properties intact
+      • makes the verify path deterministic across bcrypt versions
+    """
+    return hashlib.sha256(password.encode("utf-8")).hexdigest().encode("ascii")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password using bcrypt"""
-    return pwd_context.hash(password)
+    """Hash a password using SHA-256 + bcrypt (see ``_pre_hash``)."""
+    salt = _bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
+    return _bcrypt.hashpw(_pre_hash(password), salt).decode("ascii")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a password against its hash.
+
+    Tries the new SHA-256 + bcrypt scheme first. Falls back to plain
+    bcrypt for any legacy hashes that pre-date the pre-hash migration —
+    those will still verify, and the caller is expected to re-hash and
+    persist the new format on the next successful auth call.
+    """
+    if not hashed_password:
+        return False
+    hash_bytes = hashed_password.encode("ascii")
+    # New scheme: SHA-256 → bcrypt
+    try:
+        if _bcrypt.checkpw(_pre_hash(plain_password), hash_bytes):
+            return True
+    except (ValueError, TypeError):
+        # Malformed hash — fall through to the legacy attempt.
+        pass
+    # Legacy bcrypt-only hashes.
+    try:
+        secret = plain_password.encode("utf-8")
+        # bcrypt 5.x raises on >72 bytes; legacy hashes were created
+        # against passwords that fit, but truncate defensively.
+        if len(secret) > 72:
+            secret = secret[:72]
+        return _bcrypt.checkpw(secret, hash_bytes)
+    except (ValueError, TypeError):
+        return False
 
 
 # ============================================================================
@@ -118,9 +184,8 @@ class UserResponse(BaseModel):
     name: str
     subscription_tier: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ============================================================================
@@ -137,14 +202,14 @@ def create_access_token(user: User) -> str:
     Returns:
         Encoded JWT string
     """
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
     payload = {
         "sub": str(user.id),  # Subject (user ID as string)
         "email": user.email,
         "tier": user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier),
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "type": "access"
     }
     
@@ -161,12 +226,12 @@ def create_refresh_token(user: User) -> str:
     Returns:
         Encoded JWT string
     """
-    expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     
     payload = {
         "sub": str(user.id),
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(timezone.utc),
         "type": "refresh"
     }
     
@@ -357,7 +422,7 @@ async def get_current_user(
     
     # Update last login
     try:
-        user.last_login = datetime.utcnow()
+        user.last_login = datetime.now(timezone.utc)
         db.commit()
     except Exception as e:
         db.rollback()

@@ -17,7 +17,7 @@ Performance Impact:
 - STRATOSPHERE (5m cache): Near real-time with minimal caching
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from enum import Enum
 import logging
@@ -67,7 +67,7 @@ class CacheEntry:
         self.products = products
         self.niche = niche
         self.tier = tier
-        self.created_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
         self.expires_at = self.created_at + timedelta(minutes=ttl_minutes)
         self.metadata = metadata or {}
         self.hit_count = 0
@@ -75,19 +75,19 @@ class CacheEntry:
     @property
     def is_expired(self) -> bool:
         """Check if cache entry has expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
 
     @property
     def age_seconds(self) -> int:
         """Get age of cache entry in seconds."""
-        return int((datetime.utcnow() - self.created_at).total_seconds())
+        return int((datetime.now(timezone.utc) - self.created_at).total_seconds())
 
     @property
     def ttl_remaining_seconds(self) -> int:
         """Get remaining TTL in seconds."""
         if self.is_expired:
             return 0
-        return int((self.expires_at - datetime.utcnow()).total_seconds())
+        return int((self.expires_at - datetime.now(timezone.utc)).total_seconds())
 
     def touch(self):
         """Record a cache hit."""

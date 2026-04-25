@@ -10,7 +10,7 @@ Analyzes customer retention by acquisition cohort:
 Generates cohort retention tables showing percentage of customers
 who make repeat purchases in subsequent periods.
 """
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, timezone
 from typing import Dict, List, Optional, Tuple
 from collections import defaultdict
 import logging
@@ -73,7 +73,7 @@ class CohortAnalyzer:
             "averages": averages,
             "best_cohort": best_cohort,
             "worst_cohort": worst_cohort,
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
 
         logger.info(f"[SUCCESS] Generated {len(cohorts)} cohorts")
@@ -254,7 +254,7 @@ class CohortAnalyzer:
             retention.append(round(retention_pct))
 
             # Stop if period is in the future
-            if period_end > datetime.utcnow().date():
+            if period_end > datetime.now(timezone.utc).date():
                 break
 
         return retention

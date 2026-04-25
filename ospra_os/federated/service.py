@@ -38,7 +38,7 @@ Usage:
 
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from ospra_os.federated.data_collector import PrivacyPreservingCollector
@@ -92,12 +92,12 @@ class FederatedLearningService:
             consent.contribute_product_data = contribute_products
             consent.contribute_pricing_data = contribute_pricing
             consent.contribute_ad_data = contribute_ads
-            consent.updated_at = datetime.utcnow()
+            consent.updated_at = datetime.now(timezone.utc)
 
             # Log consent change
             consent.consent_history.append({
                 "action": "enabled",
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "scopes": {
                     "products": contribute_products,
                     "pricing": contribute_pricing,
@@ -114,10 +114,10 @@ class FederatedLearningService:
                 contribute_product_data=contribute_products,
                 contribute_pricing_data=contribute_pricing,
                 contribute_ad_data=contribute_ads,
-                consented_at=datetime.utcnow(),
+                consented_at=datetime.now(timezone.utc),
                 consent_history=[{
                     "action": "opted_in",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "scopes": {
                         "products": contribute_products,
                         "pricing": contribute_pricing,
@@ -149,12 +149,12 @@ class FederatedLearningService:
 
         consent.federated_learning_enabled = False
         consent.contribution_enabled = False
-        consent.updated_at = datetime.utcnow()
+        consent.updated_at = datetime.now(timezone.utc)
 
         # Log consent change
         consent.consent_history.append({
             "action": "disabled",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
         self.db.commit()
@@ -396,7 +396,7 @@ class FederatedLearningService:
             user_id=user_id,
             insight_id=insight_id,
             context=context or {},
-            applied_at=datetime.utcnow()
+            applied_at=datetime.now(timezone.utc)
         )
 
         self.db.add(application)
@@ -436,7 +436,7 @@ class FederatedLearningService:
             return None
 
         application.outcome = outcome
-        application.outcome_recorded_at = datetime.utcnow()
+        application.outcome_recorded_at = datetime.now(timezone.utc)
 
         # Update insight success rate
         insight = self.db.query(AggregateInsight).filter(

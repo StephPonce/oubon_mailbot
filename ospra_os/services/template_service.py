@@ -7,7 +7,7 @@ Business logic for action template marketplace.
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, and_, or_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import json
 
@@ -235,7 +235,7 @@ class TemplateService:
             raise ValueError("Template not found")
 
         template.status = "published"
-        template.published_at = datetime.utcnow()
+        template.published_at = datetime.now(timezone.utc)
         self.db.commit()
 
         return template
@@ -317,7 +317,7 @@ class TemplateService:
 
         # Process payment (integrate with Stripe/LemonSqueezy)
         # For now, simulate
-        transaction_id = f"txn_{int(datetime.utcnow().timestamp())}"
+        transaction_id = f"txn_{int(datetime.now(timezone.utc).timestamp())}"
 
         # Calculate split
         creator_amount = template.price * template.revenue_share

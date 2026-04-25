@@ -8,7 +8,7 @@ Aggregates data from:
 - Momentum Tracker (trending products)
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 import logging
 
@@ -32,7 +32,7 @@ class ReportEngine:
             Complete report data ready for rendering
         """
         logger.info(f"[START] Generating report: {config.get('name', 'Unnamed')}")
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         sections_data = {}
         sections_to_generate = config.get('sections', [])
@@ -63,9 +63,9 @@ class ReportEngine:
         report_data = {
             'metadata': {
                 'report_name': config.get('name', 'Business Report'),
-                'generated_at': datetime.utcnow().isoformat(),
+                'generated_at': datetime.now(timezone.utc).isoformat(),
                 'date_range': filters.get('date_range', {}),
-                'generation_time_ms': int((datetime.utcnow() - start_time).total_seconds() * 1000)
+                'generation_time_ms': int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
             },
             'branding': config.get('branding', self._get_default_branding()),
             'sections': sections_data
@@ -327,17 +327,17 @@ class ReportEngine:
             value = date_range_config.get('value', 'last_7_days')
 
             if value == 'last_7_days':
-                end = datetime.utcnow()
+                end = datetime.now(timezone.utc)
                 start = end - timedelta(days=7)
             elif value == 'last_30_days':
-                end = datetime.utcnow()
+                end = datetime.now(timezone.utc)
                 start = end - timedelta(days=30)
             elif value == 'last_quarter':
-                end = datetime.utcnow()
+                end = datetime.now(timezone.utc)
                 start = end - timedelta(days=90)
             else:
                 # Default to last 7 days
-                end = datetime.utcnow()
+                end = datetime.now(timezone.utc)
                 start = end - timedelta(days=7)
         else:
             # Absolute date range

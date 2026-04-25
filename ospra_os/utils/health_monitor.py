@@ -1,7 +1,7 @@
 """
 System health monitoring and alerting
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 import psutil
 import logging
@@ -25,7 +25,7 @@ class HealthMonitor:
         """
         health = {
             "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "checks": {}
         }
 

@@ -17,7 +17,7 @@ Proactive notifications for:
 import asyncio
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from pydantic import BaseModel
@@ -79,11 +79,10 @@ class Alert(BaseModel):
     product_id: Optional[str] = None
     product_name: Optional[str] = None
     score: Optional[int] = None
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+
+    # Pydantic v2 serializes datetime as ISO 8601 by default via model_dump_json(),
+    # so the old `class Config: json_encoders = {datetime: lambda v: v.isoformat()}`
+    # was a no-op in v2 and has been removed.
 
 
 class AlertPreferences(BaseModel):
@@ -134,7 +133,7 @@ class AlertStore:
             alerts = [a for a in alerts if a.type == alert_type]
         
         # Remove expired
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         alerts = [a for a in alerts if not a.expires_at or a.expires_at > now]
         
         # Sort by created_at descending
@@ -165,7 +164,7 @@ class AlertStore:
         
         # Check quiet hours
         if prefs.quiet_hours and alert.priority != AlertPriority.HIGH:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             start = datetime.strptime(prefs.quiet_hours.get("start", "22:00"), "%H:%M").time()
             end = datetime.strptime(prefs.quiet_hours.get("end", "08:00"), "%H:%M").time()
             if start <= now.time() <= end:
@@ -319,8 +318,8 @@ class OiAlertService:
             product_id=product_id,
             product_name=product_name,
             score=score,
-            created_at=datetime.utcnow(),
-            expires_at=datetime.utcnow() + timedelta(hours=expires_in_hours) if expires_in_hours else None,
+            created_at=datetime.now(timezone.utc),
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=expires_in_hours) if expires_in_hours else None,
         )
         
         if self.store.add_alert(alert):

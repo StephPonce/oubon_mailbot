@@ -4,7 +4,7 @@ Provides comprehensive business intelligence for e-commerce stores
 """
 
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc
 import logging
@@ -45,7 +45,7 @@ class AnalyticsEngine:
         Returns:
             (start_date, end_date) tuple
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if date_range == 'today':
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)

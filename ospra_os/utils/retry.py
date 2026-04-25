@@ -20,7 +20,7 @@ import logging
 import random
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union
 
@@ -196,7 +196,7 @@ class IdempotencyStore:
 
     def _cleanup_expired(self):
         """Remove expired entries."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired = [
             key for key, data in self._store.items()
             if data.get("expires_at", now) < now
@@ -222,8 +222,8 @@ class IdempotencyStore:
         self._store[key] = {
             "result": result,
             "status": status,
-            "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(seconds=self._ttl)
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(seconds=self._ttl)
         }
 
     def is_in_progress(self, key: str) -> bool:
@@ -237,8 +237,8 @@ class IdempotencyStore:
         self._store[key] = {
             "result": None,
             "status": "in_progress",
-            "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(seconds=300)  # 5 min timeout for in-progress
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(seconds=300)  # 5 min timeout for in-progress
         }
 
     def clear(self, key: str):

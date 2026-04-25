@@ -5,7 +5,7 @@ Endpoints for customer analytics, segmentation, LTV, churn prediction, and cohor
 """
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 
 from ospra_os.analytics.customer_analytics import CustomerAnalytics
@@ -68,7 +68,7 @@ async def get_customer_overview():
         "at_risk_count": len(at_risk),
         "high_value_count": len([c for c in mock_customers if c.get('ltv', 0) > 300]),
         "segments": segments,
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.now(timezone.utc).isoformat()
     }
 
     return overview
@@ -91,7 +91,7 @@ async def get_customer_segments():
     return {
         "segments": segments,
         "total_customers": len(mock_customers),
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -215,7 +215,7 @@ async def get_at_risk_customers(
         "at_risk_customers": at_risk,
         "total_count": len(at_risk),
         "threshold": threshold,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -223,7 +223,7 @@ async def get_at_risk_customers(
 
 @router.get("/cohorts")
 async def get_cohort_analysis(
-    cohort_type: str = Query("monthly", regex="^(monthly|weekly)$"),
+    cohort_type: str = Query("monthly", pattern="^(monthly|weekly)$"),
     periods: int = Query(12, ge=1, le=24)
 ):
     """
@@ -257,7 +257,7 @@ async def get_cohort_ltv():
 
     return {
         "cohort_ltv": cohort_ltv,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -294,7 +294,7 @@ async def get_ltv_by_segment():
 
     return {
         "segment_ltv": segment_ltv,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -312,7 +312,7 @@ async def get_ltv_by_source():
 
     return {
         "source_ltv": source_ltv,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -339,7 +339,7 @@ async def get_top_customers_by_ltv(
     return {
         "top_customers": top_customers,
         "total_count": len(top_customers),
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -387,7 +387,7 @@ async def get_ltv_distribution():
     return {
         "distribution": distribution,
         "total_customers": total_customers,
-        "generated_at": datetime.utcnow().isoformat()
+        "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -459,14 +459,14 @@ async def sync_from_shopify(
             )
         else:
             # Incremental sync (last 24 hours)
-            since = datetime.utcnow() - timedelta(days=1)
+            since = datetime.now(timezone.utc) - timedelta(days=1)
             customers = await sync.sync_updated_customers(since, save_to_db=True)
 
         return {
             "success": True,
             "customers_synced": len(customers),
             "sync_type": "full" if full_sync else "incremental",
-            "synced_at": datetime.utcnow().isoformat()
+            "synced_at": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -495,7 +495,7 @@ async def sync_single_customer(
         return {
             "success": True,
             "customer": customer,
-            "synced_at": datetime.utcnow().isoformat()
+            "synced_at": datetime.now(timezone.utc).isoformat()
         }
 
     except HTTPException:

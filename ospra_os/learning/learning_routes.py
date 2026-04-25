@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, HTTPException, status
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ospra_os.database import SessionLocal
 from ospra_os.learning.hybrid_learning_engine import get_learning_engine
@@ -194,12 +194,36 @@ async def record_feedback(request: FeedbackRequest):
                 "niche": request.details.get("niche", "unknown"),
                 "price": request.details.get("price", 0),
                 "product_name": request.details.get("product_name", ""),
-                "date": datetime.utcnow().isoformat()
+                "date": datetime.now(timezone.utc).isoformat()
             }]
 
             # Trigger learning cycle
             await engine.learn_global(sale_data, request.user_id)
             await engine.learn_personal(request.user_id, sale_data)
+
+        # PostHog activation funnel (task #38) — fire FIRST_SALE on the
+        # `first_sale` action. PostHog dedupes per-user-per-event server-side
+        # for clean funnel reporting.
+        if request.action == "first_sale":
+            try:
+                from ospra_os.observability.posthog_client import (
+                    capture as posthog_capture,
+                    FunnelEvent,
+                )
+                details = request.details or {}
+                posthog_capture(
+                    request.user_id,
+                    FunnelEvent.FIRST_SALE,
+                    properties={
+                        "product_id": request.product_id,
+                        "revenue": details.get("actual_revenue", 0),
+                        "units_sold": details.get("units_sold", 0),
+                        "days_to_first_sale": details.get("days_to_first_sale"),
+                    },
+                )
+            except Exception as _e:
+                # Telemetry failures must never break the feedback path.
+                pass
 
         return {
             "success": True,
@@ -418,7 +442,7 @@ async def record_ad_performance(
                 "cpa": round(cpa, 2),
                 "roas": round(roas, 2),
                 "source": "ad_metrics_api",
-                "recorded_at": datetime.utcnow().isoformat()
+                "recorded_at": datetime.now(timezone.utc).isoformat()
             }
         )
         db.add(event)
@@ -509,7 +533,7 @@ async def trigger_global_analysis():
         return {
             "success": True,
             "message": "Global pattern analysis completed",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -541,7 +565,7 @@ async def trigger_personal_analysis(user_id: int):
             "success": True,
             "message": f"Personal pattern analysis completed for user {user_id}",
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -571,7 +595,7 @@ async def trigger_all_users_analysis():
         return {
             "success": True,
             "message": "Personal pattern analysis completed for all users",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -656,7 +680,7 @@ async def trigger_learning_now():
         return {
             "success": True,
             "message": "Learning cycle completed",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except ImportError:
         raise HTTPException(
@@ -743,9 +767,9 @@ async def simulate_sale(
                 "quantity": 1,
                 "revenue": price,
                 "source": "simulation",
-                "sale_timestamp": datetime.utcnow().isoformat()
+                "sale_timestamp": datetime.now(timezone.utc).isoformat()
             },
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(timezone.utc)
         )
         db.add(event)
         db.commit()

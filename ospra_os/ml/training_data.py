@@ -26,7 +26,7 @@ Output Format: JSONL
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -108,7 +108,7 @@ class TrainingDataCollector:
             from ospra_os.database import ProductHistory, StoreProduct
 
             # Query high-performing products
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
             products = self.db.query(StoreProduct).filter(
                 and_(
@@ -171,7 +171,7 @@ Format as JSON.
                         "conversion_rate": float(product.conversion_rate),
                         "revenue": float(product.total_revenue),
                         "orders": product.total_orders,
-                        "collected_at": datetime.utcnow().isoformat()
+                        "collected_at": datetime.now(timezone.utc).isoformat()
                     }
                 ))
 
@@ -269,7 +269,7 @@ Format as JSON.
         try:
             from ospra_os.database import StoreProduct
 
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
             # Get products with descriptions and good performance
             products = self.db.query(StoreProduct).filter(
@@ -325,7 +325,7 @@ Write 2-3 compelling paragraphs.
                         "conversion_rate": float(product.conversion_rate),
                         "ctr": float(ctr),
                         "views": product.total_views,
-                        "collected_at": datetime.utcnow().isoformat()
+                        "collected_at": datetime.now(timezone.utc).isoformat()
                     }
                 ))
 
@@ -362,7 +362,7 @@ Write 2-3 compelling paragraphs.
         try:
             from ospra_os.database import StoreProduct, ProductHistory
 
-            cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_back)
 
             # Get products with price history and good performance
             products = self.db.query(StoreProduct).filter(
@@ -420,7 +420,7 @@ Recommendation: Maintain current pricing. Monitor conversion rate and adjust if 
                         "revenue": float(product.total_revenue),
                         "orders": product.total_orders,
                         "conversion_rate": float(product.conversion_rate),
-                        "collected_at": datetime.utcnow().isoformat()
+                        "collected_at": datetime.now(timezone.utc).isoformat()
                     }
                 ))
 
@@ -493,7 +493,7 @@ Recommendation: Maintain current pricing. Monitor conversion rate and adjust if 
         """
 
         if not filename:
-            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             filename = f"{task_type}_{timestamp}.jsonl"
 
         output_path = self.output_dir / filename

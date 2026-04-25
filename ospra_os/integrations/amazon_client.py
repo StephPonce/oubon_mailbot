@@ -29,7 +29,7 @@ import os
 import time
 import logging
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 import requests
@@ -83,7 +83,7 @@ class AWSAuthV4(AuthBase):
         # or implement full AWS SigV4 signing
 
         # Add required AWS headers
-        request.headers['x-amz-date'] = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+        request.headers['x-amz-date'] = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
         request.headers['x-amz-access-token'] = getattr(self, 'access_token', '')
 
         return request
@@ -170,7 +170,7 @@ class AmazonSPAPIClient:
 
         # Return cached token if still valid
         if not force_refresh and self._access_token and self._token_expires_at:
-            if datetime.utcnow() < self._token_expires_at - timedelta(minutes=5):
+            if datetime.now(timezone.utc) < self._token_expires_at - timedelta(minutes=5):
                 return self._access_token
 
         logger.info("Refreshing Amazon LWA access token")
@@ -192,7 +192,7 @@ class AmazonSPAPIClient:
 
             self._access_token = token_data["access_token"]
             expires_in = token_data.get("expires_in", 3600)  # Default 1 hour
-            self._token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            self._token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
 
             logger.info(f"Access token refreshed, expires in {expires_in}s")
             return self._access_token

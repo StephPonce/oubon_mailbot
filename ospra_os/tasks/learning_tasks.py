@@ -10,7 +10,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from ospra_os.celery_app import celery_app
@@ -56,7 +56,7 @@ def analyze_learnings(self) -> Dict[str, Any]:
         return {
             "status": "success",
             "users_queued": queued_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -120,7 +120,7 @@ def analyze_user_learnings(self, user_id: int) -> Dict[str, Any]:
             "status": "success",
             "user_id": user_id,
             "insights_found": insights_found,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -168,7 +168,7 @@ def record_action_outcome(
         #     action_id=action_id,
         #     outcome=outcome,
         #     metrics=metrics,
-        #     recorded_at=datetime.utcnow()
+        #     recorded_at=datetime.now(timezone.utc)
         # )
         #
         # self.db.add(outcome_record)
@@ -180,7 +180,7 @@ def record_action_outcome(
             "status": "recorded",
             "action_id": action_id,
             "outcome": outcome,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -238,7 +238,7 @@ def detect_patterns(self, user_id: int, pattern_type: str) -> Dict[str, Any]:
             "user_id": user_id,
             "pattern_type": pattern_type,
             "patterns": patterns_found,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -294,7 +294,7 @@ def train_recommendation_model(self, user_id: int) -> Dict[str, Any]:
             "status": "success",
             "user_id": user_id,
             "model_accuracy": model_accuracy,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -353,7 +353,7 @@ def analyze_competitor_strategies(self, user_id: int, niche: str) -> Dict[str, A
             "user_id": user_id,
             "niche": niche,
             "insights": insights_found,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

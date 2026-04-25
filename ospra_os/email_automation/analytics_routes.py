@@ -6,7 +6,7 @@ FastAPI endpoints for email automation metrics and dashboard statistics.
 
 from fastapi import APIRouter, Query
 from typing import List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.analytics import Analytics, EmailMetric
 from ospra_os.core.settings import Settings
 
@@ -165,7 +165,7 @@ async def get_performance_metrics():
     analytics = Analytics(settings.database_url)
 
     # Get last 7 days for performance metrics
-    start_date = datetime.utcnow() - timedelta(days=7)
+    start_date = datetime.now(timezone.utc) - timedelta(days=7)
     session = analytics.session
 
     recent_metrics = session.query(EmailMetric).filter(

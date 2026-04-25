@@ -16,7 +16,7 @@ Uses both REST Admin API and GraphQL Admin API.
 import os
 import httpx
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -341,7 +341,7 @@ class ShopifyClient:
         Returns:
             Dictionary with sales metrics
         """
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
         orders = await self.get_orders(
             limit=250,
             status="any",

@@ -42,7 +42,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ class SentimentRefresher:
             'refreshed': refreshed,
             'errors': errors,
             'skipped': skipped,
-            'ran_at': datetime.utcnow().isoformat(),
+            'ran_at': datetime.now(timezone.utc).isoformat(),
         }
         logger.info(
             f"[SENTIMENT-REFRESH] Complete: {refreshed}/{len(watched)} refreshed, "
@@ -337,7 +337,7 @@ def _default_writer(product: Dict, score: float) -> None:
         if row is None:
             return
         row.social_score = float(score)
-        row.last_updated = datetime.utcnow()
+        row.last_updated = datetime.now(timezone.utc)
         db.commit()
     except Exception as e:
         logger.error(f"[SENTIMENT-REFRESH] DB write failed for product {product_id}: {e}")

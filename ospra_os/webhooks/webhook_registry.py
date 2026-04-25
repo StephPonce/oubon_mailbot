@@ -12,7 +12,7 @@ import httpx
 import logging
 import os
 from typing import Dict, List, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .webhook_utils import WebhookTopics
 
@@ -213,7 +213,7 @@ class ShopifyWebhookRegistry:
             "failed": failed,
             "webhook_url_base": self.webhook_url_base,
             "details": results,
-            "registered_at": datetime.utcnow().isoformat(),
+            "registered_at": datetime.now(timezone.utc).isoformat(),
         }
         
         logger.info(

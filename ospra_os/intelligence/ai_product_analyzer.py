@@ -32,7 +32,7 @@ import logging
 import hashlib
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class COOAnalysis:
     score_breakdown: Dict[str, Any] = field(default_factory=dict)  # Detailed score components
 
     # Metadata
-    analyzed_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    analyzed_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     analysis_version: str = "v2.0"  # Updated version
     
     def to_dict(self) -> Dict[str, Any]:
@@ -173,7 +173,7 @@ class AnalysisCache:
         ttl = entry.get("ttl", self._default_ttl)
 
         # Check if expired
-        if datetime.utcnow() - cached_at > ttl:
+        if datetime.now(timezone.utc) - cached_at > ttl:
             del self._cache[key]
             self._stats["evictions"] += 1
             self._stats["misses"] += 1
@@ -193,7 +193,7 @@ class AnalysisCache:
         key = self._generate_key(product, store_context)
         self._cache[key] = {
             "analysis": analysis,
-            "cached_at": datetime.utcnow(),
+            "cached_at": datetime.now(timezone.utc),
             "ttl": ttl or self._default_ttl,
             "product_id": product.get("id") or product.get("product_id"),
         }
@@ -214,7 +214,7 @@ class AnalysisCache:
 
     def cleanup_expired(self) -> int:
         """Remove expired entries."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_keys = []
 
         for key, entry in self._cache.items():
@@ -756,7 +756,7 @@ Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
             "[STATS] STRATEGIC PRODUCT ANALYSIS SUMMARY",
             "=" * 60,
             f"\nAnalyzed: {len(analyses)} products",
-            f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+            f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
             "",
         ]
         

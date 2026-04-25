@@ -18,7 +18,7 @@ Date: November 2025
 
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 
@@ -151,7 +151,7 @@ class AutoDiscoveryJob:
             dict: Discovery results with products found, saved, deployed, etc.
         """
         logger.info(f"Starting discovery for user {user_id} (timeout: {timeout_seconds}s)")
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             # Step 1: Get user and settings
@@ -196,7 +196,7 @@ class AutoDiscoveryJob:
                 last_log = None  # Mock
 
                 if last_log and hasattr(last_log, 'created_at'):
-                    hours_since_last = (datetime.utcnow() - last_log.created_at).total_seconds() / 3600
+                    hours_since_last = (datetime.now(timezone.utc) - last_log.created_at).total_seconds() / 3600
                     min_hours = settings.get('discovery_interval_hours', 12)
 
                     if hours_since_last < min_hours:
@@ -323,7 +323,7 @@ class AutoDiscoveryJob:
                         logger.error(f"Auto-deploy failed for product {product.get('id')}: {e}")
 
             # Step 8: Create discovery log
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration_seconds = (end_time - start_time).total_seconds()
 
             log_data = {
@@ -347,6 +347,31 @@ class AutoDiscoveryJob:
                 f"{len(saved_products)} saved, {deployed_count} deployed, "
                 f"{duration_seconds:.1f}s"
             )
+
+            # PostHog activation funnel (task #38) — fire FIRST_DISCOVERY only
+            # for the first successful run that produced at least one product.
+            # The capture() helper is a no-op when PostHog is disabled, and
+            # PostHog itself dedupes per-user-per-event server-side, so emitting
+            # on every run still yields a clean activation curve.
+            if len(all_products) > 0:
+                try:
+                    from ospra_os.observability.posthog_client import (
+                        capture as posthog_capture,
+                        FunnelEvent,
+                    )
+                    posthog_capture(
+                        user_id,
+                        FunnelEvent.FIRST_DISCOVERY,
+                        properties={
+                            "niches_searched": len(niches),
+                            "products_found": len(all_products),
+                            "products_saved": len(saved_products),
+                            "duration_seconds": round(duration_seconds, 1),
+                        },
+                    )
+                except Exception as _e:
+                    # Telemetry must never break the discovery path.
+                    logger.debug(f"[POSTHOG] FIRST_DISCOVERY capture failed: {_e}")
 
             return {
                 "success": True,
@@ -376,7 +401,7 @@ class AutoDiscoveryJob:
             dict: Summary statistics for all users
         """
         logger.info("Starting discovery for all users")
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
 
         try:
             # Get all active users with auto-discovery enabled
@@ -413,7 +438,7 @@ class AutoDiscoveryJob:
             total_products_deployed = sum(r.get('products_deployed', 0) for r in successful)
             total_high_priority = sum(r.get('high_priority_count', 0) for r in successful)
 
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             total_duration = (end_time - start_time).total_seconds()
 
             summary = {
@@ -636,7 +661,7 @@ class AutoDiscoveryJob:
             'status': 'discovered',
             'discovery_score': product_data.get('score', 0.0),
             'ai_explanation': product_data.get('explanation', ''),
-            'discovered_at': datetime.utcnow(),
+            'discovered_at': datetime.now(timezone.utc),
             'source': product_data.get('source', 'auto_discovery'),
             'source_url': product_data.get('url', '')
         }
@@ -682,7 +707,7 @@ class AutoDiscoveryJob:
             #     title='New High-Priority Products Found',
             #     message=message,
             #     link='/dashboard/products?filter=discovered',
-            #     created_at=datetime.utcnow()
+            #     created_at=datetime.now(timezone.utc)
             # )
             # self.db.add(notification)
             # self.db.commit()
@@ -751,7 +776,7 @@ class AutoDiscoveryJob:
             dict: Statistics including products found, saved, deployed
         """
         try:
-            since_date = datetime.utcnow() - timedelta(days=days)
+            since_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Query discovery logs
             # logs = self.db.query(DiscoveryLog).filter(

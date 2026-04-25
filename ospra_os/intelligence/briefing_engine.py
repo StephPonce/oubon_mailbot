@@ -13,7 +13,7 @@ Key features:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from anthropic import Anthropic
 from sqlalchemy.orm import Session
@@ -82,7 +82,7 @@ class BriefingEngine:
         recommended_actions = self._get_recommended_actions(context, attention_items)
 
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "briefing_text": briefing_text,
             "attention_items": attention_items,
             "key_metrics": key_metrics,
@@ -387,7 +387,7 @@ Use plain text with clear paragraph breaks only."""
     ) -> str:
         """Generate template-based briefing if AI fails"""
 
-        briefing = f"""# Business Briefing - {datetime.utcnow().strftime('%Y-%m-%d')}
+        briefing = f"""# Business Briefing - {datetime.now(timezone.utc).strftime('%Y-%m-%d')}
 
 ## Overview
 

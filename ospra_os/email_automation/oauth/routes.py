@@ -8,7 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
@@ -213,7 +213,7 @@ async def connect_imap_smtp_provider(
                 existing.encrypted_credentials = encrypted_credentials
                 existing.is_active = True
                 existing.sync_status = 'active'
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 email_account = existing
             else:
                 # Check if this is user's first email account (make it primary)
@@ -316,7 +316,7 @@ async def email_oauth_callback(
                 existing.encrypted_credentials = encrypted_credentials
                 existing.is_active = True
                 existing.sync_status = 'active'
-                existing.updated_at = datetime.utcnow()
+                existing.updated_at = datetime.now(timezone.utc)
                 email_account = existing
             else:
                 # Check if this is user's first email account (make it primary)
@@ -493,7 +493,7 @@ async def set_primary_email(
 
         # Set this account as primary
         account.is_primary = True
-        account.updated_at = datetime.utcnow()
+        account.updated_at = datetime.now(timezone.utc)
 
         session.commit()
 

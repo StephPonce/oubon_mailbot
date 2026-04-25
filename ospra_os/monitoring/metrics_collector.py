@@ -6,7 +6,7 @@ Collects and stores API performance metrics
 import time
 from functools import wraps
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import statistics
 
@@ -29,7 +29,7 @@ class MetricsCollector:
     ):
         """Record API request metrics"""
         metric = {
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
             "method": method,
             "status_code": status_code,
             "duration_ms": duration_ms,
@@ -41,7 +41,7 @@ class MetricsCollector:
         # Record errors
         if error or status_code >= 400:
             self.errors.append({
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
                 "endpoint": endpoint,
                 "method": method,
                 "status_code": status_code,
@@ -53,7 +53,7 @@ class MetricsCollector:
 
     def get_endpoint_stats(self, endpoint: str, hours: int = 24) -> Optional[dict]:
         """Get statistics for specific endpoint"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent = [m for m in self.metrics.get(endpoint, []) if m['timestamp'] > cutoff]
 
         if not recent:
@@ -77,7 +77,7 @@ class MetricsCollector:
 
     def get_all_stats(self, hours: int = 24) -> dict:
         """Get overall API statistics"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         all_requests = []
         all_durations = []
@@ -110,7 +110,7 @@ class MetricsCollector:
 
     def get_slowest_endpoints(self, limit: int = 10, hours: int = 24) -> list:
         """Get slowest API endpoints"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         endpoint_stats = []
         for endpoint in self.metrics.keys():
@@ -128,7 +128,7 @@ class MetricsCollector:
 
     def get_recent_errors(self, hours: int = 24, limit: int = 100) -> list:
         """Get recent errors"""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         recent_errors = [e for e in self.errors if e['timestamp'] > cutoff]
         recent_errors.sort(key=lambda x: x['timestamp'], reverse=True)
         return recent_errors[:limit]
@@ -143,7 +143,7 @@ class MetricsCollector:
 
     def _cleanup_old_metrics(self):
         """Remove metrics older than max_history_hours"""
-        cutoff = datetime.utcnow() - timedelta(hours=self.max_history_hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=self.max_history_hours)
 
         # Cleanup endpoint metrics
         for endpoint in list(self.metrics.keys()):

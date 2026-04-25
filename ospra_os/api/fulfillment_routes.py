@@ -14,7 +14,7 @@ Author: Ospra Intelligence
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import os
 import json
@@ -121,7 +121,7 @@ async def fulfillment_status():
             "customer_notifications": True,
             "manual_queue": True
         },
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -244,7 +244,7 @@ async def add_tracking_number(
                 order['carrier'] = request.carrier
                 order['tracking_url'] = request.tracking_url
                 order['status'] = 'shipped'
-                order['fulfilled_at'] = datetime.utcnow().isoformat()
+                order['fulfilled_at'] = datetime.now(timezone.utc).isoformat()
                 break
         
         save_fulfillment_queue(queue)
@@ -279,7 +279,7 @@ async def mark_order_fulfilled(
                 order['status'] = 'shipped'
                 order['tracking_number'] = request.tracking_number
                 order['carrier'] = request.carrier
-                order['fulfilled_at'] = datetime.utcnow().isoformat()
+                order['fulfilled_at'] = datetime.now(timezone.utc).isoformat()
                 break
         else:
             raise HTTPException(status_code=404, detail="Order not found in queue")
@@ -495,7 +495,7 @@ async def add_to_queue(
             "quantity": quantity,
             "shipping_address": shipping_address,
             "status": "manual",
-            "created_at": datetime.utcnow().isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat()
         }
         
         queue.append(new_order)

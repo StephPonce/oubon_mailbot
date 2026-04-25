@@ -11,7 +11,7 @@ This is displayed as a dashboard card AND sent as a morning email.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc
@@ -95,7 +95,7 @@ class DailyBriefGenerator:
         )
 
         # Get user greeting
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         hour = now.hour
         if hour < 12:
             greeting = "Good morning"

@@ -7,7 +7,7 @@ and executes actions automatically.
 
 import re
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from ospra_os.database import (
@@ -79,7 +79,7 @@ class AutomationEngine:
 
                     # Update rule statistics
                     rule.times_triggered += 1
-                    rule.last_triggered = datetime.utcnow()
+                    rule.last_triggered = datetime.now(timezone.utc)
                     session.commit()
 
         return {
@@ -240,7 +240,7 @@ class AutomationEngine:
 
                     # Update template usage stats
                     template.times_used += 1
-                    template.last_used = datetime.utcnow()
+                    template.last_used = datetime.now(timezone.utc)
                     session.commit()
                 else:
                     # Use action_value as message directly
@@ -310,7 +310,7 @@ class AutomationEngine:
                     from_name=email.from_name or '',
                     subject=email.subject or '',
                     body=email.body_plain or '',
-                    received_at=email.received_at or datetime.utcnow()
+                    received_at=email.received_at or datetime.now(timezone.utc)
                 )
                 
                 if ai_result.get('should_respond'):

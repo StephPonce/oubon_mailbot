@@ -4,7 +4,7 @@ Background Jobs for A/B Testing
 Automated test monitoring, management, and notifications.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
@@ -68,7 +68,7 @@ class ABTestMonitor:
 
     def _auto_end_tests(self, db: Session, engine: ABTestEngine):
         """Auto-end tests that have reached their scheduled end time"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Find running tests with scheduled_end in the past
         result = db.execute(
@@ -201,7 +201,7 @@ class ABTestMonitor:
 
                 if result.get("success"):
                     # Mark as implemented
-                    test.test_metadata["implemented_at"] = datetime.utcnow().isoformat()
+                    test.test_metadata["implemented_at"] = datetime.now(timezone.utc).isoformat()
                     test.test_metadata["shopify_result"] = result
                     db.commit()
 
@@ -225,7 +225,7 @@ class ABTestMonitor:
 
         db = get_multi_store_session(self.database_url)
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Find old ended tests
             result = db.execute(
@@ -246,7 +246,7 @@ class ABTestMonitor:
 
             for test in old_tests:
                 # Archive test data to metadata before deletion
-                test.test_metadata["archived_at"] = datetime.utcnow().isoformat()
+                test.test_metadata["archived_at"] = datetime.now(timezone.utc).isoformat()
                 test.test_metadata["archived"] = True
 
             db.commit()
@@ -280,7 +280,7 @@ class ABTestMonitor:
             ended = sum(1 for t in all_tests if t.status == TestStatus.ENDED.value)
 
             summary = {
-                "date": datetime.utcnow().isoformat(),
+                "date": datetime.now(timezone.utc).isoformat(),
                 "running_tests": running,
                 "paused_tests": paused,
                 "ended_tests": ended,

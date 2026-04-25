@@ -12,7 +12,7 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import uuid
 import logging
@@ -100,7 +100,7 @@ def create_reset_token(email: str, db: Session) -> str:
     reset_token = PasswordResetToken(
         token=token_hash,  # SECURITY: Hashed token stored
         email=email,
-        expires_at=datetime.utcnow() + timedelta(hours=1)
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1)
     )
 
     db.add(reset_token)
@@ -355,7 +355,7 @@ def cleanup_expired_tokens(db: Session):
     Returns:
         int: Number of expired tokens removed
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Find and delete all expired tokens
     expired_count = db.query(PasswordResetToken).filter(

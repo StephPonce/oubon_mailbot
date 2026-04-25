@@ -19,7 +19,7 @@ Date: November 2025
 
 import logging
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -206,7 +206,7 @@ class UnifiedProductDeployer:
                         'input_tokens': ai_content.get('usage', {}).get('input_tokens', 0),
                         'output_tokens': ai_content.get('usage', {}).get('output_tokens', 0),
                         'cost': ai_content.get('usage', {}).get('cost', 0.0),
-                        'created_at': datetime.utcnow()
+                        'created_at': datetime.now(timezone.utc)
                     }
 
                     logger.info(f"AI content generated: {len(ai_content.get('description', ''))} chars")
@@ -258,7 +258,7 @@ class UnifiedProductDeployer:
                 'platform_product_id': deployment_result.get('platform_product_id', ''),
                 'platform_url': deployment_result.get('platform_url', ''),
                 'status': 'active',
-                'deployed_at': datetime.utcnow(),
+                'deployed_at': datetime.now(timezone.utc),
                 'ai_content': ai_content if ai_content else None,
                 'deployment_metadata': deployment_result.get('metadata', {})
             }
@@ -502,8 +502,8 @@ class UnifiedProductDeployer:
                 raise DeploymentError(f"Platform update failed: {update_result.get('error')}")
 
             # Update deployment record
-            # deployment.updated_at = datetime.utcnow()
-            # deployment.last_sync = datetime.utcnow()
+            # deployment.updated_at = datetime.now(timezone.utc)
+            # deployment.last_sync = datetime.now(timezone.utc)
             # self.db.commit()
 
             logger.info(f"[SUCCESS] Deployment {deployment_id} updated successfully")
@@ -597,7 +597,7 @@ class UnifiedProductDeployer:
 
             # Update deployment status
             # deployment.status = 'removed'
-            # deployment.removed_at = datetime.utcnow()
+            # deployment.removed_at = datetime.now(timezone.utc)
             # self.db.commit()
 
             logger.info(f"[SUCCESS] Deployment {deployment_id} removed successfully")
@@ -606,7 +606,7 @@ class UnifiedProductDeployer:
                 "success": True,
                 "deployment_id": deployment_id,
                 "permanent": permanent,
-                "removed_at": datetime.utcnow().isoformat()
+                "removed_at": datetime.now(timezone.utc).isoformat()
             }
 
         except Exception as e:
@@ -949,5 +949,5 @@ Format as JSON with keys: title, description, short_description, tags, seo_title
             'platform_url': 'https://test.myshopify.com/admin/products/123',
             'status': 'active',
             'ai_content': {},
-            'deployed_at': datetime.utcnow()
+            'deployed_at': datetime.now(timezone.utc)
         }

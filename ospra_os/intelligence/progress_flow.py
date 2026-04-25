@@ -19,7 +19,7 @@ Features:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple, Any
 from enum import Enum
 from sqlalchemy.orm import Session
@@ -135,7 +135,7 @@ class ProgressFlowTracker:
             "next_milestone_date": next_date.isoformat() if next_date else None,
             "stage_history": stage_history,
             "milestones": milestones,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     async def advance_stage(
@@ -176,10 +176,10 @@ class ProgressFlowTracker:
 
         # Update timestamps
         if new_stage == LifecycleStage.DEPLOY and not product.queued_at:
-            product.queued_at = datetime.utcnow()
+            product.queued_at = datetime.now(timezone.utc)
 
         if new_stage == LifecycleStage.ACTIVE and not product.deployed_at:
-            product.deployed_at = datetime.utcnow()
+            product.deployed_at = datetime.now(timezone.utc)
 
         self.db.commit()
 
@@ -195,7 +195,7 @@ class ProgressFlowTracker:
         if product.status == ProductStatus.ACTIVE:
             # Check if in review period (30/60/90 days)
             if product.deployed_at:
-                days_active = (datetime.utcnow() - product.deployed_at).days
+                days_active = (datetime.now(timezone.utc) - product.deployed_at).days
 
                 # Review periods: 30, 60, 90 days
                 if days_active in range(28, 35) or days_active in range(58, 65) or days_active in range(88, 95):
@@ -244,7 +244,7 @@ class ProgressFlowTracker:
         if stage == LifecycleStage.ACTIVE:
             # Progress toward 30-day milestone
             if product.deployed_at:
-                days_active = (datetime.utcnow() - product.deployed_at).days
+                days_active = (datetime.now(timezone.utc) - product.deployed_at).days
                 return min(int((days_active / 30) * 100), 100)
             return 0
 
@@ -260,7 +260,7 @@ class ProgressFlowTracker:
     def _get_days_in_stage(self, product: Product, stage: LifecycleStage) -> int:
         """Calculate days product has been in current stage"""
 
-        reference_date = datetime.utcnow()
+        reference_date = datetime.now(timezone.utc)
 
         if stage == LifecycleStage.DISCOVERY:
             if product.discovered_at:
@@ -301,17 +301,17 @@ class ProgressFlowTracker:
         """Get next milestone name and date"""
 
         if stage == LifecycleStage.DISCOVERY:
-            return "AI Analysis", datetime.utcnow() + timedelta(days=1)
+            return "AI Analysis", datetime.now(timezone.utc) + timedelta(days=1)
 
         if stage == LifecycleStage.ANALYSIS:
-            return "Deploy Decision", datetime.utcnow() + timedelta(days=2)
+            return "Deploy Decision", datetime.now(timezone.utc) + timedelta(days=2)
 
         if stage == LifecycleStage.DEPLOY:
-            return "Go Live", datetime.utcnow() + timedelta(days=3)
+            return "Go Live", datetime.now(timezone.utc) + timedelta(days=3)
 
         if stage == LifecycleStage.ACTIVE:
             if product.deployed_at:
-                days_active = (datetime.utcnow() - product.deployed_at).days
+                days_active = (datetime.now(timezone.utc) - product.deployed_at).days
 
                 if days_active < 30:
                     return "30-Day Review", product.deployed_at + timedelta(days=30)
@@ -325,7 +325,7 @@ class ProgressFlowTracker:
             return "30-Day Review", None
 
         if stage == LifecycleStage.REVIEW:
-            return "Review Complete", datetime.utcnow() + timedelta(days=7)
+            return "Review Complete", datetime.now(timezone.utc) + timedelta(days=7)
 
         if stage == LifecycleStage.DROPPED:
             return "Archived", None
@@ -366,7 +366,7 @@ class ProgressFlowTracker:
             history.append({
                 "stage": "active",
                 "entered": product.deployed_at.isoformat(),
-                "duration_days": (datetime.utcnow() - product.deployed_at).days
+                "duration_days": (datetime.now(timezone.utc) - product.deployed_at).days
             })
 
         return history
@@ -404,15 +404,15 @@ class ProgressFlowTracker:
         if product.deployed_at:
             milestones["30_day_review"] = {
                 "date": (product.deployed_at + timedelta(days=30)).isoformat(),
-                "completed": (datetime.utcnow() - product.deployed_at).days >= 30
+                "completed": (datetime.now(timezone.utc) - product.deployed_at).days >= 30
             }
             milestones["60_day_review"] = {
                 "date": (product.deployed_at + timedelta(days=60)).isoformat(),
-                "completed": (datetime.utcnow() - product.deployed_at).days >= 60
+                "completed": (datetime.now(timezone.utc) - product.deployed_at).days >= 60
             }
             milestones["90_day_review"] = {
                 "date": (product.deployed_at + timedelta(days=90)).isoformat(),
-                "completed": (datetime.utcnow() - product.deployed_at).days >= 90
+                "completed": (datetime.now(timezone.utc) - product.deployed_at).days >= 90
             }
         else:
             milestones["30_day_review"] = {"date": None, "completed": False}

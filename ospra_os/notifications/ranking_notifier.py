@@ -9,7 +9,7 @@ Date: November 2025
 
 import logging
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ class RankingNotifier:
     </div>
 
     <div class="footer">
-        <p>OspraOS Product Rankings | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        <p>OspraOS Product Rankings | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</p>
     </div>
 </body>
 </html>
@@ -248,7 +248,7 @@ class RankingNotifier:
     </div>
 
     <div class="footer">
-        <p>OspraOS Product Rankings | {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}</p>
+        <p>OspraOS Product Rankings | {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}</p>
         <p><a href="http://localhost:5173/rankings" style="color: #3b82f6;">View Full Rankings Dashboard</a></p>
     </div>
 </body>

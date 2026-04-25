@@ -11,7 +11,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from ospra_os.celery_app import celery_app
@@ -76,7 +76,7 @@ def sync_shopify_products(self, store_id: int) -> Dict[str, Any]:
         products_synced = 0
 
         # Update last sync time
-        store.last_sync_at = datetime.utcnow()
+        store.last_sync_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info(f"Synced {products_synced} products for store {store_id}")
@@ -85,7 +85,7 @@ def sync_shopify_products(self, store_id: int) -> Dict[str, Any]:
             "status": "success",
             "store_id": store_id,
             "products_synced": products_synced,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -123,7 +123,7 @@ def sync_all_stores(self) -> Dict[str, Any]:
         return {
             "status": "success",
             "stores_queued": queued_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -184,7 +184,7 @@ def check_inventory_levels(self) -> Dict[str, Any]:
             "low_stock": low_stock_count,
             "out_of_stock": out_of_stock_count,
             "alerts_sent": alerts_sent,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -248,7 +248,7 @@ def sync_orders(self, store_id: int, since_date: str = None) -> Dict[str, Any]:
             "status": "success",
             "store_id": store_id,
             "orders_synced": orders_synced,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -311,7 +311,7 @@ def update_product_inventory(
 
         # Update local database
         product.inventory_quantity = new_quantity
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(timezone.utc)
         self.db.commit()
 
         logger.info(f"Inventory updated for product {product_id}")
@@ -320,7 +320,7 @@ def update_product_inventory(
             "status": "success",
             "product_id": product_id,
             "new_quantity": new_quantity,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

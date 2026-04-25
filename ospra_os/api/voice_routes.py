@@ -26,7 +26,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ospra_os.database import get_db, User
 from ospra_os.auth.jwt_auth import get_current_user
@@ -214,7 +214,7 @@ def _get_user_context(db: Session, user_id: int) -> Dict[str, Any]:
     # Get today's revenue and orders
     # Note: This would connect to your Shopify/order tracking system
     # For now, using placeholder values
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     today_revenue = 0.0  # TODO: Query from Shopify API or orders table
     today_orders = 0     # TODO: Query from orders table
@@ -253,7 +253,7 @@ async def transcribe_audio(
 
     SECURITY: File uploads are validated for size, format, and MIME type.
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # SECURITY: Validate uploaded file (size, format, MIME type, magic bytes)
@@ -263,7 +263,7 @@ async def transcribe_audio(
         processor = VoiceProcessor()
         transcript = await processor.transcribe_audio(audio_data, format=file_ext)
 
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
         return TranscribeResponse(
             transcript=transcript,
@@ -310,7 +310,7 @@ async def process_voice_command(
 
     SECURITY: File uploads are validated for size, format, and MIME type.
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # SECURITY: Validate uploaded file (size, format, MIME type, magic bytes)
@@ -326,7 +326,7 @@ async def process_voice_command(
         # Process command
         result = await processor.process_command(transcript, user_context)
 
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
         return CommandResponse(
             command_type=result.get("type", "unknown"),
@@ -371,7 +371,7 @@ async def process_text_command(
     - "Show me pending actions"
     - "Enable auto-pilot mode"
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     try:
         processor = VoiceProcessor()
@@ -382,7 +382,7 @@ async def process_text_command(
         # Process command
         result = await processor.process_command(request.text, user_context)
 
-        duration_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        duration_ms = int((datetime.now(timezone.utc) - start_time).total_seconds() * 1000)
 
         return CommandResponse(
             command_type=result.get("type", "unknown"),

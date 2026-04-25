@@ -9,7 +9,7 @@ Scheduled Jobs:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, List
 
 from ospra_os.celery_app import celery_app
@@ -49,7 +49,7 @@ def daily_product_discovery(self) -> Dict[str, Any]:
         return {
             "status": "success",
             "users_queued": queued_count,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -101,7 +101,7 @@ def discover_products_for_user(self, user_id: int) -> Dict[str, Any]:
             "status": "success",
             "user_id": user_id,
             "products_found": len(products_found),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -150,7 +150,7 @@ def monitor_supplier_prices(self) -> Dict[str, Any]:
             "status": "success",
             "products_checked": checked_count,
             "price_changes": price_changes,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -207,7 +207,7 @@ def analyze_product_performance(self, product_id: int) -> Dict[str, Any]:
         return {
             "status": "success",
             "metrics": metrics,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:
@@ -246,7 +246,7 @@ def batch_analyze_products(self, product_ids: List[int]) -> Dict[str, Any]:
         return {
             "status": "success",
             "products_queued": len(results),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     except Exception as e:

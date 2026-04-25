@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 import uuid
 import os
@@ -267,7 +267,7 @@ async def get_report_history(
             'report_id': 'rpt_abc123',
             'name': 'Weekly Business Summary',
             'report_type': 'full',
-            'generated_at': datetime.utcnow().isoformat(),
+            'generated_at': datetime.now(timezone.utc).isoformat(),
             'date_range': 'Nov 13-19, 2025',
             'format': 'pdf',
             'size_kb': 1250,
@@ -293,7 +293,7 @@ async def get_report(report_id: str):
         'report': {
             'report_id': report_id,
             'name': 'Weekly Business Summary',
-            'generated_at': datetime.utcnow().isoformat(),
+            'generated_at': datetime.now(timezone.utc).isoformat(),
             'download_url': f'/api/reports/{report_id}/download'
         }
     }
@@ -348,7 +348,7 @@ async def list_schedules(active_only: bool = True):
             'time': '08:00',
             'timezone': 'America/Los_Angeles',
             'is_active': True,
-            'next_run': datetime.utcnow().isoformat(),
+            'next_run': datetime.now(timezone.utc).isoformat(),
             'last_run': None,
             'total_runs': 0
         }

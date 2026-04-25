@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 @dataclass
@@ -72,7 +72,7 @@ class ProductCandidate:
         if self.tags is None:
             self.tags = []
         if self.discovered_at is None:
-            self.discovered_at = datetime.utcnow()
+            self.discovered_at = datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for API responses."""

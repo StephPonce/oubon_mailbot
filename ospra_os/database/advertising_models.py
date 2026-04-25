@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey, Index, JSON, UniqueConstraint, Enum as SQLEnum
 )
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import (
     Base,
@@ -114,7 +114,7 @@ class AdCampaign(Base):
         else:
             self.roas = 0.0
 
-        self.last_updated = datetime.utcnow()
+        self.last_updated = datetime.now(timezone.utc)
 
     def get_performance_summary(self) -> dict:
         """Get campaign performance summary."""

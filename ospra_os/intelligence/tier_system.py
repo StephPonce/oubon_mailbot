@@ -16,7 +16,7 @@ import warnings
 import logging
 from typing import Dict, List, Optional, Any
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 # Import from new unified system
@@ -165,7 +165,7 @@ class TierSystem:
             "tier_name": tier_def.get("name"),
             "price": tier_def.get("price"),
             "features": tier_def.get("features", []),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
 

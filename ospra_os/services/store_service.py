@@ -11,7 +11,7 @@ Example: "Yoga mats convert at 4.2% in Fitness First (Store A),
 from typing import List, Dict, Optional, Any
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from ospra_os.database import (
     Store,
@@ -247,7 +247,7 @@ class StoreService:
 
         store.status = StoreStatus(status.lower())
         store.sync_error = sync_error
-        store.updated_at = datetime.utcnow()
+        store.updated_at = datetime.now(timezone.utc)
 
         # Update is_active for backward compatibility
         store.is_active = store.status in [StoreStatus.ACTIVE, StoreStatus.SETUP]
@@ -474,7 +474,7 @@ class StoreService:
             return None
 
         learning.status = "applied"
-        learning.applied_at = datetime.utcnow()
+        learning.applied_at = datetime.now(timezone.utc)
         self.db.commit()
         self.db.refresh(learning)
 
@@ -518,7 +518,7 @@ class StoreService:
             return None
 
         learning.status = "dismissed"
-        learning.dismissed_at = datetime.utcnow()
+        learning.dismissed_at = datetime.now(timezone.utc)
         learning.dismissal_reason = reason
         self.db.commit()
         self.db.refresh(learning)

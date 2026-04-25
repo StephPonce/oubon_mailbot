@@ -13,7 +13,7 @@ import os
 import secrets
 import json
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlencode, quote
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
@@ -37,9 +37,11 @@ APP_NAME = "Ospra Intelligence"
 APP_URL = os.getenv("APP_URL", "http://localhost:5173")
 CALLBACK_URL = os.getenv("WOOCOMMERCE_CALLBACK_URL", "http://localhost:8001/api/woocommerce/oauth/callback")
 
-# OAuth state storage (use Redis in production)
-# Maps state token -> {user_id, store_url, created_at}
-_oauth_states: Dict[str, Dict[str, Any]] = {}
+# OAuth state — DB-backed via ``ospra_os.security.oauth_state``. See
+# audit fix #8 in that module's docstring.
+from ospra_os.security.oauth_state import put_state, pop_state
+
+_OAUTH_PROVIDER = "woocommerce"
 
 # Connected stores (use database in production)
 # Maps user_id -> {store_id -> store_data}
@@ -226,12 +228,19 @@ async def connect_store(
     # Generate unique state
     state = secrets.token_urlsafe(32)
 
-    # Store user_id with the OAuth state for callback verification
-    _oauth_states[state] = {
-        "user_id": user_id,
-        "store_url": full_url,
-        "created_at": datetime.utcnow().isoformat(),
-    }
+    # Store user_id with the OAuth state for callback verification.
+    # WooCommerce makes the callback as a server-to-server POST, so the
+    # callback worker may be a totally different process from the one
+    # that handled /connect — the DB-backed state store handles that.
+    put_state(
+        _OAUTH_PROVIDER,
+        state,
+        {
+            "user_id": user_id,
+            "store_url": full_url,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
 
     # WooCommerce OAuth endpoint
     # Docs: https://woocommerce.github.io/woocommerce-rest-api-docs/#authentication
@@ -276,11 +285,11 @@ async def oauth_callback(request: Request):
     if not all([state_token, consumer_key, consumer_secret]):
         return {"success": False, "error": "Missing credentials"}
 
-    # Verify state and get associated user_id
-    if state_token not in _oauth_states:
+    # Verify state and get associated user_id (atomic pop, replay-safe).
+    state_data = pop_state(_OAUTH_PROVIDER, state_token)
+    if state_data is None:
         return {"success": False, "error": "Invalid or expired state"}
 
-    state_data = _oauth_states.pop(state_token)
     store_url = state_data.get("store_url")
     user_id = state_data.get("user_id")  # The actual user ID from when /connect was called
 
@@ -316,7 +325,7 @@ async def oauth_callback(request: Request):
         "consumer_key": consumer_key,
         "consumer_secret": consumer_secret,
         "currency": currency,
-        "connected_at": datetime.utcnow().isoformat(),
+        "connected_at": datetime.now(timezone.utc).isoformat(),
     }
 
     return {"success": True, "message": "Store connected successfully"}
@@ -403,7 +412,7 @@ async def get_store_stats(
         # Get recent orders for revenue calculation
         orders = await client.get_orders(per_page=100)
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         rev_7d = rev_30d = 0.0
         ord_7d = ord_30d = 0
         

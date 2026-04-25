@@ -2,7 +2,7 @@
 Calendar view for scheduled ads
 """
 from typing import Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from ospra_os.services.schedule_manager import ScheduleManager
 
@@ -28,7 +28,7 @@ class CalendarView:
         }
         """
         if not start_date:
-            start_date = datetime.utcnow()
+            start_date = datetime.now(timezone.utc)
 
         # Get all active and pending schedules
         schedules = self.manager.list_schedules(limit=1000)
@@ -61,9 +61,9 @@ class CalendarView:
     ) -> Dict:
         """Get schedules organized by day for a month"""
         if not year:
-            year = datetime.utcnow().year
+            year = datetime.now(timezone.utc).year
         if not month:
-            month = datetime.utcnow().month
+            month = datetime.now(timezone.utc).month
 
         schedules = self.manager.list_schedules(limit=1000)
 
@@ -95,7 +95,7 @@ class CalendarView:
 
         Returns list of {date, total_budget}
         """
-        start_date = datetime.utcnow().date()
+        start_date = datetime.now(timezone.utc).date()
         schedules = self.manager.list_schedules(limit=1000)
 
         forecast = []

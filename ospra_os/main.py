@@ -6,7 +6,82 @@ from pathlib import Path
 # Get the project root directory (where .env is located)
 project_root = Path(__file__).parent.parent
 env_path = project_root / ".env"
-load_dotenv(dotenv_path=env_path, override=True)
+# In test mode (APP_ENV=testing) the test harness has already set the
+# environment (DATABASE_URL pointing at the test SQLite, JWT_SECRET_KEY
+# stable, etc.) BEFORE this module gets imported. Calling load_dotenv with
+# override=True here would clobber those test-only values with the real
+# .env (Neon Postgres URL, production secrets), which then breaks every
+# downstream test that touches a settings-derived database. Drop into
+# non-overriding load when running under tests so .env can still fill in
+# anything the harness didn't set, without trampling what it did.
+_in_tests = os.getenv("APP_ENV") == "testing" or "PYTEST_CURRENT_TEST" in os.environ
+load_dotenv(dotenv_path=env_path, override=not _in_tests)
+
+
+def _preflight_check_dependencies() -> None:
+    """
+    Fail fast with a clear, actionable message if a required dependency is
+    missing. Without this, a missing ``psycopg2`` (the most common case
+    after a ``.venv`` rebuild) surfaces as a confusing SQLAlchemy
+    ``ModuleNotFoundError`` deep in the connection-pool stack — the kind of
+    error that wedges local dev for fifteen minutes while you figure out
+    you just forgot to ``uv sync``.
+
+    Runs once at import time, before any ospra_os module that would
+    otherwise trigger the lazy import. Skipped under pytest so the test
+    harness doesn't pay the cost on every collection (test conftest
+    already controls its own dependency surface).
+    """
+    if _in_tests:
+        return
+
+    # Only enforce when we'll actually need PostgreSQL — i.e. when
+    # DATABASE_URL is set to a postgres URL. Local SQLite dev (no
+    # DATABASE_URL set) doesn't need psycopg2.
+    db_url = os.getenv("DATABASE_URL", "")
+    needs_postgres = db_url.startswith(("postgres://", "postgresql://", "postgresql+"))
+
+    missing: list[tuple[str, str]] = []  # (import_name, hint)
+
+    if needs_postgres:
+        try:
+            import psycopg2  # noqa: F401
+        except ImportError:
+            missing.append(("psycopg2", "psycopg2-binary"))
+
+    # cryptography is required by the credential-encryption module — a
+    # missing import there fails-open in dev (ephemeral key) but the
+    # underlying ``from cryptography.fernet import Fernet`` still raises
+    # if cryptography isn't installed at all.
+    try:
+        import cryptography  # noqa: F401
+    except ImportError:
+        missing.append(("cryptography", "cryptography"))
+
+    if not missing:
+        return
+
+    import sys
+    package_list = ", ".join(p for _, p in missing)
+    print(
+        "\n"
+        "─" * 72 + "\n"
+        "  Ospra startup blocked — missing Python dependencies\n"
+        "─" * 72 + "\n"
+        f"  Missing: {', '.join(name for name, _ in missing)}\n"
+        f"  Install: uv sync   (or pip install {package_list})\n"
+        "\n"
+        "  This usually happens after a fresh `.venv` rebuild or a Python\n"
+        "  version bump. Re-run after dependencies are restored.\n"
+        + "─" * 72 + "\n",
+        file=sys.stderr,
+        flush=True,
+    )
+    sys.exit(2)
+
+
+_preflight_check_dependencies()
+
 
 # Debug: Print if OAuth vars are loaded
 
@@ -143,6 +218,19 @@ except Exception as e:
     logger.warning(f"Password reset router not loaded: {e}")
     password_reset_router = None
     _HAS_PASSWORD_RESET = False
+
+# Account / Data & Privacy router — Shopify Partner App approval blocker
+# (Settings → Data & Privacy page must let users export + delete their data
+# via the same handlers the GDPR webhooks call). See
+# docs/guides/SHOPIFY_PARTNER_APP_APPROVAL_READINESS.md §4.
+try:
+    from ospra_os.api.account_routes import router as account_router  # type: ignore
+    _HAS_ACCOUNT = True
+    logger.info("Account / Data & Privacy router loaded successfully")
+except Exception as e:
+    logger.warning(f"Account router not loaded: {e}")
+    account_router = None
+    _HAS_ACCOUNT = False
 
 # Frontend Compatibility router (provides missing endpoint aliases)
 try:
@@ -873,6 +961,72 @@ tags_metadata = [
     },
 ]
 
+# ---------------------------------------------------------------
+# Lifespan (Pass 4d): replaces the deprecated @app.on_event pair.
+#
+# FastAPI 0.100+ emits DeprecationWarning on @app.on_event and will remove it
+# in a future major. The lifespan async-context-manager form is equivalent:
+# everything before `yield` runs on startup, everything after runs on
+# shutdown. Forward references to `_run_startup` / `_run_shutdown` are safe
+# because lookup happens at call time, not at definition time — both helpers
+# are defined later in this module.
+# ---------------------------------------------------------------
+from contextlib import asynccontextmanager  # noqa: E402  (kept near use)
+
+
+@asynccontextmanager
+async def app_lifespan(app: "FastAPI"):  # type: ignore[name-defined]
+    """
+    Startup -> yield -> shutdown. See `_run_startup_critical`,
+    ``_run_startup_deferred`` and ``_run_shutdown``.
+
+    Cold-start optimization (Pass 4d-followup): the startup work is split
+    in two. ``_run_startup_critical`` only does what request handlers
+    genuinely need to be in place (DB schema). Everything else — schedulers,
+    AliExpress token refresh, sentiment refresher, etc. — runs in
+    ``_run_startup_deferred`` as a fire-and-forget background task so the
+    lifespan can ``yield`` and uvicorn can start serving traffic
+    seconds sooner. On Render Starter (1 vCPU, scales to zero) this turns
+    a ~30–60 s blocking startup into a ~3–5 s one.
+    """
+    import asyncio as _asyncio
+
+    try:
+        await _run_startup_critical()
+    except Exception as e:  # pragma: no cover - startup failures are logged below
+        logger.error(f"Startup error bubbled to lifespan: {e}")
+        raise
+
+    # Schedule the deferred work but do NOT await it. If something in the
+    # deferred phase fails we log it but never block the app.
+    deferred_task = _asyncio.create_task(_run_startup_deferred())
+
+    def _log_deferred_done(t: "_asyncio.Task") -> None:
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            logger.error(f"Deferred startup task failed: {exc}")
+
+    deferred_task.add_done_callback(_log_deferred_done)
+
+    try:
+        yield
+    finally:
+        # Best-effort: give the deferred task a chance to finish on shutdown
+        # so any half-initialized scheduler can clean up.
+        if not deferred_task.done():
+            deferred_task.cancel()
+            try:
+                await deferred_task
+            except (_asyncio.CancelledError, Exception):
+                pass
+        try:
+            await _run_shutdown()
+        except Exception as e:  # pragma: no cover - shutdown is best-effort
+            logger.error(f"Shutdown error bubbled to lifespan: {e}")
+
+
 app = FastAPI(
     title="Ospra OS API",
     description="""
@@ -916,6 +1070,7 @@ For API support, contact support@ospra.io
     license_info={
         "name": "Proprietary",
     },
+    lifespan=app_lifespan,
 )
 
 #
@@ -947,6 +1102,18 @@ if _HAS_OBSERVABILITY:
             traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
             profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE
         )
+
+    # Setup PostHog analytics (task #38) — feature flags + activation funnel
+    if settings.POSTHOG_ENABLED and settings.POSTHOG_API_KEY:
+        try:
+            from ospra_os.observability.posthog_client import setup_posthog
+            setup_posthog(
+                api_key=settings.POSTHOG_API_KEY,
+                host=settings.POSTHOG_HOST,
+                debug=settings.POSTHOG_DEBUG,
+            )
+        except Exception as _e:
+            logger.warning(f"PostHog init failed (analytics disabled): {_e}")
 
     # Register exception handlers
     register_exception_handlers(app)
@@ -1098,13 +1265,22 @@ def celery_health():
         }
 
 # ---------------------------------------------------------------
-# Startup Event - Initialize DBs and Scheduler
+# Startup helper — invoked from the lifespan context manager above
+# (migrated from @app.on_event("startup") in Pass 4d).
 # ---------------------------------------------------------------
-@app.on_event("startup")
-async def startup_event():
-    """Initialize databases and start background scheduler."""
+async def _run_startup_critical():
+    """
+    Minimum work that MUST finish before request handlers can serve traffic.
+
+    Cold-start optimization (Pass 4d-followup): we used to do all 17 startup
+    steps inline before yielding to uvicorn — schedulers, AliExpress token
+    refresh, sentiment refresher, etc. On Render Starter that meant logins
+    waited 30+ seconds even after the container was hot. The only step that
+    request handlers genuinely need is ``init_database`` (otherwise they
+    query nonexistent tables); everything else is moved to
+    ``_run_startup_deferred`` and runs in the background.
+    """
     import time
-    import asyncio
     import os
 
     # Skip startup initialization in test mode
@@ -1113,9 +1289,10 @@ async def startup_event():
         return
 
     startup_start = time.time()
-    logger.info(f"Startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"Critical startup initiated at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Validate environment variables
+    # Validate environment variables (cheap, but we want it visible in
+    # the logs BEFORE we yield in case something is misconfigured).
     try:
         from ospra_os.core.env_validator import validate_environment
         env_result = validate_environment(fail_fast=False, require_ai_provider=True)
@@ -1125,6 +1302,58 @@ async def startup_event():
             logger.info(f"Environment validation found {len(env_result['warnings'])} warning(s)")
     except Exception as e:
         logger.warning(f"Environment validation failed: {e}")
+
+    settings = get_settings()
+
+    # The core DB init — handlers expect tables to exist. We deliberately
+    # DON'T raise on the lighter-weight init_followup_db / init_analytics_db
+    # / init_aliexpress_oauth_db calls, because those move to the deferred
+    # phase below. Only ``init_database`` is hard-blocking.
+    try:
+        from ospra_os.database import init_database
+        init_database(settings.database_url)
+        logger.info("All database tables initialized (including users table)")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+    # Schema drift check. ``Base.metadata.create_all`` only CREATES
+    # missing tables — it never ALTERs an existing one. So when a column
+    # is added to a model after the table already exists, the gap is
+    # silent until a query selects the new column. We surface it at
+    # boot so it's findable in 30 seconds, not 30 minutes after a 500
+    # at the worst possible moment. (Origin story: ``brand_name`` /
+    # ``brand_descriptor`` added to User model during the SaaS-launch
+    # refactor; bit prod login the next time the .venv was rebuilt.)
+    try:
+        from ospra_os.database.schema_drift import warn_on_drift
+        warn_on_drift()
+    except Exception as e:
+        logger.warning(f"schema_drift check failed (non-fatal): {e}")
+
+    critical_duration = time.time() - startup_start
+    logger.info(f"Critical startup completed in {critical_duration:.2f}s — yielding to uvicorn")
+
+
+async def _run_startup_deferred():
+    """
+    Everything else: schedulers, secondary DB init, network token refresh.
+
+    Runs as a fire-and-forget task AFTER lifespan yields, so request
+    handlers don't wait on it. Each step is wrapped in try/except — a
+    scheduler that fails to start should not prevent the rest from
+    starting, and certainly should not affect serving traffic.
+    """
+    import time
+    import os
+
+    if os.getenv("APP_ENV") == "testing":
+        return
+
+    startup_start = time.time()
+    logger.info("Deferred startup initiated (background)")
 
     settings = get_settings()
 
@@ -1151,19 +1380,6 @@ async def startup_event():
         logger.info("AliExpress OAuth database initialized")
     except Exception as e:
         logger.warning(f"AliExpress OAuth database initialization failed: {e}")
-
-    # Initialize Multi-Store database (CRITICAL: Must use init_database not init_multi_store_db)
-    # init_multi_store_db uses legacy Base that doesn't include User model!
-    try:
-        from ospra_os.database import init_database
-        init_database(settings.database_url)
-        logger.info("All database tables initialized (including users table)")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        import traceback
-        traceback.print_exc()
-        # Don't swallow this error - it's critical
-        raise
 
     # Initialize Ad Schedule database
     try:
@@ -1347,11 +1563,35 @@ async def startup_event():
     logger.info(" Customer analytics managed by Celery Beat (see /api/tasks/beat-schedule)")
 
     # Start AliExpress token refresh scheduler
+    #
+    # Cold-start note: ``check_tokens_on_startup`` makes an outbound HTTP
+    # call to AliExpress, which can be slow or hang on regional issues. We
+    # run it as its own sub-task with a hard timeout so a slow AliExpress
+    # response can never stall the rest of deferred startup. The scheduler
+    # itself (which runs the same check on a cadence) is started
+    # synchronously since that's just APScheduler config.
     try:
-        from ospra_os.api.aliexpress_token_scheduler import start_token_refresh_scheduler, check_tokens_on_startup
+        from ospra_os.api.aliexpress_token_scheduler import (
+            start_token_refresh_scheduler,
+            check_tokens_on_startup,
+        )
+        import asyncio as _asyncio
+
         start_token_refresh_scheduler()
-        # Check tokens immediately on startup
-        await check_tokens_on_startup()
+
+        async def _bounded_aliexpress_check() -> None:
+            try:
+                await _asyncio.wait_for(check_tokens_on_startup(), timeout=15.0)
+                logger.info("AliExpress startup token check completed")
+            except _asyncio.TimeoutError:
+                logger.warning(
+                    "AliExpress startup token check timed out after 15s "
+                    "— scheduler will retry on its next tick"
+                )
+            except Exception as e:
+                logger.warning(f"AliExpress startup token check failed: {e}")
+
+        _asyncio.create_task(_bounded_aliexpress_check())
         logger.info("AliExpress token refresh scheduler started")
     except Exception as e:
         logger.warning(f"AliExpress token refresh scheduler failed to start: {e}")
@@ -1381,16 +1621,35 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"Sentiment refresh scheduler failed to start: {e}")
 
-    # Log startup completion with timing
+    # Audit fix #5 — webhook DLQ retry worker. Picks up failed background
+    # tasks (rows in ``webhook_failures``) every minute and retries with
+    # exponential backoff. See ``ospra_os/webhooks/dlq.py`` for the full
+    # contract. This is fire-and-forget; cancellation on shutdown is
+    # handled by the lifespan deferred-task wrapper.
+    try:
+        import asyncio as _asyncio_dlq
+        from ospra_os.webhooks.dlq import run_retry_worker
+        _asyncio_dlq.create_task(run_retry_worker(interval_seconds=60))
+        logger.info("Webhook DLQ retry worker started (60s interval)")
+    except Exception as e:
+        logger.warning(f"Webhook DLQ retry worker failed to start: {e}")
+
+    # Log deferred-startup completion with timing. The "critical" portion
+    # was already logged by ``_run_startup_critical`` before the lifespan
+    # yielded; this number is the additional wall-clock time spent in the
+    # background after traffic was being served.
     startup_duration = time.time() - startup_start
-    logger.info(f"Startup completed in {startup_duration:.2f} seconds at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(
+        f"Deferred startup completed in {startup_duration:.2f} seconds "
+        f"at {time.strftime('%Y-%m-%d %H:%M:%S')}"
+    )
 
 
 # ---------------------------------------------------------------
-# Shutdown Event - Stop Background Jobs
+# Shutdown helper — invoked from the lifespan context manager above
+# (migrated from @app.on_event("shutdown") in Pass 4d).
 # ---------------------------------------------------------------
-@app.on_event("shutdown")
-async def shutdown_event():
+async def _run_shutdown():
     """Cleanup on shutdown"""
     logger.info("[PAUSE]  Shutting down Ospra Intelligence...")
     logger.info(" Shutting down Ospra Intelligence...")
@@ -1464,6 +1723,15 @@ async def shutdown_event():
         logger.error(f"Error stopping customer analytics scheduler: {e}")
         logger.warning(f"Error stopping customer analytics scheduler: {e}")
 
+    # Flush pending PostHog events (task #38) — must happen before exit so we
+    # don't drop activation-funnel events buffered in the async sender.
+    try:
+        from ospra_os.observability.posthog_client import shutdown as posthog_shutdown
+        posthog_shutdown()
+        logger.info("[SUCCESS] PostHog events flushed")
+    except Exception as e:
+        logger.warning(f"Error flushing PostHog events: {e}")
+
 
 if gmail_oauth_router:
     app.include_router(gmail_oauth_router)  # exposes /gmail/auth/*
@@ -1473,6 +1741,9 @@ if _HAS_AUTH and auth_router:
 
 if _HAS_PASSWORD_RESET and password_reset_router:
     app.include_router(password_reset_router)  # exposes /api/auth/forgot-password, /api/auth/reset-password
+
+if _HAS_ACCOUNT and account_router:
+    app.include_router(account_router)  # exposes /api/account/data-summary, /data-export, /data-delete
 
 if _HAS_FRONTEND_COMPAT and frontend_compat_router:
     app.include_router(frontend_compat_router)  # exposes /auth/* aliases + missing endpoints
@@ -4226,8 +4497,8 @@ async def get_top_rankings(
             "success": True,
             "rankings": rankings,
             "total_count": len(rankings),
-            "last_updated": datetime.utcnow().isoformat(),
-            "next_update": (datetime.utcnow() + timedelta(hours=1)).isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "next_update": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         }
 
     except Exception as e:
@@ -4350,7 +4621,7 @@ async def get_product_rank_history(
         session = get_multi_store_session(db_url)
 
         # Get history for the past N days
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
         history = session.query(RankingHistory).filter(
             RankingHistory.product_id == product_id,
@@ -4412,7 +4683,7 @@ async def get_new_entries(
         session = get_multi_store_session(db_url)
 
         # Get today's rankings
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Find products in top 20 today with rank_direction = 'new'
         new_entries = session.query(RankingHistory).filter(
@@ -4467,7 +4738,7 @@ async def get_fallen_products(
         session = get_multi_store_session(db_url)
 
         # Get yesterday's and today's dates
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         yesterday = today - timedelta(days=1)
 
         # Find products that were in top 20 yesterday
@@ -4571,7 +4842,7 @@ async def trends_websocket(websocket: WebSocket):
                 # Prepare update message
                 update = {
                     'type': 'trends_update',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
                     'data': {
                         'trending': trending[:10],  # Top 10
                         'movers': movers_up,
@@ -4595,7 +4866,7 @@ async def trends_websocket(websocket: WebSocket):
                 # Send error message to client
                 error_msg = {
                     'type': 'error',
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'timestamp': datetime.now(timezone.utc).isoformat() + 'Z',
                     'error': str(e)
                 }
                 await websocket.send_json(error_msg)

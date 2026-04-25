@@ -5,7 +5,7 @@ Specialized manager for testing ad creatives and ad copy for Meta/TikTok campaig
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
@@ -94,7 +94,7 @@ class AdTestManager:
                 }
             })
 
-        scheduled_end = datetime.utcnow() + timedelta(days=duration_days)
+        scheduled_end = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
         test = self.engine.create_test(
             name=test_name,
@@ -178,7 +178,7 @@ class AdTestManager:
                 }
             })
 
-        scheduled_end = datetime.utcnow() + timedelta(days=duration_days)
+        scheduled_end = datetime.now(timezone.utc) + timedelta(days=duration_days)
 
         test = self.engine.create_test(
             name=test_name,
@@ -249,7 +249,7 @@ class AdTestManager:
             visitor_id=visitor_id,
             event_type="click",
             metadata=metadata or {},
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         self.db.add(event)
 
@@ -350,9 +350,9 @@ class AdTestManager:
         # Update test
         test.winner_variant_id = winner_variant_id
         test.status = "ended"
-        test.ended_at = datetime.utcnow()
+        test.ended_at = datetime.now(timezone.utc)
         test.test_metadata = test.test_metadata or {}
-        test.test_metadata["implemented_at"] = datetime.utcnow().isoformat()
+        test.test_metadata["implemented_at"] = datetime.now(timezone.utc).isoformat()
         test.test_metadata["winning_ad_config"] = winning_config
 
         self.db.commit()

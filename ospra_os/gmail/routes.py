@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 import os, json, pathlib
 from google_auth_oauthlib.flow import Flow
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Allow OAuth over HTTP for local development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
@@ -118,7 +118,7 @@ async def callback(request: Request):
                 # Get or create user (default user_id=1)
                 user = session.query(User).filter(User.id == 1).first()
                 if not user:
-                    user = User(id=1, email=email_address, name="Default User", created_at=datetime.utcnow())
+                    user = User(id=1, email=email_address, name="Default User", created_at=datetime.now(timezone.utc))
                     session.add(user)
                     session.commit()
 
@@ -151,7 +151,7 @@ async def callback(request: Request):
                         is_active=True,
                         is_primary=False,
                         sync_status='active',
-                        created_at=datetime.utcnow()
+                        created_at=datetime.now(timezone.utc)
                     )
                     session.add(new_account)
                     session.commit()

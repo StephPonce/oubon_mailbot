@@ -18,7 +18,7 @@ Safety features:
 """
 
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import asyncio
 from sqlalchemy.orm import Session
@@ -119,7 +119,7 @@ class AutoPilot:
             return {"success": False, "error": "AutoPilot in emergency stop mode"}
 
         report = {
-            "cycle_start": datetime.utcnow().isoformat(),
+            "cycle_start": datetime.now(timezone.utc).isoformat(),
             "mode": self.mode.value,
             "phases": {}
         }
@@ -136,7 +136,7 @@ class AutoPilot:
         evening_results = await self._evening_review_phase(user_id)
         report["phases"]["evening_review"] = evening_results
 
-        report["cycle_end"] = datetime.utcnow().isoformat()
+        report["cycle_end"] = datetime.now(timezone.utc).isoformat()
         report["actions_taken"] = self.actions_today
         report["safety_status"] = self._check_safety_limits()
 
@@ -515,7 +515,7 @@ Return 3 specific, actionable priorities for tomorrow."""
     def _log_action(self, message: str):
         """Log action to audit trail."""
         self.audit_log.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "message": message
         })
 
@@ -525,7 +525,7 @@ Return 3 specific, actionable priorities for tomorrow."""
 
     def get_audit_log(self, hours: int = 24) -> List[Dict[str, Any]]:
         """Get recent audit log entries."""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         return [
             entry for entry in self.audit_log

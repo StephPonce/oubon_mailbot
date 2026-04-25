@@ -13,7 +13,7 @@ Key features:
 
 import logging
 from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ class GradeReasoningEngine:
             "strengths": strengths,
             "weaknesses": weaknesses,
             "recommendation": recommendation,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     def _calculate_profit_potential(self, product: Dict) -> Dict[str, Any]:
