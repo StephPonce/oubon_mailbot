@@ -589,6 +589,16 @@ def _estimate_cost(n_fixtures: int) -> str:
 
 
 async def _async_main(args) -> int:
+    # Pull .env into the process env so XAI_API_KEY / ANTHROPIC_API_KEY
+    # land where _select_provider expects them. Optional dep — if
+    # python-dotenv isn't installed we just skip; the user has env
+    # set via shell.
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+
     if args.live:
         if not (os.getenv("XAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY")):
             print(
