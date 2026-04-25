@@ -16,6 +16,7 @@
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../services/auth';
+import { initAnalytics, identifyUser, resetUser, capture, EVENTS } from '../services/analytics';
 
 
 // =============================================================================
@@ -38,10 +39,27 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Subscribe to auth changes
+    // Initialize PostHog once on mount. No-op if VITE_POSTHOG_KEY isn't
+    // set in env or if posthog-js isn't installed (see services/analytics.js).
+    initAnalytics();
+
+    // Subscribe to auth changes — identify/reset PostHog on transitions.
+    let prevAuthed = false;
     const unsubscribe = authService.subscribe((newState) => {
       setState(newState);
       setLoading(false);
+
+      const nowAuthed = !!newState.isAuthenticated;
+      if (nowAuthed && !prevAuthed && newState.user) {
+        // Just logged in — identify the user and capture the event.
+        identifyUser(newState.user);
+        capture(EVENTS.LOGIN_SUCCEEDED, { tier: newState.user.tier });
+      } else if (!nowAuthed && prevAuthed) {
+        // Just logged out — reset analytics user.
+        capture(EVENTS.LOGOUT);
+        resetUser();
+      }
+      prevAuthed = nowAuthed;
     });
 
     return unsubscribe;

@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
 import { api, API_BASE_URL } from '../services/api';
+import { capture, EVENTS } from '../services/analytics';
 import { PageLayout } from './Layout';
 import { AIImageComparison } from './AIImageComparison';
 
@@ -624,18 +625,38 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
     if (!product || amzTextLoading) return;
     setAmzTextLoading(true);
     setAmzTextError(null);
+    // Track the click — answers "is this on-demand fetch button
+    // actually being used, and how often is the response cached?"
+    capture(EVENTS.AMAZON_REVIEWS_FETCH_REQUESTED, {
+      product_title: product?.title?.slice(0, 80),
+      niche: product?.niche,
+    });
     try {
       const result = await api.fetchAmazonReviewText(product, 15);
       if (!result || result.success === false) {
         setAmzTextError(result?.error || 'Fetch failed');
+        capture(EVENTS.AMAZON_REVIEWS_FETCH_FAILED, {
+          error: result?.error || 'unknown',
+        });
       } else if (!result.available) {
         // Clean "no data" state — surface the reason but not as an error
         setAmzText({ ...result, _empty: true });
+        capture(EVENTS.AMAZON_REVIEWS_FETCH_NO_DATA, {
+          reason: result?.reason || 'unknown',
+        });
       } else {
         setAmzText(result);
+        capture(EVENTS.AMAZON_REVIEWS_FETCH_SUCCEEDED, {
+          review_count: result.review_count_returned,
+          cached: !!result.cached,
+          verified_share: result.verified_share,
+        });
       }
     } catch (err) {
       setAmzTextError(err.message || 'Fetch failed');
+      capture(EVENTS.AMAZON_REVIEWS_FETCH_FAILED, {
+        error: err?.message || 'exception',
+      });
     } finally {
       setAmzTextLoading(false);
     }
