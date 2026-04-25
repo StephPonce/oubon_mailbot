@@ -13,7 +13,7 @@ SECURITY: All models include proper field validation:
 Author: OspraOS
 """
 
-from pydantic import BaseModel, Field, field_validator, HttpUrl
+from pydantic import BaseModel, ConfigDict, Field, field_validator, HttpUrl
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from datetime import datetime
@@ -108,8 +108,7 @@ class PlatformCredentials(BaseModel):
     shop_name: Optional[str] = Field(None, max_length=200)
     store_url: Optional[str] = Field(None, max_length=500)
 
-    class Config:
-        extra = "allow"  # Allow extra fields for different platforms
+    model_config = ConfigDict(extra="allow")  # Allow extra fields for different platforms
 
 
 # ============================================================================

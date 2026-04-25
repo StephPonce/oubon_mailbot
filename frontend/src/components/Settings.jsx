@@ -5,9 +5,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
+import {
   Home, Package, Bot, Zap, Settings as SettingsIcon, LogOut,
-  User, CreditCard, Bell, Check, Activity, Loader2, PanelLeftClose, PanelLeft
+  User, CreditCard, Bell, Check, Activity, Loader2, PanelLeftClose, PanelLeft,
+  Shield, Download, Trash2, AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
@@ -141,6 +142,271 @@ function Sidebar({ currentPath }) {
     </aside>
   );
 }
+
+/**
+ * Data & Privacy panel.
+ *
+ * Required by Shopify Partner App approval (see
+ * docs/guides/SHOPIFY_PARTNER_APP_APPROVAL_READINESS.md §4): users must
+ * be able to self-serve export and deletion. The buttons hit
+ * /api/account/data-export and /api/account/data-delete which call the
+ * SAME backend service the GDPR webhooks call, so behaviour matches what
+ * Shopify's reviewer tests via webhook ping.
+ */
+function DataPrivacySection() {
+  const [summary, setSummary] = React.useState(null);
+  const [loadingSummary, setLoadingSummary] = React.useState(true);
+  const [exporting, setExporting] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmEmail, setConfirmEmail] = React.useState('');
+  const [deleteStores, setDeleteStores] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [done, setDone] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api.getDataSummary()
+      .then((res) => { if (!cancelled) setSummary(res); })
+      .catch(() => { if (!cancelled) setSummary(null); })
+      .finally(() => { if (!cancelled) setLoadingSummary(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleExport = async () => {
+    setError(null);
+    setExporting(true);
+    try {
+      const payload = await api.exportMyData();
+      // Trigger a JSON download in the browser. Doing it client-side
+      // keeps the backend stateless — no temp files, no S3.
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      a.download = `ospra-data-export-${stamp}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(`Export failed: ${e?.message || 'unknown error'}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setError(null);
+    setDeleting(true);
+    try {
+      const res = await api.deleteMyData({
+        confirmEmail,
+        deleteConnectedStores: deleteStores,
+      });
+      setDone(res?.message || 'Your data has been deleted.');
+      setConfirmOpen(false);
+    } catch (e) {
+      setError(`Deletion failed: ${e?.message || 'unknown error'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <SettingsSection title="Data & Privacy" icon={Shield}>
+      <div className="space-y-5">
+        {/* What we store */}
+        <div>
+          <h3 className="text-white font-medium mb-2 text-sm">What we store</h3>
+          {loadingSummary ? (
+            <p className="text-white/40 text-xs flex items-center gap-2">
+              <Loader2 className="w-3 h-3 animate-spin" /> Counting your records…
+            </p>
+          ) : summary ? (
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                <p className="text-2xl text-white font-semibold">
+                  {summary.record_counts?.email_followups_found ?? 0}
+                </p>
+                <p className="text-white/40 text-xs">Email follow-ups</p>
+              </div>
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                <p className="text-2xl text-white font-semibold">
+                  {summary.record_counts?.orders_found ?? 0}
+                </p>
+                <p className="text-white/40 text-xs">Orders</p>
+              </div>
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                <p className="text-2xl text-white font-semibold">
+                  {summary.store_count ?? 0}
+                </p>
+                <p className="text-white/40 text-xs">Connected stores</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-white/40 text-xs">Could not load record counts.</p>
+          )}
+        </div>
+
+        {/* What we keep, what we don't, retention */}
+        {summary && (
+          <details className="text-xs">
+            <summary className="text-white/60 cursor-pointer hover:text-white">
+              Full data-handling summary
+            </summary>
+            <div className="mt-3 space-y-3 text-white/60">
+              <div>
+                <p className="text-white/80 font-medium mb-1">We store:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {(summary.what_we_store || []).map((line, i) => (
+                    <li key={`s-${i}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="text-white/80 font-medium mb-1">We do NOT store:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {(summary.what_we_dont_store || []).map((line, i) => (
+                    <li key={`n-${i}`}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+              {summary.retention_summary && (
+                <div>
+                  <p className="text-white/80 font-medium mb-1">Retention:</p>
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {Object.entries(summary.retention_summary).map(([k, v]) => (
+                      <li key={k}>
+                        <span className="text-white/80">{k.replace(/_/g, ' ')}:</span>{' '}
+                        {v}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="pt-2">
+                Full policy:{' '}
+                <a
+                  href="https://ospra.os/legal/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-400 hover:underline"
+                >
+                  ospra.os/legal/privacy
+                </a>
+              </p>
+            </div>
+          </details>
+        )}
+
+        {/* Export */}
+        <div className="flex items-center justify-between gap-4 pt-2 border-t border-white/10">
+          <div>
+            <p className="text-white text-sm font-medium">Download my data</p>
+            <p className="text-white/40 text-xs">
+              JSON export of every record tied to your email.
+            </p>
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white hover:bg-white/15 transition-all flex items-center gap-2 text-sm disabled:opacity-50"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {exporting ? 'Preparing…' : 'Export'}
+          </button>
+        </div>
+
+        {/* Delete */}
+        <div className="pt-2 border-t border-white/10">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-white text-sm font-medium">Delete my data</p>
+              <p className="text-white/40 text-xs">
+                Removes follow-ups and order rows. Optionally also disconnects
+                and wipes data for stores you've linked.
+              </p>
+            </div>
+            {!confirmOpen ? (
+              <button
+                onClick={() => setConfirmOpen(true)}
+                className="px-4 py-2 rounded-xl bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 transition-all flex items-center gap-2 text-sm"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            ) : null}
+          </div>
+
+          {confirmOpen && (
+            <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 space-y-3">
+              <div className="flex items-start gap-2 text-red-200 text-sm">
+                <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <p>
+                  This deletes the data we hold about you. Your account record
+                  itself is removed by support after a manual confirmation —
+                  email <span className="font-mono">support@ospra.os</span>.
+                </p>
+              </div>
+              <label className="block text-xs text-white/60">
+                Type your email (<span className="font-mono">{summary?.user?.email || ''}</span>) to confirm:
+              </label>
+              <input
+                type="email"
+                value={confirmEmail}
+                onChange={(e) => setConfirmEmail(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-white text-sm focus:border-red-500/50 focus:outline-none"
+                placeholder="you@example.com"
+              />
+              <label className="flex items-center gap-2 text-xs text-white/70">
+                <input
+                  type="checkbox"
+                  checked={deleteStores}
+                  onChange={(e) => setDeleteStores(e.target.checked)}
+                  className="accent-red-500"
+                />
+                Also disconnect and wipe my connected stores ({summary?.store_count ?? 0})
+              </label>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting || !confirmEmail}
+                  className="px-3 py-1.5 rounded-lg bg-red-500/30 border border-red-500/50 text-red-100 hover:bg-red-500/40 transition-all flex items-center gap-2 text-sm disabled:opacity-50"
+                >
+                  {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                  {deleting ? 'Deleting…' : 'Confirm delete'}
+                </button>
+                <button
+                  onClick={() => { setConfirmOpen(false); setConfirmEmail(''); }}
+                  disabled={deleting}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {done && (
+            <p className="mt-3 text-green-400 text-sm flex items-center gap-2">
+              <Check className="w-4 h-4" /> {done}
+            </p>
+          )}
+          {error && (
+            <p className="mt-3 text-red-400 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> {error}
+            </p>
+          )}
+        </div>
+      </div>
+    </SettingsSection>
+  );
+}
+
 
 function SettingsSection({ title, icon: Icon, children }) {
   return (
@@ -388,6 +654,9 @@ export function Settings() {
               )}
             </div>
           </SettingsSection>
+
+          {/* Data & Privacy — Shopify Partner App approval requirement */}
+          <DataPrivacySection />
 
           {/* Danger Zone */}
           <SettingsSection title="Danger Zone" icon={LogOut}>

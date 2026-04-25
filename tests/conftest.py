@@ -8,6 +8,12 @@ import asyncio
 from typing import Generator
 from unittest.mock import MagicMock, AsyncMock, patch
 
+# Exclude archived legacy tests from collection. Files in tests/archive/ are
+# preserved for git-blame / reference only — they must never execute.
+# Pass 6 moved the old test_tenant_isolation.py here (superseded by
+# tests/integration/test_tenant_isolation_scaffold.py).
+collect_ignore_glob = ["archive/*"]
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -16,9 +22,62 @@ from sqlalchemy.pool import StaticPool
 # Set test environment before importing app
 import tempfile
 os.environ["APP_ENV"] = "testing"
-# Use file-based test database instead of :memory: to avoid per-connection isolation issues
-TEST_DB_PATH = os.path.join(tempfile.gettempdir(), "test_database.db")
+
+
+def _pick_writable_tmp_dir() -> str:
+    """Return the first writable scratch directory we find.
+
+    `tempfile.gettempdir()` can resolve to a read-only path in some sandboxed
+    or container environments (e.g. mounted FS without RW for the current
+    user). When that happens, every test that touches the SQLite file dies
+    with `disk I/O error` even though the code is fine. Probe a short list
+    of candidates and pick the first one we can actually write to.
+    """
+    candidates = [
+        tempfile.gettempdir(),
+        "/tmp",
+        "/var/tmp",
+        os.path.expanduser("~/.cache/ospra_tests"),
+    ]
+    for path in candidates:
+        if not path:
+            continue
+        try:
+            os.makedirs(path, exist_ok=True)
+            probe = os.path.join(path, ".ospra_test_write_probe")
+            with open(probe, "w") as fh:
+                fh.write("ok")
+            os.remove(probe)
+            return path
+        except OSError:
+            continue
+    # Last-ditch fallback: the cwd. If even that fails, the tests will
+    # surface a clear DB error at fixture-setup time.
+    return os.getcwd()
+
+
+# Use file-based test database instead of :memory: to avoid per-connection isolation issues.
+#
+# Under pytest-xdist (`-n auto` in pytest.ini) each worker imports this module
+# in its own subprocess. If they all hammer the same DB file they race on
+# `os.remove(TEST_DB_PATH)` and `Base.metadata.create_all` during session
+# setup, which surfaces as `FileNotFoundError` / `OperationalError: no such
+# table` storms. Append the worker id (set by xdist as PYTEST_XDIST_WORKER,
+# e.g. "gw0", "gw1", "master" when not parallel) so every worker gets its
+# own isolated SQLite file.
+TEST_DB_DIR = _pick_writable_tmp_dir()
+_WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "master")
+TEST_DB_PATH = os.path.join(TEST_DB_DIR, f"test_database_{_WORKER_ID}.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+
+# Provide stable test-only secrets BEFORE importing the app. Without these,
+# pytest.ini's `filterwarnings = error` promotes the app's startup
+# "JWT_SECRET_KEY not set" and "token blacklist in-memory" warnings into
+# ImportErrors during conftest collection (see Pass 6 notes). These values
+# are ONLY used for tests — never in real envs.
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-only-jwt-secret-do-not-use-in-production-ever"
+)
 
 # Import from main database package (not multi_store_models) to use consistent Base class
 from ospra_os.database.base import Base, ProductStatus
@@ -78,22 +137,39 @@ def engine():
 
 @pytest.fixture(scope="function")
 def db_session(engine) -> Generator[Session, None, None]:
-    """Create a fresh database session for each test."""
+    """Create a fresh database session for each test.
+
+    Uses the basic external-transaction pattern: open a Connection, start a
+    transaction on it, give the Session a Connection-scoped binding so the
+    Session's ``commit()`` flushes through but the outer transaction
+    survives, then roll back on teardown.
+
+    Some tests deliberately trigger an IntegrityError (e.g. UNIQUE-constraint
+    tests). When that happens SQLAlchemy invalidates the outer transaction;
+    the teardown rollback then warns "transaction already deassociated from
+    connection". Swallow that — at that point the connection is being closed
+    anyway and the data never reaches disk.
+    """
     connection = engine.connect()
     transaction = connection.begin()
 
     TestingSessionLocal = sessionmaker(
         autocommit=False,
         autoflush=False,
-        bind=connection
+        bind=connection,
     )
     session = TestingSessionLocal()
 
-    yield session
-
-    session.close()
-    transaction.rollback()
-    connection.close()
+    try:
+        yield session
+    finally:
+        session.close()
+        if transaction.is_active:
+            try:
+                transaction.rollback()
+            except Exception:
+                pass
+        connection.close()
 
 
 @pytest.fixture(scope="function")

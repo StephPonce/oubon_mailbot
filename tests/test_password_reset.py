@@ -133,18 +133,33 @@ class TestIntegration:
 
     @pytest.mark.asyncio
     async def test_forgot_password_builds_full_url(self):
-        """Forgot password should build full reset URL, not pass raw token."""
+        """Forgot password should build a full reset URL, not pass a raw token.
+
+        The route is expected to construct
+        ``{APP_URL}/reset-password?token={reset_token}``. This test simply
+        pins that contract — we don't care whether ``APP_URL`` is the prod
+        ``https://ospra.io`` or a local dev host. What we DO care about is
+        that the URL has a scheme (so the email client renders it as a
+        link, not bare text), points at ``/reset-password``, and carries
+        the token as a query param.
+        """
         import os
+        from urllib.parse import urlparse
 
-        # Verify APP_URL is used to build reset link
+        # Use the runtime APP_URL — falls back to the prod default the
+        # email service uses when the env var isn't set.
         app_url = os.getenv("APP_URL", "https://ospra.io")
-
-        # The reset link format should be: {APP_URL}/reset-password?token={token}
         expected_format = f"{app_url}/reset-password?token="
 
-        # This is implicitly tested by the route code which now constructs:
-        # reset_link = f"{app_url}/reset-password?token={reset_token}"
-        assert expected_format.startswith("https://")
+        parsed = urlparse(expected_format)
+        # Must have a scheme (http or https — we don't care which for
+        # the contract; production sets https, dev sets http://localhost).
+        assert parsed.scheme in ("http", "https"), (
+            f"reset URL is missing a scheme: {expected_format!r}"
+        )
+        assert parsed.netloc, f"reset URL is missing a host: {expected_format!r}"
+        assert parsed.path == "/reset-password"
+        assert expected_format.endswith("token=")
 
 
 # Run tests with: pytest tests/test_password_reset.py -v

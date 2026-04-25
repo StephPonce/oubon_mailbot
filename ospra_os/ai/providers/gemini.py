@@ -13,8 +13,22 @@ from typing import Dict, Any, Optional
 import json
 import re
 import logging
-import google.generativeai as genai
-from google.generativeai.types import BlockedPromptException, StopCandidateException
+import warnings
+
+# google-generativeai emits a FutureWarning at import time announcing the
+# package is deprecated in favor of google-genai, plus a chain of upstream
+# import-time warnings (httplib2 / pyparsing setName deprecation, google.api_core
+# Python-3.10 EOL FutureWarning). Migration to google-genai is tracked
+# separately; silence the import here so test collection
+# (``filterwarnings = error``) doesn't blow up just because we touched this
+# module.
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import google.generativeai as genai  # noqa: E402
+    from google.generativeai.types import (  # noqa: E402
+        BlockedPromptException,
+        StopCandidateException,
+    )
 
 from ospra_os.ai.providers.base import (
     AIProvider,

@@ -28,9 +28,18 @@ class TestSaturationScoreCalculation:
 
     @pytest.fixture
     def scorer(self):
-        """Create scorer instance without scrapers."""
-        with patch.object(SaturationScorer, '_detect_providers', return_value=[]):
-            return SaturationScorer()
+        """Create scorer instance without scrapers.
+
+        We bypass ``__init__`` (which tries to import optional scrapers
+        like AmazonBestsellersScraper / TikTokShopScraper) so this test
+        runs hermetically — none of the math methods we're exercising
+        depend on scrapers being wired up.
+        """
+        with patch.object(SaturationScorer, '__init__', lambda self: None):
+            s = SaturationScorer()
+            s.amazon_scraper = None
+            s.tiktok_scraper = None
+            return s
 
     def test_low_saturation_returns_deploy(self, scorer):
         """Products with low saturation should recommend deploy."""

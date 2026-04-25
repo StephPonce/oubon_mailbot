@@ -54,6 +54,27 @@ except ImportError:
     XAITwitterDiscovery = None
     HAS_XAI_TWITTER = False
 
+# First-party TikTok Shop Partner API connector (task #36). Different from the
+# Apify-based TikTokShopScraper above — this one hits open-api.tiktokglobalshop.com
+# directly and returns real units_sold_7d + view velocity for ranked candidates.
+try:
+    from ospra_os.product_research.connectors.tiktok_shop import TikTokShopConnector
+    HAS_TIKTOK_SHOP_API = True
+except ImportError:
+    TikTokShopConnector = None
+    HAS_TIKTOK_SHOP_API = False
+
+# Pinterest Trends via Apify (task #37). Early-signal trend source for visual
+# product categories — adds a 0.15-weighted demand signal to opportunity_scorer.
+try:
+    from ospra_os.product_research.connectors.apify.pinterest_trends import (
+        PinterestTrendsApify,
+    )
+    HAS_PINTEREST_TRENDS = True
+except ImportError:
+    PinterestTrendsApify = None
+    HAS_PINTEREST_TRENDS = False
+
 
 class MultiSourceDiscovery:
     """
@@ -140,6 +161,8 @@ class MultiSourceDiscovery:
         self.aliexpress = None
         self.amazon = None
         self.tiktok = None
+        self.tiktok_shop_api = None  # first-party TikTok Shop Partner API (#36)
+        self.pinterest_trends = None  # Apify Pinterest Trends — early-signal source (#37)
         self.amazon_bestsellers = None
         self.reddit = None
         self.shopify_competitor = None
@@ -194,6 +217,22 @@ class MultiSourceDiscovery:
             print(f"[WARNING]  Failed to initialize TikTok scraper: {e}")
             self.tiktok = None
 
+        # Try to initialize first-party TikTok Shop Partner API connector (#36).
+        # Distinct from the Apify-based `self.tiktok` above: this one hits the
+        # official open-api.tiktokglobalshop.com endpoints and only lights up
+        # when all four partner credentials are present.
+        if HAS_TIKTOK_SHOP_API:
+            try:
+                candidate_shop_api = TikTokShopConnector()
+                if candidate_shop_api.is_available():
+                    self.tiktok_shop_api = candidate_shop_api
+                    print("[SUCCESS] TikTok Shop Partner API connector initialized")
+                else:
+                    print("[WARNING]  TikTok Shop Partner API credentials not configured")
+            except Exception as e:
+                print(f"[WARNING]  Failed to initialize TikTok Shop Partner API: {e}")
+                self.tiktok_shop_api = None
+
         # Try to initialize Amazon Bestsellers scraper via Apify
         try:
             self.amazon_bestsellers = AmazonBestsellersScraper()
@@ -205,6 +244,20 @@ class MultiSourceDiscovery:
         except Exception as e:
             print(f"[WARNING]  Failed to initialize Amazon Bestsellers scraper: {e}")
             self.amazon_bestsellers = None
+
+        # Try to initialize Pinterest Trends via Apify (#37). Reuses the
+        # APIFY_API_TOKEN already validated above for the TikTok/Amazon scrapers.
+        if HAS_PINTEREST_TRENDS:
+            try:
+                candidate_pinterest = PinterestTrendsApify()
+                if candidate_pinterest.is_available():
+                    self.pinterest_trends = candidate_pinterest
+                    print("[SUCCESS] Pinterest Trends connector initialized (weight 0.15)")
+                else:
+                    print("[WARNING]  Apify not configured - skipping Pinterest Trends")
+            except Exception as e:
+                print(f"[WARNING]  Failed to initialize Pinterest Trends: {e}")
+                self.pinterest_trends = None
 
         # REMOVED 2025-12-07: Reddit, Shopify, AliExpress Apify scrapers
         # Use official APIs instead:

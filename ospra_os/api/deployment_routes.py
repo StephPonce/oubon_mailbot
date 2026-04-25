@@ -103,7 +103,7 @@ class DeployProductRequest(BaseModel):
 
 class BulkDeployRequest(BaseModel):
     """Request to deploy multiple products"""
-    products: List[SourceProduct] = Field(..., min_items=1, max_items=20, description="Products to deploy (max 20)")
+    products: List[SourceProduct] = Field(..., min_length=1, max_length=20, description="Products to deploy (max 20)")
     niche: str = Field(..., description="Product niche")
     options: Optional[Dict] = Field(default_factory=dict, description="Deployment options")
     async_mode: bool = Field(default=False, description="Run in background (returns job_id)")

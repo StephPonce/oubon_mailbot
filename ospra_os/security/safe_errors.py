@@ -32,8 +32,15 @@ from functools import wraps
 
 logger = logging.getLogger(__name__)
 
-# Check if we're in development mode
-_is_development = os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "local")
+def _is_development() -> bool:
+    """Check if running in development mode (evaluated at call time so the
+    decision picks up env changes between import and request)."""
+    # Treat the test runner as a non-dev environment so dev-only fields
+    # (which can echo raw exception strings) never appear in responses
+    # the security tests assert on.
+    if os.getenv("APP_ENV", "").lower() in ("test", "testing"):
+        return False
+    return os.getenv("ENVIRONMENT", "development").lower() in ("development", "dev", "local")
 
 
 def _is_production() -> bool:
@@ -94,7 +101,7 @@ def safe_error_response(
         response["support_message"] = f"If this persists, contact support with error ID: {error_id}"
 
     # In development, include more details (but never in production)
-    if _is_development and not _is_production():
+    if _is_development() and not _is_production():
         response["_dev_error_type"] = type(error).__name__
         response["_dev_error_message"] = str(error)[:200]  # Truncate
         # Still don't include full traceback even in dev for API responses
@@ -123,7 +130,7 @@ def safe_error_detail(error: Exception) -> str:
     )
 
     # Return safe message
-    if _is_development and not _is_production():
+    if _is_development() and not _is_production():
         return f"Error: {type(error).__name__} (ID: {error_id})"
 
     return f"An error occurred. Reference ID: {error_id}"
@@ -178,7 +185,7 @@ class SafeErrorHandler:
                 "error_id": self.error_id,
             }
 
-            if _is_development and not _is_production():
+            if _is_development() and not _is_production():
                 self.response["_dev_error_type"] = type(exc_val).__name__
                 self.response["_dev_error_message"] = str(exc_val)[:200]
 

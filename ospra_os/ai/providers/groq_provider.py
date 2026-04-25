@@ -25,7 +25,32 @@ import json
 import re
 import logging
 import os
-from groq import Groq, APIError, RateLimitError as GroqRateLimitError
+
+# Pass 6 (test-suite consolidation): the `groq` SDK is an OPTIONAL runtime
+# dependency — it's only needed if a tenant actually selects the Groq
+# provider. Historically this module did a hard `from groq import ...` at
+# import time, which meant `ospra_os.ai.factory` (and therefore anything
+# that transitively imported the AI layer — including the FastAPI app
+# `main.py` under test) crashed on any machine that didn't have groq
+# installed. That turned a silent-optional into a hard-fail.
+#
+# We now import groq lazily: if the package is missing we stub out Groq
+# plus its exception types so the *class* can still be imported and
+# inspected. Any attempt to actually *instantiate* GroqProvider without
+# groq installed raises APIKeyError at __init__ time with a clear message.
+try:
+    from groq import Groq, APIError, RateLimitError as GroqRateLimitError
+    _GROQ_AVAILABLE = True
+except ModuleNotFoundError:  # pragma: no cover - env-dependent
+    Groq = None  # type: ignore[assignment,misc]
+
+    class APIError(Exception):  # type: ignore[no-redef]
+        """Stub for groq.APIError when the groq SDK isn't installed."""
+
+    class GroqRateLimitError(Exception):  # type: ignore[no-redef]
+        """Stub for groq.RateLimitError when the groq SDK isn't installed."""
+
+    _GROQ_AVAILABLE = False
 
 from ospra_os.ai.providers.base import (
     AIProvider,
@@ -103,10 +128,17 @@ class GroqProvider(AIProvider):
             api_key: Groq API key (or uses GROQ_API_KEY env var)
             model: Model to use (default: llama-3.3-70b-versatile)
         """
+        if not _GROQ_AVAILABLE:
+            raise APIKeyError(
+                "Groq SDK is not installed. Install the optional dependency "
+                "with `uv add groq` (or `pip install groq`) before using "
+                "GroqProvider. See TASKS.md #31 for context on why this is "
+                "now a lazy import."
+            )
         api_key = api_key or os.getenv("GROQ_API_KEY")
         if not api_key:
             raise APIKeyError("GROQ_API_KEY not configured")
-            
+
         super().__init__(api_key)
         
         self.provider_name = "groq"

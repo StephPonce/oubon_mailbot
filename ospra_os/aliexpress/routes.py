@@ -1,23 +1,81 @@
-"""AliExpress OAuth routes for authentication."""
+"""
+AliExpress OAuth routes — *platform-level* credential.
+
+Important context: AliExpress is a **sourcing-side** relationship for Ospra
+(we read product/supplier data from AliExpress to feed the discovery
+engine), NOT a per-tenant selling-side relationship like Shopify. There is
+exactly one AliExpress credential active at a time, and it belongs to the
+platform — every tenant benefits from the same upstream catalogue.
+
+Persistence path (audit fix, was: module-level globals):
+  - ``ospra_os.database.aliexpress_tokens.save_token("dropship", ...)``
+  - ``ospra_os.database.aliexpress_tokens.load_token("dropship")``
+
+Five other modules already store/read the platform credential through that
+table (``api/aliexpress_oauth.py``, ``api/aliexpress_token_routes.py``,
+``api/aliexpress_product_routes.py``, ``api/aliexpress_affiliate_oauth.py``,
+``api/aliexpress_token_scheduler.py``); we just have to plug into it.
+
+Audit blocker addressed: the previous module-level globals
+``_access_token`` / ``_refresh_token`` / ``_token_expires_at`` meant that
+in a multi-worker deployment, whichever worker handled the callback held
+the credential and the others read ``None``. Worse, on a single worker the
+globals were lost on every restart and every read returned None until the
+next manual reauth.
+"""
 import os
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
+from datetime import datetime
 from ospra_os.core.settings import Settings, get_settings
 from ospra_os.aliexpress.oauth import AliExpressOAuth
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.database.aliexpress_tokens import (
+    save_token as save_platform_token,
+    load_token as load_platform_token,
+)
 import time
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
 
-# In-memory storage for testing (replace with database later)
+# OAuth CSRF state still lives in-process. It's session-scoped (cleared after
+# the callback consumes it) and not a credential, so the multi-worker
+# fragility is bounded — at worst the state check fails and the user has to
+# reauth, never a credential leak. A follow-up will move this to Redis along
+# with the Shopify/Woo OAuth state stores (audit blocker #8).
 _oauth_state: Optional[str] = None
-_access_token: Optional[str] = None
-_refresh_token: Optional[str] = None
-_token_expires_at: float = 0
+
+# Platform credential cache. Source of truth is the DB; this is a cheap
+# memo so /auth/status and /auth/token don't round-trip Postgres on every
+# call. ``_load_platform_token_from_db`` rehydrates it on demand.
+_PLATFORM_API_TYPE = "dropship"
+
+
+def _load_platform_credential() -> Optional[dict]:
+    """
+    Read the active platform credential from the persistent store.
+
+    Returns a dict with ``access_token``, ``refresh_token``, ``expires_at``
+    (epoch float), and ``is_expired``. Returns None if no credential is
+    stored.
+    """
+    record = load_platform_token(_PLATFORM_API_TYPE)
+    if not record:
+        return None
+    try:
+        expires_at_dt = datetime.fromisoformat(record["expires_at"])
+    except (KeyError, ValueError):
+        return None
+    return {
+        "access_token": record["access_token"],
+        "refresh_token": record.get("refresh_token"),
+        "expires_at": expires_at_dt.timestamp(),
+        "is_expired": bool(record.get("is_expired")),
+    }
 
 
 def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOAuth:
@@ -154,7 +212,7 @@ async def oauth_callback(
 
     AliExpress redirects here after user approves → exchange code for token
     """
-    global _oauth_state, _access_token, _refresh_token, _token_expires_at
+    global _oauth_state
 
     # Check for errors
     if error:
@@ -194,14 +252,33 @@ async def oauth_callback(
         result = oauth.exchange_code_for_token(code)
 
         if result.get("success"):
-            # Store token in memory
-            _access_token = result.get("access_token")
-            _refresh_token = result.get("refresh_token")
-            _token_expires_at = time.time() + result.get("expires_in", 2592000)
-            _user_info = {
+            # Persist the platform credential. Other modules read it via
+            # ``aliexpress_tokens.load_token("dropship")`` and the token
+            # refresh scheduler keeps it alive — both depend on this row
+            # existing, so writing here is the single source of truth.
+            access_token = result.get("access_token")
+            refresh_token = result.get("refresh_token")
+            expires_in = int(result.get("expires_in", 2592000))
+            saved = save_platform_token(
+                api_type=_PLATFORM_API_TYPE,
+                access_token=access_token,
+                refresh_token=refresh_token,
+                expires_in=expires_in,
+            )
+            if not saved:
+                logger.error("AliExpress callback: failed to persist token")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "error": "Token exchange succeeded but persistence failed.",
+                    },
+                )
+            token_expires_at = time.time() + expires_in
+            user_info = {
                 "user_id": result.get("user_id"),
                 "seller_id": result.get("seller_id"),
-                "account": result.get("account")
+                "account": result.get("account"),
             }
 
             # Return success HTML page
@@ -256,9 +333,9 @@ async def oauth_callback(
 
         <div class="info">
             <strong>Connection Details:</strong><br>
-            Account: {_user_info.get('account', 'N/A')}<br>
-            Token expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(_token_expires_at))}<br>
-            Time remaining: {int((_token_expires_at - time.time()) / 3600)} hours ({int((_token_expires_at - time.time()) / 86400)} days)
+            Account: {user_info.get('account', 'N/A')}<br>
+            Token expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(token_expires_at))}<br>
+            Time remaining: {int((token_expires_at - time.time()) / 3600)} hours ({int((token_expires_at - time.time()) / 86400)} days)
         </div>
 
         <a href="/admin/dashboard/v2" class="btn">
@@ -296,45 +373,44 @@ async def oauth_callback(
 @router.get("/auth/status")
 async def check_auth_status(current_user: User = Depends(get_current_user)):
     """
-    Check if AliExpress is connected and token is valid.
+    Check if the platform AliExpress credential is connected and not expired.
 
-    Returns connection status, expiry time, etc.
+    Reads from the persistent ``aliexpress_tokens`` table — same row the
+    refresh scheduler maintains and other modules query. JWT-protected:
+    we never expose token state to anonymous callers, even just metadata.
     """
-    global _access_token, _token_expires_at
-
-    if not _access_token:
+    cred = _load_platform_credential()
+    if not cred:
         return JSONResponse(
             status_code=200,
             content={
                 "connected": False,
                 "status": "Not connected",
-                "message": "Visit /aliexpress/auth/start to connect"
-            }
+                "message": "Visit /aliexpress/auth/start to connect",
+            },
         )
 
-    # Check if token expired
-    if time.time() > _token_expires_at:
+    if cred["is_expired"] or time.time() > cred["expires_at"]:
         return JSONResponse(
             status_code=200,
             content={
                 "connected": False,
                 "status": "Token expired",
-                "message": "Re-authenticate at /aliexpress/auth/start"
-            }
+                "message": "Re-authenticate at /aliexpress/auth/start",
+            },
         )
 
-    time_remaining = int(_token_expires_at - time.time())
-
+    time_remaining = int(cred["expires_at"] - time.time())
     return JSONResponse(
         status_code=200,
         content={
             "connected": True,
             "status": "Connected",
-            "token": _access_token[:20] + "...",
+            "token": cred["access_token"][:20] + "...",
             "time_remaining_seconds": time_remaining,
             "time_remaining_hours": round(time_remaining / 3600, 1),
-            "time_remaining_days": round(time_remaining / 86400, 1)
-        }
+            "time_remaining_days": round(time_remaining / 86400, 1),
+        },
     )
 
 
@@ -343,33 +419,46 @@ async def get_access_token(current_user: User = Depends(get_current_user)):
     """
     Get the current access token (for internal use by AliExpress connector).
 
-    Returns the token if valid, otherwise raises 401.
+    Returns the token if valid, otherwise raises 401. JWT-protected — we
+    never hand the platform credential to an anonymous caller.
     """
-    global _access_token, _token_expires_at
-
-    if not _access_token or time.time() > _token_expires_at:
+    cred = _load_platform_credential()
+    if not cred or cred["is_expired"] or time.time() > cred["expires_at"]:
         raise HTTPException(
             status_code=401,
-            detail="No valid access token. Authenticate at /aliexpress/auth/start"
+            detail="No valid access token. Authenticate at /aliexpress/auth/start",
         )
-
-    return {"access_token": _access_token}
+    return {"access_token": cred["access_token"]}
 
 
 @router.post("/auth/disconnect")
 async def disconnect_aliexpress(
     current_user: User = Depends(get_current_user),
-    oauth: AliExpressOAuth = Depends(get_oauth_client)
 ):
     """
-    Disconnect AliExpress by invalidating stored tokens.
+    Disconnect AliExpress by deleting the stored platform credential.
+
+    The previous implementation called a noop SQL update that never
+    actually invalidated anything (``oauth.session.query(...).update(...)``
+    on a non-existent column). We now delete the row directly from the
+    persistent store the rest of the codebase reads.
     """
     try:
-        # Invalidate all tokens
-        oauth.session.query(oauth.session.query(oauth.session.bind.dialect.name).statement).update(
-            {"is_valid": False}
+        from ospra_os.database.aliexpress_tokens import (
+            SessionLocal as TokenSessionLocal,
+            AliExpressToken,
         )
-        oauth.session.commit()
+
+        db = TokenSessionLocal()
+        try:
+            row = db.query(AliExpressToken).filter_by(
+                api_type=_PLATFORM_API_TYPE
+            ).first()
+            if row is not None:
+                db.delete(row)
+                db.commit()
+        finally:
+            db.close()
 
         return JSONResponse(
             status_code=200,

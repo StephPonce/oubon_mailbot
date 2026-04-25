@@ -52,11 +52,10 @@ class WaitlistEntry(BaseModel):
     position: Optional[int] = None  # Waitlist position
     notified: bool = False  # Have we told them it's live?
     converted: bool = False  # Did they actually subscribe?
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+
+    # Pydantic v2 serializes datetime as ISO 8601 by default via model_dump_json(),
+    # so the old `class Config: json_encoders = {datetime: lambda v: v.isoformat()}`
+    # was a no-op in v2 and has been removed.
 
 
 class WaitlistStats(BaseModel):

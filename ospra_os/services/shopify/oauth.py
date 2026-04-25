@@ -31,25 +31,26 @@ class ShopifyOAuth:
     Shopify OAuth handler for multi-store SaaS.
     """
     
-    # Required scopes for full store access
+    # Minimum-viable OAuth scope set (14 scopes). Mirror of
+    # ospra_os/api/shopify_oauth_routes.py::SHOPIFY_SCOPES — kept in
+    # lock-step so a stale import path doesn't ask Shopify for the
+    # broader pre-Pass-4d scope list and trip app review. Full
+    # justification in docs/guides/SHOPIFY_PARTNER_APP_APPROVAL_READINESS.md §1.
     DEFAULT_SCOPES = [
         "read_products",
         "write_products",
         "read_orders",
-        "write_orders",
         "read_customers",
         "read_inventory",
         "write_inventory",
         "read_locations",
         "read_fulfillments",
         "write_fulfillments",
-        "read_shipping",
         "read_analytics",
-        "read_themes",
         "read_content",
+        "write_content",
         "read_price_rules",
-        "read_discounts",
-        "read_marketing_events",
+        "write_price_rules",
     ]
     
     def __init__(

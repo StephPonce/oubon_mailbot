@@ -13,7 +13,7 @@ import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from ospra_os.database.db import get_db
 from ospra_os.whitelabel.service import WhiteLabelService
@@ -29,19 +29,20 @@ class PartnerCreate(BaseModel):
     company_name: str = Field(..., min_length=1, max_length=255)
     contact_name: Optional[str] = Field(None, max_length=255)
     contact_email: EmailStr
-    slug: str = Field(..., min_length=2, max_length=50, regex="^[a-z0-9-]+$")
-    plan: str = Field("starter", regex="^(starter|growth|enterprise)$")
+    slug: str = Field(..., min_length=2, max_length=50, pattern="^[a-z0-9-]+$")
+    plan: str = Field("starter", pattern="^(starter|growth|enterprise)$")
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "company_name": "E-Commerce Pros Agency",
                 "contact_name": "John Smith",
                 "contact_email": "admin@ecompros.io",
                 "slug": "ecompros",
-                "plan": "growth"
+                "plan": "growth",
             }
         }
+    )
 
 
 class PartnerResponse(BaseModel):
@@ -58,8 +59,8 @@ class PartnerResponse(BaseModel):
     status: str
     activated_at: Optional[str]
 
-    class Config:
-        orm_mode = True
+    # v2: orm_mode was renamed to from_attributes
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BrandingUpdate(BaseModel):
@@ -70,22 +71,22 @@ class BrandingUpdate(BaseModel):
     logo_dark_url: Optional[str] = Field(None, max_length=500)
     favicon_url: Optional[str] = Field(None, max_length=500)
     logo_email_url: Optional[str] = Field(None, max_length=500)
-    primary_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    secondary_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    accent_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    background_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    surface_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    text_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    text_muted_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    success_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    warning_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
-    error_color: Optional[str] = Field(None, regex="^#[0-9a-fA-F]{6}$")
+    primary_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    secondary_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    accent_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    background_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    surface_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    text_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    text_muted_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    success_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    warning_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
+    error_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     font_family: Optional[str] = Field(None, max_length=100)
     heading_font: Optional[str] = Field(None, max_length=100)
     custom_css: Optional[str] = None
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "brand_name": "E-Commerce Pros",
                 "tagline": "Your E-Commerce Success Partner",
@@ -93,21 +94,23 @@ class BrandingUpdate(BaseModel):
                 "primary_color": "#2563eb",
                 "secondary_color": "#7c3aed",
                 "accent_color": "#10b981",
-                "font_family": "Poppins"
+                "font_family": "Poppins",
             }
         }
+    )
 
 
 class DomainConfigure(BaseModel):
     """Configure custom domain request"""
     domain: str = Field(..., min_length=4, max_length=255)
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
-                "domain": "app.ecompros.io"
+                "domain": "app.ecompros.io",
             }
         }
+    )
 
 
 class ClientAdd(BaseModel):
@@ -117,15 +120,16 @@ class ClientAdd(BaseModel):
     client_email: Optional[EmailStr] = None
     plan: str = Field("basic", max_length=50)
 
-    class Config:
-        schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": 42,
                 "client_name": "Bob's Store",
                 "client_email": "bob@bobsstore.com",
-                "plan": "premium"
+                "plan": "premium",
             }
         }
+    )
 
 
 # ==================== DEPENDENCIES ====================

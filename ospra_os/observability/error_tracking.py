@@ -1,14 +1,28 @@
 """
 Sentry Error Tracking Integration
 Provides centralized error tracking, alerting, and performance monitoring.
+
+Sentry SDK is treated as an optional dependency: if `sentry_sdk` isn't
+installed (e.g. lean test environments), every public function in this module
+becomes a no-op so that importing this module never breaks application boot
+or test collection. Setup is gated on the DSN being present in production.
 """
 
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
-from sentry_sdk.integrations.httpx import HttpxIntegration
 from typing import Optional, Dict, Any
 from enum import Enum
+
+try:
+    import sentry_sdk  # type: ignore
+    from sentry_sdk.integrations.fastapi import FastApiIntegration  # type: ignore
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration  # type: ignore
+    from sentry_sdk.integrations.httpx import HttpxIntegration  # type: ignore
+    HAS_SENTRY = True
+except ImportError:
+    sentry_sdk = None  # type: ignore
+    FastApiIntegration = None  # type: ignore
+    SqlalchemyIntegration = None  # type: ignore
+    HttpxIntegration = None  # type: ignore
+    HAS_SENTRY = False
 
 
 class ErrorSeverity(str, Enum):
@@ -44,6 +58,10 @@ def setup_sentry(
             traces_sample_rate=0.1  # 10% of requests
         )
     """
+
+    if not HAS_SENTRY:
+        print("[WARNING]  sentry_sdk not installed - error tracking disabled")
+        return
 
     if not dsn:
         print("[WARNING]  Sentry DSN not provided - error tracking disabled")
@@ -138,6 +156,9 @@ def capture_exception(
             )
     """
 
+    if not HAS_SENTRY:
+        return
+
     with sentry_sdk.push_scope() as scope:
         # Set severity
         scope.level = level.value
@@ -183,6 +204,9 @@ def capture_message(
         )
     """
 
+    if not HAS_SENTRY:
+        return
+
     with sentry_sdk.push_scope() as scope:
         scope.level = level.value
 
@@ -210,6 +234,8 @@ def set_user_context(user_id: int, email: Optional[str] = None, username: Option
         set_user_context(user_id=123, email="user@example.com")
     """
 
+    if not HAS_SENTRY:
+        return
     sentry_sdk.set_user({
         "id": user_id,
         "email": email,
@@ -241,6 +267,8 @@ def add_breadcrumb(
         )
     """
 
+    if not HAS_SENTRY:
+        return
     sentry_sdk.add_breadcrumb(
         message=message,
         category=category,
@@ -265,6 +293,8 @@ def start_transaction(name: str, op: str = "http.server") -> Any:
             # ... expensive operation ...
             pass
     """
+    if not HAS_SENTRY:
+        return _NullSpan()
     return sentry_sdk.start_transaction(name=name, op=op)
 
 
@@ -286,4 +316,28 @@ def start_span(description: str, op: str = "function") -> Any:
             with start_span(description="Update inventory", op="db.query"):
                 update_inventory()
     """
+    if not HAS_SENTRY:
+        return _NullSpan()
     return sentry_sdk.start_span(description=description, op=op)
+
+
+class _NullSpan:
+    """No-op context manager returned when Sentry SDK isn't installed.
+
+    Allows callers to use `with start_transaction(...)` / `with start_span(...)`
+    without crashing when Sentry is disabled.
+    """
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+    def set_tag(self, *_args, **_kwargs):
+        pass
+
+    def set_data(self, *_args, **_kwargs):
+        pass
+
+    def set_status(self, *_args, **_kwargs):
+        pass

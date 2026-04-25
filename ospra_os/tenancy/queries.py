@@ -81,9 +81,14 @@ class TenantQueryError(Exception):
 # `None` values are filtered out so that optional models (e.g. Amazon SP-API
 # models which are only available when credential_encryption is wired up) do
 # not leak into the set if they fail to import.
+#
+# NOTE (Pass 4d disambiguation): `Product` used to live in this set, but it
+# has NO `user_id` column — ownership flows through `store_id -> Store.user_id`.
+# Listing it here meant every `tenant_db.query(Product)` raised TenantQueryError.
+# Product is now in INDIRECT_VIA_STORE_MODELS instead, and the query path joins
+# through Store when filtering.
 USER_SCOPED_MODELS = {m for m in {
     Store,
-    Product,
     ProductDeployment,
     AdCampaign,
     EmailTemplate,
@@ -116,9 +121,19 @@ USER_SCOPED_MODELS = {m for m in {
 # two sets are now equivalent; `USER_SCOPED_MODELS` is the canonical name.
 DIRECT_TENANT_MODELS = USER_SCOPED_MODELS
 
+# Models whose tenancy flows through Store — they have `store_id` but no
+# `user_id`. Filtering these requires a join to Store and a filter on
+# Store.user_id. The wrapper handles the join automatically.
+INDIRECT_VIA_STORE_MODELS = {
+    Product,
+}
+
 # Models that have a store_id column (operate at the per-store granularity).
-# Filtering by user_id still applies (every Product belongs to a user AND a
-# store); store filter is layered on top via TenantContext.store_id.
+# This is a *superset* of INDIRECT_VIA_STORE_MODELS: models listed here AND in
+# USER_SCOPED_MODELS also have `user_id` (the user_id filter is the primary
+# tenant check; store_id is an optional additional scoping layer via
+# TenantContext.store_id). Models listed here AND in INDIRECT_VIA_STORE_MODELS
+# have only `store_id`, so the Store join is the sole tenant check.
 STORE_SCOPED_MODELS = {
     Product,
     ProductDeployment,
@@ -203,12 +218,27 @@ class TenantScopedSession:
                     f"Model {model.__name__} is in USER_SCOPED_MODELS but has no user_id field. "
                     f"Remove it from the set or add a user_id column."
                 )
+        elif model in INDIRECT_VIA_STORE_MODELS:
+            # Ownership flows through Store: Product.store_id -> Store.id,
+            # Store.user_id -> User.id. Join Store so the filter stays on a
+            # single SQL statement (no second round-trip) and the ORM can
+            # still apply `.all()`, `.first()`, `.get()` etc. downstream.
+            if not hasattr(model, 'store_id'):
+                raise TenantQueryError(
+                    f"Model {model.__name__} is in INDIRECT_VIA_STORE_MODELS "
+                    f"but has no store_id field."
+                )
+            query = (
+                query
+                .join(Store, Store.id == model.store_id)
+                .filter(Store.user_id == self._tenant.user_id)
+            )
         else:
             # Unknown model - fail safe (better to error than silently leak)
             raise TenantQueryError(
                 f"Model {model.__name__} is not categorized for tenant scoping. "
-                f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
-                f"ospra_os/tenancy/queries.py."
+                f"Add it to USER_SCOPED_MODELS, INDIRECT_VIA_STORE_MODELS, or "
+                f"UNSCOPED_MODELS in ospra_os/tenancy/queries.py."
             )
 
         return query
@@ -243,11 +273,23 @@ class TenantScopedSession:
                     return None  # Not owned by this user
             return instance
 
+        if model in INDIRECT_VIA_STORE_MODELS:
+            # Verify ownership via the parent Store row. One extra SELECT,
+            # acceptable because .get() is not a hot path — bulk access goes
+            # through .query() which uses a join.
+            store_id = getattr(instance, 'store_id', None)
+            if store_id is None:
+                return None
+            parent_store = self._db.query(Store).get(store_id)
+            if parent_store is None or parent_store.user_id != self._tenant.user_id:
+                return None
+            return instance
+
         # Uncategorized model - fail safe (same policy as query())
         raise TenantQueryError(
             f"Model {model.__name__} is not categorized for tenant scoping. "
-            f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
-            f"ospra_os/tenancy/queries.py."
+            f"Add it to USER_SCOPED_MODELS, INDIRECT_VIA_STORE_MODELS, or "
+            f"UNSCOPED_MODELS in ospra_os/tenancy/queries.py."
         )
 
     def get_or_404(self, model: Type[T], ident: Any, detail: Optional[str] = None) -> T:
@@ -326,6 +368,22 @@ class TenantScopedSession:
             self._db.delete(instance)
             return
 
+        if model in INDIRECT_VIA_STORE_MODELS:
+            store_id = getattr(instance, 'store_id', None)
+            if store_id is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot delete resource with no parent store"
+                )
+            parent_store = self._db.query(Store).get(store_id)
+            if parent_store is None or parent_store.user_id != self._tenant.user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot delete resource owned by another user"
+                )
+            self._db.delete(instance)
+            return
+
         if model in UNSCOPED_MODELS:
             self._db.delete(instance)
             return
@@ -333,9 +391,9 @@ class TenantScopedSession:
         # Uncategorized model - fail safe
         raise TenantQueryError(
             f"Model {model.__name__} is not categorized for tenant scoping. "
-            f"Add it to USER_SCOPED_MODELS or UNSCOPED_MODELS in "
-            f"ospra_os/tenancy/queries.py before deleting through a "
-            f"TenantScopedSession."
+            f"Add it to USER_SCOPED_MODELS, INDIRECT_VIA_STORE_MODELS, or "
+            f"UNSCOPED_MODELS in ospra_os/tenancy/queries.py before deleting "
+            f"through a TenantScopedSession."
         )
 
     def bulk_update_mappings(self, model: Type[T], mappings: List[dict]) -> None:

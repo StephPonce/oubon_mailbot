@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import time as time_cls
 from functools import lru_cache
-from typing import List, Optional
+from typing import Dict, List, Optional
 from pydantic import EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     SENTRY_ENVIRONMENT: str = Field(default="production")  # production, staging, development
     SENTRY_TRACES_SAMPLE_RATE: float = Field(default=0.1)  # 10% of transactions
     SENTRY_PROFILES_SAMPLE_RATE: float = Field(default=0.1)  # 10% profiling
+
+    # PostHog Analytics (task #38) — feature flags + activation funnel
+    # signup → first discovery → first deploy → first sale
+    POSTHOG_API_KEY: Optional[str] = None
+    POSTHOG_HOST: str = Field(default="https://us.i.posthog.com")
+    POSTHOG_DEBUG: bool = Field(default=False)
+    POSTHOG_ENABLED: bool = Field(default=True)  # master switch — set False in tests
 
     # Gmail (optional for production without email features)
     GMAIL_USER_EMAIL: str = Field(default="noreply@ospra.io")
@@ -100,6 +107,18 @@ class Settings(BaseSettings):
     TIKTOK_CLIENT_SECRET: Optional[str] = None
     TIKTOK_ADVERTISER_ID: Optional[str] = None
     TIKTOK_REDIRECT_URI: Optional[str] = Field(default="http://localhost:8001/api/tiktok/auth/callback")
+
+    # TikTok Shop Partner API (https://developers.tiktok-shops.com/) — seller-side
+    # product/order/trend-feed API. Distinct from TIKTOK_CLIENT_KEY/SECRET which
+    # target the content-side TikTok Open Platform. App key + secret identify
+    # the partner app; access token + shop cipher identify a single seller's
+    # authorized shop and are rotated by the OAuth flow in auth/tiktok_oauth.py.
+    TIKTOK_SHOP_APP_KEY: Optional[str] = None
+    TIKTOK_SHOP_APP_SECRET: Optional[str] = None
+    TIKTOK_SHOP_ACCESS_TOKEN: Optional[str] = None
+    TIKTOK_SHOP_CIPHER: Optional[str] = None  # shop_cipher from OAuth callback
+    TIKTOK_SHOP_REGION: str = "US"  # US | UK | ID | MY | PH | SG | TH | VN
+    TIKTOK_SHOP_API_HOST: str = "https://open-api.tiktokglobalshop.com"
 
     # Google Ads Platform
     GOOGLE_ADS_CUSTOMER_ID: Optional[str] = None
@@ -361,6 +380,108 @@ class Settings(BaseSettings):
         object.__setattr__(self, "openai_api_key", self.OPENAI_API_KEY)
         object.__setattr__(self, "claude_api_key", self.CLAUDE_API_KEY)
         object.__setattr__(self, "slack_webhook_url", self.SLACK_WEBHOOK_URL)
+
+    # ------------------------------------------------------------------
+    # Feature flags — derived from which env vars are actually configured.
+    # Call sites should use these instead of checking individual env vars,
+    # so adding a new provider only requires updating one place.
+    # ------------------------------------------------------------------
+    @property
+    def AI_ENABLED(self) -> bool:
+        """True if at least one AI provider key is present."""
+        return any([
+            self.OPENAI_API_KEY,
+            self.CLAUDE_API_KEY,
+            self.GEMINI_API_KEY,
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("XAI_API_KEY"),
+        ])
+
+    @property
+    def EMAIL_AUTOMATION_ENABLED(self) -> bool:
+        """True when at least one email provider (Gmail/Outlook/iCloud) can be used."""
+        has_google = bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
+        has_outlook = bool(os.getenv("OUTLOOK_CLIENT_ID") and os.getenv("OUTLOOK_CLIENT_SECRET"))
+        has_encryption = bool(os.getenv("EMAIL_OAUTH_ENCRYPTION_KEY"))
+        return has_encryption and (has_google or has_outlook)
+
+    @property
+    def SHOPIFY_OAUTH_ENABLED(self) -> bool:
+        """True when Shopify Partner OAuth is configured (required for multi-tenant installs)."""
+        return bool(
+            os.getenv("SHOPIFY_PARTNER_CLIENT_ID")
+            and os.getenv("SHOPIFY_PARTNER_CLIENT_SECRET")
+        )
+
+    @property
+    def SHOPIFY_SINGLE_STORE_ENABLED(self) -> bool:
+        """True for single-tenant deployments using a private app token."""
+        return bool(self.SHOPIFY_STORE and (self.SHOPIFY_API_TOKEN or self.SHOPIFY_ACCESS_TOKEN))
+
+    @property
+    def ALIEXPRESS_ENABLED(self) -> bool:
+        return bool(self.ALIEXPRESS_API_KEY and self.ALIEXPRESS_APP_SECRET)
+
+    @property
+    def CJ_DROPSHIPPING_ENABLED(self) -> bool:
+        return bool(os.getenv("CJ_API_EMAIL") and os.getenv("CJ_API_KEY"))
+
+    @property
+    def AMAZON_REVIEWS_ENABLED(self) -> bool:
+        return bool(self.AMAZON_ACCESS_KEY and self.AMAZON_SECRET_KEY and self.AMAZON_PARTNER_TAG)
+
+    @property
+    def APIFY_ENABLED(self) -> bool:
+        return bool(self.APIFY_API_TOKEN)
+
+    @property
+    def BILLING_ENABLED(self) -> bool:
+        return bool(
+            os.getenv("LEMONSQUEEZY_API_KEY")
+            and self.LEMONSQUEEZY_WEBHOOK_SECRET
+        )
+
+    @property
+    def META_ADS_ENABLED(self) -> bool:
+        return bool(self.META_APP_ID and self.META_APP_SECRET and self.META_AD_ACCOUNT_ID)
+
+    @property
+    def TIKTOK_ADS_ENABLED(self) -> bool:
+        return bool(self.TIKTOK_CLIENT_KEY and self.TIKTOK_CLIENT_SECRET)
+
+    @property
+    def GOOGLE_ADS_ENABLED(self) -> bool:
+        return bool(self.GOOGLE_ADS_CUSTOMER_ID and self.GOOGLE_ADS_DEVELOPER_TOKEN)
+
+    @property
+    def OBSERVABILITY_ENABLED(self) -> bool:
+        return bool(self.SENTRY_DSN)
+
+    @property
+    def ALERTS_ENABLED(self) -> bool:
+        return bool(self.SLACK_WEBHOOK_URL)
+
+    def feature_summary(self) -> Dict[str, bool]:
+        """Snapshot of which features are enabled in this deployment.
+
+        Useful for startup logs and a `/health/features` endpoint.
+        """
+        return {
+            "ai": self.AI_ENABLED,
+            "email_automation": self.EMAIL_AUTOMATION_ENABLED,
+            "shopify_oauth": self.SHOPIFY_OAUTH_ENABLED,
+            "shopify_single_store": self.SHOPIFY_SINGLE_STORE_ENABLED,
+            "aliexpress": self.ALIEXPRESS_ENABLED,
+            "cj_dropshipping": self.CJ_DROPSHIPPING_ENABLED,
+            "amazon_reviews": self.AMAZON_REVIEWS_ENABLED,
+            "apify": self.APIFY_ENABLED,
+            "billing": self.BILLING_ENABLED,
+            "meta_ads": self.META_ADS_ENABLED,
+            "tiktok_ads": self.TIKTOK_ADS_ENABLED,
+            "google_ads": self.GOOGLE_ADS_ENABLED,
+            "observability": self.OBSERVABILITY_ENABLED,
+            "alerts": self.ALERTS_ENABLED,
+        }
 
 
 @lru_cache(maxsize=1)

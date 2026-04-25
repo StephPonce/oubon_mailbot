@@ -73,6 +73,14 @@ def get_engine(database_url: str = None):
     """
     url = database_url or DATABASE_URL
 
+    # ``make dev-local`` sets this to force SQLite regardless of what the
+    # .env file has configured. Without this flag, ``load_dotenv(override=True)``
+    # in main.py would clobber the empty ``DATABASE_URL`` we set on the
+    # command line and we'd be back to hitting the remote DB.
+    if os.getenv("OSPRA_FORCE_LOCAL_SQLITE") == "1":
+        url = "sqlite:///./data/ospra_local.db"
+        print("[INFO] OSPRA_FORCE_LOCAL_SQLITE=1 — using local SQLite (overrides .env)")
+
     # In test mode, use SQLite in-memory database if no DATABASE_URL provided
     if not url and is_test_mode():
         url = "sqlite:///:memory:"

@@ -6,14 +6,17 @@ from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text,
     ForeignKey, Index, JSON, Enum as SQLEnum, UniqueConstraint
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, Session, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, Session, sessionmaker
 from sqlalchemy import create_engine
 from datetime import datetime
 import enum
 import json
 import os
 
+# SQLAlchemy 2.0: declarative_base moved from sqlalchemy.ext.declarative to
+# sqlalchemy.orm. The old import path still works but emits a
+# MovedIn20Warning which, combined with our `filterwarnings = error` pytest
+# config, blocks conftest.py from loading (see Pass 6 notes).
 Base = declarative_base()
 
 

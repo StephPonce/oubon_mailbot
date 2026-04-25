@@ -34,7 +34,10 @@ google-auth-httplib2>=0.2.0
 
 # Authentication
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
+# bcrypt is called directly from ospra_os/auth/jwt_auth.py — passlib was
+# removed to avoid its broken self-test on bcrypt 4+ (see the comment in
+# that module). Keep this pin in sync with pyproject.toml so a uv-based
+# install and a pip-based install produce identical hashing behaviour.
 bcrypt>=4.1.2
 
 # Scheduling

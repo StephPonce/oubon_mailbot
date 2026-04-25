@@ -3,11 +3,35 @@ Test script for Marketing Angle Generator
 
 Tests the AI-powered marketing angle generation system that creates
 unique positioning for products to prevent direct competition between users.
+
+NOTE (Pass 6): `MarketingAngleGenerator` imports AIFactory which transitively
+imports the Groq provider's top-level `groq` package at module load time.
+In environments without the optional `groq` dep the import cascade raises
+ModuleNotFoundError at *collection* time. We guard the import so the file
+loads regardless, and skip the tests inside when the dep is missing.
 """
 
 import asyncio
+
 import httpx
-from ospra_os.intelligence.marketing_angle_generator import MarketingAngleGenerator
+import pytest
+
+try:
+    from ospra_os.intelligence.marketing_angle_generator import MarketingAngleGenerator
+
+    MARKETING_ANGLES_AVAILABLE = True
+    MARKETING_ANGLES_SKIP_REASON = ""
+except ModuleNotFoundError as _e:  # pragma: no cover - env-dependent
+    MarketingAngleGenerator = None  # type: ignore[assignment]
+    MARKETING_ANGLES_AVAILABLE = False
+    MARKETING_ANGLES_SKIP_REASON = (
+        f"MarketingAngleGenerator import failed ({_e.name} missing). "
+        "Install optional AI providers (groq) or mock them to run this test."
+    )
+
+pytestmark = pytest.mark.skipif(
+    not MARKETING_ANGLES_AVAILABLE, reason=MARKETING_ANGLES_SKIP_REASON
+)
 
 
 async def test_marketing_angle_generator():

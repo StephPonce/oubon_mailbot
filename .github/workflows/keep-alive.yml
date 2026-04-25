@@ -1,0 +1,59 @@
+name: Keep Render service warm
+
+# Cold-start mitigation. Render Starter web services scale to zero after
+# ~15 minutes idle. The first request after that idle window has to pull
+# the image, boot the container, and finish the FastAPI lifespan startup
+# — observed wall-clock 30–90s for a fresh Ospra boot. Pinging /health
+# every 10 minutes from GitHub Actions keeps the dyno alive and kills the
+# user-visible cold start entirely.
+#
+# Why GitHub Actions and not UptimeRobot / cron-job.org?
+#   - Already part of the deploy story; one less external account to own.
+#   - Free for public repos, generous minutes for private.
+#   - Audit trail visible to anyone with repo access.
+#
+# If we move to a Render plan that doesn't scale to zero (Standard+),
+# delete this workflow. Until then, this is the smallest piece of code
+# that yields the biggest UX improvement on login.
+
+on:
+  schedule:
+    # Every 10 minutes. Render's idle timeout is 15 min, so 10 gives us
+    # one safe "missed run" of headroom before the dyno would scale down.
+    - cron: "*/10 * * * *"
+  # Allow manual trigger from the Actions tab for ad-hoc warmups.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping /health
+        # Repo secret ``OSPRA_API_HEALTH_URL`` should be set to e.g.
+        # https://ospra-intelligence-api.onrender.com/health. We hide it in
+        # a secret rather than hard-coding so we can rotate the host or
+        # swap to a staging environment without editing the workflow.
+        env:
+          HEALTH_URL: ${{ secrets.OSPRA_API_HEALTH_URL }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "OSPRA_API_HEALTH_URL secret is not set — skipping ping."
+            echo "Configure it in repo Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+
+          # 30s connect timeout + 30s overall — generous enough that a
+          # genuinely cold container can finish booting, tight enough
+          # that a hung request doesn't burn workflow minutes.
+          status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+                        --connect-timeout 30 --max-time 60 \
+                        "$HEALTH_URL")
+
+          echo "Ping $HEALTH_URL → HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::warning::Health check returned $status (expected 200)."
+            # Don't fail the workflow — a transient 502 during a deploy
+            # rotation is normal and shouldn't page the team. The next
+            # run (10 min later) will catch a sustained outage.
+          fi

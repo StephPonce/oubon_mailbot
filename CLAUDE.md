@@ -6,9 +6,18 @@ Guidance for Claude Code when working in this repository.
 
 **Ospra OS** is an AI-powered e-commerce automation SaaS for dropshipping. It does product discovery (AliExpress + CJ Dropshipping + Amazon + Apify-driven trend signals), social-sentiment scoring, AI grading, automated Shopify deployment, and Gmail-based customer support automation.
 
-The product the user actually uses on the live storefront is **Oubon Shop** (`oubonshop.com`). Anything matching `oubon` / `Oubon` / `OUBON` is preserved across all cleanup work.
+The user's own storefront is **Oubon Shop** (`oubonshop.com`) — it's the reference tenant and the first customer. As of Pass 4b (commit `a01830a`), all tenant-facing prompts, policies, and AI output are parameterized via `ospra_os/tenancy/brand.py` + factory functions in `policies.py`. Oubon is the default fallback, not a hardcode.
 
 The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a legacy `app/` directory or root-level `main.py`; both were consolidated during the December 2025 migration (see `docs/archive/T2_MIGRATION_COMPLETE.md`).
+
+### Important memory files — read these first each session
+
+- `TASKS.md` — current task list (what's pending / in progress / blocked)
+- `memory/decisions.md` — locked architecture and product decisions with rationale
+- `memory/target_customer.md` — who we're building for (broadened Pass 4)
+- `memory/pricing.md` — tier ladder + standalone modules + white-glove
+- `memory/competitors.md` — competitive landscape + our edges
+- `memory/roadmap_priorities.md` — ordered roadmap with ship rules
 
 ## Standing rules (carry across sessions)
 

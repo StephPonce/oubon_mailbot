@@ -8,7 +8,7 @@ Uses Claude (Anthropic API) to generate professional product content:
 - Competitive pricing suggestions
 - Complete Shopify listings
 
-Model: claude-sonnet-4-20250514 (cost-efficient)
+Model: claude-sonnet-4-5-20250929 (current Sonnet 4.5)
 """
 
 import os
@@ -132,7 +132,7 @@ class ProductContentGenerator:
             self.client = AsyncAnthropic(api_key=self.api_key)
             logger.info("[SUCCESS] ProductContentGenerator initialized with Claude Sonnet 4.5")
 
-        self.model = "claude-sonnet-4-20250514"  # Latest cost-efficient model
+        self.model = "claude-sonnet-4-5-20250929"  # Sonnet 4.5 (current)
         self.rate_limiter = RateLimiter(calls_per_minute=rate_limit)
         self.usage_tracker = UsageTracker()
 

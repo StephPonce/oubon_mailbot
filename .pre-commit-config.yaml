@@ -1,0 +1,43 @@
+# Pre-commit hooks — install with `pre-commit install` (one-time per clone).
+# Runs automatically on `git commit` to catch common issues before CI does.
+#
+# Manual run: `pre-commit run --all-files`
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^ospra_os/
+      # Formatting is intentionally OFF — we don't want pre-commit rewriting
+      # every file on first install. Enable later once codebase is formatted.
+      # - id: ruff-format
+      #   files: ^ospra_os/
+
+  - repo: local
+    hooks:
+      - id: no-oubon-in-prompts
+        name: "No Oubon hardcoded in tenant-neutral modules"
+        entry: bash -c '! git diff --cached -U0 -- ospra_os/email_automation/policies.py ospra_os/ai/multi_provider_client.py ospra_os/email_automation/smart_reply.py ospra_os/email_automation/email_processor.py | grep -E "^\+" | grep -v "^+++" | grep -v "DEFAULT_" | grep -q "Oubon"'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: no-tracked-db-files
+        name: "No SQLite/DB files staged"
+        entry: bash -c '! git diff --cached --name-only | grep -E "\.(db|sqlite|sqlite3)$"'
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

@@ -32,7 +32,7 @@ dependencies = [
     "pytrends>=4.9.2",
     "praw>=7.7.1",
     "pytz>=2024.1",
-    "httpx>=0.27.0",
+    "httpx[socks]>=0.27.0",
     "playwright>=1.55.0",
     "fake-useragent>=2.2.0",
     "tenacity>=9.1.2",
@@ -51,6 +51,23 @@ dependencies = [
     "onnxruntime>=1.23.2",
     "sentry-sdk[fastapi,httpx,sqlalchemy]>=2.47.0",
     "resend>=2.19.0",
+    "slowapi>=0.1.9",
+    "python-jose[cryptography]>=3.5.0",
+    # NOTE: ``passlib[bcrypt]`` used to live here. We dropped it because
+    # passlib 1.7.x's backend probe crashes against bcrypt 4+ on the very
+    # first password hash, and ``ospra_os/auth/jwt_auth.py`` now calls
+    # bcrypt directly. If something else imports passlib later, audit
+    # whether it can use the bcrypt module instead before re-adding.
+    # bcrypt is called directly from ``ospra_os/auth/jwt_auth.py`` (the
+    # ``# bcrypt directly — no passlib`` block); the pre-hash there
+    # explicitly handles bcrypt 4+'s strict 72-byte ValueError. The
+    # previous ``bcrypt<4`` pin was a stale workaround for passlib's
+    # broken backend probe — passlib is no longer imported anywhere in
+    # the codebase. ``requirements.txt`` already pins ``>=4.1.2``; this
+    # entry now matches so a ``pip install -r requirements.txt`` and a
+    # ``uv sync`` produce identical password-hashing behaviour. (Audit
+    # fix #6 — dev/prod hashing divergence.)
+    "bcrypt>=4.1.2",
 ]
 
 [project.optional-dependencies]

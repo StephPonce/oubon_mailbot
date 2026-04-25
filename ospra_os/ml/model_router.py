@@ -94,7 +94,7 @@ MODELS = {
 
     # Premium (Claude) - $3.00 per 1M tokens
     "claude-sonnet": ModelConfig(
-        name="claude-sonnet-4-20250514",
+        name="claude-sonnet-4-5-20250929",
         tier=ModelTier.PREMIUM,
         cost_per_1k_tokens=0.003,
         max_tokens=8192,

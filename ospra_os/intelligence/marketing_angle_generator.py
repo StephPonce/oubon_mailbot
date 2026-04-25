@@ -271,13 +271,16 @@ Return ONLY valid JSON (no markdown, no code blocks, no extra text) with this ex
 
 IMPORTANT: Return ONLY the JSON object, nothing else."""
 
-        response = await self.ai.generate_content(
-            prompt=prompt,
-            max_tokens=1000
-        )
+        # Audit fix: ``self.ai.generate_content`` doesn't exist on any
+        # provider class — the marketing-angle AI path was silently
+        # raising AttributeError on every call and falling through to
+        # ``_generate_template_angle``. Every angle in production was
+        # template-generated. The provider interface exposes ``chat`` for
+        # generic prompt → text calls; that's what we use here.
+        response = await self.ai.chat(message=prompt)
 
         # Clean response (remove markdown if present)
-        response = response.strip()
+        response = (response or "").strip()
         if response.startswith('```'):
             # Remove markdown code blocks
             lines = response.split('\n')

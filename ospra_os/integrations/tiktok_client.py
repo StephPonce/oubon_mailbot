@@ -14,7 +14,12 @@ from dotenv import load_dotenv
 
 # Load .env file to ensure environment variables are available
 # override=True forces .env values to take precedence over shell env vars
-load_dotenv(override=True)
+# — except in tests, where the harness has already fixed up the env (e.g.
+# pinning DATABASE_URL to the per-worker SQLite file). Overriding there
+# would clobber those test-only values with real Neon Postgres credentials
+# from .env and break unrelated tests that touch settings-derived URLs.
+_in_tests = os.getenv("APP_ENV") == "testing" or "PYTEST_CURRENT_TEST" in os.environ
+load_dotenv(override=not _in_tests)
 
 logger = logging.getLogger(__name__)
 

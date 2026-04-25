@@ -209,8 +209,18 @@ class ClaudeProvider(AIProvider):
         Args:
             message: User's question or message
             context: Optional context (products, metrics, preferences)
-                     If context["system_prompt"] is provided, use it directly.
-                     This allows OiService to inject context-aware prompts.
+                     - If context["system_prompt"] is a ``str``, used as-is.
+                     - If context["system_prompt"] is a ``dict`` with keys
+                       ``{"static": str, "dynamic": str}``, the ``static`` chunk
+                       is sent as a cached content block (5-minute ephemeral
+                       TTL, Anthropic prompt-caching) and the ``dynamic`` chunk
+                       is appended as a second, un-cached block. Use this form
+                       when the leading chunk is stable across many requests
+                       (OiService system prompt, grading rubric, support
+                       policy) so Anthropic bills the repeat calls at the 10%
+                       cached-read rate instead of full input tokens.
+                     - When omitted, falls back to the provider's built-in
+                       dashboard consultant prompt.
 
         Returns:
             AI response as formatted string
@@ -218,15 +228,19 @@ class ClaudeProvider(AIProvider):
         Raises:
             InvalidResponseError: If Claude returns invalid data
         """
-        # Check if a system_prompt was provided in context (from OiService)
-        # This allows OiService to inject fully built context-aware prompts
+        # Build the Anthropic `system` parameter. Three supported shapes:
+        #   (a) str            — send as a single text block, no caching
+        #   (b) {static, dynamic} dict — split into two blocks; static cached
+        #   (c) None           — auto-build from context
+        raw_system = None
         if context and "system_prompt" in context:
-            system_prompt = context["system_prompt"]
+            raw_system = context["system_prompt"]
             logger.debug("Using system prompt from context (OiService)")
         else:
-            # Fallback to building our own prompt
-            system_prompt = self._build_chat_system_prompt(context)
+            raw_system = self._build_chat_system_prompt(context)
             logger.debug("Building system prompt internally")
+
+        system_param = self._build_cached_system_param(raw_system)
 
         # Temperature — callers that need low-variance, near-deterministic output
         # (e.g. AI product analyzer generating structured JSON) can pass
@@ -253,7 +267,7 @@ class ClaudeProvider(AIProvider):
             response = self.client.messages.create(
                 model=self.model_name,
                 max_tokens=1024,
-                system=system_prompt,
+                system=system_param,
                 temperature=temperature,
                 messages=[
                     {
@@ -266,11 +280,23 @@ class ClaudeProvider(AIProvider):
             # Extract response text
             response_text = response.content[0].text
 
-            # Track token usage
-            tokens_used = response.usage.input_tokens + response.usage.output_tokens
+            # Track token usage + cache stats. When prompt caching is working,
+            # `cache_creation_input_tokens` fires on the first call of a TTL
+            # window and `cache_read_input_tokens` fires on every subsequent
+            # call — the latter is billed at ~10% of normal input tokens.
+            usage = response.usage
+            tokens_used = usage.input_tokens + usage.output_tokens
             self.track_usage(tokens_used)
 
-            logger.debug(f"Chat response generated: {tokens_used} tokens used")
+            cache_created = getattr(usage, "cache_creation_input_tokens", 0) or 0
+            cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+            if cache_created or cache_read:
+                logger.debug(
+                    f"Chat response: {tokens_used} tokens "
+                    f"(cache_created={cache_created}, cache_read={cache_read})"
+                )
+            else:
+                logger.debug(f"Chat response generated: {tokens_used} tokens used")
 
             # Strip markdown formatting symbols
             return strip_markdown(response_text)
@@ -286,6 +312,52 @@ class ClaudeProvider(AIProvider):
         except Exception as e:
             logger.error(f"Unexpected error in chat: {e}")
             raise InvalidResponseError(f"Failed to generate chat response: {e}")
+
+    # --- prompt caching helpers --------------------------------------------
+
+    # Anthropic's cache minimum is 1024 input tokens for Sonnet and 2048 for
+    # Haiku. Blocks shorter than this are sent un-cached (Anthropic would
+    # otherwise silently ignore the cache_control flag). We approximate with
+    # a 4-chars-per-token heuristic — good enough to stay above the threshold
+    # after tokenization variability; callers that care about exact token
+    # counts can pre-flight via the tokenizer.
+    _CACHE_MIN_CHARS = 1024 * 4  # ~1024 tokens worth of English text
+
+    def _build_cached_system_param(self, raw_system):
+        """
+        Convert the caller-supplied system prompt into the shape Anthropic's
+        `messages.create(system=...)` expects.
+
+        Three inputs:
+          - ``str``                           — single un-cached text block
+          - ``{"static": s, "dynamic": d}``   — cached static + un-cached dynamic
+          - already a list of content blocks  — pass through verbatim
+        """
+        # Pre-built content-block list — caller owns cache_control semantics.
+        if isinstance(raw_system, list):
+            return raw_system
+
+        # Split form — mark static chunk for ephemeral caching if it's long
+        # enough to clear Anthropic's minimum. Under the floor, skip the
+        # cache flag (Anthropic would reject or ignore it, and logging
+        # cache_creation=0 every call is noise).
+        if isinstance(raw_system, dict):
+            static = str(raw_system.get("static", "") or "")
+            dynamic = str(raw_system.get("dynamic", "") or "")
+            blocks = []
+            if static:
+                block = {"type": "text", "text": static}
+                if len(static) >= self._CACHE_MIN_CHARS:
+                    block["cache_control"] = {"type": "ephemeral"}
+                blocks.append(block)
+            if dynamic:
+                blocks.append({"type": "text", "text": dynamic})
+            # If somehow both were empty, fall through to a safe empty string
+            return blocks if blocks else ""
+
+        # Plain string — pass through. Anthropic's SDK accepts either a string
+        # or a list of content blocks for the `system` param.
+        return raw_system
 
     async def optimize_pricing(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
         """

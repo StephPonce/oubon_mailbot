@@ -142,12 +142,20 @@ def check_sensitive_rate_limit(endpoint: str, request: Request) -> None:
     allowed, error_msg, retry_after = sensitive_rate_limiter.check_rate_limit(endpoint, ip)
 
     if not allowed:
-        # Log to security audit
+        # Log to security audit. The previous form swallowed any failure
+        # silently — that meant a broken auth_logger (e.g. unwritable
+        # ``logs/`` dir, see audit fix #9) made every rate-limit hit
+        # invisible to ops. We still don't want a logger blowup to drop
+        # the 429, but the failure deserves to surface in stdout so the
+        # operator can fix the security audit pipeline.
         try:
             from ospra_os.security.auth_logger import log_rate_limit_exceeded
             log_rate_limit_exceeded(ip_address=ip, endpoint=f"/api/auth/{endpoint}", user_id=None)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "rate_limiting: failed to write rate-limit hit to security log "
+                "(rate limit still enforced): %s", e
+            )
 
         raise HTTPException(
             status_code=429,

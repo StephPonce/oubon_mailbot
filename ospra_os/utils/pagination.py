@@ -70,7 +70,24 @@ def safe_pagination(
         @router.get("/items")
         async def list_items(pagination: PaginationParams = Depends(safe_pagination)):
             items = db.query(Item).offset(pagination.offset).limit(pagination.limit).all()
+
+    Also callable directly (e.g. from tests or non-FastAPI code) with bare
+    int kwargs — the FastAPI ``Query`` sentinels are detected and replaced
+    with their plain-Python defaults so the function works in both contexts.
     """
+    # When this function is invoked directly (not through FastAPI's
+    # dependency injection), the defaults are FastAPI Query() sentinel
+    # objects rather than ints. Coerce them back to plain defaults so
+    # arithmetic and comparison operations don't blow up.
+    from fastapi.params import Query as _QueryParam
+
+    if isinstance(page, _QueryParam):
+        page = 1
+    if isinstance(per_page, _QueryParam):
+        per_page = DEFAULT_PAGE_SIZE
+    if isinstance(offset, _QueryParam):
+        offset = None
+
     # Calculate offset from page if not directly provided
     if offset is None:
         calculated_offset = (page - 1) * per_page
@@ -101,6 +118,9 @@ def safe_limit(
         async def get_recent(limit: int = Depends(safe_limit)):
             items = db.query(Item).limit(limit).all()
     """
+    from fastapi.params import Query as _QueryParam
+    if isinstance(limit, _QueryParam):
+        limit = DEFAULT_PAGE_SIZE
     return min(limit, MAX_PAGE_SIZE)
 
 

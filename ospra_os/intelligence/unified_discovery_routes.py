@@ -28,14 +28,36 @@ PERFORMANCE OPTIMIZATIONS:
 - Instant cache hits for repeat requests
 """
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import logging
 import os
 import time
 
+from ospra_os.auth.dependencies import get_current_user
+from ospra_os.auth.jwt_handler import TokenPayload
+from ospra_os.core.tiers import (
+    SubscriptionTier as TierEnum,
+    clamp_request_count,
+    get_products_per_request_ceiling,
+)
+
 logger = logging.getLogger(__name__)
+
+
+def _tier_from_payload(user: Optional[TokenPayload]) -> TierEnum:
+    """Map a JWT payload to the canonical SubscriptionTier enum.
+
+    Unauthenticated callers get NEST (the free-tier ceiling still applies to
+    public/anonymous traffic so an unauth'd user can't stampede the API).
+    """
+    if user is None or not user.tier:
+        return TierEnum.NEST
+    try:
+        return TierEnum(user.tier.lower())
+    except ValueError:
+        return TierEnum.NEST
 
 # When True, empty discovery responses fall back to hardcoded demo products.
 # Default: False. Production MUST NOT silently return fake products — users need
@@ -191,11 +213,12 @@ class EnhanceImagesRequest(BaseModel):
 @router.get("/live-products")
 async def get_products(
     niche: str = Query("smart_home", description="Product category"),
-    count: int = Query(20, ge=1, le=50, description="Number of products"),
+    count: int = Query(20, ge=1, le=100, description="Number of products (tier-capped)"),
     min_score: float = Query(30.0, ge=0, le=100, description="Minimum OI score"),
     include_sentiment: bool = Query(True, description="Include social sentiment"),
     include_ai_images: bool = Query(False, description="Generate AI images for top products (~$0.04 each)"),
-    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data")
+    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data"),
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
 ):
     """
     Discover products from all available sources WITH CACHING.
@@ -215,6 +238,20 @@ async def get_products(
     start_time = time.time()
     products: List[Dict] = []
     discovery_error_msg: Optional[str] = None
+
+    # ==== TIER-BASED COUNT CLAMPING ====
+    # Free-tier traffic (including anonymous) can't request 100 products at once.
+    # The weekly quota is still enforced by tier_enforcement middleware; this is
+    # the per-call ceiling on top of that. See ospra_os/core/tiers.py.
+    user_tier = _tier_from_payload(current_user)
+    original_count = count
+    count, was_clamped = clamp_request_count(count, user_tier)
+    tier_ceiling = get_products_per_request_ceiling(user_tier)
+    if was_clamped:
+        logger.info(
+            f"[TIER CLAMP] user_tier={user_tier.value} requested={original_count} "
+            f"ceiling={tier_ceiling} effective={count}"
+        )
 
     try:
         engine = get_engine()
@@ -254,6 +291,12 @@ async def get_products(
                         "from_cache": True,
                         "cache_age_seconds": cached_entry.age_seconds,
                         "response_time_ms": int(elapsed * 1000),
+                        "tier_meta": {
+                            "tier": user_tier.value,
+                            "per_request_ceiling": tier_ceiling,
+                            "requested": original_count,
+                            "clamped": was_clamped,
+                        },
                     }
             elif cached_entry:
                 logger.warning(f"[CACHE EMPTY] /products?niche={niche} - invalidating empty cache")
@@ -362,6 +405,12 @@ async def get_products(
             "ai_images_generated": include_ai_images,
             "from_cache": False,
             "response_time_ms": int(elapsed * 1000),
+            "tier_meta": {
+                "tier": user_tier.value,
+                "per_request_ceiling": tier_ceiling,
+                "requested": original_count,
+                "clamped": was_clamped,
+            },
         }
 
     except HTTPException:
@@ -381,7 +430,7 @@ async def get_products(
 @router.get("/quick/{niche}")
 async def quick_discover(
     niche: str,
-    count: int = Query(10, ge=1, le=50),
+    count: int = Query(10, ge=1, le=100),
     include_ai_images: bool = Query(False, description="Generate AI images"),
     include_sentiment: bool = Query(
         True,
@@ -392,7 +441,8 @@ async def quick_discover(
             "Safely no-ops if xAI or Reddit aren't configured."
         ),
     ),
-    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data")
+    force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data"),
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
 ):
     """
     Quick discovery with caching.
@@ -404,10 +454,28 @@ async def quick_discover(
     - Demo fallback is only enabled when the operator sets ALLOW_DEMO_FALLBACK=1
       (for local dev without API keys); the response then carries is_fallback=True
       so the frontend can display a clear banner.
+
+    Tier clamp:
+    - `count` is clamped to the caller's per-request ceiling from
+      ospra_os.core.tiers.get_products_per_request_ceiling(tier). Anonymous
+      traffic defaults to NEST. When clamped, the response carries
+      tier_meta.clamped=True so the UI can nudge the user to upgrade.
     """
     start_time = time.time()
     products = []
     discovery_error_msg: Optional[str] = None
+
+    # ==== TIER CLAMP ====
+    caller_tier = _tier_from_payload(current_user)
+    requested_count = count
+    effective_count, was_clamped = clamp_request_count(requested_count, caller_tier)
+    count = effective_count
+    tier_meta = {
+        "tier": caller_tier.value,
+        "per_request_ceiling": get_products_per_request_ceiling(caller_tier),
+        "requested": requested_count,
+        "clamped": was_clamped,
+    }
 
     try:
         engine = get_engine()
@@ -454,6 +522,7 @@ async def quick_discover(
                         "cache_age_seconds": cached_entry.age_seconds,
                         "cache_ttl_remaining": cached_entry.ttl_remaining_seconds,
                         "response_time_ms": int(elapsed * 1000),
+                        "tier_meta": tier_meta,
                     }
             elif cached_entry:
                 logger.warning(f"[CACHE EMPTY] /quick/{niche} - invalidating empty cache entry")
@@ -507,6 +576,7 @@ async def quick_discover(
                     "discovery_error": discovery_error_msg,
                     "diagnostics": diagnostics,
                     "response_time_ms": int(elapsed * 1000),
+                    "tier_meta": tier_meta,
                 }
 
             # Production path: be honest about failure
@@ -575,6 +645,7 @@ async def quick_discover(
             if CACHE_AVAILABLE
             else 0,
             "response_time_ms": int(elapsed * 1000),
+            "tier_meta": tier_meta,
         }
 
     except HTTPException:

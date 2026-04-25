@@ -98,7 +98,7 @@ class ClaudeProvider(AIProvider):
             messages = [{"role": "user", "content": prompt}]
 
             # Use model from config or default to Sonnet
-            model_name = model_config.name if model_config else "claude-sonnet-4-20250514"
+            model_name = model_config.name if model_config else "claude-sonnet-4-5-20250929"
 
             # Call API
             response = client.messages.create(

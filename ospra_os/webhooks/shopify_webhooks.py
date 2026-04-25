@@ -27,6 +27,7 @@ import os
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+from .dlq import safe_dispatch
 from .webhook_utils import (
     verify_and_parse_webhook,
     record_learning_event,
@@ -545,8 +546,18 @@ async def webhook_customers_data_request(
     
     logger.info(f"📋 [GDPR] Customer data request from {shop_domain}")
     
-    background_tasks.add_task(process_gdpr_data_request, data, store_id)
-    
+    # Audit fix #5: dispatch through ``safe_dispatch`` so any failure
+    # is recorded in ``webhook_failures`` for retry. The previous
+    # ``add_task(process_..., data, store_id)`` form swallowed errors
+    # silently after Shopify already had its 200 — the 30-day SLA kept
+    # ticking even when the deletion didn't happen.
+    background_tasks.add_task(
+        safe_dispatch,
+        "ospra_os.webhooks.shopify_webhooks.process_gdpr_data_request",
+        data,
+        context={"store_id": store_id},
+    )
+
     return {"status": "received", "webhook": "customers/data_request"}
 
 
@@ -569,8 +580,13 @@ async def webhook_customers_redact(
     
     logger.info(f"🗑️ [GDPR] Customer redact request from {shop_domain}")
     
-    background_tasks.add_task(process_gdpr_customer_redact, data, store_id)
-    
+    background_tasks.add_task(
+        safe_dispatch,
+        "ospra_os.webhooks.shopify_webhooks.process_gdpr_customer_redact",
+        data,
+        context={"store_id": store_id},
+    )
+
     return {"status": "received", "webhook": "customers/redact"}
 
 
@@ -591,8 +607,13 @@ async def webhook_shop_redact(
     
     logger.warning(f"🗑️ [GDPR] Shop redact request - DELETE ALL DATA for {shop_domain}")
     
-    background_tasks.add_task(process_gdpr_shop_redact, data, store_id)
-    
+    background_tasks.add_task(
+        safe_dispatch,
+        "ospra_os.webhooks.shopify_webhooks.process_gdpr_shop_redact",
+        data,
+        context={"store_id": store_id},
+    )
+
     return {"status": "received", "webhook": "shop/redact"}
 
 
@@ -619,8 +640,13 @@ async def webhook_app_uninstalled(
     
     logger.warning(f"👋 [app/uninstalled] Store {shop_domain} uninstalled the app")
     
-    background_tasks.add_task(process_app_uninstalled, data, store_id)
-    
+    background_tasks.add_task(
+        safe_dispatch,
+        "ospra_os.webhooks.shopify_webhooks.process_app_uninstalled",
+        data,
+        context={"store_id": store_id},
+    )
+
     return {"status": "received", "shop": shop_domain, "webhook": "app/uninstalled"}
 
 
@@ -997,81 +1023,195 @@ async def process_checkout_create(data: Dict[str, Any], store_id: Optional[int])
         logger.error(f"Failed to process checkout: {e}")
 
 
-async def process_gdpr_data_request(data: Dict[str, Any], store_id: Optional[int]):
-    """Process GDPR data export request."""
+async def process_gdpr_data_request(data: Dict[str, Any], *, store_id: Optional[int] = None):
+    """
+    Process GDPR data export request.
+
+    Wrapped by ``ospra_os.webhooks.dlq.safe_dispatch`` at call sites so
+    any exception is recorded for retry. We deliberately let exceptions
+    propagate now — the previous ``except Exception`` swallow meant a
+    DB hiccup during ``customers/data_request`` quietly missed the
+    30-day SLA.
+    """
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.security.gdpr import export_customer_data
+
+    shop_domain = data.get('shop_domain', '')
+    customer = data.get('customer', {}) or {}
+    customer_email = customer.get('email', '') or ''
+    data_request = data.get('data_request', {}) or {}
+    data_request_id = data_request.get('id')
+
+    if not customer_email:
+        # Truly nothing to do — not a retriable failure.
+        logger.warning("[GDPR] data_request payload missing customer.email — nothing to export")
+        return
+
+    db = SessionLocal()
     try:
-        shop_domain = data.get('shop_domain', '')
-        customer = data.get('customer', {})
-        customer_email = customer.get('email', '')
-        
-        logger.info(f"[GDPR] Data request for {customer_email} from {shop_domain}")
-        
-        # TODO: Compile customer data and respond
-        # Must respond within 30 days
-        
-    except Exception as e:
-        logger.error(f"Failed to process GDPR data request: {e}")
+        export_customer_data(
+            db,
+            customer_email=customer_email,
+            shop_domain=shop_domain or "<unknown>",
+            data_request_id=data_request_id,
+        )
+        logger.info(f"[GDPR] data_request export completed for {customer_email}")
+    finally:
+        db.close()
 
 
-async def process_gdpr_customer_redact(data: Dict[str, Any], store_id: Optional[int]):
-    """Process GDPR customer data deletion request."""
+async def process_gdpr_customer_redact(data: Dict[str, Any], *, store_id: Optional[int] = None):
+    """
+    Process GDPR customer data deletion request.
+
+    Wrapped by ``safe_dispatch`` — failures land in ``webhook_failures``
+    for retry. See ``process_gdpr_data_request`` for the rationale on
+    propagating exceptions instead of swallowing them.
+    """
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.security.gdpr import redact_customer_data
+
+    shop_domain = data.get('shop_domain', '')
+    customer = data.get('customer', {}) or {}
+    customer_email = customer.get('email', '') or ''
+
+    if not customer_email:
+        logger.warning("[GDPR] customers/redact payload missing customer.email — nothing to delete")
+        return
+
+    db = SessionLocal()
     try:
-        shop_domain = data.get('shop_domain', '')
-        customer = data.get('customer', {})
-        customer_id = customer.get('id')
-        customer_email = customer.get('email', '')
-        
-        logger.info(f"[GDPR] Redact customer {customer_id} ({customer_email}) from {shop_domain}")
-        
-        # TODO: Delete customer data from all internal systems
-        # Must complete within 30 days
-        
-    except Exception as e:
-        logger.error(f"Failed to process GDPR customer redact: {e}")
+        result = redact_customer_data(
+            db,
+            customer_email=customer_email,
+            shop_domain=shop_domain or "<unknown>",
+        )
+        logger.info(
+            f"[GDPR] customer redact completed for {customer_email}: "
+            f"{result['deleted']}"
+        )
+    finally:
+        db.close()
 
 
-async def process_gdpr_shop_redact(data: Dict[str, Any], store_id: Optional[int]):
-    """Process GDPR shop data deletion (app uninstall)."""
+async def process_gdpr_shop_redact(data: Dict[str, Any], *, store_id: Optional[int] = None):
+    """
+    Process GDPR shop data deletion (app uninstall).
+
+    Wrapped by ``safe_dispatch`` — Shopify's 48-hour SLA is enforced
+    via the DLQ retry schedule (1m → 5m → 30m → 2h → 8h, dead at
+    attempt 6) which fits comfortably under 48h.
+    """
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.security.gdpr import redact_shop_data
+
+    shop_domain = data.get('shop_domain', '') or data.get('domain', '')
+    if not shop_domain:
+        logger.warning("[GDPR] shop/redact payload missing shop_domain — nothing to delete")
+        return
+
+    db = SessionLocal()
     try:
-        shop_domain = data.get('shop_domain', '')
-        shop_id = data.get('shop_id')
-        
-        logger.warning(f"[GDPR] DELETE ALL DATA for shop {shop_domain} (ID: {shop_id})")
-        
-        # TODO: Delete ALL store data
-        # Must complete within 48 hours
-        
-    except Exception as e:
-        logger.error(f"Failed to process GDPR shop redact: {e}")
+        result = redact_shop_data(db, shop_domain=shop_domain)
+        logger.warning(
+            f"[GDPR] shop redact completed for {shop_domain}: "
+            f"{result['deleted']}"
+        )
+    finally:
+        db.close()
 
 
-async def process_app_uninstalled(data: Dict[str, Any], store_id: Optional[int]):
-    """Process app uninstallation."""
+async def process_app_uninstalled(data: Dict[str, Any], *, store_id: Optional[int] = None):
+    """
+    Process app uninstallation.
+
+    Shopify-side: Shopify itself cancels any active app subscription when
+    the merchant uninstalls the app — we don't have to call
+    ``appSubscriptionCancel`` ourselves. But we DO need to reflect that
+    locally so the user isn't still showing as "Soar tier" with no way to
+    pay. Steps:
+
+      1. Mark the Store row as inactive (existing behavior).
+      2. If the store had a Shopify-billed subscription, downgrade the
+         owning User to Nest. This matters because users who installed via
+         the App Store have no LemonSqueezy subscription to fall back on.
+      3. Clear the stored ``app_subscription_id`` so a future reinstall
+         starts fresh rather than thinking we still hold an active charge.
+    """
+    # Audit fix #5: exceptions propagate to ``safe_dispatch`` so a real
+    # failure (DB outage during uninstall) gets retried instead of silently
+    # leaving the user on a paid tier with a dead store.
+    shop_domain = data.get('shop_domain', data.get('domain', ''))
+
+    logger.warning(f"App uninstalled by {shop_domain}")
+
+    if not store_id:
+        return
+
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.database.store_models import Store
+    from ospra_os.database import User, SubscriptionTier
+
+    db = SessionLocal()
     try:
-        shop_domain = data.get('shop_domain', data.get('domain', ''))
-        
-        logger.warning(f"App uninstalled by {shop_domain}")
-        
-        # Mark store as inactive
-        if store_id:
-            try:
-                from ospra_os.database.connection import SessionLocal
-                from ospra_os.database.store_models import Store
-                
-                db = SessionLocal()
-                try:
-                    store = db.query(Store).filter(Store.id == store_id).first()
-                    if store:
-                        store.is_active = False
-                        db.commit()
-                        logger.info(f"  Store {store_id} marked as inactive")
-                finally:
-                    db.close()
-            except Exception as e:
-                logger.error(f"  Failed to update store status: {e}")
-        
-    except Exception as e:
-        logger.error(f"Failed to process app uninstall: {e}")
+        store = db.query(Store).filter(Store.id == store_id).first()
+        if not store:
+            logger.warning(f"  app/uninstalled: Store {store_id} not found")
+            return
+
+        store.is_active = False
+
+        # Was this store on a Shopify-native paid plan? If credential
+        # decryption itself fails we have a configuration issue (no
+        # encryption key, or wrong key) — let it propagate so the DLQ
+        # records the failure rather than silently treating the store as
+        # not-paid and skipping the downgrade.
+        creds = (
+            store.get_credentials()
+            if hasattr(store, "get_credentials")
+            else (store.credentials or {})
+        )
+        if not isinstance(creds, dict):
+            creds = {}
+
+        had_shopify_subscription = bool(creds.get("app_subscription_id"))
+        if had_shopify_subscription:
+            # Clear the local record of the charge — Shopify already
+            # cancelled it on their side.
+            for k in (
+                "app_subscription_id",
+                "app_subscription_tier",
+                "app_subscription_cycle",
+                "app_subscription_status",
+                "pending_app_subscription_id",
+                "pending_app_subscription_tier",
+                "pending_app_subscription_cycle",
+            ):
+                creds.pop(k, None)
+            if hasattr(store, "set_credentials"):
+                store.set_credentials(creds)
+            else:
+                store.credentials = creds
+
+            # Downgrade the user. Only do this if they're not on the
+            # free tier already — never silently overwrite a
+            # LemonSqueezy-paid tier just because their Shopify store
+            # also went away.
+            user = db.query(User).filter(User.id == store.user_id).first()
+            if user and getattr(user.subscription_tier, "value", None) != SubscriptionTier.NEST.value:
+                logger.info(
+                    f"  Downgrading user {user.id} to NEST after Shopify uninstall"
+                )
+                user.subscription_tier = SubscriptionTier.NEST
+                user.subscription_expires = None
+
+        db.commit()
+        logger.info(f"  Store {store_id} marked as inactive (shopify_billed={had_shopify_subscription})")
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 async def trigger_fulfillment(data: Dict[str, Any], store_id: Optional[int]):

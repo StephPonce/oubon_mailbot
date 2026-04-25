@@ -35,15 +35,18 @@ except ImportError:
     HAS_JWT = False
     print("[WARNING]  python-jose not installed. Run: pip install python-jose[cryptography]")
 
-# Password hashing - standardized on passlib (same as jwt_auth.py)
+# Password hashing - call bcrypt directly (passlib's bcrypt backend
+# self-test crashes against bcrypt>=4 because of the 72-byte limit).
+import hashlib as _hashlib
 try:
-    from passlib.context import CryptContext
-    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    import bcrypt as _bcrypt
+    pwd_context = None  # legacy alias kept for downstream imports
     HAS_BCRYPT = True
 except ImportError:
+    _bcrypt = None
     pwd_context = None
     HAS_BCRYPT = False
-    print("[WARNING]  passlib not installed. Run: pip install passlib[bcrypt]")
+    print("[WARNING]  bcrypt not installed. Run: pip install bcrypt")
 
 logger = logging.getLogger(__name__)
 
@@ -179,25 +182,38 @@ _fallback_blacklist: set = set()
 # PASSWORD HASHING (Standardized on passlib - same as jwt_auth.py)
 # ============================================================================
 
+_BCRYPT_ROUNDS = 12
+
+
+def _pre_hash(password: str) -> bytes:
+    """SHA-256 pre-hash to lift bcrypt's 72-byte ceiling."""
+    return _hashlib.sha256(password.encode("utf-8")).hexdigest().encode("ascii")
+
+
 def hash_password(password: str) -> str:
     """
-    Hash a password using bcrypt via passlib.
+    Hash a password using SHA-256 + bcrypt.
 
     Args:
         password: Plain text password
 
     Returns:
-        Hashed password string
+        Hashed password string ($2b$… bcrypt format)
     """
-    if not HAS_BCRYPT or pwd_context is None:
-        raise RuntimeError("passlib not installed")
+    if not HAS_BCRYPT or _bcrypt is None:
+        raise RuntimeError("bcrypt not installed")
 
-    return pwd_context.hash(password)
+    salt = _bcrypt.gensalt(rounds=_BCRYPT_ROUNDS)
+    return _bcrypt.hashpw(_pre_hash(password), salt).decode("ascii")
 
 
 def verify_password(password: str, hashed: str) -> bool:
     """
     Verify a password against its hash.
+
+    Tries the new SHA-256 + bcrypt scheme first, then falls back to
+    plain bcrypt for any legacy hashes from before the pre-hash
+    migration.
 
     Args:
         password: Plain text password to check
@@ -206,12 +222,27 @@ def verify_password(password: str, hashed: str) -> bool:
     Returns:
         True if password matches
     """
-    if not HAS_BCRYPT or pwd_context is None:
-        raise RuntimeError("passlib not installed")
+    if not HAS_BCRYPT or _bcrypt is None:
+        raise RuntimeError("bcrypt not installed")
 
+    if not hashed:
+        return False
+    hash_bytes = hashed.encode("ascii")
+
+    # New scheme.
     try:
-        return pwd_context.verify(password, hashed)
-    except Exception as e:
+        if _bcrypt.checkpw(_pre_hash(password), hash_bytes):
+            return True
+    except (ValueError, TypeError) as e:
+        logger.debug(f"Pre-hash verify path: {e}")
+
+    # Legacy bcrypt-only fallback.
+    try:
+        secret = password.encode("utf-8")
+        if len(secret) > 72:
+            secret = secret[:72]
+        return _bcrypt.checkpw(secret, hash_bytes)
+    except (ValueError, TypeError) as e:
         logger.error(f"Password verification error: {e}")
         return False
 

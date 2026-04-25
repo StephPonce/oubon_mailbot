@@ -41,9 +41,18 @@ except ImportError as e:
     enrich_product = None
 
 try:
-    from ospra_os.intelligence.self_learning import SelfLearningEngine
+    # Pass 4d: migrated from the deprecated `ospra_os.intelligence.self_learning`
+    # shim to `ospra_os.learning.hybrid_learning_engine`. We alias
+    # `SelfLearningEngine` → `HybridLearningEngine` to keep call sites in this
+    # file working without a wider refactor; any usage that calls legacy
+    # methods (analyze_product_patterns, score_product, etc.) will now raise
+    # AttributeError at the call site, which is the correct signal that the
+    # old API has been retired.
+    from ospra_os.learning.hybrid_learning_engine import (
+        HybridLearningEngine as SelfLearningEngine,
+    )
 except ImportError as e:
-    logger.warning(f"SelfLearningEngine not available: {e}")
+    logger.warning(f"HybridLearningEngine not available: {e}")
     SelfLearningEngine = None
 
 try:
@@ -471,6 +480,26 @@ async def deploy_to_shopify(product_id: str, current_user: User = Depends(get_cu
                     'shopify_url': deployment_data['shopify_url']
                 }
             )
+
+            # PostHog activation funnel (task #38) — fire FIRST_DEPLOY for the
+            # current user. PostHog dedupes per-user-per-event server-side, so
+            # firing on every deploy yields a clean once-per-user activation
+            # signal in the funnel.
+            try:
+                from ospra_os.observability.posthog_client import (
+                    capture as posthog_capture,
+                    FunnelEvent,
+                )
+                posthog_capture(
+                    current_user.id,
+                    FunnelEvent.FIRST_DEPLOY,
+                    properties={
+                        "product_id": product_id,
+                        "shopify_id": shopify_product["id"],
+                    },
+                )
+            except Exception as _e:
+                logger.debug(f"[POSTHOG] FIRST_DEPLOY capture failed: {_e}")
 
             return {
                 "status": "success",

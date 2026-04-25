@@ -50,6 +50,8 @@ class DemandSignal(str, Enum):
     AMAZON_REVIEWS = "amazon_reviews"
     REDDIT_MENTIONS = "reddit_mentions"
     REDDIT_SENTIMENT = "reddit_sentiment"
+    PINTEREST_TREND = "pinterest_trend"
+    PINTEREST_SAVES = "pinterest_saves"
 
 
 class CompetitionSignal(str, Enum):
@@ -77,7 +79,11 @@ class DemandMetrics:
     reddit_mentions_7d: int = 0              # Mentions in last 7 days
     reddit_mentions_30d: int = 0             # Mentions in last 30 days
     reddit_sentiment: float = 0.0            # -1 to 1 sentiment score
-    
+    pinterest_trend_score: float = 0.0       # 0-100 from Pinterest Trends
+    pinterest_velocity: float = 0.0          # % change estimate from Pinterest
+    pinterest_saves: int = 0                 # Total saves on top results
+    pinterest_repins: int = 0                # Total repins on top results
+
     # Calculated scores (0-100)
     velocity_score: float = 0.0              # How fast is demand growing?
     volume_score: float = 0.0                # How much demand exists?
@@ -201,6 +207,17 @@ class OpportunityScorer:
         'volume': 0.35,        # How much total demand exists?
         'momentum': 0.25       # Is it accelerating or slowing?
     }
+
+    # Trend-source sub-weights — used inside velocity/volume/momentum to blend
+    # multiple trend signals. Pinterest is a strong early-signal source for
+    # visual product categories (home, kitchen, beauty, fitness, fashion) and
+    # typically leads Google Trends by 4–8 weeks.
+    TREND_SOURCE_WEIGHTS = {
+        'google_trends': 0.55,
+        'pinterest':     0.15,  # task #37 — Pinterest weight in opportunity_scorer
+        'tiktok':        0.20,
+        'amazon':        0.10,
+    }
     
     COMPETITION_WEIGHTS = {
         'seller_density': 0.35,    # How many sellers?
@@ -238,6 +255,7 @@ class OpportunityScorer:
         self.apify_available = False
         self.saturation_tracker = None
         self.velocity_detector = None
+        self.pinterest_trends = None
 
         self._init_data_sources()
 
@@ -256,6 +274,19 @@ class OpportunityScorer:
         if self.apify_token:
             self.apify_available = True
             logger.info("[SUCCESS] Apify connected")
+
+        # Pinterest Trends (Apify-driven; weight 0.15 in TREND_SOURCE_WEIGHTS)
+        if self.apify_available:
+            try:
+                from ospra_os.product_research.connectors.apify.pinterest_trends import (
+                    PinterestTrendsApify,
+                )
+                pin = PinterestTrendsApify(api_token=self.apify_token)
+                if pin.is_available():
+                    self.pinterest_trends = pin
+                    logger.info("[SUCCESS] Pinterest Trends connected (weight 0.15)")
+            except Exception as e:
+                logger.warning(f"[WARNING] Pinterest Trends not available: {e}")
         
         # Internal trackers
         try:
@@ -326,87 +357,121 @@ class OpportunityScorer:
                 sources.append('reddit')
             except Exception as e:
                 logger.debug(f"Reddit data not available: {e}")
-        
+
+        # 5. Pinterest Trends (early-signal demand source, weight 0.15)
+        if self.pinterest_trends:
+            try:
+                pin_data = await self._get_pinterest_trends(search_keywords[:3])
+                metrics.pinterest_trend_score = pin_data.get('trend_score', 0)
+                metrics.pinterest_velocity = pin_data.get('velocity', 0)
+                metrics.pinterest_saves = pin_data.get('saves', 0)
+                metrics.pinterest_repins = pin_data.get('repins', 0)
+                if pin_data.get('trend_score', 0) > 0 or pin_data.get('saves', 0) > 0:
+                    sources.append('pinterest')
+            except Exception as e:
+                logger.debug(f"Pinterest data not available: {e}")
+
         # Calculate component scores
         metrics.velocity_score = self._calc_velocity_score(metrics)
         metrics.volume_score = self._calc_volume_score(metrics)
         metrics.momentum_score = self._calc_momentum_score(metrics)
-        
+
         # Calculate final demand score
         metrics.demand_score = (
             metrics.velocity_score * self.DEMAND_WEIGHTS['velocity'] +
             metrics.volume_score * self.DEMAND_WEIGHTS['volume'] +
             metrics.momentum_score * self.DEMAND_WEIGHTS['momentum']
         )
-        
-        # Data quality
+
+        # Data quality (5 possible sources: google, tiktok, amazon, reddit, pinterest)
         metrics.sources_available = sources
-        metrics.data_quality = len(sources) / 4  # 4 possible sources
-        
+        metrics.data_quality = len(sources) / 5
+
         return metrics
     
     def _calc_velocity_score(self, metrics: DemandMetrics) -> float:
-        """Calculate how fast demand is growing (0-100)"""
-        scores = []
-        
+        """Calculate how fast demand is growing (0-100), source-weighted."""
+        weighted_scores: List[Tuple[float, float]] = []  # (score, weight) pairs
+        w = self.TREND_SOURCE_WEIGHTS
+
         # Google Trends growth (most reliable for velocity)
         if metrics.google_trend_growth:
-            # +50% growth = 100 score, 0% = 50, -50% = 0
             trend_velocity = 50 + metrics.google_trend_growth
-            scores.append(max(0, min(100, trend_velocity)))
-        
+            weighted_scores.append((max(0, min(100, trend_velocity)), w['google_trends']))
+
         # TikTok views velocity
         if metrics.tiktok_views > 0:
-            # Scale: 1M views = 100, 100K = 70, 10K = 50
             import math
             view_score = min(100, 50 + math.log10(max(1, metrics.tiktok_views)) * 10)
-            scores.append(view_score)
-        
+            weighted_scores.append((view_score, w['tiktok']))
+
         # Amazon BSR improvement
         if metrics.amazon_bsr_trend != 0:
-            # Negative trend = improving (moving up in rankings)
             bsr_velocity = 50 - (metrics.amazon_bsr_trend * 0.5)
-            scores.append(max(0, min(100, bsr_velocity)))
-        
-        # Reddit mention growth
+            weighted_scores.append((max(0, min(100, bsr_velocity)), w['amazon']))
+
+        # Pinterest velocity (rising-keyword + save/repin ratio signal, weight 0.15)
+        if metrics.pinterest_velocity != 0 or metrics.pinterest_trend_score > 0:
+            # Pinterest velocity is already a % change estimate (-50..+50)
+            pin_velocity = 50 + metrics.pinterest_velocity
+            weighted_scores.append((max(0, min(100, pin_velocity)), w['pinterest']))
+
+        # Reddit mention growth — included as un-weighted bonus signal
         if metrics.reddit_mentions_30d > 0:
             reddit_growth = (metrics.reddit_mentions_7d / metrics.reddit_mentions_30d) * 100
-            # 50% in last week = growing fast
             reddit_velocity = min(100, reddit_growth * 2)
-            scores.append(reddit_velocity)
-        
-        return sum(scores) / len(scores) if scores else 50
+            # Use a small fixed weight (treated as bonus signal)
+            weighted_scores.append((reddit_velocity, 0.05))
+
+        if not weighted_scores:
+            return 50
+
+        total_weight = sum(weight for _, weight in weighted_scores)
+        if total_weight == 0:
+            return 50
+        return sum(score * weight for score, weight in weighted_scores) / total_weight
     
     def _calc_volume_score(self, metrics: DemandMetrics) -> float:
-        """Calculate total demand volume (0-100)"""
-        scores = []
-        
+        """Calculate total demand volume (0-100), source-weighted."""
+        weighted_scores: List[Tuple[float, float]] = []
+        w = self.TREND_SOURCE_WEIGHTS
+
         # Google Trends absolute interest
         if metrics.google_trend_score > 0:
-            scores.append(metrics.google_trend_score)
-        
+            weighted_scores.append((metrics.google_trend_score, w['google_trends']))
+
         # TikTok engagement
         if metrics.tiktok_views > 0:
-            # High views + high engagement = high volume
             engagement_boost = metrics.tiktok_engagement_rate * 100
             view_base = min(80, metrics.tiktok_views / 50000)
-            scores.append(min(100, view_base + engagement_boost))
-        
-        # Amazon reviews (proxy for sales volume)
+            weighted_scores.append((min(100, view_base + engagement_boost), w['tiktok']))
+
+        # Amazon volume (reviews + BSR averaged)
+        amazon_components = []
         if metrics.amazon_reviews_count > 0:
             import math
-            # 1000 reviews = ~70, 10000 = ~90
             review_score = min(100, 30 + math.log10(max(1, metrics.amazon_reviews_count)) * 20)
-            scores.append(review_score)
-        
-        # Amazon BSR (lower = more sales)
+            amazon_components.append(review_score)
         if metrics.amazon_bsr > 0:
-            # BSR 1 = 100, BSR 100 = 80, BSR 10000 = 40
             import math
             bsr_score = max(0, 100 - math.log10(max(1, metrics.amazon_bsr)) * 20)
-            scores.append(bsr_score)
-        
-        return sum(scores) / len(scores) if scores else 50
+            amazon_components.append(bsr_score)
+        if amazon_components:
+            weighted_scores.append(
+                (sum(amazon_components) / len(amazon_components), w['amazon'])
+            )
+
+        # Pinterest volume (saves are highest purchase-intent signal, weight 0.15)
+        if metrics.pinterest_trend_score > 0:
+            weighted_scores.append((metrics.pinterest_trend_score, w['pinterest']))
+
+        if not weighted_scores:
+            return 50
+
+        total_weight = sum(weight for _, weight in weighted_scores)
+        if total_weight == 0:
+            return 50
+        return sum(score * weight for score, weight in weighted_scores) / total_weight
     
     def _calc_momentum_score(self, metrics: DemandMetrics) -> float:
         """Calculate if demand is accelerating or decelerating (0-100)"""
@@ -972,6 +1037,48 @@ class OpportunityScorer:
             'mentions_30d': 0,
             'sentiment': 0
         }
+
+    async def _get_pinterest_trends(self, keywords: List[str]) -> Dict:
+        """
+        Fetch Pinterest trend signals via Apify (weight 0.15 in demand calculation).
+
+        Pinterest is an early-signal source for visual product categories
+        (home, kitchen, beauty, fashion, fitness). Repins and saves typically
+        precede Amazon bestseller status by 4-8 weeks.
+
+        Returns averaged signals across the provided keywords.
+        """
+        if not self.pinterest_trends or not keywords:
+            return {}
+
+        try:
+            results = await self.pinterest_trends.get_interest(
+                search_terms=keywords[:3],
+                geo='US',
+            )
+
+            if not results:
+                return {}
+
+            # Average across keywords (already trimmed to top 3)
+            valid = [r for r in results if r.trend_score > 0 or r.total_saves > 0]
+            if not valid:
+                return {}
+
+            avg_trend = sum(r.trend_score for r in valid) / len(valid)
+            avg_velocity = sum(r.velocity for r in valid) / len(valid)
+            total_saves = sum(r.total_saves for r in valid)
+            total_repins = sum(r.total_repins for r in valid)
+
+            return {
+                'trend_score': round(avg_trend, 1),
+                'velocity': round(avg_velocity, 1),
+                'saves': total_saves,
+                'repins': total_repins,
+            }
+        except Exception as e:
+            logger.debug(f"Pinterest trends fetch failed: {e}")
+            return {}
     
     async def _get_amazon_competition(self, keyword: str) -> Dict:
         """Fetch Amazon competition data"""

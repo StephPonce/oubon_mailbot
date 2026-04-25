@@ -44,8 +44,43 @@ _fernet = None
 _encryption_available = False
 
 
+class CredentialEncryptionError(RuntimeError):
+    """
+    Raised when credential encryption is required but unavailable.
+
+    In production, every call to ``encrypt_*`` / ``decrypt_*`` MUST
+    succeed. The previous behaviour was to log ``[CRITICAL]`` and
+    silently store credentials as plain JSON — that's a fail-OPEN posture
+    that turned a missing env var into a silent data-at-rest exposure.
+    We now fail closed: callers see a clear 500 the first time the key
+    is missing or wrong, the operator notices, the env var gets fixed.
+    """
+
+
+def _is_production() -> bool:
+    """
+    Detect production deployment via standard host markers.
+
+    Centralised so the env-var heuristic is one line to update if we add
+    a new host (Fly, Heroku, ...).
+    """
+    return (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
+        os.getenv("RENDER", "") == "true" or
+        os.getenv("RAILWAY_ENVIRONMENT", "") != ""
+    )
+
+
 def _init_fernet():
-    """Initialize Fernet cipher lazily."""
+    """
+    Initialize Fernet cipher lazily.
+
+    Returns the Fernet instance on success. Returns ``None`` ONLY in
+    development when the cryptography package is missing or the key is
+    intentionally absent — in production, raising is the responsibility
+    of the call site (see ``_require_fernet``) so import never crashes
+    the whole app.
+    """
     global _fernet, _encryption_available
 
     if _fernet is not None:
@@ -69,18 +104,17 @@ def _init_fernet():
         key = os.getenv("EMAIL_OAUTH_ENCRYPTION_KEY")
 
     if not key:
-        # Check if we're in production
-        is_production = (
-            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
-            os.getenv("RENDER", "") == "true" or
-            os.getenv("RAILWAY_ENVIRONMENT", "") != ""
-        )
-
-        if is_production:
+        if _is_production():
+            # Loud, machine-readable, and structured. The actual ``raise``
+            # happens at first use (not at import) so the rest of the app
+            # can still come up enough to serve /health and surface the
+            # error in logs.
             logger.error(
-                "[CRITICAL] CREDENTIALS_ENCRYPTION_KEY not set in production! "
-                "Credentials will NOT be encrypted. "
-                "Generate key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+                "[CRITICAL] CREDENTIALS_ENCRYPTION_KEY not set in production. "
+                "Refusing to fall back to plaintext storage — every "
+                "credential read/write will now raise. Generate a key with: "
+                'python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"'
             )
             _encryption_available = False
             return None
@@ -106,6 +140,25 @@ def _init_fernet():
         return None
 
 
+def _require_fernet():
+    """
+    Get the Fernet instance, raising in production if it's unavailable.
+
+    Wrap every call site that's about to write or read sensitive data.
+    Development environments still get the soft-fail behaviour so
+    test-suite imports don't blow up if cryptography isn't installed.
+    """
+    fernet = _init_fernet()
+    if fernet is None and _is_production():
+        raise CredentialEncryptionError(
+            "Credential encryption is unavailable in production. "
+            "Set CREDENTIALS_ENCRYPTION_KEY (Fernet key) and restart the "
+            "service. See ospra_os/security/credential_encryption.py for "
+            "the generation command."
+        )
+    return fernet
+
+
 def is_encryption_available() -> bool:
     """Check if encryption is properly configured."""
     _init_fernet()
@@ -128,9 +181,14 @@ def encrypt_field(value: str) -> str:
     if not value:
         return value
 
-    fernet = _init_fernet()
+    # Production: raises if the key is missing. Development: falls back
+    # to an ephemeral key (set up in ``_init_fernet``).
+    fernet = _require_fernet()
     if fernet is None:
-        logger.warning("Encryption unavailable - storing value unencrypted")
+        # Development-only branch — cryptography not installed. Returning
+        # the raw value is acceptable here because ``_is_production`` is
+        # False; ``_require_fernet`` would have raised otherwise.
+        logger.warning("Encryption unavailable (dev mode) - storing value unencrypted")
         return value
 
     try:
@@ -138,6 +196,10 @@ def encrypt_field(value: str) -> str:
         return encrypted.decode()
     except Exception as e:
         logger.error(f"Encryption failed: {e}")
+        if _is_production():
+            raise CredentialEncryptionError(
+                f"Field encryption failed in production: {e}"
+            ) from e
         return value
 
 
@@ -157,17 +219,24 @@ def decrypt_field(encrypted_value: str) -> str:
     if not encrypted_value:
         return encrypted_value
 
-    fernet = _init_fernet()
+    fernet = _require_fernet()
     if fernet is None:
-        # Assume value was stored unencrypted
+        # Dev-only branch.
         return encrypted_value
 
     try:
         decrypted = fernet.decrypt(encrypted_value.encode())
         return decrypted.decode()
     except Exception as e:
-        # Value might not be encrypted (legacy data)
-        logger.debug(f"Decryption failed, assuming plain text: {e}")
+        # Legacy unencrypted-row tolerance: the value pre-dates
+        # encryption and is stored as plain text. We keep returning it,
+        # but warn so operators can run a backfill — silent debug-level
+        # logging here used to mean nobody noticed unencrypted rows for
+        # months.
+        logger.warning(
+            "decrypt_field: value did not decrypt with current key — "
+            "treating as legacy plaintext. Run a credential migration."
+        )
         return encrypted_value
 
 
@@ -191,9 +260,11 @@ def encrypt_credentials(credentials: Dict[str, Any]) -> str:
     if not credentials:
         return ""
 
-    fernet = _init_fernet()
+    fernet = _require_fernet()
     if fernet is None:
-        logger.warning("Encryption unavailable - storing credentials as plain JSON")
+        # Dev-only branch (cryptography missing). In production
+        # ``_require_fernet`` would have raised.
+        logger.warning("Encryption unavailable (dev mode) - storing credentials as plain JSON")
         return json.dumps(credentials)
 
     try:
@@ -202,6 +273,10 @@ def encrypt_credentials(credentials: Dict[str, Any]) -> str:
         return encrypted.decode()
     except Exception as e:
         logger.error(f"Credential encryption failed: {e}")
+        if _is_production():
+            raise CredentialEncryptionError(
+                f"Credential encryption failed in production: {e}"
+            ) from e
         return json.dumps(credentials)
 
 
@@ -226,9 +301,9 @@ def decrypt_credentials(encrypted_credentials: Union[str, Dict]) -> Dict[str, An
     if isinstance(encrypted_credentials, dict):
         return encrypted_credentials
 
-    fernet = _init_fernet()
+    fernet = _require_fernet()
     if fernet is None:
-        # Try parsing as plain JSON
+        # Dev-only branch. Try parsing as plain JSON.
         try:
             return json.loads(encrypted_credentials)
         except json.JSONDecodeError:
@@ -238,9 +313,17 @@ def decrypt_credentials(encrypted_credentials: Union[str, Dict]) -> Dict[str, An
         decrypted = fernet.decrypt(encrypted_credentials.encode())
         return json.loads(decrypted.decode())
     except Exception:
-        # Might be unencrypted JSON (legacy data)
+        # Legacy plain-JSON tolerance — same rationale as
+        # ``decrypt_field``. Warn at warning-level so unencrypted rows
+        # show up in the operator's log feed.
         try:
-            return json.loads(encrypted_credentials)
+            parsed = json.loads(encrypted_credentials)
+            logger.warning(
+                "decrypt_credentials: value did not decrypt with current "
+                "key but parsed as plain JSON — treating as legacy row. "
+                "Run a credential migration."
+            )
+            return parsed
         except json.JSONDecodeError:
             logger.error("Failed to decrypt or parse credentials")
             return {}

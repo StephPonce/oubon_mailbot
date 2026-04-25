@@ -6,7 +6,7 @@ FastAPI endpoints for syncing and fetching emails from connected accounts.
 
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 
 from ospra_os.email_automation.email_sync import EmailSyncService
@@ -37,8 +37,7 @@ class EmailResponse(BaseModel):
     has_attachments: bool
     labels: Optional[List[str]]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmailDetailResponse(BaseModel):
@@ -60,8 +59,7 @@ class EmailDetailResponse(BaseModel):
     provider: str
     email_account_email: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SyncResponse(BaseModel):

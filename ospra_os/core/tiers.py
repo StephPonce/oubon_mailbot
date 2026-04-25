@@ -543,6 +543,43 @@ def get_tier_limit(tier: SubscriptionTier, limit_name: str) -> int:
     return get_tier_feature(tier, limit_name, 0)
 
 
+# ==================== PER-REQUEST CEILINGS ====================
+# The weekly `products_per_week` quota is enforced by middleware. In addition,
+# each individual discovery call is capped so a Nest user can't burn their
+# entire weekly budget in a single request. Formula: min(weekly_quota,
+# PER_REQUEST_CAP) — with unlimited tiers getting the PER_REQUEST_CAP.
+
+_PER_REQUEST_CEILINGS = {
+    SubscriptionTier.NEST: 10,           # Same as weekly — one-shot budget
+    SubscriptionTier.FLIGHT: 25,         # Half the weekly allowance per call
+    SubscriptionTier.SOAR: 50,           # Generous but bounded (pagination beyond)
+    SubscriptionTier.STRATOSPHERE: 100,  # Power users; unlimited weekly, but
+                                         # one call can't exceed 100 (prevents
+                                         # accidental API cost blow-ups).
+}
+
+
+def get_products_per_request_ceiling(tier: SubscriptionTier) -> int:
+    """Upper bound on `count` for a single discovery call, per tier.
+
+    This is orthogonal to the weekly quota: even a Stratosphere user with
+    unlimited weekly discovery is capped at 100 products per HTTP request so
+    one runaway call can't exhaust an entire day's supplier API budget.
+    """
+    return _PER_REQUEST_CEILINGS.get(tier, 10)
+
+
+def clamp_request_count(requested: int, tier: SubscriptionTier) -> tuple[int, bool]:
+    """Clamp a user's `count` request to the tier's per-request ceiling.
+
+    Returns (effective_count, was_clamped). Callers should surface
+    was_clamped=True in the API response so the frontend can prompt an upgrade.
+    """
+    ceiling = get_products_per_request_ceiling(tier)
+    effective = min(max(requested, 1), ceiling)
+    return effective, effective < requested
+
+
 def compare_tiers(tier_a: SubscriptionTier, tier_b: SubscriptionTier) -> int:
     """
     Compare two tiers.
@@ -780,6 +817,8 @@ __all__ = [
     "get_tier_feature",
     "tier_has_feature",
     "get_tier_limit",
+    "get_products_per_request_ceiling",
+    "clamp_request_count",
     "compare_tiers",
     "tier_at_least",
     "get_upgrade_path",

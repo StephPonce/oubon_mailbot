@@ -58,11 +58,12 @@ class TestAuthEndpoints:
 
     def test_login_success(self, client, db_session):
         """Test successful login"""
-        # Create user with known password hash
-        from passlib.context import CryptContext
+        # Use the production hash function so the test stays in sync with
+        # whatever scheme jwt_auth currently uses (currently SHA-256 +
+        # bcrypt — see ``ospra_os/auth/jwt_auth.py::_pre_hash``).
+        from ospra_os.auth.jwt_auth import hash_password
 
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        password_hash = pwd_context.hash("testpassword123")
+        password_hash = hash_password("testpassword123")
 
         user = User(
             email="login@example.com",
@@ -85,11 +86,10 @@ class TestAuthEndpoints:
 
     def test_login_invalid_credentials(self, client, db_session):
         """Test login with invalid credentials"""
-        # Create user
-        from passlib.context import CryptContext
+        # Use the production hash function (SHA-256 + bcrypt).
+        from ospra_os.auth.jwt_auth import hash_password
 
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        password_hash = pwd_context.hash("correctpassword")
+        password_hash = hash_password("correctpassword")
 
         user = User(
             email="wrongpwd@example.com",
@@ -185,13 +185,20 @@ class TestCurrentUser:
     """Tests for /api/auth/me endpoint"""
 
     def test_get_current_user(self, auth_client, test_user):
-        """Test getting current user info"""
+        """Test getting current user info.
+
+        The /api/auth/me endpoint wraps the user under ``user`` and adds
+        a sibling ``subscription`` block — the test pins that contract so
+        we notice if the response shape ever changes silently.
+        """
         response = auth_client.get("/api/auth/me")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["email"] == test_user.email
-        assert data["name"] == test_user.name
+        assert data.get("success") is True
+        user_block = data.get("user") or {}
+        assert user_block.get("email") == test_user.email
+        assert user_block.get("name") == test_user.name
 
     def test_get_current_user_without_auth(self, client):
         """Test getting current user without authentication"""

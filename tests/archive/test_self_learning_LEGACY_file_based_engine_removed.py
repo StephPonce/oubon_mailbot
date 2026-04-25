@@ -1,3 +1,32 @@
+"""
+ARCHIVED in Pass 4d (2026-04)
+==============================
+This test file exercised the *file-based* SelfLearningEngine that has since
+been fully replaced by the database-backed `HybridLearningEngine`
+(ospra_os/learning/hybrid_learning_engine.py). The methods this suite
+calls — `analyze_product_patterns`, `score_product`, `get_recommendations`,
+`predict_performance`, `detect_underperformers`, `learn_from_outcome` —
+do not exist on either the deprecated compatibility shim
+(`ospra_os.learning.self_learning_engine.SelfLearningEngine`, which only
+exposes `record_performance` / `get_adjusted_score` / `get_learning_report`
+/ `weights`) or the new HybridLearningEngine (which uses a completely
+different async, DB-session-based API).
+
+This file is NOT collected by pytest (it lives under tests/archive/). It is
+kept as a historical reference for the shape of the old API. When we build
+a new test suite for HybridLearningEngine, it should:
+
+- use an in-memory SQLAlchemy session via `ospra_os.database.base.Base`
+  (like `tests/integration/test_tenant_isolation_scaffold.py`)
+- drive the new async entry points: `learn_global`, `learn_personal`,
+  `get_adjusted_score`, `get_learning_report(user_id=...)`
+- cover the Global-Brain / Personal-Layer split that's the whole point of
+  the rewrite
+
+The hardcoded `sys.path.insert(...)` below is a dead giveaway that this
+was an ad-hoc developer smoke script, not a CI-grade test.
+"""
+
 import sys
 sys.path.insert(0, '/Users/stephenponce/Documents/Ospra OS/Bots/oubon_mailbot')
 

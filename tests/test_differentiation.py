@@ -8,10 +8,38 @@ Tests all 4 layers:
 4. Marketing Angles
 
 Plus the master SmartRecommendationEngine that combines them all.
+
+NOTE (Pass 6): `SmartRecommendationEngine` imports the Groq provider
+transitively, which in turn imports the top-level `groq` package at module
+load time. In environments where `groq` isn't installed (CI minimal profile,
+dev sandboxes without optional AI deps), the import cascade raises
+ModuleNotFoundError at *collection* time — taking down unrelated tests in
+the same pytest run. We guard the import so the file loads regardless, and
+skip the tests inside when the dep is missing. The guard preserves full
+coverage when groq IS installed.
 """
 import asyncio
+
+import pytest
+
 from ospra_os.core.settings import get_settings
-from ospra_os.intelligence.smart_recommendations import SmartRecommendationEngine
+
+try:
+    from ospra_os.intelligence.smart_recommendations import SmartRecommendationEngine
+
+    SMART_RECS_AVAILABLE = True
+    SMART_RECS_SKIP_REASON = ""
+except ModuleNotFoundError as _e:  # pragma: no cover - env-dependent
+    SmartRecommendationEngine = None  # type: ignore[assignment]
+    SMART_RECS_AVAILABLE = False
+    SMART_RECS_SKIP_REASON = (
+        f"SmartRecommendationEngine import failed ({_e.name} missing). "
+        "Install optional AI providers or mock them to run this test."
+    )
+
+pytestmark = pytest.mark.skipif(
+    not SMART_RECS_AVAILABLE, reason=SMART_RECS_SKIP_REASON
+)
 
 
 async def test_smart_recommendations():
@@ -21,6 +49,14 @@ async def test_smart_recommendations():
     print("[TEST] TESTING COMPLETE DIFFERENTIATION SYSTEM")
     print("=" * 70)
 
+    # ``get_settings()`` is ``@lru_cache``'d, and various tests touch
+    # ``os.environ`` (test_security uses ``patch.dict(..., clear=True)``).
+    # Bust the cache so we re-read the env we care about — DATABASE_URL,
+    # which conftest pins to the per-worker SQLite file. Pass 4d also
+    # silenced the ``load_dotenv(override=True)`` calls in
+    # ``ospra_os/main.py`` and ``ospra_os/integrations/tiktok_client.py``
+    # under APP_ENV=testing to keep this URL stable across test imports.
+    get_settings.cache_clear()
     settings = get_settings()
     engine = SmartRecommendationEngine(settings.database_url)
 

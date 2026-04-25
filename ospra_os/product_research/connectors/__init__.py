@@ -1,5 +1,6 @@
 """API Connectors for product research platforms."""
 
-from .base import BaseConnector
+from .base import BaseConnector, ProductCandidate
+from .tiktok_shop import TikTokShopConnector
 
-__all__ = ["BaseConnector"]
+__all__ = ["BaseConnector", "ProductCandidate", "TikTokShopConnector"]
