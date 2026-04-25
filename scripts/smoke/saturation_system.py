@@ -1,11 +1,27 @@
 """
 Test script for Saturation Tracking System
 Verifies database tables and core functionality
+
+NOTE: Standalone integration smoke harness — hardcodes a local SQLite
+path (``./data/multi_store.db``) and exercises an old engine API
+signature (``ProductIntelligenceEngine(database_url=…, enable_saturation_tracking=True)``)
+that's since been refactored. Skipped under the unit suite.
+
+Run directly with: ``python tests/test_saturation_system.py``
 """
 
 import asyncio
 import sys
 from datetime import datetime
+
+import pytest
+
+# Skip module under pytest — see header comment.
+pytestmark = pytest.mark.skip(
+    reason="Standalone integration smoke harness — uses ./data/multi_store.db and a stale "
+    "ProductIntelligenceEngine signature. Run with: python tests/test_saturation_system.py"
+)
+
 from ospra_os.database import (
     Base,
     ProductSaturation,

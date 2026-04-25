@@ -121,18 +121,22 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     // Last-ditch fallbacks
     p.url || p.source_url || null;
   
-  // Check if scores are REAL or DEFAULT (50 = default)
-  const hasRealDemandScore = p.demand_score !== undefined && p.demand_score !== 50;
-  const hasRealTrendScore = p.trend_score !== undefined && p.trend_score !== 50;
-  // Post-Fix #15: sentiment_score is null when no real social data was found.
-  // null is NOT a "default estimate" - it's an honest empty state. Treat it
-  // as real data (we asked and got "no data"), distinct from `undefined` (never asked).
-  const hasRealSentimentScore = p.sentiment_score !== undefined && p.sentiment_score !== 50;
+  // 2026-04-25 honest scoring rewrite: backend now sends ``null`` for any
+  // component without real signal (demand, trend, sentiment) instead of the
+  // 50/55 baseline it used to fall back to. Preserve those nulls — using
+  // ``|| 50`` here would silently re-fabricate the default we just killed
+  // backend-side. The "unavailable" rendering branch below uses these
+  // nulls to draw the striped "no data" bar.
+  const hasRealDemandScore = p.demand_score !== undefined && p.demand_score !== null;
+  const hasRealTrendScore = p.trend_score !== undefined && p.trend_score !== null;
+  const hasRealSentimentScore = p.sentiment_score !== undefined && p.sentiment_score !== null;
   const hasAnyRealScores = hasRealDemandScore || hasRealTrendScore || hasRealSentimentScore || (p.sales_count > 0);
 
-  // Score breakdown - mark as estimated if default
-  const demandScore = p.demand_score || p.demandScore || 50;
-  const trendScore = p.trend_score || p.trendScore || 50;
+  // Preserve nulls verbatim. Don't coerce.
+  const demandScore = p.demand_score !== undefined ? p.demand_score
+    : (p.demandScore !== undefined ? p.demandScore : null);
+  const trendScore = p.trend_score !== undefined ? p.trend_score
+    : (p.trendScore !== undefined ? p.trendScore : null);
   // CRITICAL: preserve null sentiment_score from backend. Using `||` would
   // silently coerce null → 50, reintroducing the fake default we just killed.
   const sentimentScore =
@@ -201,6 +205,15 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     viral_score: viralScore,
     profit_score: profitScore,
     scores_estimated: !hasAnyRealScores,
+    // Honest-scoring fields (backend rewrite 2026-04-25):
+    //   tier === 'INSUFFICIENT_DATA' → don't claim a buy verdict
+    //   data_confidence_pct → 0–100 fraction of design weight backed by real signal
+    //   missing_components → which components had no real data
+    tier: p.tier || null,
+    data_confidence_pct: p.data_confidence_pct ?? null,
+    data_confidence: p.data_confidence ?? null,
+    active_components: Array.isArray(p.active_components) ? p.active_components : [],
+    missing_components: Array.isArray(p.missing_components) ? p.missing_components : [],
     commission_rate: p.commission_rate || p.commissionRate || null,
     recommendation: p.recommendation || null,
     reasons: p.reasons || [],
@@ -596,7 +609,38 @@ function ImageGallery({ product, aiImageUrl, enhancedImages, onRegenerateAi, reg
 // This replaces the old "trust the aggregate number" pattern. Users can now
 // click through to real Reddit posts and read paraphrased Grok tweets.
 // ============================================================================
-function SocialEvidencePanel({ twitterEvidence, redditEvidence, amazonEvidence, dataSources }) {
+function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonEvidence, dataSources }) {
+  // ── PHASE K: ON-DEMAND AMAZON REVIEW TEXT FETCH ──────────────────────────
+  // The bulk-at-discovery fetch was killed for cost reasons (~$45-90/mo).
+  // Verbatim Amazon review prose is now a click-to-load action: user
+  // explicitly opts in per product. The server caches by ASIN for 24h so
+  // repeated clicks on the same listing within a day reuse one Apify
+  // call (free re-render).
+  const [amzText, setAmzText] = useState(null);          // result payload
+  const [amzTextLoading, setAmzTextLoading] = useState(false);
+  const [amzTextError, setAmzTextError] = useState(null);
+
+  const handleFetchAmazonText = useCallback(async () => {
+    if (!product || amzTextLoading) return;
+    setAmzTextLoading(true);
+    setAmzTextError(null);
+    try {
+      const result = await api.fetchAmazonReviewText(product, 15);
+      if (!result || result.success === false) {
+        setAmzTextError(result?.error || 'Fetch failed');
+      } else if (!result.available) {
+        // Clean "no data" state — surface the reason but not as an error
+        setAmzText({ ...result, _empty: true });
+      } else {
+        setAmzText(result);
+      }
+    } catch (err) {
+      setAmzTextError(err.message || 'Fetch failed');
+    } finally {
+      setAmzTextLoading(false);
+    }
+  }, [product, amzTextLoading]);
+
   // ── AMAZON STATE DETECTION (Task #18 - primary social signal) ────────────
   // amazon_evidence can be:
   //   { found_matches: true, top_matches: [...], buzz_score, ... }  → show data
@@ -782,6 +826,79 @@ function SocialEvidencePanel({ twitterEvidence, redditEvidence, amazonEvidence, 
                 </a>
               ))}
             </div>
+
+            {/* ── PHASE K: ON-DEMAND VERBATIM REVIEWS ────────────────────── */}
+            {/* Click-to-load. Server caches 24h per ASIN, so a second click  */}
+            {/* on the same listing within 24h is a free re-render.           */}
+            {!amzText && !amzTextLoading && !amzTextError && (
+              <button
+                type="button"
+                onClick={handleFetchAmazonText}
+                className="text-[11px] px-3 py-1.5 rounded-md bg-[#FF9900]/10 hover:bg-[#FF9900]/20 border border-[#FF9900]/30 hover:border-[#FF9900]/60 text-yellow-300 transition-all"
+                title="Pulls verbatim Amazon reviews via Apify — server caches 24h per ASIN, so re-clicks within a day don't re-bill."
+              >
+                Fetch real Amazon reviews →
+              </button>
+            )}
+
+            {amzTextLoading && (
+              <div className="text-[11px] text-white/50 px-3 py-1.5">
+                Fetching Amazon review text…
+              </div>
+            )}
+
+            {amzTextError && (
+              <div className="text-[11px] text-red-300/80 px-3 py-1.5 bg-red-500/5 border border-red-500/20 rounded-md">
+                Couldn't fetch reviews: {amzTextError}
+              </div>
+            )}
+
+            {amzText?._empty && (
+              <div className="text-[11px] text-white/40 px-3 py-1.5">
+                No verbatim Amazon reviews available
+                {amzText.reason ? ` (${amzText.reason})` : '.'}
+              </div>
+            )}
+
+            {amzText && !amzText._empty && Array.isArray(amzText.reviews) && amzText.reviews.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-center gap-2 text-[11px] text-white/60">
+                  <span className="text-yellow-300/90">
+                    {amzText.review_count_returned} review{amzText.review_count_returned === 1 ? '' : 's'}
+                  </span>
+                  {typeof amzText.average_rating === 'number' && (
+                    <span className="text-yellow-300/70">avg ★ {amzText.average_rating.toFixed(2)}</span>
+                  )}
+                  {typeof amzText.verified_share === 'number' && (
+                    <span className="text-green-300/70">
+                      {Math.round(amzText.verified_share * 100)}% verified
+                    </span>
+                  )}
+                  {amzText.cached && (
+                    <span className="text-cyan-300/60" title="Served from 24h ASIN cache (no Apify charge)">
+                      cached
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {amzText.reviews.slice(0, 5).map((r, i) => (
+                    <div
+                      key={i}
+                      className="text-[11px] bg-white/5 border border-white/10 rounded px-2.5 py-1.5"
+                    >
+                      <div className="flex items-center gap-2 text-[10px] text-white/50 mb-0.5">
+                        {typeof r.rating === 'number' && (
+                          <span className="text-yellow-300/90">★ {r.rating}</span>
+                        )}
+                        {r.verified && <span className="text-green-300/80">✓ verified</span>}
+                        {r.title && <span className="text-white/70 italic">"{r.title}"</span>}
+                      </div>
+                      <p className="text-white/80 leading-snug">{r.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -797,9 +914,21 @@ function SocialEvidencePanel({ twitterEvidence, redditEvidence, amazonEvidence, 
               X
             </div>
             <span className="text-white/80 text-sm font-medium">Twitter / X</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-300/80 border border-yellow-500/20" title="Grok paraphrases based on training data, not verbatim live tweets.">
-              paraphrased
-            </span>
+            {twitter?.source_type === 'grok_live_search' && Array.isArray(twitter?.citations) && twitter.citations.length > 0 ? (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-300/80 border border-green-500/20"
+                title={`xAI live search returned ${twitter.citations.length} real tweet citations.`}
+              >
+                live · {twitter.citations.length} citation{twitter.citations.length === 1 ? '' : 's'}
+              </span>
+            ) : (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-300/80 border border-yellow-500/20"
+                title="Grok paraphrased these from its X knowledge — no live citations were returned for this product."
+              >
+                paraphrased
+              </span>
+            )}
           </div>
           {twitterChecked && twitter?.fetched_at && (
             <span className="text-[10px] text-white/30">
@@ -882,13 +1011,55 @@ function SocialEvidencePanel({ twitterEvidence, redditEvidence, amazonEvidence, 
               )}
             </div>
 
-            {/* Sample tweets (paraphrased) */}
+            {/* Sample tweets — paraphrased OR (Phase F) backed by real
+                X citations from xAI live search. When citations are
+                present, render each tweet's row as a clickable link. */}
             <div className="space-y-1.5">
-              {twitter.sample_tweets.slice(0, 5).map((t, i) => (
-                <div key={i} className="text-xs text-white/75 bg-white/5 border border-white/10 rounded-lg px-3 py-2 leading-relaxed">
-                  <span className="text-white/40 mr-1">›</span>{t}
-                </div>
-              ))}
+              {twitter.sample_tweets.slice(0, 5).map((t, i) => {
+                const url = Array.isArray(twitter.citations) ? twitter.citations[i] : null;
+                if (url) {
+                  return (
+                    <a
+                      key={i}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs text-white/80 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 rounded-lg px-3 py-2 leading-relaxed transition-colors"
+                      title="Open the real tweet on X"
+                    >
+                      <span className="text-cyan-300 mr-1">›</span>{t}
+                      <span className="block text-[10px] text-cyan-300/70 mt-1 truncate">{url}</span>
+                    </a>
+                  );
+                }
+                return (
+                  <div key={i} className="text-xs text-white/75 bg-white/5 border border-white/10 rounded-lg px-3 py-2 leading-relaxed">
+                    <span className="text-white/40 mr-1">›</span>{t}
+                  </div>
+                );
+              })}
+              {/* When the model returned more citations than paraphrased
+                  samples, surface the extras as bare links so the user
+                  sees we've actually pulled fresh sources. */}
+              {Array.isArray(twitter.citations) &&
+                twitter.citations.length > (twitter.sample_tweets?.length || 0) && (
+                  <div className="text-[11px] text-white/50 mt-1">
+                    <span className="text-white/40">More citations: </span>
+                    {twitter.citations
+                      .slice(twitter.sample_tweets?.length || 0, (twitter.sample_tweets?.length || 0) + 5)
+                      .map((url, i) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-300/80 hover:text-cyan-200 underline mr-2 break-all"
+                        >
+                          {url.replace(/^https?:\/\//, '').slice(0, 32)}…
+                        </a>
+                      ))}
+                  </div>
+                )}
             </div>
 
             {/* Praise / complaints */}
@@ -1248,12 +1419,32 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   };
 
   // STABLE score breakdown - computed once, memoized
-  // Post-Fix #15: sentiment_score can be null when no real social data was found.
-  // null → render a "No social data yet" state, NOT a 0 bar (which would lie
-  // about the scoring). `unavailable: true` triggers the honest empty UI.
+  // Honest scoring (2026-04-25): demand_score, trend_score, AND sentiment_score
+  // can ALL be null when the backend couldn't find real signal. Each gets the
+  // "No data" striped bar treatment instead of a fake number.
   const scoreBreakdown = useMemo(() => [
-    { key: 'demand_score', label: 'Demand', icon: TrendingUp, color: 'text-green-400', value: product.demand_score, estimated: product.demand_score === 50 },
-    { key: 'trend_score', label: 'Trend', icon: Zap, color: 'text-cyan-400', value: product.trend_score, estimated: product.trend_score === 50 },
+    {
+      key: 'demand_score',
+      label: 'Demand',
+      icon: TrendingUp,
+      color: 'text-green-400',
+      value: product.demand_score,
+      unavailable: product.demand_score === null || product.demand_score === undefined,
+      note: (product.demand_score === null || product.demand_score === undefined)
+        ? 'No order, review, or engagement data yet.'
+        : null,
+    },
+    {
+      key: 'trend_score',
+      label: 'Trend',
+      icon: Zap,
+      color: 'text-cyan-400',
+      value: product.trend_score,
+      unavailable: product.trend_score === null || product.trend_score === undefined,
+      note: (product.trend_score === null || product.trend_score === undefined)
+        ? 'No Google Trends, TikTok, or viral indicator data.'
+        : null,
+    },
     {
       key: 'sentiment_score',
       label: 'Sentiment',
@@ -1271,7 +1462,15 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   const generateSEOCaption = async () => {
     setGeneratingCaption(true);
     try {
-      const response = await api.generateCaption(product.title, product.niche, product.suggested_price);
+      // Pass actual product tags so Claude has product-specific signals,
+      // not just the category label. See api.generateCaption + the
+      // anti-template prompt in product_analysis_routes.py.
+      const response = await api.generateCaption(
+        product.title,
+        product.niche,
+        product.suggested_price,
+        product.tags
+      );
       if (response.success && response.caption) {
         setCaption(response.caption);
       } else {
@@ -1300,14 +1499,17 @@ Transform your ${nicheFormatted} experience with this thoughtfully designed esse
 Free shipping on orders over $50. 30-day hassle-free returns.`;
   };
 
-  const generateAIAnalysis = async () => {
+  const generateAIAnalysis = async (forceRefresh = false) => {
     setGeneratingAnalysis(true);
     setAnalysisError(null);
 
     try {
       // Routes through authService.post() so the JWT is attached.
       // Backend endpoint /api/oi/analyze-product requires auth (Depends(get_current_user)).
-      const data = await api.analyzeProduct(product);
+      // ``forceRefresh`` is True when the user explicitly clicked the
+      // Refresh button — bypasses the 15-min server-side cache that was
+      // making re-clicks return identical analysis.
+      const data = await api.analyzeProduct(product, forceRefresh === true);
 
       if (!data || data.success === false) {
         throw new Error(data?.error || 'Analysis failed');
@@ -1571,24 +1773,57 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
               })}
             </div>
 
-            {/* Quick Recommendation */}
-            <div className={`mt-4 p-3 rounded-xl ${
-              product.oi_score >= 70 ? 'bg-green-500/10 border border-green-500/20' :
-              product.oi_score >= 50 ? 'bg-yellow-500/10 border border-yellow-500/20' :
-              'bg-red-500/10 border border-red-500/20'
-            }`}>
-              <p className={`text-sm font-medium ${
-                product.oi_score >= 70 ? 'text-green-300' :
-                product.oi_score >= 50 ? 'text-yellow-300' :
-                'text-red-300'
-              }`}>
-                {product.recommendation || (
-                  product.oi_score >= 70 ? 'HIGH OPPORTUNITY: Strong buy signal based on demand and trend data' :
-                  product.oi_score >= 50 ? 'MODERATE: Worth testing with a small budget' :
-                  'LOW POTENTIAL: Consider skipping this product'
-                )}
-              </p>
-            </div>
+            {/* Quick Recommendation — honest tier-aware variant */}
+            {(() => {
+              // Honest scoring: when the backend says INSUFFICIENT_DATA, we
+              // surface that explicitly with a neutral tone. No green
+              // "Strong buy" badges on products we couldn't validate.
+              const tier = product.tier;
+              const confPct = product.data_confidence_pct;
+              const isInsufficient = tier === 'INSUFFICIENT_DATA';
+              const isStrong = !isInsufficient && product.oi_score >= 70;
+              const isMod = !isInsufficient && !isStrong && product.oi_score >= 50;
+
+              const containerCls = isInsufficient
+                ? 'bg-white/5 border border-white/10'
+                : isStrong
+                  ? 'bg-green-500/10 border border-green-500/20'
+                  : isMod
+                    ? 'bg-yellow-500/10 border border-yellow-500/20'
+                    : 'bg-red-500/10 border border-red-500/20';
+              const textCls = isInsufficient
+                ? 'text-white/70'
+                : isStrong
+                  ? 'text-green-300'
+                  : isMod
+                    ? 'text-yellow-300'
+                    : 'text-red-300';
+
+              return (
+                <div className={`mt-4 p-3 rounded-xl ${containerCls}`}>
+                  {isInsufficient && (
+                    <p className="text-white/50 text-[11px] uppercase tracking-wider mb-1">
+                      Insufficient data — {confPct ?? 0}% data coverage
+                    </p>
+                  )}
+                  <p className={`text-sm font-medium ${textCls}`}>
+                    {product.recommendation || (
+                      isStrong ? 'HIGH OPPORTUNITY: Strong buy signal based on demand and trend data' :
+                      isMod    ? 'MODERATE: Worth testing with a small budget' :
+                                 'LOW POTENTIAL: Consider skipping this product'
+                    )}
+                  </p>
+                  {!isInsufficient && typeof confPct === 'number' && confPct < 100 && (
+                    <p className="text-white/40 text-[11px] mt-1">
+                      Data confidence: {confPct}%
+                      {Array.isArray(product.missing_components) && product.missing_components.length > 0 && (
+                        <> · Missing: {product.missing_components.join(', ')}</>
+                      )}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           {/* AI Analysis Section - AUTO-LOADED */}
@@ -1600,7 +1835,7 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                 {generatingAnalysis && <Loader2 className="w-4 h-4 animate-spin text-purple-400" />}
               </h4>
               <button
-                onClick={generateAIAnalysis}
+                onClick={() => generateAIAnalysis(true)}
                 disabled={generatingAnalysis}
                 className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
               >
@@ -1704,9 +1939,12 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
               - "Not searched yet" → no section (don't show anything)
               ========================================================== */}
           <SocialEvidencePanel
+            product={product}
             twitterEvidence={product.twitter_evidence}
             redditEvidence={product.reddit_evidence}
             amazonEvidence={product.amazon_evidence}
+            aliexpressBuzz={product.aliexpress_buzz}
+            sentimentSource={product.sentiment_source}
             dataSources={dataSources}
           />
 
@@ -1866,6 +2104,13 @@ export function ProductDiscovery() {
   // Populated when the discovery API returns a 503 / structured error.
   // Shape: { error, discovery_error, diagnostics, hint, status } or null.
   const [discoveryError, setDiscoveryError] = useState(null);
+  // Populated when the backend clamped the requested product count to the
+  // caller's tier ceiling. Shape:
+  //   { tier, per_request_ceiling, requested, clamped } or null.
+  // Surfaced by services/api.js as a non-enumerable property on the products
+  // array — we copy it into state so the upgrade-nudge banner can dismiss
+  // independently of the product list.
+  const [tierNudge, setTierNudge] = useState(null);
   const [generatingImages, setGeneratingImages] = useState(false);
   const [showEnhancer, setShowEnhancer] = useState(false);
   const [enhancerProduct, setEnhancerProduct] = useState(null);
@@ -2095,9 +2340,12 @@ export function ProductDiscovery() {
 
       console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
 
-      // Fetch products (same niche for all filter types)
-      // Note: Backend limits count to 50 max
-      const response = await api.discoverProducts({ niche, count: 30 });
+      // Fetch products (same niche for all filter types).
+      // Request the Stratosphere ceiling (100). The backend clamps to the
+      // caller's tier ceiling (NEST=10, FLIGHT=25, SOAR=50, STRATOSPHERE=100)
+      // and sets tier_meta.clamped so `tierNudge` can prompt an upgrade when
+      // the request would have returned more at a higher tier.
+      const response = await api.discoverProducts({ niche, count: 100 });
       console.log('[ProductDiscovery] API Response:', response);
 
       // Structured error from backend (503 with diagnostics) — surface it to the user.
@@ -2116,6 +2364,17 @@ export function ProductDiscovery() {
 
       let loadedProducts = Array.isArray(response) ? response : (response.products || response.data || []);
       console.log(`[ProductDiscovery] Loaded ${loadedProducts.length} products from API`);
+
+      // Surface tier-clamp event as an upgrade-nudge banner. The API layer
+      // attaches tier_meta non-enumerably; we read it here and push it into
+      // state so the banner can be dismissed without re-clearing the product
+      // list.
+      const tierMeta = response?.tier_meta;
+      if (tierMeta?.clamped) {
+        setTierNudge(tierMeta);
+      } else {
+        setTierNudge(null);
+      }
 
       // If still no products, log warning
       if (!loadedProducts || loadedProducts.length === 0) {
@@ -2340,6 +2599,41 @@ export function ProductDiscovery() {
           <div>
             <p className="text-blue-200 font-medium">Limited Data Available</p>
             <p className="text-blue-200/70 text-sm">Scores marked "Est." are estimates. Connect Google Trends, TikTok, and sentiment APIs for accurate metrics.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Tier clamp nudge — shown when the backend capped the requested
+          product count at the caller's per-request ceiling (see
+          ospra_os/core/tiers.py::get_products_per_request_ceiling). */}
+      {tierNudge && (
+        <div className="mb-6 p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Info className="w-5 h-5 text-purple-300 flex-shrink-0" />
+            <div>
+              <p className="text-purple-100 font-medium">
+                Showing {tierNudge.per_request_ceiling} of {tierNudge.requested} requested products
+              </p>
+              <p className="text-purple-200/70 text-sm">
+                Your {tierNudge.tier} tier caps per-request discovery at {tierNudge.per_request_ceiling}.
+                {' '}Upgrade for more results per run.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="/settings?tab=billing"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-500/30 hover:bg-purple-500/40 text-purple-100 border border-purple-400/40"
+            >
+              See plans
+            </a>
+            <button
+              onClick={() => setTierNudge(null)}
+              className="text-purple-200/60 hover:text-purple-100 text-sm px-2"
+              aria-label="Dismiss upgrade nudge"
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}

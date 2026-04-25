@@ -389,6 +389,7 @@ class OspraAPI {
           count: data.count,
           from_cache: data.from_cache,
           is_fallback: data.is_fallback,
+          tier_meta: data.tier_meta,
           products_length: (data.products || data.data || []).length
         });
 
@@ -397,8 +398,28 @@ class OspraAPI {
           console.warn('[API] Backend returned demo products (dev fallback):', data.warning);
         }
 
-        // Normalize: return array when success, error object when explicit error.
-        return data.products || data.data || [];
+        // Surface tier clamp events so upgrade nudges in the UI don't require
+        // another round-trip. data.tier_meta is {tier, per_request_ceiling,
+        // requested, clamped} when the backend applied a per-request ceiling.
+        if (data.tier_meta?.clamped) {
+          console.info(
+            `[API] Tier clamp: requested ${data.tier_meta.requested} products, ` +
+            `${data.tier_meta.tier} tier caps at ${data.tier_meta.per_request_ceiling}`
+          );
+        }
+
+        // Normalize: return an array on success with `tier_meta` attached as a
+        // non-enumerable property so callers that iterate don't see it, but the
+        // discovery UI can still read `result.tier_meta` for upgrade nudges.
+        const products = data.products || data.data || [];
+        if (data.tier_meta) {
+          Object.defineProperty(products, 'tier_meta', {
+            value: data.tier_meta,
+            enumerable: false,
+            writable: false,
+          });
+        }
+        return products;
       } catch (error) {
         console.error('[API] discoverProducts network error:', error);
         return {
@@ -789,11 +810,15 @@ class OspraAPI {
    * @param {object} product - The product object from discovery
    * @returns {Promise<{success: boolean, analysis?: object, source?: string, error?: string}>}
    */
-  async analyzeProduct(product) {
+  async analyzeProduct(product, forceRefresh = false) {
     try {
       const data = await authService.post('/api/oi/analyze-product', {
         product_id: product.id,
         product_title: product.title,
+        // Bypass the backend's 15-min in-memory cache when the user
+        // explicitly clicks Refresh. Auto-loads on panel-open leave
+        // forceRefresh=false so they keep hitting the cache.
+        force_refresh: forceRefresh === true,
         product_data: {
           niche: product.niche,
           cost_price: product.cost_price,
@@ -818,16 +843,60 @@ class OspraAPI {
   }
 
   /**
+   * Fetch verbatim Amazon review TEXT for a single product (Phase K
+   * on-demand). Server-side cache is keyed by ASIN with a 24h TTL, so
+   * repeated calls on the same listing within a day reuse one Apify
+   * fetch (and don't re-bill).
+   *
+   * Pass the full discovery product dict — the route reads
+   * ``amazon_evidence.top_matches[0]`` to find the ASIN. Response
+   * shape:
+   *   { success, available, asin?, review_count_returned?,
+   *     average_rating?, verified_share?, reviews?: [...], cached?,
+   *     reason?: 'no_amazon_match' | 'amazon_review_text_connector_unavailable' | ... }
+   *
+   * Frontend should render a clean "no Amazon reviews available" state
+   * when ``available`` is false. The ``cached`` flag is purely
+   * informational (useful for a small "served from cache" hint).
+   */
+  async fetchAmazonReviewText(product, maxReviews = 15) {
+    try {
+      // Send only the fields the route actually reads so we don't push
+      // megabytes of payload up the wire on click.
+      const data = await authService.post('/api/oi/amazon-reviews', {
+        product_data: {
+          title: product.title,
+          name: product.name,
+          amazon_evidence: product.amazon_evidence,
+        },
+        max_reviews: maxReviews,
+      });
+      return data;
+    } catch (error) {
+      console.error('[API] fetchAmazonReviewText error:', error);
+      return { success: false, available: false, error: error.message || 'Fetch failed' };
+    }
+  }
+
+  /**
    * Generate SEO-optimized product caption.
    * Calls POST /api/oi/generate-caption (requires auth).
    */
-  async generateCaption(productTitle, niche, price) {
+  async generateCaption(productTitle, niche, price, tags = null) {
     try {
+      // Send the actual product tags when available — the previous
+      // ``tags: [niche]`` form gave Claude only the category label, so
+      // every caption in a niche shared the same "Tags:" line and
+      // converged on the same template wording. Frontend callers
+      // should now pass ``product.tags`` (or extracted title tokens).
+      const realTags = Array.isArray(tags) && tags.length > 0
+        ? tags.filter(Boolean).slice(0, 12)
+        : [niche];
       const data = await authService.post('/api/oi/generate-caption', {
         product_title: productTitle,
         product_niche: niche,
         price: parseFloat(price) || 0,
-        tags: [niche]
+        tags: realTags
       });
       if (data.success && data.caption) {
         return { success: true, caption: data.caption };
@@ -1035,9 +1104,33 @@ Price: ${parseFloat(price).toFixed(2)}`;
   async upgradeTier(tier) {
     return authService.post('/api/user/upgrade', { tier });
   }
-  
+
   async getTierInfo() {
     return authService.get('/api/user/tier');
+  }
+
+  // ===========================================================================
+  // DATA & PRIVACY (GDPR self-serve)
+  // ===========================================================================
+  // These endpoints are powered by ospra_os/api/account_routes.py and share
+  // the same backend service module (ospra_os/security/gdpr.py) used by the
+  // Shopify GDPR webhooks — so the export/delete a user triggers from the
+  // UI is identical to what Shopify gets when it pings customers/data_request
+  // or shop/redact.
+
+  async getDataSummary() {
+    return authService.get('/api/account/data-summary');
+  }
+
+  async exportMyData() {
+    return authService.get('/api/account/data-export');
+  }
+
+  async deleteMyData({ confirmEmail, deleteConnectedStores = true } = {}) {
+    return authService.post('/api/account/data-delete', {
+      confirm_email: confirmEmail,
+      delete_connected_stores: deleteConnectedStores,
+    });
   }
 }
 

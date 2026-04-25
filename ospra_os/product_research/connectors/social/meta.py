@@ -1,100 +1,52 @@
-"""Meta (Facebook/Instagram) connector for social signals."""
+"""
+Meta (Facebook/Instagram) connector — DEPRECATED placeholder.
+
+The Meta Graph API is no longer viable for product-discovery sentiment:
+
+  • Public Facebook post search (`/search?type=post`) was deprecated in
+    2018 — the endpoint no longer exists.
+  • Instagram Hashtag Search (``ig_hashtag_search``) requires a
+    Business or Creator IG account linked to a Facebook Page that the
+    caller owns, capped at 30 unique hashtags per 7 days per IG user.
+    That doesn't fit a multi-tenant SaaS where tenants don't all run IG
+    businesses and we'd need to query arbitrary product hashtags.
+
+Phase J replaced this with an Apify path, see
+``ospra_os/product_research/connectors/apify/instagram_hashtag.py``.
+
+This shim is kept only so legacy import paths
+(``from ...social.meta import MetaConnector``) don't break — it
+intentionally exposes ``available=False`` so callers that still
+reference it route to the Apify connector instead of silently no-op-ing.
+"""
 
 from typing import List, Optional
+
 from ..base import BaseConnector, ProductCandidate
 
 
 class MetaConnector(BaseConnector):
-    """
-    Meta Platform integration (Facebook + Instagram).
-
-    Use Meta Graph API to:
-    - Track hashtag volume
-    - Monitor product mentions
-    - Analyze engagement on product posts
-    - Find trending products in target demographics
-
-    Setup:
-    1. Create Facebook App at developers.facebook.com
-    2. Get access token with instagram_basic, pages_read_engagement permissions
-    3. Set META_ACCESS_TOKEN in .env
-    """
+    """Deprecated: the Meta Graph API path is no longer wired. See
+    ``InstagramHashtagApify`` (Phase J)."""
 
     @property
     def name(self) -> str:
-        return "Meta (Facebook/Instagram)"
+        return "Meta (Facebook/Instagram) — deprecated"
 
     @property
     def source_id(self) -> str:
         return "meta"
 
+    def is_available(self) -> bool:  # type: ignore[override]
+        return False
+
     async def search(self, query: str, **kwargs) -> List[ProductCandidate]:
-        """
-        Search for product mentions across Facebook/Instagram.
-
-        Args:
-            query: Product name or hashtag
-            platform: 'facebook', 'instagram', or 'both'
-            time_range: Days to look back (default: 30)
-
-        Returns:
-            Product candidates with social engagement data
-        """
-        if not self.api_key:
-            print("[WARNING]  META_ACCESS_TOKEN not configured")
-            return []
-
-        platform = kwargs.get("platform", "both")
-        time_range = kwargs.get("time_range", 30)
-
-        # TODO: Implement Meta Graph API integration
-        # Example endpoints:
-        # - GET /search?type=post&q={query}
-        # - GET /instagram_hashtag_search?q={hashtag}
-        # - GET /page/posts (for business pages)
-
-        print(f"[STATS] Meta API call: search('{query}', platform={platform})")
         return []
 
-    async def get_trending(self, category: Optional[str] = None, limit: int = 10) -> List[ProductCandidate]:
-        """
-        Get trending products based on hashtag volume and engagement.
-
-        Args:
-            category: Product category
-            limit: Max results
-
-        Returns:
-            Trending products ranked by social engagement
-        """
-        if not self.api_key:
-            print("[WARNING]  META_ACCESS_TOKEN not configured")
-            return []
-
-        # TODO: Implement trending hashtag discovery
-        # - Query top hashtags in niche
-        # - Calculate engagement rate
-        # - Find products with rising mentions
-
-        print(f"[STATS] Meta API call: get_trending(category={category})")
+    async def get_trending(
+        self, category: Optional[str] = None, limit: int = 10
+    ) -> List[ProductCandidate]:
         return []
 
     async def get_hashtag_stats(self, hashtag: str) -> dict:
-        """
-        Get stats for a specific hashtag.
-
-        Returns:
-            {
-                "post_count": int,
-                "recent_post_count": int,
-                "avg_engagement": float
-            }
-        """
-        if not self.api_key:
-            return {}
-
-        # TODO: Implement hashtag stats via Instagram Graph API
-        # GET /ig_hashtag_search?q={hashtag}
-        # GET /{hashtag_id}/recent_media
-
         return {}

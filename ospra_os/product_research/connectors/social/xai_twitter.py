@@ -803,13 +803,24 @@ IMPORTANT: Only include products that are ACTUALLY trending on Twitter right now
         include_tweets: bool = True
     ) -> Dict[str, Any]:
         """
-        Get Twitter sentiment for a specific product.
+        Get Twitter sentiment for a specific product — using xAI's
+        live X search for real tweet citations.
 
-        HALLUCINATION-RESISTANT prompt: the model is required to set
-        found_real_tweets=false and return null scores when it cannot
-        find actual tweets about this product. This is the honest path.
-        Verified by scripts/audit_sentiment.py (April 2026): eliminates
-        fabrication on nonsense and generic products.
+        Phase F upgrade (2026-04-25): switched from chat-mode (Grok
+        paraphrasing what it knows) to live-search mode via xAI's
+        ``search_parameters``. The model now actually queries X in
+        real time and the response includes a ``citations`` field
+        with real tweet URLs. We surface those URLs alongside the
+        paraphrased samples so users can click through and verify.
+
+        Honesty rules from the original prompt remain — if the model
+        can't find real tweets, ``found_real_tweets=false`` and
+        ``citations=[]``. Live search reduces hallucination risk
+        because the model is grounded on actual posts rather than
+        paraphrasing memory.
+
+        Cost: live_search tokens count toward your existing xAI Grok
+        spend. No separate X API subscription needed.
         """
         if not self.is_available():
             return {"error": "xAI not available", "found_real_tweets": False, "sentiment_score": None}
@@ -905,47 +916,90 @@ IF NO TWEETS AT EITHER LEVEL, RETURN:
 }}"""
 
         try:
+            # xAI live search: ``search_parameters`` is xAI-specific and
+            # passed via the OpenAI SDK's ``extra_body``. The model is
+            # grounded on real X posts rather than paraphrasing memory,
+            # and the response includes a ``citations`` field with real
+            # tweet URLs. ``mode="auto"`` lets the model decide whether
+            # the query needs search; for product sentiment it always
+            # will. ``sources=[{"type":"x"}]`` restricts search to X.
             response = await self.client.chat.completions.create(
                 model="grok-3",
                 messages=[
                     {
                         "role": "system",
                         "content": (
-                            "You are Grok. Be rigorously honest: if you cannot find real tweets "
-                            "about the specific product asked about, return found_real_tweets=false "
-                            "and null/zero values. Fabricating data is a serious error. Generic "
-                            "products, unbranded items, and unknown SKUs almost always have no "
-                            "tweet data - that is the correct answer, not a failure."
+                            "You are Grok with live X (Twitter) search enabled. "
+                            "When you find real tweets, paraphrase them faithfully and ALSO "
+                            "include the tweet URLs from your search results in the "
+                            "``citations`` array of your JSON response. "
+                            "Be rigorously honest: if live search returns no real tweets "
+                            "about the specific product or category, set "
+                            "found_real_tweets=false and return null/zero values with an "
+                            "empty citations array. Fabricating tweets or citations is a "
+                            "serious error. Generic, unbranded, or unknown products "
+                            "frequently have no tweet data — that's the correct honest "
+                            "answer, not a failure."
                         )
                     },
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.2,
-                max_tokens=1500
+                max_tokens=1500,
+                extra_body={
+                    "search_parameters": {
+                        "mode": "auto",
+                        "sources": [{"type": "x"}],
+                        "max_search_results": 15,
+                        "return_citations": True,
+                    }
+                },
             )
 
             content = response.choices[0].message.content
+
+            # xAI returns real tweet URLs in ``response.citations`` when
+            # live search was used. Surface them on the parsed result so
+            # downstream code (and the UI) can show clickable sources
+            # rather than only paraphrased text.
+            real_citations: list[str] = []
+            try:
+                citations_attr = getattr(response, "citations", None)
+                if citations_attr:
+                    real_citations = [str(c) for c in citations_attr if c]
+            except Exception:
+                real_citations = []
 
             import re
             json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 parsed = json.loads(json_match.group())
-                # Ensure required fields are present even if the model
-                # returned a partial response
                 parsed.setdefault("found_real_tweets", False)
                 parsed.setdefault("sample_tweets", [])
                 parsed.setdefault("tweet_count", 0)
                 parsed.setdefault("engagement", {"total_likes": 0, "total_retweets": 0, "total_replies": 0})
+
+                # Real citation URLs win. If the model also put URLs
+                # inside ``citations`` in its JSON, merge — dedupe by URL.
+                model_citations = parsed.get("citations") or []
+                merged = list(dict.fromkeys([*real_citations, *(str(u) for u in model_citations if u)]))
+                parsed["citations"] = merged
+                # If we got real citations from xAI but the model claimed
+                # found_real_tweets=False, trust xAI: it actually searched.
+                if real_citations and not parsed.get("found_real_tweets"):
+                    parsed["found_real_tweets"] = True
+                    parsed["search_level"] = parsed.get("search_level") or "product"
                 return parsed
 
             return {
                 "product": product_name,
-                "found_real_tweets": False,
+                "found_real_tweets": bool(real_citations),
                 "sentiment_score": None,
-                "tweet_count": 0,
+                "tweet_count": len(real_citations),
                 "sample_tweets": [],
+                "citations": real_citations,
                 "raw_analysis": content,
-                "note": "Could not parse JSON from response"
+                "note": "Could not parse JSON from response",
             }
 
         except Exception as e:
@@ -954,7 +1008,8 @@ IF NO TWEETS AT EITHER LEVEL, RETURN:
                 "found_real_tweets": False,
                 "sentiment_score": None,
                 "tweet_count": 0,
-                "sample_tweets": []
+                "sample_tweets": [],
+                "citations": [],
             }
     
     async def find_trending_hashtags(

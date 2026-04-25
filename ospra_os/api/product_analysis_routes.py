@@ -129,6 +129,11 @@ class ProductAnalysisRequest(BaseModel):
     product_id: str
     product_title: str
     product_data: Optional[Dict[str, Any]] = {}
+    # When True, bypass the 15-minute analysis cache. Wired to the
+    # frontend "Refresh" button — the cache was silently shadowing it,
+    # making the button look broken. Auto-load on panel-open still
+    # leaves this False so it can hit the cache.
+    force_refresh: bool = False
 
 
 class CaptionRequest(BaseModel):
@@ -136,6 +141,38 @@ class CaptionRequest(BaseModel):
     product_niche: str = "general"
     price: float = 0
     tags: Optional[List[str]] = []
+
+
+# Phase K (on-demand): the route accepts a product dict produced by
+# discovery, the same shape /analyze-product expects. The Amazon ASIN/URL
+# is read from ``product_data.amazon_evidence.top_matches[0]``.
+class AmazonReviewTextRequest(BaseModel):
+    product_data: Dict[str, Any]
+    max_reviews: int = 15
+
+
+# Lazy singleton — engine init spins up sentiment connectors. We don't
+# want to pay that on every request, but we don't want to do it at import
+# time either (some tests stub out env vars before importing). One cheap
+# instance per process is plenty.
+_engine_singleton = None
+_engine_lock = None
+
+
+async def _get_engine():
+    """Lazily build a single ProductDiscoveryEngine instance per process."""
+    global _engine_singleton, _engine_lock
+    if _engine_singleton is not None:
+        return _engine_singleton
+    import asyncio
+    if _engine_lock is None:
+        _engine_lock = asyncio.Lock()
+    async with _engine_lock:
+        if _engine_singleton is not None:
+            return _engine_singleton
+        from ospra_os.intelligence.product_discovery import ProductDiscoveryEngine
+        _engine_singleton = ProductDiscoveryEngine()
+    return _engine_singleton
 
 
 # ============================================================================
@@ -165,6 +202,7 @@ async def analyze_product(request: ProductAnalysisRequest, current_user: User = 
                 product,
                 brand_name=brand_name,
                 brand_descriptor=brand_descriptor,
+                force_refresh=request.force_refresh,
             )
             if analysis:
                 return {"success": True, "analysis": analysis, "source": "claude"}
@@ -193,6 +231,82 @@ async def refresh_sentiment_now(current_user: User = Depends(get_current_user)):
     except Exception as e:
         logger.error(f"Manual sentiment refresh failed: {e}")
         raise HTTPException(status_code=500, detail=f"Refresh failed: {e}")
+
+
+@router.post("/amazon-reviews")
+async def fetch_amazon_review_text(
+    request: AmazonReviewTextRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Phase K (on-demand): pull verbatim Amazon review text for ONE product.
+
+    Called by the frontend when a user opens a product card or hits
+    "Refresh AI analysis", NOT during bulk discovery. The fetch is cached
+    by ASIN for 24h so repeated clicks on the same listing don't re-bill
+    the Apify actor.
+
+    Response:
+      - 200 with ``{"success": True, "available": True, ..., "cached": bool}``
+        when reviews were fetched (or returned from cache).
+      - 200 with ``{"success": True, "available": False, "reason": ...}``
+        when the product has no Amazon match, the connector isn't
+        configured, or the actor returned nothing — the frontend should
+        surface a clean "no Amazon reviews available" state.
+    """
+    product = request.product_data or {}
+    title = product.get("title") or product.get("name") or "(unknown)"
+
+    engine = await _get_engine()
+
+    if not getattr(engine, "amazon_reviews_text_available", False):
+        return {
+            "success": True,
+            "available": False,
+            "reason": "amazon_review_text_connector_unavailable",
+            "title": title,
+        }
+
+    # Quick guard: if the product has no Amazon match at all there's
+    # nothing for the engine to fetch. Surface this as a clean "no data"
+    # instead of letting the engine silently return None.
+    evidence = product.get("amazon_evidence") or {}
+    if not (evidence.get("top_matches") or []):
+        return {
+            "success": True,
+            "available": False,
+            "reason": "no_amazon_match",
+            "title": title,
+        }
+
+    try:
+        result = await engine.fetch_amazon_review_text(
+            product, max_reviews=max(1, min(int(request.max_reviews), 25))
+        )
+    except Exception as exc:
+        logger.warning(f"amazon-reviews fetch failed for {title}: {exc}")
+        raise HTTPException(status_code=502, detail=f"Apify call failed: {exc}")
+
+    if not result:
+        return {
+            "success": True,
+            "available": False,
+            "reason": "actor_returned_no_data",
+            "title": title,
+        }
+
+    # Echo the per-product payload so the frontend can render it directly.
+    return {
+        "success": True,
+        "available": True,
+        "title": title,
+        "asin": result.get("asin"),
+        "review_count_returned": result.get("review_count_returned", 0),
+        "average_rating": result.get("average_rating"),
+        "verified_share": result.get("verified_share", 0.0),
+        "reviews": result.get("reviews") or [],
+        "cached": result.get("cached", False),
+    }
 
 
 @router.post("/generate-caption")
@@ -293,6 +407,7 @@ async def _analyze_with_claude(
     product: dict,
     brand_name: str = DEFAULT_BRAND_NAME,
     brand_descriptor: str = DEFAULT_BRAND_DESCRIPTOR,
+    force_refresh: bool = False,
 ) -> Optional[dict]:
     """
     Generate analysis using Claude API.
@@ -302,14 +417,20 @@ async def _analyze_with_claude(
       - temperature=0.2 (low-but-nonzero sampling)
       - 15-minute in-memory result cache to stop UI refresh loops from
         burning API tokens and producing drifting analyses.
+      - ``force_refresh`` (Bug fix): the 15-min cache was silently
+        shadowing the frontend "Refresh" button — same product
+        signals → same cache key → same response. When True we skip
+        the cache lookup but still write the new result back so a
+        subsequent auto-load can hit it.
     """
     # Cache check FIRST — same signals, same analysis.
     # Brand is part of the cache key so different tenants don't share cache entries.
     cache_key = _analysis_cache_key(title, product, brand_name=brand_name)
-    cached = _cache_get(cache_key)
-    if cached is not None:
-        logger.debug(f"[AI-ANALYSIS] Cache hit for {title[:40]!r} (key={cache_key[:8]})")
-        return cached
+    if not force_refresh:
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            logger.debug(f"[AI-ANALYSIS] Cache hit for {title[:40]!r} (key={cache_key[:8]})")
+            return cached
 
     prompt = _build_analysis_prompt(title, product, brand_name, brand_descriptor)
 
@@ -322,7 +443,7 @@ async def _analyze_with_claude(
                 "content-type": "application/json"
             },
             json={
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-sonnet-4-5-20250929",
                 "max_tokens": 1024,
                 "temperature": ANALYSIS_TEMPERATURE,
                 "messages": [{"role": "user", "content": prompt}]
@@ -391,9 +512,20 @@ async def _generate_caption_with_claude(
     else:
         price_tier = f"premium tier (${price:.2f})"
 
+    # Caption prompt — anti-template version (regression fix of #16).
+    #
+    # The previous prompt had a rigid 4-step ``STRUCTURE`` block, which
+    # made Claude collapse onto the same scaffold every time
+    # (every caption opened "Transform any standard X into an
+    # intelligent command center with the Y, engineered for..."). We
+    # now (a) drop the structure block entirely, (b) let Claude pick
+    # the shape, and (c) explicitly forbid the specific opener
+    # patterns we've seen repeat. Combined with ``temperature: 0.9``
+    # below this stops the templated-output failure mode.
     prompt = f"""You are a senior copywriter for {brand_name}, {brand_descriptor}.
 
-Write a Shopify product description for THIS SPECIFIC product. Do NOT reuse generic niche-level copy.
+Write a Shopify product description for THIS SPECIFIC product. The copy must be
+recognisably about THIS product — not a generic description of its category.
 
 Product title: {title}
 Category: {niche.replace('_', ' ').title()}
@@ -401,27 +533,19 @@ Price tier: {price_tier}
 Tags: {tag_line}
 Salient title tokens: {key_tokens}
 
-CRITICAL: The final copy must be clearly distinguishable from a description of any
-other product in the same category. Work in at least two product-specific signals
-drawn from the title, tags, or salient tokens above (e.g. material, mechanism,
-power source, form factor). If the product mentions something concrete —
-"wireless", "stainless", "foldable", "rechargeable", "smart", "silicone",
-"bluetooth", "LED" — weave that in. Do not invent specs that weren't provided.
-
-STRICT REQUIREMENTS:
-- NO emojis whatsoever
-- NO hashtags
-- Max 1 exclamation mark in the whole piece
-- Professional, clean, premium tone ({brand_name} brand: sophisticated, modern, trustworthy)
-- Focus on how it fits into real life, not a spec sheet
-- Subtle urgency, never salesy
-- 80-120 words total
-
-STRUCTURE:
-1. Opening hook that references the actual product (not the category) — 1 sentence
-2. 2-3 benefit sentences grounded in the specific signals above
-3. Quality / trust statement tied to {price_tier}
-4. Soft call-to-action — 1 sentence
+REQUIREMENTS
+- 80-120 words. Tight, premium, modern. Tone matches the {brand_name} brand.
+- Lead with a concrete detail of THIS product (a feature, a use, a material).
+  Do NOT open with the words "Transform", "Discover", "Introducing", "Experience",
+  "Elevate", "Upgrade your", or any variation that could fit any product.
+- Work in at least two product-specific signals drawn from the title, tags, or
+  salient tokens above (mechanism, material, capacity, compatibility, etc.).
+  Don't invent specs that weren't provided.
+- Pick whatever structure best fits THIS product — don't follow a fixed scaffold.
+  The shape of the paragraph(s) should differ based on what the product is.
+- No emojis. No hashtags. Max 1 exclamation mark in total.
+- End with a soft, brand-appropriate close. Avoid "Order now", "Shop today", or
+  other off-the-shelf CTAs.
 
 Output ONLY the caption text. No preamble, no labels, no markdown."""
 
@@ -434,8 +558,12 @@ Output ONLY the caption text. No preamble, no labels, no markdown."""
                 "content-type": "application/json"
             },
             json={
-                "model": "claude-sonnet-4-20250514",
+                "model": "claude-sonnet-4-5-20250929",
                 "max_tokens": 400,
+                # Higher temperature so two products in the same niche
+                # genuinely diverge. The analysis call uses 0.2 for
+                # stability; captions need the opposite.
+                "temperature": 0.9,
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=20.0

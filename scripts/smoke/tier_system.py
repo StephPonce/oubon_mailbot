@@ -1,11 +1,29 @@
 """
 Test script for Subscription Tier System
 Verifies database tables, TierManager service, and API endpoints
+
+NOTE: This is a standalone integration smoke harness that hardcodes a
+local SQLite path (``./oubon_store.db``) and expects a backend running
+at ``http://localhost:8001``. It is NOT safe to run under pytest's
+default fixtures because:
+  • the local DB file may be missing newer columns (e.g. ``brand_name``)
+  • the API tests need a live server
+We skip the module from the unit run; invoke it directly via
+``python tests/test_tier_system.py`` against a running stack.
 """
 
 import asyncio
 import sys
 from datetime import datetime
+
+import pytest
+
+# Skip this entire module under pytest — see header comment.
+pytestmark = pytest.mark.skip(
+    reason="Standalone integration smoke harness — needs running backend at localhost:8001 "
+    "and the dev SQLite at ./oubon_store.db. Run with: python tests/test_tier_system.py"
+)
+
 from ospra_os.database import Base, User, UserSettings
 from ospra_os.subscription.tier_manager import TierManager
 from sqlalchemy import create_engine, inspect

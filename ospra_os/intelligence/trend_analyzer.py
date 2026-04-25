@@ -242,11 +242,31 @@ Format your response as JSON:
                     # Convert Apify results to our format
                     latest_values = {}
                     momentum = {}
+                    # Phase G: capture related_queries — what people search
+                    # ALONGSIDE this keyword. This is qualitative context for
+                    # the AI agent: "users searching for 'smart plug' are
+                    # also searching for 'reviews', 'vs alexa', 'doesn't
+                    # work' — shape our read of the product accordingly."
+                    # Trends remains an INTEREST signal, not a sentiment
+                    # signal. We're using related-query VOCABULARY as
+                    # qualitative context, not the search-volume number.
+                    related_queries_by_kw: dict[str, list] = {}
 
                     for trend_data in results:
                         kw = trend_data.search_term
                         latest_values[kw] = trend_data.current_interest
                         momentum[kw] = trend_data.velocity
+                        rqs = getattr(trend_data, 'related_queries', None) or []
+                        if rqs:
+                            related_queries_by_kw[kw] = [
+                                {
+                                    'query': rq.get('query'),
+                                    'value': rq.get('value'),
+                                    'rank': rq.get('rank'),
+                                }
+                                for rq in rqs
+                                if rq.get('query')
+                            ][:10]
 
                     primary_keyword = keywords[0]
                     primary_momentum = momentum.get(primary_keyword, 0)
@@ -262,7 +282,8 @@ Format your response as JSON:
                         'interest_scores': latest_values,
                         'momentum': momentum,
                         'trend_direction': trend_direction,
-                        'primary_momentum': primary_momentum
+                        'primary_momentum': primary_momentum,
+                        'related_queries': related_queries_by_kw,
                     }
 
             except Exception as e:

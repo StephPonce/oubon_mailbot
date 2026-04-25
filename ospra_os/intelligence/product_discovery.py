@@ -27,6 +27,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
@@ -222,6 +223,33 @@ class ProductDiscoveryEngine:
         self.amazon_scraper = None
         self.apify_available = False
         
+        # Pinterest scraper — initialized in the same Apify block but as an
+        # optional dependency (older deploys may not have the connector
+        # installed). Pinterest Trends gives us visual-niche momentum
+        # (kitchen, beauty, home decor) that Google/TikTok miss.
+        self.pinterest_scraper = None
+
+        # TikTok Shop Partner API connector — first-party data
+        # (real units_sold_7d, real view counts). Requires per-seller
+        # OAuth, so it's best-effort: if TIKTOK_SHOP_APP_KEY +
+        # TIKTOK_SHOP_ACCESS_TOKEN are configured, we wire it as a
+        # parallel trend source. Otherwise we silently skip — most users
+        # won't have this configured and that's fine.
+        self.tiktok_shop_connector = None
+        if os.getenv("TIKTOK_SHOP_APP_KEY") and os.getenv("TIKTOK_SHOP_ACCESS_TOKEN"):
+            try:
+                from ospra_os.product_research.connectors.tiktok_shop import (
+                    TikTokShopConnector,
+                )
+                self.tiktok_shop_connector = TikTokShopConnector()
+                self.sources_status['tiktok_shop'] = '[SUCCESS] Connected (Partner API)'
+                logger.info("[SUCCESS] TikTok Shop Partner API connected")
+            except Exception as exc:
+                self.sources_status['tiktok_shop'] = f'[ERROR] {exc}'
+                logger.warning(f"[WARNING] TikTok Shop Partner init failed: {exc}")
+        else:
+            self.sources_status['tiktok_shop'] = '[INFO] Not configured (set TIKTOK_SHOP_APP_KEY/_ACCESS_TOKEN)'
+
         if self.apify_token:
             try:
                 from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
@@ -231,12 +259,31 @@ class ProductDiscoveryEngine:
                 self.sources_status['tiktok'] = '[SUCCESS] Connected (Apify)'
                 self.sources_status['amazon'] = '[SUCCESS] Connected (Apify)'
                 logger.info("[SUCCESS] TikTok + Amazon scrapers loaded")
+
+                # Pinterest is best-effort. Older codebases or deploys
+                # that don't have the actor configured will hit ImportError
+                # — that's fine, we just log + skip.
+                try:
+                    from ospra_os.product_research.connectors.apify.pinterest_trends import (
+                        PinterestTrendsApify,
+                    )
+                    self.pinterest_scraper = PinterestTrendsApify(api_token=self.apify_token)
+                    self.sources_status['pinterest'] = '[SUCCESS] Connected (Apify)'
+                    logger.info("[SUCCESS] Pinterest Trends scraper loaded")
+                except ImportError as exc:
+                    self.sources_status['pinterest'] = f'[INFO] Connector not installed: {exc}'
+                    logger.info(f"[INFO] Pinterest Trends: connector not available ({exc})")
+                except Exception as exc:
+                    self.sources_status['pinterest'] = f'[ERROR] {exc}'
+                    logger.warning(f"[WARNING] Pinterest Trends init failed: {exc}")
+
             except Exception as e:
                 self.sources_status['tiktok'] = f'[ERROR] {e}'
                 self.sources_status['amazon'] = f'[ERROR] {e}'
         else:
             self.sources_status['tiktok'] = '[ERROR] No APIFY_API_TOKEN'
             self.sources_status['amazon'] = '[ERROR] No APIFY_API_TOKEN'
+            self.sources_status['pinterest'] = '[ERROR] No APIFY_API_TOKEN'
     
     def _init_supplier_sources(self):
         """Initialize SUPPLIER sources (where to buy)"""
@@ -318,6 +365,84 @@ class ProductDiscoveryEngine:
                 self.sources_status['amazon_reviews'] = f'[ERROR] {e}'
         else:
             self.sources_status['amazon_reviews'] = '[ERROR] No APIFY_API_TOKEN'
+
+        # Phase H — AliExpress reviews (per-product review TEXT via Apify).
+        # Only invoked for top-N AliExpress products by OI in step 4b to
+        # control cost. Best-effort: silently disabled if Apify isn't
+        # configured.
+        self.aliexpress_reviews = None
+        self.aliexpress_reviews_available = False
+        if self.apify_token:
+            try:
+                from ospra_os.product_research.connectors.apify.aliexpress_reviews import (
+                    AliExpressReviewsApify,
+                )
+                self.aliexpress_reviews = AliExpressReviewsApify(api_token=self.apify_token)
+                self.aliexpress_reviews_available = self.aliexpress_reviews.is_available()
+                if self.aliexpress_reviews_available:
+                    self.sources_status['aliexpress_reviews'] = '[SUCCESS] Connected (Apify)'
+                    logger.info("[SUCCESS] AliExpress reviews connector loaded")
+                else:
+                    self.sources_status['aliexpress_reviews'] = '[ERROR] Init failed'
+            except Exception as e:
+                self.sources_status['aliexpress_reviews'] = f'[ERROR] {e}'
+        else:
+            self.sources_status['aliexpress_reviews'] = '[ERROR] No APIFY_API_TOKEN'
+
+        # Phase I — YouTube Data API v3 (review videos + verbatim viewer
+        # comments). Free 10k quota units/day; ~107 units per product, so
+        # capped at top 10 ranked products in step 5c. The qualitative
+        # agent reads ``top_comments`` as actual viewer feedback prose.
+        self.youtube_reviews = None
+        self.youtube_reviews_available = False
+        youtube_key = os.getenv('YOUTUBE_API_KEY')
+        if youtube_key:
+            try:
+                from ospra_os.product_research.connectors.social.youtube import (
+                    YouTubeReviewsConnector,
+                )
+                self.youtube_reviews = YouTubeReviewsConnector(api_key=youtube_key)
+                self.youtube_reviews_available = self.youtube_reviews.is_available()
+                if self.youtube_reviews_available:
+                    self.sources_status['youtube'] = '[SUCCESS] Connected (Data API v3)'
+                    logger.info("[SUCCESS] YouTube reviews connector loaded")
+                else:
+                    self.sources_status['youtube'] = '[ERROR] Init failed'
+            except Exception as e:
+                self.sources_status['youtube'] = f'[ERROR] {e}'
+        else:
+            self.sources_status['youtube'] = '[ERROR] No YOUTUBE_API_KEY'
+
+        # Phase K — Amazon per-product review TEXT (verbatim buyer
+        # prose) via a dedicated Apify actor. The niche-level
+        # ``amazon_reviews`` connector gives aggregate rating only;
+        # this fills the qualitative gap on the top-N ranked products.
+        self.amazon_reviews_text = None
+        self.amazon_reviews_text_available = False
+        if self.apify_token:
+            try:
+                from ospra_os.product_research.connectors.apify.amazon_reviews_text import (
+                    AmazonReviewsTextApify,
+                )
+                self.amazon_reviews_text = AmazonReviewsTextApify(api_token=self.apify_token)
+                self.amazon_reviews_text_available = self.amazon_reviews_text.is_available()
+                if self.amazon_reviews_text_available:
+                    self.sources_status['amazon_reviews_text'] = '[SUCCESS] Connected (Apify)'
+                    logger.info("[SUCCESS] Amazon review-text connector loaded")
+                else:
+                    self.sources_status['amazon_reviews_text'] = '[ERROR] Init failed'
+            except Exception as e:
+                self.sources_status['amazon_reviews_text'] = f'[ERROR] {e}'
+        else:
+            self.sources_status['amazon_reviews_text'] = '[ERROR] No APIFY_API_TOKEN'
+
+        # Phase J (Instagram via Apify) was disabled per cost-cut decision —
+        # IG captions are the noisiest verbatim source we tried, and the
+        # signal didn't justify ~$50-70/mo. Connector file is kept on disk at
+        # ``connectors/apify/instagram_hashtag.py`` (with its tests) in case
+        # we want to revisit it; it just isn't wired into discovery.
+        self.instagram_hashtag = None
+        self.instagram_hashtag_available = False
     
     def _log_status(self):
         """Log data source status"""
@@ -331,7 +456,7 @@ class ProductDiscoveryEngine:
         for source in ['aliexpress', 'cj_dropshipping']:
             logger.info(f"   {source}: {self.sources_status.get(source, '[ERROR] Not loaded')}")
         logger.info("\n[SENTIMENT] SENTIMENT SOURCES (Social Validation):")
-        for source in ['x_twitter', 'reddit', 'amazon_reviews']:
+        for source in ['x_twitter', 'reddit', 'amazon_reviews', 'amazon_reviews_text', 'aliexpress_reviews', 'youtube']:
             logger.info(f"   {source}: {self.sources_status.get(source, '[ERROR] Not loaded')}")
         connected = sum(1 for s in self.sources_status.values() if '[SUCCESS]' in s)
         logger.info(f"\n[STATS] {connected}/{len(self.sources_status)} sources connected")
@@ -465,6 +590,16 @@ class ProductDiscoveryEngine:
             niche
         )
 
+        # Merge cached TikTok engagement (playCount, commentCount, etc.) onto
+        # discovered products so the scoring pass actually has TikTok data
+        # to read. Previously this data was fetched in Step 1 and dropped
+        # before the merge — sentiment/demand/trend TikTok branches were
+        # dead code in practice.
+        try:
+            self._merge_tiktok_engagement_into_products(all_products)
+        except Exception as exc:
+            logger.warning(f"   TikTok engagement merge failed (non-fatal): {exc}")
+
         logger.info(f"   -> {len(all_products)} unique products after cross-reference")
         logger.info(f"   ⏱️ Step 3 took {time.time() - step3_start:.2f}s")
 
@@ -565,6 +700,148 @@ class ProductDiscoveryEngine:
         # Filter and sort
         filtered = [p for p in scored_products if p.get('oi_score', 0) >= min_score]
         ranked = sorted(filtered, key=lambda x: x.get('oi_score', 0), reverse=True)
+
+        # =====================================================================
+        # STEP 5a: ALIEXPRESS REVIEW TEXT (Phase H)
+        # =====================================================================
+        # The AliExpress affiliate API gives us ``evaluate_rate`` (rolled-up
+        # buyer rating) but NO review text. To do real qualitative reads we
+        # need verbatim reviews. We pull them per-product via Apify, capped
+        # at the top 10 ranked products to keep costs at ~$9/mo. The reviews
+        # land on ``product.aliexpress_reviews`` as text the qualitative
+        # agent then reads in step 5b.
+        if self.aliexpress_reviews_available and ranked:
+            ae_review_start = time.time()
+            ae_top = [
+                p for p in ranked[:10]
+                if p.get("supplier_url") and "aliexpress" in (p.get("supplier_url") or "")
+            ]
+            logger.info(
+                f"\n[REVIEWS] STEP 5a: AliExpress review text for top "
+                f"{len(ae_top)} ranked products..."
+            )
+            if ae_top:
+                # Fan out per-product Apify calls in parallel; cap each at
+                # the same per-source timeout we use elsewhere.
+                review_tasks = [
+                    _with_timeout(
+                        self.aliexpress_reviews.fetch_reviews(
+                            product_url=p["supplier_url"],
+                            max_reviews=20,
+                        ),
+                        SENTIMENT_SOURCE_TIMEOUT,
+                    )
+                    for p in ae_top
+                ]
+                review_results = await asyncio.gather(*review_tasks, return_exceptions=True)
+                attached = 0
+                for product, result in zip(ae_top, review_results):
+                    if isinstance(result, (asyncio.TimeoutError, Exception)) or not result:
+                        product["aliexpress_reviews"] = None
+                        continue
+                    if not result.get("available"):
+                        product["aliexpress_reviews"] = None
+                        continue
+                    product["aliexpress_reviews"] = result
+                    attached += 1
+                logger.info(
+                    f"   ✓ AliExpress reviews: {attached}/{len(ae_top)} attached "
+                    f"(took {time.time() - ae_review_start:.2f}s)"
+                )
+
+        # =====================================================================
+        # STEP 5c: YOUTUBE REVIEW VIDEOS + VIEWER COMMENTS (Phase I)
+        # =====================================================================
+        # YouTube is where buyers go to watch a product BEFORE buying. Top
+        # comments are real reviewer feedback prose — perfect input for the
+        # qualitative agent. Free 10k quota/day; ~107 units per product, so
+        # cap at top 10 ranked products to stay safely under quota.
+        if self.youtube_reviews_available and ranked:
+            yt_start = time.time()
+            yt_top = ranked[:10]
+            logger.info(
+                f"\n[YOUTUBE] STEP 5c: YouTube review videos + comments for top "
+                f"{len(yt_top)} ranked products..."
+            )
+            yt_tasks = [
+                _with_timeout(
+                    self.youtube_reviews.get_product_reviews(
+                        product_name=p.get("title") or p.get("name") or "",
+                        max_videos=5,
+                        max_comments_per_video=5,
+                    ),
+                    SENTIMENT_SOURCE_TIMEOUT,
+                )
+                for p in yt_top
+            ]
+            yt_results = await asyncio.gather(*yt_tasks, return_exceptions=True)
+            yt_attached = 0
+            for product, result in zip(yt_top, yt_results):
+                if isinstance(result, (asyncio.TimeoutError, Exception)) or not result:
+                    product["youtube_evidence"] = None
+                    continue
+                if not result.get("available"):
+                    product["youtube_evidence"] = None
+                    continue
+                product["youtube_evidence"] = result
+                yt_attached += 1
+            logger.info(
+                f"   ✓ YouTube reviews: {yt_attached}/{len(yt_top)} attached "
+                f"(took {time.time() - yt_start:.2f}s)"
+            )
+
+        # Step 5d (Instagram) was removed per cost-cut decision — see init
+        # block comment above for context.
+
+        # Step 5e (Amazon review text) was moved to ON-DEMAND fetch per
+        # cost-cut decision. Discovery no longer fans out the Apify call to
+        # top-10 products; instead, ``ProductDiscovery.fetch_amazon_review_text``
+        # is called by a frontend route (or the qualitative-refresh action) when
+        # a user actually opens a product card. The fetch is cached by ASIN for
+        # 24h so repeated clicks don't re-bill. ~$5-15/mo at typical click
+        # volumes vs. $45-90/mo for the bulk-at-discovery path.
+
+        # =====================================================================
+        # STEP 5b: QUALITATIVE AI AGENT — actual "eyes" on social evidence
+        # =====================================================================
+        # Numeric composite says HOW STRONG the signal is. The agent says
+        # WHAT THE SIGNAL IS SAYING. Capped at the top 10 ranked products so
+        # we don't burn tokens on weak candidates the user wouldn't click on
+        # anyway. Strict provider routing: xAI Grok (live X integration)
+        # primary, Claude as fallback. See sentiment_qualitative.py.
+        if include_sentiment and ranked:
+            qual_start = time.time()
+            logger.info("\n[AGENT] STEP 5b: Qualitative AI read on top 10 ranked products...")
+
+            try:
+                from ospra_os.intelligence.sentiment_qualitative import assess_product
+            except ImportError as exc:
+                logger.warning(f"   qualitative agent unavailable: {exc}")
+                assess_product = None  # type: ignore[assignment]
+
+            if assess_product is not None:
+                top_for_agent = ranked[:10]
+                qual_tasks = [
+                    _with_timeout(assess_product(p), SENTIMENT_SOURCE_TIMEOUT)
+                    for p in top_for_agent
+                ]
+                qual_results = await asyncio.gather(*qual_tasks, return_exceptions=True)
+                merged = 0
+                for product, result in zip(top_for_agent, qual_results):
+                    if isinstance(result, (asyncio.TimeoutError, Exception)):
+                        # Don't crash discovery on agent failure; surface in logs only.
+                        logger.debug(
+                            "   qualitative agent failed for %s: %s",
+                            product.get('title', '?')[:30], result,
+                        )
+                        product['qualitative_assessment'] = None
+                        continue
+                    product['qualitative_assessment'] = result.to_dict()
+                    merged += 1
+                logger.info(
+                    f"   ✓ {merged}/{len(top_for_agent)} qualitative reads landed "
+                    f"(took {time.time() - qual_start:.2f}s)"
+                )
 
         # URL VALIDATION: drop products with no usable outbound source URL so
         # the frontend never receives an unclickable product card.
@@ -698,6 +975,22 @@ class ProductDiscoveryEngine:
             trend_tasks.append(self._fetch_amazon_trends(niche))
             trend_labels.append("amazon_bsr")
 
+        # Pinterest Trends task — wired here for the first time. The
+        # PinterestTrendsApify connector existed but only powered the
+        # opportunity_scorer; discovery never saw it. Pinterest is
+        # uniquely strong for visual/lifestyle niches (kitchen, beauty,
+        # home decor) and complements Google Trends for those categories.
+        if self.apify_available and getattr(self, "pinterest_scraper", None):
+            trend_tasks.append(self._fetch_pinterest_trends(niche))
+            trend_labels.append("pinterest_trends")
+
+        # TikTok Shop Partner API task — first-party data with real
+        # units_sold_7d. Most user shops won't have this OAuth-configured,
+        # so guarded behind ``self.tiktok_shop_connector``.
+        if getattr(self, "tiktok_shop_connector", None):
+            trend_tasks.append(self._fetch_tiktok_shop_trends(niche))
+            trend_labels.append("tiktok_shop")
+
         # Execute ALL trend queries in parallel (each capped at TREND_SOURCE_TIMEOUT)
         if trend_tasks:
             logger.info(
@@ -745,41 +1038,221 @@ class ProductDiscoveryEngine:
         return unique_keywords[:10]  # Top 10 trending keywords
 
     async def _fetch_google_trends(self, keyword: str, niche: str) -> dict:
-        """Fetch trending keywords from Google Trends (wrapper for parallel execution)."""
+        """
+        Fetch trending keywords from Google Trends.
+
+        Phase G: also stash ``related_queries`` on
+        ``self._google_trends_related`` so the qualitative agent can
+        consume them as context (NOT as sentiment input — Trends is
+        interest, not opinion).
+        """
         try:
             trend_data = await self.trend_analyzer._get_google_trends(keyword, niche)
             if trend_data.get('available'):
-                # Extract rising momentum keywords
                 momentum = trend_data.get('momentum', {})
                 rising_keywords = [kw for kw, score in momentum.items() if score > 10]
+
+                # Stash related queries keyed by lowercased base keyword
+                # so we can fuzzy-match per product later.
+                if not hasattr(self, "_google_trends_related") or self._google_trends_related is None:
+                    self._google_trends_related = {}
+                rqs = trend_data.get('related_queries') or {}
+                for kw, qs in rqs.items():
+                    if kw and qs:
+                        self._google_trends_related[kw.lower().strip()] = qs
+
                 return {
                     'keywords': rising_keywords,
                     'trend_direction': trend_data.get('trend_direction', 'STABLE'),
-                    'source': 'google_trends'
+                    'source': 'google_trends',
+                    'momentum': momentum,
+                    'related_queries': rqs,
                 }
         except Exception as e:
             logger.debug(f"Google Trends fetch failed for '{keyword}': {e}")
         return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'google_trends'}
 
     async def _fetch_tiktok_trends(self, niche: str, keyword: str) -> List[str]:
-        """Fetch viral product keywords from TikTok (wrapper for parallel execution)."""
+        """
+        Fetch viral product keywords from TikTok.
+
+        Bug fix: previously this method dropped every engagement field
+        (playCount, commentCount, etc.) before merging — the catalog called
+        this out as "fetched then dropped." Now we ALSO stash the engagement
+        data on ``self._tiktok_engagement_cache`` keyed by normalized
+        product name, so the scoring pass can fuzzy-match it back onto
+        discovered products. This is what unblocks TikTok in the demand,
+        trend, and (new) sentiment cascades.
+        """
         try:
             tiktok_products = await self.tiktok_scraper.discover_products(
                 niche=niche,
                 max_products=5,
-                keyword=keyword
+                keyword=keyword,
             )
             keywords = []
+            # Initialize cache lazily so we don't break instances that
+            # were constructed before this attribute existed.
+            if not hasattr(self, "_tiktok_engagement_cache") or self._tiktok_engagement_cache is None:
+                self._tiktok_engagement_cache = {}
+
             for p in tiktok_products:
-                name = p.get('name', '')
-                # Extract key product words
+                name = (p.get('name') or p.get('title') or '').strip()
+                if not name:
+                    continue
+
+                # Keyword extraction (existing behaviour)
                 words = [w for w in name.split() if len(w) > 3 and w.isalpha()]
                 if words:
                     keywords.append(' '.join(words[:3]))
+
+                # Stash engagement under a normalized key for fuzzy match.
+                norm = ' '.join(name.lower().split())
+                self._tiktok_engagement_cache[norm] = {
+                    'play_count': int(p.get('playCount') or p.get('play_count') or 0),
+                    'comment_count': int(p.get('commentCount') or p.get('comment_count') or 0),
+                    'share_count': int(p.get('shareCount') or p.get('share_count') or 0),
+                    'digg_count': int(p.get('diggCount') or p.get('digg_count') or 0),
+                    'video_url': p.get('webVideoUrl') or p.get('video_url'),
+                    'caption': p.get('text') or p.get('caption') or '',
+                    'source_keyword': keyword,
+                }
             return keywords
         except Exception as e:
             logger.debug(f"TikTok trends fetch failed: {e}")
         return []
+
+    def _merge_tiktok_engagement_into_products(self, products: List[Dict]) -> None:
+        """
+        Fuzzy-match cached TikTok engagement onto discovered products.
+
+        Called from the discovery flow AFTER suppliers and trends have been
+        fetched. For each product we look at the title and try to find a
+        TikTok cache entry whose normalized name shares ≥2 keyword tokens —
+        that's enough overlap to call it the same product without inviting
+        the cross-niche false positives we saw with the CJ matcher.
+        """
+        cache = getattr(self, "_tiktok_engagement_cache", None) or {}
+        if not cache:
+            return
+        for product in products:
+            title = (product.get('title') or '').lower()
+            if not title:
+                continue
+            title_tokens = {t for t in title.split() if len(t) > 3}
+            best_score = 0
+            best_data = None
+            for norm, engagement in cache.items():
+                tt_tokens = {t for t in norm.split() if len(t) > 3}
+                if not tt_tokens:
+                    continue
+                overlap = len(title_tokens & tt_tokens)
+                if overlap >= 2 and overlap > best_score:
+                    best_score = overlap
+                    best_data = engagement
+            if best_data:
+                # Land on the product object in the shape the scoring pass expects.
+                product.setdefault('data_sources', {})
+                product['data_sources']['tiktok'] = {
+                    'available': True,
+                    'views': best_data['play_count'],
+                    'comments': best_data['comment_count'],
+                    'shares': best_data['share_count'],
+                    'likes': best_data['digg_count'],
+                    'video_url': best_data['video_url'],
+                    'caption': best_data['caption'],
+                    'matched_via': 'fuzzy_title',
+                }
+                product['tiktok_views'] = best_data['play_count']
+                product['tiktok_comment_count'] = best_data['comment_count']
+                product['tiktok_engagement'] = (
+                    (best_data['digg_count'] + best_data['comment_count'])
+                    / best_data['play_count']
+                    if best_data['play_count'] > 0 else 0.0
+                )
+
+    async def _fetch_tiktok_shop_trends(self, niche: str) -> dict:
+        """
+        Fetch trending TikTok Shop products via the official Partner API.
+
+        Returns dict-shaped output (matching `_fetch_google_trends`) plus
+        stashes the raw `units_sold_7d` / `views_7d` per product on
+        ``self._tiktok_shop_cache`` so the scoring pass can fuzzy-merge it
+        onto discovered products as a real demand signal (first-party
+        purchase data, stronger than any social proxy we have).
+        """
+        try:
+            connector = self.tiktok_shop_connector
+            candidates = await connector.get_trending(category=None, limit=20)
+
+            if not hasattr(self, "_tiktok_shop_cache") or self._tiktok_shop_cache is None:
+                self._tiktok_shop_cache = {}
+
+            keywords = []
+            for c in candidates or []:
+                name = (c.name or "").strip()
+                if not name:
+                    continue
+                words = [w for w in name.split() if len(w) > 3 and w.isalpha()]
+                if words:
+                    keywords.append(" ".join(words[:3]))
+
+                norm = " ".join(name.lower().split())
+                self._tiktok_shop_cache[norm] = {
+                    'units_sold_7d': getattr(c, 'units_sold_7d', 0) or 0,
+                    'views_7d': getattr(c, 'views_7d', 0) or 0,
+                    'velocity_score': getattr(c, 'velocity_score', 0) or 0,
+                    'product_url': getattr(c, 'url', None),
+                }
+
+            return {
+                'keywords': keywords,
+                'trend_direction': 'RISING' if keywords else 'UNKNOWN',
+                'source': 'tiktok_shop',
+            }
+        except Exception as e:
+            logger.debug(f"TikTok Shop trends fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'tiktok_shop'}
+
+    async def _fetch_pinterest_trends(self, niche: str) -> dict:
+        """
+        Fetch Pinterest Trends keywords for the niche.
+
+        Pinterest is uniquely valuable for visual / lifestyle product
+        discovery (kitchen, beauty, home decor) — what's "rising on
+        Pinterest" usually surfaces 2-4 weeks before Google/TikTok pick
+        it up. Returns the same shape as ``_fetch_google_trends`` so the
+        merge loop can treat it identically.
+        """
+        try:
+            # Pinterest connectors expose either ``get_trending_pins`` or
+            # ``get_trending_keywords`` depending on the actor version.
+            # Try whichever is available; fall back to empty cleanly.
+            scraper = self.pinterest_scraper
+            if hasattr(scraper, "get_trending_keywords"):
+                trending = await scraper.get_trending_keywords(niche=niche, limit=10)
+            elif hasattr(scraper, "get_trending_pins"):
+                pins = await scraper.get_trending_pins(niche=niche, limit=10)
+                # Extract title tokens
+                trending = []
+                for pin in pins or []:
+                    title = (pin.get("title") or pin.get("description") or "").strip()
+                    if title:
+                        words = [w for w in title.split() if len(w) > 3 and w.isalpha()]
+                        if words:
+                            trending.append(" ".join(words[:3]))
+            else:
+                logger.debug("Pinterest scraper has no recognized trending method")
+                trending = []
+
+            return {
+                'keywords': trending or [],
+                'trend_direction': 'RISING' if trending else 'UNKNOWN',
+                'source': 'pinterest_trends',
+            }
+        except Exception as e:
+            logger.debug(f"Pinterest trends fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'pinterest_trends'}
 
     async def _fetch_amazon_trends(self, niche: str) -> List[str]:
         """Fetch bestseller keywords from Amazon (wrapper for parallel execution)."""
@@ -1081,9 +1554,13 @@ class ProductDiscoveryEngine:
                     best_cj_id = cj_product['product_id']
                     match_details.append(match_breakdown)
 
-            # Threshold: 0.40 = relaxed match (products often named differently)
-            # Previously 0.55 was too strict - AliExpress and CJ name products very differently
-            if best_match and best_score >= 0.40:
+            # Threshold: 0.55 = strict-enough to prevent false-positive merges.
+            # The previous 0.40 + the 0.3 keyword floor below let unrelated
+            # CJ items merge into AliExpress products purely on synonym overlap
+            # (wifi↔smart↔wireless), then the supplier-badges UI lit up
+            # ``CJ Dropshipping ✓`` on AliExpress-only products. Raised back to
+            # 0.55 in tandem with removing the floor — see ``_calculate_match_score``.
+            if best_match and best_score >= 0.55:
                 merged_product = self._merge_supplier_data(ali_product, best_match)
                 merged_product['match_confidence'] = round(best_score * 100, 1)
                 merged.append(merged_product)
@@ -1166,19 +1643,19 @@ class ProductDiscoveryEngine:
             expanded1 = self._expand_keywords(keywords1)
             expanded2 = self._expand_keywords(keywords2)
 
-            # Jaccard similarity on expanded sets
+            # Jaccard similarity on expanded sets — raw, no floor.
+            # The 0.3 minimum that used to live here ("at least 1 common
+            # keyword = 0.3") was the smoking gun behind the false-CJ-badge
+            # bug: synonym expansion turns ``wifi``/``smart``/``wireless``
+            # into the same cluster, so two unrelated smart-home products
+            # always shared at least one expanded keyword and the floor
+            # made every pair score ≥0.3 on this 40%-weight axis. Combined
+            # with the 0.40 acceptance threshold and a category bonus, that
+            # gave a free 0.22 toward acceptance regardless of similarity.
             intersection = expanded1 & expanded2
             union = expanded1 | expanded2
             if union:
-                # Base Jaccard score
-                jaccard = len(intersection) / len(union)
-
-                # Bonus for having ANY overlap (encourages matches)
-                if intersection:
-                    # At least 1 common keyword = 0.3 minimum
-                    breakdown['keyword_score'] = max(0.3, jaccard)
-                else:
-                    breakdown['keyword_score'] = jaccard
+                breakdown['keyword_score'] = len(intersection) / len(union)
 
         # 3. TITLE SIMILARITY (20% weight) - Character-level backup
         title1 = self._normalize_title(product1.get('title', ''))
@@ -1421,15 +1898,28 @@ class ProductDiscoveryEngine:
         # Start with AliExpress data (usually more complete)
         merged = ali_product.copy()
 
+        # ``available=True`` only when the CJ payload actually contains real
+        # CJ-side data. Belt-and-braces against the false-CJ-badge bug: even
+        # if the matcher mis-pairs an Ali product with an empty/sentinel CJ
+        # row, we won't tell the UI "CJ available" without proof.
+        cj_has_real_payload = bool(
+            cj_product.get('product_id')
+            or cj_product.get('cj_pid')
+            or cj_product.get('warehouse')
+            or cj_product.get('cj_url')
+        )
+
         # Mark as cross-referenced
-        merged['cross_referenced'] = True
-        merged['available_on'] = ['aliexpress', 'cj_dropshipping']
+        merged['cross_referenced'] = bool(cj_has_real_payload)
+        merged['available_on'] = (
+            ['aliexpress', 'cj_dropshipping'] if cj_has_real_payload else ['aliexpress']
+        )
 
         # Add CJ data to data_sources
         if 'data_sources' not in merged:
             merged['data_sources'] = {}
         merged['data_sources']['cj_dropshipping'] = cj_product.get('data_sources', {}).get('cj_dropshipping', {})
-        merged['data_sources']['cj_dropshipping']['available'] = True
+        merged['data_sources']['cj_dropshipping']['available'] = bool(cj_has_real_payload)
 
         # ================================================================
         # MERGE IMAGES FROM BOTH SUPPLIERS (More complete coverage)
@@ -1607,8 +2097,17 @@ class ProductDiscoveryEngine:
                 'recommendation': sentiment.get('recommendation'),
                 'note': sentiment.get('note'),
                 'fetched_at': _dt.utcnow().isoformat(),
-                # Transparency: these tweets are paraphrased by the model, not verbatim live posts
-                'source_type': 'grok_paraphrase',
+                # Phase F: real tweet URLs from xAI live search. These are
+                # verifiable links (UI can render as clickable). When present,
+                # source_type flips from "grok_paraphrase" to "grok_live_search".
+                # An empty citations list with sample_tweets present means we
+                # fell back to the older paraphrase-only path (xAI live search
+                # may have been disabled or returned no real posts).
+                'citations': sentiment.get('citations') or [],
+                'source_type': (
+                    'grok_live_search' if (sentiment.get('citations') or [])
+                    else 'grok_paraphrase'
+                ),
             }
 
             # Update data_sources with the full picture for scoring
@@ -2203,7 +2702,15 @@ class ProductDiscoveryEngine:
                 demand_score = min(95, 50 + 15 * math.log10(1 + rc))
                 has_demand_signal = True
 
-            product['demand_score'] = demand_score
+            # Bug fix (regression of #11/#12): never write the 50-baseline as
+            # if it were a real score. If we have no signal, the field is
+            # ``None`` so the UI can show "no data" instead of "score=50".
+            # The redistribution math at the end of this function still uses
+            # ``has_demand_signal`` to decide whether to count this in the
+            # OI total, so making the field nullable here doesn't break the
+            # composite score — it only stops two unrelated products from
+            # showing identical 50/55 numbers.
+            product['demand_score'] = demand_score if has_demand_signal else None
             product['has_demand_signal'] = has_demand_signal
 
             # ================================================================
@@ -2271,7 +2778,10 @@ class ProductDiscoveryEngine:
                 trend_score = min(100, trend_score + 8)
                 has_trend_signal = True
 
-            product['trend_score'] = trend_score
+            # Same fix as demand: don't pretend the 55-baseline is a real
+            # score when no Google Trends / direction / viral / TikTok /
+            # Twitter signal contributed.
+            product['trend_score'] = trend_score if has_trend_signal else None
             product['trend_direction'] = trend_direction
             product['has_trend_signal'] = has_trend_signal
 
@@ -2350,98 +2860,119 @@ class ProductDiscoveryEngine:
             # are all absent — it's weaker evidence (no real buyer voice) so
             # it caps sentiment score at 70.
             # ================================================================
+            # ================================================================
+            # SENTIMENT — COMPOSITE (diversity × volume) — 2026-04-25 rewrite
+            # ================================================================
+            # The previous cascade was "first source wins, take max with a
+            # tier-floor." Two failure modes:
+            #
+            #   1. A SINGLE Reddit post got the same baseline floor (58) as
+            #      50 posts. Volume was ignored past tier boundaries.
+            #   2. A product with only Amazon scored as if Amazon was a
+            #      complete view. Diversity wasn't reflected.
+            #
+            # New model (see ``ospra_os/intelligence/sentiment_composite.py``):
+            # each source contributes a polarity score AND a confidence
+            # weight (log-saturated by evidence volume). The final sentiment
+            # is a weight-weighted average across present sources, plus a
+            # ``sentiment_confidence`` that blends per-source weight and
+            # source-count diversity. Confidence flows into ``data_confidence``
+            # so single-source weakness can drive the product into the
+            # INSUFFICIENT_DATA tier even when polarity is high.
+            # ================================================================
+            from ospra_os.intelligence.sentiment_composite import (
+                compose as _compose_sentiment,
+                SentimentInput,
+                amazon_weight as _amazon_w,
+                twitter_weight as _twitter_w,
+                reddit_weight as _reddit_w,
+                tiktok_weight as _tiktok_w,
+                score_from_amazon_buzz as _amazon_s,
+                score_from_twitter_polarity as _twitter_s,
+                score_from_reddit_mentions as _reddit_s,
+                score_from_tiktok_engagement as _tiktok_s,
+            )
+            # AE review-text helpers exist (aliexpress_review_weight,
+            # score_from_aliexpress_reviews) but aren't called from the
+            # composite cascade — that runs for ALL products inside
+            # _calculate_scores, while AE reviews are only fetched for
+            # the top 10 (cost cap). Mixing them in the composite would
+            # create a discontinuity where ranks 1-10 have 4-source
+            # sentiment and ranks 11+ have 3-source. Instead, AE reviews
+            # are passed to the qualitative agent only — same products,
+            # same cap, where verbatim text matters most.
+
+            sentiment_inputs = []
+
+            # Amazon — rating-driven polarity, weighted by review count.
+            if amazon_found_real and amazon_buzz_raw > 0 and amazon_review_count_raw > 0:
+                sentiment_inputs.append(SentimentInput(
+                    name='amazon_reviews',
+                    score=_amazon_s(amazon_buzz_raw),
+                    weight=_amazon_w(int(amazon_review_count_raw)),
+                ))
+
+            # Twitter — Grok polarity, weighted by tweet count.
+            twitter_tweet_count = (
+                (data_sources.get('x_twitter') or {}).get('tweet_count', 0) or 0
+            )
+            if twitter_found_real and twitter_sentiment_raw is not None:
+                sentiment_inputs.append(SentimentInput(
+                    name='twitter',
+                    score=_twitter_s(twitter_sentiment_raw),
+                    weight=_twitter_w(int(twitter_tweet_count)),
+                ))
+
+            # Reddit — mention count drives both score and weight.
+            if reddit_mentions > 0:
+                sentiment_inputs.append(SentimentInput(
+                    name='reddit',
+                    score=_reddit_s(int(reddit_mentions)),
+                    weight=_reddit_w(int(reddit_mentions)),
+                ))
+
+            # TikTok — comment count drives score and weight.
+            tiktok_comment_count = (
+                tiktok_data.get('comment_count', 0)
+                or tiktok_data.get('total_comments', 0)
+                or 0
+            )
+            tiktok_view_count = tiktok_views or 0
+            if tiktok_comment_count > 0 or tiktok_view_count > 1000:
+                sentiment_inputs.append(SentimentInput(
+                    name='tiktok',
+                    score=_tiktok_s(int(tiktok_comment_count), int(tiktok_view_count)),
+                    weight=_tiktok_w(int(tiktok_comment_count), int(tiktok_view_count)),
+                ))
+
+            sentiment_result = _compose_sentiment(sentiment_inputs)
+
+            # Persist on the product. ``sentiment_score`` is None whenever
+            # no source had data — the OI composite treats None as zero
+            # (no redistribution) so single-source / low-volume products
+            # land in INSUFFICIENT_DATA appropriately.
+            product['sentiment_score'] = sentiment_result.sentiment_score
+            product['sentiment_confidence'] = sentiment_result.sentiment_confidence
+            product['sentiment_diversity'] = sentiment_result.diversity
+            product['sentiment_n_sources'] = sentiment_result.n_sources
+            product['sentiment_source'] = sentiment_result.primary_source
+            product['sentiment_sources'] = sentiment_result.sources  # [(name, score, weight), ...]
+            product['sentiment_available'] = sentiment_result.sentiment_score is not None
+
+            # Local boolean used by the report block below (preserved for
+            # backward compat with code that checked ``has_*_signal``).
             has_twitter_signal = twitter_found_real and twitter_sentiment_raw is not None
             has_reddit_signal = reddit_mentions > 0
             has_amazon_signal = amazon_found_real and amazon_buzz_raw > 0
-            has_cj_proxy_signal = cj_proxy_score is not None
-            # Task #19: AE buyer-rating signal. Weaker than Amazon (no review
-            # text, no cohort) but stronger than CJ proxy (real buyer voice,
-            # not just supplier structural quality). Free — comes from the
-            # affiliate response we already paid for to discover the product.
-            has_aliexpress_signal = aliexpress_found_real and aliexpress_buzz_raw > 0
+            sentiment_score = sentiment_result.sentiment_score
 
-            if (
-                not has_twitter_signal
-                and not has_reddit_signal
-                and not has_amazon_signal
-                and not has_cj_proxy_signal
-                and not has_aliexpress_signal
-            ):
-                # No real social data at all. Set to None so the OI formula
-                # knows to redistribute sentiment's weight to other components.
-                sentiment_score = None
-                product['sentiment_score'] = None
-                product['sentiment_available'] = False
-                product['sentiment_source'] = None
-            else:
-                # Start from a neutral baseline only when we HAVE data.
-                sentiment_score = 55
-                sentiment_source_tag = None
-
-                # Amazon buzz is the PRIMARY signal when available
-                # buzz_score is already 0-100, so use it directly as the floor
-                if has_amazon_signal:
-                    sentiment_score = max(sentiment_score, int(amazon_buzz_raw))
-                    sentiment_source_tag = 'amazon_reviews'
-
-                # Twitter sentiment (-1 to 1 scale -> 0 to 100)
-                if has_twitter_signal:
-                    # Convert -1 to +1 scale to 0-100, but more generous
-                    # -1 = 20, 0 = 55, +1 = 90 (not 0/50/100)
-                    twitter_sentiment_score = int(55 + twitter_sentiment_raw * 35)
-                    # Take the max so Twitter can raise but not lower Amazon's floor
-                    if twitter_sentiment_score > sentiment_score:
-                        sentiment_score = twitter_sentiment_score
-                        sentiment_source_tag = sentiment_source_tag or 'twitter'
-
-                # Reddit mentions boost (LOWERED thresholds)
-                reddit_floor = 0
-                if reddit_mentions > 50:
-                    reddit_floor = 92
-                elif reddit_mentions > 20:
-                    reddit_floor = 82
-                elif reddit_mentions > 10:
-                    reddit_floor = 72
-                elif reddit_mentions > 5:
-                    reddit_floor = 65
-                elif reddit_mentions > 0:
-                    reddit_floor = 58
-                if reddit_floor > sentiment_score:
-                    sentiment_score = reddit_floor
-                    sentiment_source_tag = sentiment_source_tag or 'reddit'
-
-                # Task #19: AliExpress buyer-rating tier. Slots between
-                # Amazon (primary) and CJ proxy (tertiary):
-                #   - contributes only when Amazon is absent (Amazon
-                #     dominates because it has verbatim reviews)
-                #   - can lift above Twitter/Reddit scores (real buyer
-                #     rating > conversation volume)
-                #   - capped at 78 (< Amazon ceiling, > CJ proxy cap of 70)
-                if has_aliexpress_signal and not has_amazon_signal:
-                    capped_ae = min(78, int(aliexpress_buzz_raw))
-                    if capped_ae > sentiment_score:
-                        sentiment_score = capped_ae
-                        sentiment_source_tag = sentiment_source_tag or 'aliexpress_api'
-
-                # Task #22: CJ proxy is the TERTIARY signal. Only contributes
-                # when no stronger (Amazon/AE/Twitter/Reddit) signal has
-                # lifted the score above the baseline. Capped at 70 because
-                # it's structural quality, not real buyer voice.
-                if (
-                    has_cj_proxy_signal
-                    and not has_amazon_signal
-                    and not has_aliexpress_signal
-                    and not has_twitter_signal
-                    and not has_reddit_signal
-                ):
-                    capped_cj = min(70, cj_proxy_score)
-                    if capped_cj > sentiment_score:
-                        sentiment_score = capped_cj
-                        sentiment_source_tag = 'cj_supplier_proxy'
-
-                product['sentiment_score'] = sentiment_score
-                product['sentiment_available'] = True
-                product['sentiment_source'] = sentiment_source_tag
+            # AliExpress buyer-rating and CJ structural metadata are tracked
+            # on the product so the sourcing-score block below can use them.
+            # They are NO LONGER sentiment inputs.
+            product['aliexpress_buyer_rating'] = (
+                int(aliexpress_buzz_raw) if (aliexpress_found_real and aliexpress_buzz_raw > 0) else None
+            )
+            product['cj_supplier_quality'] = cj_proxy_score
 
             # ================================================================
             # PROFIT SCORE (15%) - Margin analysis
@@ -2537,10 +3068,22 @@ class ProductDiscoveryEngine:
                 'supplier_rating': min(100, int(supplier_rating * 20)) if supplier_rating > 0 else 50,
                 # Task #22: CJ supplier-quality proxy (fallback for CJ-only products)
                 'cj_supplier_proxy': cj_proxy_score,
-                # Task #19: AE buyer-rating signal (evaluate_rate-backed)
-                'aliexpress_buzz': int(aliexpress_buzz_raw) if has_aliexpress_signal else None,
-                'aliexpress_rating': aliexpress_rating_raw if has_aliexpress_signal else None,
+                # AE buyer-rating now exposed as a sourcing signal (not sentiment).
+                # The architectural rewrite removed ``has_aliexpress_signal`` from
+                # the sentiment cascade — re-derive locally here so this report
+                # block doesn't NameError.
+                'aliexpress_buzz': (
+                    int(aliexpress_buzz_raw) if (aliexpress_found_real and aliexpress_buzz_raw > 0) else None
+                ),
+                'aliexpress_rating': (
+                    aliexpress_rating_raw if (aliexpress_found_real and aliexpress_buzz_raw > 0) else None
+                ),
             }
+            # Local derivations used by the validated-sources + coverage blocks
+            # below. Same predicates as in the report dict above; kept as
+            # explicit names so the readers stay readable.
+            _ae_signal_present = bool(aliexpress_found_real and aliexpress_buzz_raw > 0)
+            _cj_signal_present = cj_proxy_score is not None
 
             # Track which sources provided real data
             sources_validated = []
@@ -2558,13 +3101,13 @@ class ProductDiscoveryEngine:
             # Task #18: Amazon counts as validated only when fuzzy-match found listings
             if amazon_found_real and amazon_review_count_raw > 0:
                 sources_validated.append('amazon_reviews')
-            # Task #19: AE buyer-rating counts as validated when we actually
-            # got a non-empty evaluate_rate from the affiliate response.
-            if has_aliexpress_signal:
+            # AE buyer-rating: now feeds sourcing, not sentiment. Still
+            # counted as a validated DATA source so coverage reports it.
+            if _ae_signal_present:
                 sources_validated.append('aliexpress_ratings')
-            # Task #22: CJ supplier-quality proxy — counts as a (weaker) validated
-            # source only when it's actually acting as the sentiment driver.
-            if has_cj_proxy_signal and product.get('sentiment_source') == 'cj_supplier_proxy':
+            # CJ supplier-quality proxy — coverage signal only when CJ is
+            # the product's source (otherwise it doesn't apply).
+            if _cj_signal_present and is_cj_product:
                 sources_validated.append('cj_supplier_proxy')
             if google_trend_score > 0 or google_data.get('available'):
                 sources_validated.append('google_trends')
@@ -2639,7 +3182,7 @@ class ProductDiscoveryEngine:
             # entry for products that came from CJ (not applicable for
             # AliExpress-only products).
             if is_cj_product:
-                coverage['cj_supplier_proxy'] = 'real' if has_cj_proxy_signal else 'empty'
+                coverage['cj_supplier_proxy'] = 'real' if _cj_signal_present else 'empty'
             else:
                 coverage['cj_supplier_proxy'] = 'n/a'
 
@@ -2672,86 +3215,215 @@ class ProductDiscoveryEngine:
 
             # ================================================================
             # FINAL OI SCORE CALCULATION (with relevance adjustment)
-            # Task #12 + POST-FIX #15: When a component has no real signal,
-            # redistribute its weight across components that DO have real
-            # data. Previously only sentiment-null was redistributed, so
-            # demand=50 and trend=55 baselines flattened products in niches
-            # where AliExpress orders and Google Trends were missing.
-            #
-            # Profit is always computed (at minimum from a neutral baseline
-            # but it uses actual price data when present), and sourcing
-            # always varies by intrinsic product attributes, so those two
-            # components carry weight unconditionally.
             # ================================================================
-            base_weights = {
-                'demand':    (0.25, demand_score if has_demand_signal else None),
-                'trend':     (0.25, trend_score if has_trend_signal else None),
-                'sentiment': (0.15, sentiment_score),  # already None when absent
+            # OI COMPOSITE — HONEST SCORING (rewritten 2026-04-25)
+            # ================================================================
+            # Previous behaviour: missing components had their weight
+            # redistributed to whichever components had data, so a product
+            # with only profit (15%) + sourcing (20%) data would be scored
+            # as if those two represented 100% of the analysis. That
+            # inflated weak products into the EXCELLENT tier just because
+            # they had a US warehouse and decent margin.
+            #
+            # New behaviour: missing components are treated as ZERO. The
+            # composite naturally compresses when signals are missing.
+            # A product with only profit + sourcing tops out at:
+            #   0.15 * 100 + 0.20 * 100 = 35
+            # — which is correctly in the AVOID/INSUFFICIENT-DATA band.
+            #
+            # ``data_confidence`` records what fraction of the design
+            # weight came from real signals. The tier ladder below
+            # requires BOTH a high score AND high confidence to label a
+            # product GOLDEN/EXCELLENT — you can't be "Strong buy" on 40%
+            # of the data.
+            # ================================================================
+            component_values = {
+                'demand':    (0.25, demand_score    if has_demand_signal              else None),
+                'trend':     (0.25, trend_score     if has_trend_signal               else None),
+                'sentiment': (0.15, sentiment_score if sentiment_score is not None    else None),
                 'profit':    (0.15, profit_score),
                 'sourcing':  (0.20, product['sourcing_score']),
             }
-            active = {k: (w, v) for k, (w, v) in base_weights.items() if v is not None}
-            total_active_weight = sum(w for w, _ in active.values())
-            if total_active_weight <= 0:
-                # Extreme edge case: nothing scorable. Fall back to neutral.
-                base_score = 50.0
-            else:
-                base_score = sum((w / total_active_weight) * v for w, v in active.values())
 
-            redistributed = [k for k in base_weights if k not in active]
-            product['sentiment_weight_redistributed'] = 'sentiment' in redistributed
-            product['weights_redistributed'] = redistributed
-            product['active_components'] = list(active.keys())
+            # Treat-missing-as-zero: missing components contribute 0 to the
+            # weighted sum, NOT redistributed.
+            base_score = sum(
+                w * (v if v is not None else 0)
+                for w, v in component_values.values()
+            )
+
+            # ``data_confidence`` = fraction of design weight backed by real
+            # signal. Profit (15%) and sourcing (20%) always count because
+            # we always know cost/price and supplier metadata. The other
+            # three only count when their respective signal flags are True.
+            data_confidence = sum(
+                w for w, v in component_values.values() if v is not None
+            )  # 0.0–1.0
+            present_components = [k for k, (_, v) in component_values.items() if v is not None]
+            missing_components = [k for k, (_, v) in component_values.items() if v is None]
+
+            product['active_components'] = present_components
+            product['missing_components'] = missing_components
+            product['data_confidence'] = round(data_confidence, 2)
+            product['data_confidence_pct'] = int(round(data_confidence * 100))
 
             # Apply relevance multiplier (IMPROVED - less harsh)
             # Relevance 100 = 1.0x (no change)
             # Relevance 70 = 0.95x (5% penalty)
             # Relevance 50 = 0.90x (10% penalty)
             # Relevance 30 = 0.80x (20% penalty)
-            # Relevance 0 = 0.70x (30% penalty, down from 50%)
-            relevance = product.get('relevance_score', 70)  # Default to 70 (assume relevant)
-            relevance_multiplier = 0.70 + (relevance / 100) * 0.30  # Range: 0.70 to 1.0
+            # Relevance 0 = 0.70x (30% penalty)
+            relevance = product.get('relevance_score', 70)
+            relevance_multiplier = 0.70 + (relevance / 100) * 0.30
 
             oi_score = base_score * relevance_multiplier
 
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:
                 oi_score = min(oi_score, 45)
-                product['relevance_note'] = f'⚠️ Off-topic: Low relevance ({relevance}%) to niche'
+                product['relevance_note'] = f'Off-topic: Low relevance ({relevance}%) to niche'
 
-            product['oi_score'] = round(oi_score, 1)  # Keep 1 decimal for differentiation
+            product['oi_score'] = round(oi_score, 1)
             product['final_score'] = product['oi_score']
-            product['base_score'] = round(base_score, 1)  # Store pre-relevance score for debugging
+            product['base_score'] = round(base_score, 1)
 
-            # Calculate confidence based on data availability
+            # Discovery-stage confidence (kept for backward-compat; counts
+            # number of validated source connectors that ran).
             max_sources = 6  # aliexpress, cj, twitter, reddit, google_trends, tiktok
             product['confidence'] = round((len(sources_validated) / max_sources) * 100, 0)
 
             # ================================================================
-            # TIER CLASSIFICATION (with more granular thresholds)
+            # TIER CLASSIFICATION — gated on BOTH score and data confidence
             # ================================================================
-            if oi_score >= 85:
+            # If we don't have enough data to grade with confidence, we
+            # don't pretend to grade. Below 50% data coverage the product
+            # is INSUFFICIENT_DATA regardless of whether profit + sourcing
+            # add up to a high number — those two alone don't justify a
+            # buy recommendation.
+            if data_confidence < 0.50:
+                product['tier'] = 'INSUFFICIENT_DATA'
+                product['recommendation'] = (
+                    f'Not enough validated signal to grade '
+                    f'({product["data_confidence_pct"]}% data coverage — '
+                    f'missing: {", ".join(missing_components) or "none"})'
+                )
+            elif oi_score >= 85 and data_confidence >= 0.85:
                 product['tier'] = 'GOLDEN'
-                product['recommendation'] = '🔥 RARE GEM - Deploy immediately, high demand + low competition window'
-            elif oi_score >= 75:
+                product['recommendation'] = 'RARE GEM - Deploy immediately; strong signals across the board.'
+            elif oi_score >= 75 and data_confidence >= 0.70:
                 product['tier'] = 'EXCELLENT'
-                product['recommendation'] = '✅ Strong buy - trending with great sourcing options'
-            elif oi_score >= 65:
+                product['recommendation'] = 'Strong buy - validated demand, trend, and sourcing.'
+            elif oi_score >= 65 and data_confidence >= 0.60:
                 product['tier'] = 'GOOD'
-                product['recommendation'] = '👍 Worth testing - solid opportunity with good margins'
+                product['recommendation'] = 'Worth testing - solid opportunity, monitor weak signals.'
             elif oi_score >= 55:
                 product['tier'] = 'FAIR'
-                product['recommendation'] = '⚠️ Proceed with caution - monitor trends before committing'
+                product['recommendation'] = 'Proceed with caution - mixed signals.'
             elif oi_score >= 45:
                 product['tier'] = 'POOR'
-                product['recommendation'] = '❌ Skip - weak signals or high competition'
+                product['recommendation'] = 'Skip - weak signals or insufficient validation.'
             else:
                 product['tier'] = 'AVOID'
-                product['recommendation'] = '🚫 Avoid - insufficient data or poor opportunity'
+                product['recommendation'] = 'Avoid - insufficient data or poor opportunity.'
 
             logger.debug(f"   Scored: {product.get('title', '')[:30]}... -> {oi_score} ({product['tier']})")
 
         return products
+
+    # =========================================================================
+    # ON-DEMAND ENRICHMENT (Phase K — lazy fetch, cost-controlled)
+    # =========================================================================
+
+    # Class-level ASIN cache for on-demand Amazon review-text fetches.
+    # Keyed by ASIN -> (timestamp, result). 24h TTL chosen because review
+    # text doesn't shift meaningfully day-to-day, and repeated clicks on
+    # the same product within a day shouldn't re-bill the actor.
+    _amazon_review_text_cache: Dict[str, Tuple[float, Dict]] = {}
+    _AMAZON_REVIEW_TEXT_TTL_SECONDS: int = 86400  # 24h
+
+    async def fetch_amazon_review_text(
+        self,
+        product: Dict,
+        *,
+        max_reviews: int = 15,
+        timeout_secs: float = 30.0,
+    ) -> Optional[Dict]:
+        """
+        On-demand: pull verbatim Amazon review text for ONE product.
+
+        Intended to be called by a frontend product-detail route or by a
+        "refresh AI analysis" action — NOT during bulk discovery. This
+        keeps Apify spend at ~$5-15/mo (only products users actually
+        click) instead of ~$45-90/mo (top-10 every discovery).
+
+        Caches by ASIN for 24h, so repeated clicks on the same listing
+        within a day reuse the same fetched payload.
+
+        Args:
+          product: a discovery product dict. Must have either
+            ``amazon_evidence.top_matches[0].asin`` or ``...url`` set
+            for there to be anything to fetch.
+          max_reviews: per-product cap (default 15).
+          timeout_secs: hard cap on the actor wait.
+
+        Returns:
+          The same shape that ``AmazonReviewsTextApify.fetch_reviews``
+          returns, plus a ``"cached"`` boolean. Returns ``None`` if no
+          ASIN/URL was present, the connector isn't available, or the
+          actor errored. Also writes the result to
+          ``product["amazon_review_text"]`` so the qualitative agent
+          picks it up on the next ``assess_product`` call.
+        """
+        if not self.amazon_reviews_text_available or not self.amazon_reviews_text:
+            return None
+
+        evidence = product.get("amazon_evidence") or {}
+        top_matches = evidence.get("top_matches") or []
+        if not top_matches:
+            return None
+        first = top_matches[0]
+        asin = (first.get("asin") or "").strip().upper() or None
+        url = first.get("url") or None
+        if not asin and not url:
+            return None
+
+        # Cache lookup keyed by ASIN (URL can also yield an ASIN inside
+        # the connector — we use ASIN once we have it).
+        cache_key = asin or url
+        cached = type(self)._amazon_review_text_cache.get(cache_key)
+        if cached:
+            cached_at, cached_result = cached
+            if time.time() - cached_at < type(self)._AMAZON_REVIEW_TEXT_TTL_SECONDS:
+                # Return a shallow copy with the ``cached`` flag set.
+                out = dict(cached_result)
+                out["cached"] = True
+                product["amazon_review_text"] = out
+                return out
+            # Stale — fall through and re-fetch.
+
+        try:
+            result = await _with_timeout(
+                self.amazon_reviews_text.fetch_reviews(
+                    asin=asin, product_url=url, max_reviews=max_reviews,
+                ),
+                timeout_secs,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.debug(
+                "fetch_amazon_review_text: actor failed for %s: %s",
+                asin or url, exc,
+            )
+            return None
+
+        if not result or not result.get("available"):
+            return None
+
+        # Populate cache + product, mark as fresh.
+        type(self)._amazon_review_text_cache[cache_key] = (time.time(), dict(result))
+        result_with_flag = dict(result)
+        result_with_flag["cached"] = False
+        product["amazon_review_text"] = result_with_flag
+        return result_with_flag
 
     def _calculate_relevance(self, title: str, niche: str) -> float:
         """
