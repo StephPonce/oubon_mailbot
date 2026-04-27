@@ -73,11 +73,17 @@ _start_backend() {
     return 1
   fi
   echo "[BACKEND] Starting OspraOS on port $BACKEND_PORT..."
-  # Load .env (but not DATABASE_URL — let the app decide local vs. prod)
-  set -a
-  # shellcheck disable=SC1091
-  source "$PROJECT_ROOT/.env"
-  set +a
+  # NOTE: We deliberately do NOT `source .env` here.
+  # ospra_os/main.py:18 calls python-dotenv's load_dotenv() at module
+  # import time, BEFORE any module reads os.getenv(). Sourcing .env in
+  # bash on top of that was redundant and exposed a bug class:
+  #   .env uses dotenv format (forgiving about unquoted spaces) but
+  #   `source .env` is strict bash, which choked on values like
+  #   BRAND_NAME=Ospra OS, breaking startup with "OS: command not found"
+  #   at the line of any unquoted multi-word value.
+  # Removing the source eliminates the entire failure mode. The Python
+  # process inherits an empty/clean env from this shell; dotenv populates
+  # everything it needs at import time. Verified main.py loads at line 18.
   nohup uv run uvicorn ospra_os.main:app \
     --host 0.0.0.0 --port "$BACKEND_PORT" --reload \
     > "$LOGS_DIR/backend.log" 2>&1 &
