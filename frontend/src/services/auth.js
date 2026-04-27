@@ -25,7 +25,10 @@
 // CONFIGURATION
 // =============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Default backend is :8001 (matches scripts/run.sh and frontend/.env.example).
+// :8000 was an outdated fallback that caused the LoginForm to enter the
+// "Server waking up" loop locally, because nothing listens on 8000.
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'ospra_access_token';

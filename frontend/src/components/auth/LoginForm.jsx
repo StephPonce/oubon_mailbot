@@ -30,36 +30,66 @@ export function LoginForm() {
   // Get redirect destination from state
   const from = location.state?.from || '/dashboard';
 
-  // Wake up the server when page loads (helps with Render cold starts)
+  // Wake up the server when page loads (helps with Render cold starts).
+  //
+  // Bug fixes (Apr 2026):
+  //   1. The previous version returned the cleanup `() => clearInterval`
+  //      from an INNER async function — it never reached the React
+  //      effect's cleanup slot, so the interval ran forever even after
+  //      navigating away.
+  //   2. Local dev hits localhost; if the first health check failed for
+  //      any reason (port mismatch, fetch error, slow response > 10s),
+  //      the user got stuck on "Server waking up..." with the login
+  //      button disabled, unable to recover.
+  //   3. Skip the cold-start UI entirely on localhost. Cold starts are a
+  //      Render production concern; locally the backend either responds
+  //      or it doesn't, and the actual login attempt will surface any
+  //      real error.
   useEffect(() => {
+    const isLocalhost =
+      typeof window !== 'undefined' &&
+      /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(window.location.hostname);
+
+    // On localhost: skip the wake-up dance and let the user log in.
+    if (isLocalhost) {
+      setServerStatus('ready');
+      return;
+    }
+
     let mounted = true;
+    let interval = null;
 
     const checkServer = async () => {
       setServerStatus('checking');
       const isHealthy = await authService.checkServerHealth();
-
       if (!mounted) return;
 
       if (isHealthy) {
         setServerStatus('ready');
-      } else {
-        setServerStatus('waking');
-        // Keep checking until server responds
-        const interval = setInterval(async () => {
-          const healthy = await authService.checkServerHealth();
-          if (healthy && mounted) {
-            setServerStatus('ready');
-            clearInterval(interval);
-          }
-        }, 3000);
-
-        // Cleanup interval on unmount
-        return () => clearInterval(interval);
+        return;
       }
+
+      // Production cold-start: poll every 3s until the server responds,
+      // but don't block the user — they can still attempt login (the
+      // login fetch itself has its own retry).
+      setServerStatus('waking');
+      interval = setInterval(async () => {
+        const healthy = await authService.checkServerHealth();
+        if (healthy && mounted) {
+          setServerStatus('ready');
+          if (interval) {
+            clearInterval(interval);
+            interval = null;
+          }
+        }
+      }, 3000);
     };
 
     checkServer();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   const handleSubmit = async (e) => {
@@ -176,10 +206,13 @@ export function LoginForm() {
               </Link>
             </div>
 
-            {/* Submit button */}
+            {/* Submit button — only disabled while an actual login is in
+                flight. The "waking" state used to block this button, but
+                that meant a single failed health check left the user
+                unable to log in at all (see useEffect comment above). */}
             <button
               type="submit"
-              disabled={loading || serverStatus === 'waking'}
+              disabled={loading}
               className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-semibold hover:from-purple-500 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98]"
             >
               {loading ? (
@@ -190,8 +223,6 @@ export function LoginForm() {
                   </svg>
                   Signing in...
                 </span>
-              ) : serverStatus === 'waking' ? (
-                'Server waking up...'
               ) : (
                 'Sign In'
               )}
