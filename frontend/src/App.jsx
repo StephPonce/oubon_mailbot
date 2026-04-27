@@ -20,6 +20,7 @@ import ProductDiscovery from './components/ProductDiscovery';
 import AutopilotControl from './components/AutopilotControl';
 import ActionQueue from './components/ActionQueue';
 import Settings from './components/Settings';
+import Stores from './components/Stores';
 
 /**
  * AppRoutes - Wrapped in DashboardProvider for Oi context
@@ -96,13 +97,21 @@ function AppRoutes() {
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/settings" 
+        <Route
+          path="/settings"
           element={
             <ProtectedRoute>
               <Settings />
             </ProtectedRoute>
-          } 
+          }
+        />
+        <Route
+          path="/settings/stores"
+          element={
+            <ProtectedRoute>
+              <Stores />
+            </ProtectedRoute>
+          }
         />
         
         {/* Premium routes (require higher tier) */}

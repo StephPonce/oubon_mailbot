@@ -878,6 +878,47 @@ class OspraAPI {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Shopify OAuth (store connection)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Kick off Shopify OAuth for a shop domain. Returns
+   * { authorization_url, shop_domain, state }. Caller should redirect
+   * `window.location` to the authorization_url.
+   *
+   * Pass either `mystore` or `mystore.myshopify.com` — backend normalizes.
+   */
+  async initiateShopifyOAuth(shopDomain) {
+    return await authService.post('/api/shopify/oauth/initiate', {
+      shop_domain: shopDomain,
+    });
+  }
+
+  /**
+   * List connected Shopify stores for the current user. Returns
+   * { connected: bool, stores: [...] }.
+   */
+  async getShopifyStores() {
+    try {
+      const data = await authService.get('/api/shopify/oauth/status');
+      return data;
+    } catch (err) {
+      console.error('[API] getShopifyStores error:', err);
+      return { connected: false, stores: [], error: err.message };
+    }
+  }
+
+  /**
+   * Disconnect a Shopify store (revokes our access token, marks the
+   * store inactive locally, queues a webhook unsubscribe).
+   */
+  async disconnectShopifyStore(storeId) {
+    return await authService.post('/api/shopify/oauth/disconnect', {
+      store_id: storeId,
+    });
+  }
+
   /**
    * Generate SEO-optimized product caption.
    * Calls POST /api/oi/generate-caption (requires auth).
