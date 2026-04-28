@@ -104,20 +104,23 @@ _OAUTH_PROVIDER = "shopify_partner"
 
 def get_shopify_credentials():
     """Get Shopify Partner app credentials."""
-    api_key = os.getenv("SHOPIFY_API_KEY")
-    api_secret = os.getenv("SHOPIFY_API_SECRET")
-    
+    api_key = os.getenv("SHOPIFY_PARTNER_CLIENT_ID")
+    api_secret = os.getenv("SHOPIFY_PARTNER_CLIENT_SECRET")
+
     if not api_key or not api_secret:
         raise ValueError(
-            "SHOPIFY_API_KEY and SHOPIFY_API_SECRET must be set. "
+            "SHOPIFY_PARTNER_CLIENT_ID and SHOPIFY_PARTNER_CLIENT_SECRET must be set. "
             "Get these from your Shopify Partner Dashboard."
         )
-    
+
     return api_key, api_secret
 
 
 def get_oauth_redirect_uri():
     """Get the OAuth callback URL."""
+    explicit = os.getenv("SHOPIFY_REDIRECT_URI")
+    if explicit:
+        return explicit
     base_url = os.getenv(
         "OAUTH_BASE_URL",
         os.getenv("RENDER_EXTERNAL_URL", "https://ospra-intelligence-api.onrender.com")
