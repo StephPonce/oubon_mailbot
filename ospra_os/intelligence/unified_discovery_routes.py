@@ -60,6 +60,25 @@ def _tier_from_payload(user: Optional[TokenPayload]) -> TierEnum:
         return TierEnum.NEST
 
 
+def _image_budget_for_tier(tier: TierEnum) -> int:
+    """How many top products get a Stability-enhanced image per request.
+
+    Image enhancement is the only per-request cost that scales with
+    output size (~$0.06/image, capped). NEST users get a teaser (3),
+    Stratosphere users get most of their top results enhanced. The
+    cap holds even for cache hits — disk-cache hits are free, but the
+    budget gates which products got enhanced when first cached.
+
+    NEST=3, FLIGHT=5, SOAR=8, STRATOSPHERE=12.
+    """
+    return {
+        TierEnum.NEST: 3,
+        TierEnum.FLIGHT: 5,
+        TierEnum.SOAR: 8,
+        TierEnum.STRATOSPHERE: 12,
+    }.get(tier, 3)
+
+
 def _cache_tier_from_core(tier: TierEnum):
     """Map ospra_os.core.tiers.SubscriptionTier → product_cache.SubscriptionTier.
 
@@ -330,7 +349,9 @@ async def get_products(
                     )
 
                     if include_ai_images and products:
-                        products = await enhance_products_with_images(products, max_images=5)
+                        products = await enhance_products_with_images(
+                            products, max_images=_image_budget_for_tier(user_tier)
+                        )
 
                     return {
                         "success": True,
@@ -448,7 +469,9 @@ async def get_products(
         products = products[:count]
 
         if include_ai_images and products:
-            products = await enhance_products_with_images(products, max_images=5)
+            products = await enhance_products_with_images(
+                products, max_images=_image_budget_for_tier(user_tier)
+            )
 
         elapsed = time.time() - start_time
 
@@ -568,7 +591,9 @@ async def quick_discover(
                     )
 
                     if include_ai_images and products:
-                        products = await enhance_products_with_images(products, max_images=3)
+                        products = await enhance_products_with_images(
+                            products, max_images=_image_budget_for_tier(caller_tier)
+                        )
 
                     return {
                         "success": True,
@@ -684,7 +709,9 @@ async def quick_discover(
         products = products[:count]
 
         if include_ai_images and products:
-            products = await enhance_products_with_images(products, max_images=3)
+            products = await enhance_products_with_images(
+                products, max_images=_image_budget_for_tier(caller_tier)
+            )
 
         elapsed = time.time() - start_time
         logger.info(
