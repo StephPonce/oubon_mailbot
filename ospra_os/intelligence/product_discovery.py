@@ -672,11 +672,31 @@ class ProductDiscoveryEngine:
                 for i, result in enumerate(sentiment_results):
                     label = sentiment_labels[i] if i < len(sentiment_labels) else f"sentiment_{i}"
 
+                    # When a sentiment task times out or crashes wholesale,
+                    # leave a breadcrumb on every product so downstream
+                    # debugging can tell "source attempted but failed" apart
+                    # from "source never wired". Without this, products
+                    # silently lack data_sources[label] and look identical
+                    # to products from a backend with the connector disabled.
+                    def _stamp_attempt_failure(reason: str) -> None:
+                        for product in all_products:
+                            if 'data_sources' not in product:
+                                product['data_sources'] = {}
+                            # Don't clobber a real entry if one was set by
+                            # a prior partial completion of this source.
+                            product['data_sources'].setdefault(label, {
+                                'available': False,
+                                'attempted': True,
+                                'reason': reason,
+                            })
+
                     if isinstance(result, asyncio.TimeoutError):
                         logger.warning(f"   ⏱️ {label} sentiment TIMED OUT after {SENTIMENT_SOURCE_TIMEOUT}s - skipped")
+                        _stamp_attempt_failure(f'timeout_{SENTIMENT_SOURCE_TIMEOUT}s')
                         continue
                     if isinstance(result, Exception):
                         logger.warning(f"   ⚠️ {label} sentiment failed: {result}")
+                        _stamp_attempt_failure(f'exception:{type(result).__name__}')
                         continue
 
                     if result:
@@ -712,6 +732,19 @@ class ProductDiscoveryEngine:
                                     if 'data_sources' not in product:
                                         product['data_sources'] = {}
                                     product['data_sources'].update(enriched.get('data_sources', {}))
+                            else:
+                                # Product wasn't in this enricher's per-source top-N
+                                # cap (e.g. Twitter enricher caps at 20 to bound cost).
+                                # Without a breadcrumb here, the product silently lacks
+                                # data_sources[label] and looks identical to a product
+                                # from a backend where the source is disabled.
+                                if 'data_sources' not in product:
+                                    product['data_sources'] = {}
+                                product['data_sources'].setdefault(label, {
+                                    'available': False,
+                                    'attempted': False,
+                                    'reason': 'out_of_per_source_cap',
+                                })
                         logger.info(f"   ✓ {label}: sentiment data merged")
 
                 logger.info(f"   ⏱️ Step 4 (parallel) took {time.time() - step4_start:.2f}s")
@@ -2805,9 +2838,31 @@ class ProductDiscoveryEngine:
                 trend_score = min(100, trend_score + 8)
                 has_trend_signal = True
 
+            # AliExpress velocity — Western-trend fallback. Mirror of the
+            # AE-buyer sentiment fallback: when no Western trend signal
+            # (Google Trends / TikTok / Twitter buzz) fires, fall back to
+            # AE buzz_score gated on recent_sales volume. A product with
+            # buzz=85 and 11k recent sales is meaningfully trending even
+            # if Western public-social ignores it.
+            #
+            # Why gated: buzz_score alone can be inflated by old reviews,
+            # so we require >1k recent sales to confirm the buzz reflects
+            # current buyer interest, not historical noise.
+            #
+            # Cap at 80: we have velocity but no direction (no week-over-
+            # week comparison from AE), so this branch can't claim
+            # peak-trending. Western signals are the only way to hit 90+.
+            if not has_trend_signal:
+                ae_buzz_for_trend = float(ae_signals.get('buzz_score') or 0)
+                ae_recent_for_trend = int(ae_signals.get('recent_sales') or 0)
+                if ae_buzz_for_trend > 50 and ae_recent_for_trend > 1000:
+                    trend_score = min(80, 30 + ae_buzz_for_trend * 0.5)
+                    has_trend_signal = True
+                    product['trend_source'] = 'aliexpress_velocity'
+
             # Same fix as demand: don't pretend the 55-baseline is a real
             # score when no Google Trends / direction / viral / TikTok /
-            # Twitter signal contributed.
+            # Twitter / AE-velocity signal contributed.
             product['trend_score'] = trend_score if has_trend_signal else None
             product['trend_direction'] = trend_direction
             product['has_trend_signal'] = has_trend_signal
