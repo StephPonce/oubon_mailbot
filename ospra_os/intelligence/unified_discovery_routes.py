@@ -140,72 +140,99 @@ def get_engine():
 
 
 def get_image_generator():
-    """Get AI image generator (lazy load)"""
+    """Get the Stability-backed AI image enhancer (lazy load).
+
+    The integrations.ai_image_generator module exposes AIImageEnhancer —
+    Stability-only, no OpenAI/Gemini fallbacks (per product decision: we
+    enhance the supplier's product image, never generate from scratch,
+    so we never need a text-to-image model).
+    """
     global _image_generator
     if _image_generator is None:
         try:
             from ospra_os.integrations.ai_image_generator import get_image_generator as get_gen
             _image_generator = get_gen()
-            if _image_generator.openai_available or _image_generator.stability_available:
-                logger.info("[SUCCESS] AI Image Generator loaded for discovery")
+            if getattr(_image_generator, 'stability_key', ''):
+                logger.info("[SUCCESS] AI Image Enhancer (Stability) loaded for discovery")
             else:
-                logger.warning("[WARNING] AI Image Generator loaded but no API keys configured")
+                logger.warning("[WARNING] AI Image Enhancer loaded but STABILITY_API_KEY not set")
         except Exception as e:
-            logger.warning(f"[WARNING] AI Image Generator not available: {e}")
+            logger.warning(f"[WARNING] AI Image Enhancer not available: {e}")
             _image_generator = None
     return _image_generator
 
 
+def _image_generator_available(generator) -> bool:
+    """True iff the Stability-backed enhancer has a usable API key."""
+    return bool(generator and getattr(generator, 'stability_key', ''))
+
+
 async def enhance_products_with_images(products: List[Dict], max_images: int = 5) -> List[Dict]:
     """
-    Add AI-generated images to products.
-    
-    Only generates images for top products to save API costs (~$0.04/image).
+    Enhance product images via Stability (background removal + clean replacement).
+
+    Only enhances the top N by OI score to cap Stability spend (~$0.06/image).
+    Cached on disk by URL hash so repeat hits are free.
+
+    Output keys mirror the legacy multi-provider flow for frontend compat:
+      - ai_image_url       (the enhanced URL — kept for existing UI bindings)
+      - enhanced_image_url (alias, more descriptive — what the enhancer returns)
+      - original_image_url (the supplier URL we started from)
+      - image_source       ('stability' | 'cached' | 'generation_failed' | 'error')
     """
     generator = get_image_generator()
-    if not generator:
-        logger.warning("No image generator available - returning products without AI images")
+    if not _image_generator_available(generator):
+        reason = 'not_available' if not generator else 'no_api_key'
+        if reason == 'no_api_key':
+            logger.warning("No image API configured (need STABILITY_API_KEY)")
+        else:
+            logger.warning("Image enhancer not available — returning products as-is")
         for p in products:
             p['ai_image_url'] = None
-            p['image_source'] = 'not_available'
+            p['enhanced_image_url'] = None
+            p['image_source'] = reason
         return products
-    
-    if not generator.openai_available and not generator.stability_available:
-        logger.warning("No AI image API configured (need OPENAI_API_KEY or STABILITY_API_KEY)")
-        for p in products:
-            p['ai_image_url'] = None
-            p['image_source'] = 'no_api_key'
-        return products
-    
-    # Only generate for top N products (by score) to save costs
+
+    # Only enhance top N products (by score) to cap Stability spend
     sorted_products = sorted(products, key=lambda p: p.get('oi_score', 0), reverse=True)
     products_to_enhance = sorted_products[:max_images]
-    
-    logger.info(f" Generating AI images for top {len(products_to_enhance)} products...")
-    
+
+    logger.info(f" Enhancing top {len(products_to_enhance)} product images via Stability...")
+
     enhanced_count = 0
     for product in products_to_enhance:
+        original_url = product.get('image_url') or product.get('main_image')
+        if not original_url:
+            product['ai_image_url'] = None
+            product['enhanced_image_url'] = None
+            product['image_source'] = 'no_source_image'
+            continue
         try:
-            result = await generator.generate_product_image(
-                product_title=product.get('title', 'Product'),
+            result = await generator.enhance_product_image(
+                image_url=original_url,
                 niche=product.get('niche', 'smart_home'),
-                original_image_url=product.get('image_url') or product.get('main_image'),
-                tags=product.get('tags', [])
             )
-            
-            if result and result.get('ai_image_url'):
-                product['ai_image_url'] = result['ai_image_url']
-                product['original_image_url'] = result.get('original_image_url', product.get('image_url'))
-                product['image_source'] = result.get('source', 'openai')
+
+            if result and result.get('success') and result.get('enhanced_image_url'):
+                enhanced = result['enhanced_image_url']
+                product['ai_image_url'] = enhanced            # legacy frontend key
+                product['enhanced_image_url'] = enhanced       # canonical key
+                product['original_image_url'] = result.get('original_url', original_url)
+                # 'cached' when disk-cache hit (cost $0), 'stability' for a fresh API call.
+                product['image_source'] = 'cached' if result.get('cached') else 'stability'
                 enhanced_count += 1
-                logger.info(f"   [SUCCESS] Generated image for: {product.get('title', '')[:40]}...")
+                logger.info(f"   [SUCCESS] {product['image_source']} image for: {product.get('title', '')[:40]}...")
             else:
                 product['ai_image_url'] = None
+                product['enhanced_image_url'] = None
                 product['image_source'] = 'generation_failed'
-                
+                if result and result.get('error'):
+                    logger.debug(f"   Image enhance failed: {result['error']}")
+
         except Exception as e:
-            logger.warning(f"   [ERROR] Image generation failed for {product.get('title', '')[:30]}: {e}")
+            logger.warning(f"   [ERROR] Image enhance failed for {product.get('title', '')[:30]}: {e}")
             product['ai_image_url'] = None
+            product['enhanced_image_url'] = None
             product['image_source'] = 'error'
     
     # Mark remaining products as not enhanced
@@ -728,26 +755,29 @@ async def enhance_images(request: EnhanceImagesRequest):
                 "products": request.products
             }
         
-        if not generator.openai_available and not generator.stability_available:
+        if not _image_generator_available(generator):
             return {
                 "success": False,
-                "error": "No AI image API configured. Set OPENAI_API_KEY or STABILITY_API_KEY",
+                "error": "No image API configured. Set STABILITY_API_KEY",
                 "products": request.products
             }
-        
+
         enhanced = await enhance_products_with_images(
-            request.products, 
+            request.products,
             max_images=request.max_images
         )
-        
-        generated_count = sum(1 for p in enhanced if p.get('image_source') in ['openai', 'stability', 'cache'])
-        
+
+        # 'stability' = fresh API call (~$0.06), 'cached' = disk-cache hit ($0).
+        generated_count = sum(1 for p in enhanced if p.get('image_source') == 'stability')
+        cached_count = sum(1 for p in enhanced if p.get('image_source') == 'cached')
+
         return {
             "success": True,
             "products": enhanced,
             "total": len(enhanced),
             "generated": generated_count,
-            "estimated_cost": generated_count * 0.04
+            "cached": cached_count,
+            "estimated_cost": round(generated_count * 0.06, 2),
         }
         
     except Exception as e:
@@ -829,21 +859,23 @@ async def get_sources_status():
         connected = sum(1 for s in engine.sources_status.values() if '[SUCCESS]' in s)
         total = len(engine.sources_status)
         
-        # Add image generator status
+        # Image enhancer status — Stability-only by design (we enhance the
+        # supplier's product photo, never generate from scratch). Legacy
+        # openai_configured / gemini_configured fields are retained as
+        # constant False for backwards-compat with any older dashboards
+        # that read them; new clients should look at active_provider.
+        stability_ok = _image_generator_available(generator)
         image_status = {
             "available": generator is not None,
-            "openai_configured": getattr(generator, 'openai_available', False) if generator else False,
-            "gemini_configured": getattr(generator, 'gemini_available', False) if generator else False,
-            "stability_configured": getattr(generator, 'stability_available', False) if generator else False,
-            "cached_images": len(generator.cache) if generator and hasattr(generator, 'cache') else 0,
-            "active_provider": (
-                "openai" if (generator and getattr(generator, 'openai_available', False)) else
-                "gemini" if (generator and getattr(generator, 'gemini_available', False)) else
-                "stability" if (generator and getattr(generator, 'stability_available', False)) else
-                "none"
-            )
+            "stability_configured": stability_ok,
+            "openai_configured": False,   # deprecated — Stability-only now
+            "gemini_configured": False,   # deprecated — Stability-only now
+            "cached_images": (
+                len(getattr(generator, 'cache', {})) if generator else 0
+            ),
+            "active_provider": "stability" if stability_ok else "none",
         }
-        
+
         return {
             "success": True,
             "sources": engine.sources_status,
@@ -852,9 +884,9 @@ async def get_sources_status():
                 "total": total,
                 "connected": connected,
                 "disconnected": total - connected,
-                "ai_images_available": image_status["openai_configured"] or image_status["gemini_configured"] or image_status["stability_configured"],
-                "ai_provider": image_status["active_provider"]
-            }
+                "ai_images_available": stability_ok,
+                "ai_provider": image_status["active_provider"],
+            },
         }
         
     except Exception as e:
@@ -1059,13 +1091,8 @@ async def health_check():
         generator = get_image_generator()
         
         has_suppliers = engine.aliexpress_available or engine.cj_available
-        
-        # Check AI image providers
-        openai_avail = generator and getattr(generator, 'openai_available', False)
-        gemini_avail = generator and getattr(generator, 'gemini_available', False)
-        stability_avail = generator and getattr(generator, 'stability_available', False)
-        has_images = openai_avail or gemini_avail or stability_avail
-        
+        has_images = _image_generator_available(generator)
+
         return {
             "status": "healthy" if has_suppliers else "degraded",
             "sources": engine.sources_status,
@@ -1078,14 +1105,9 @@ async def health_check():
                 "reddit": engine.reddit_available,
                 "google_trends": engine.trends_available,
                 "ai_images": has_images,
-                "ai_image_provider": (
-                    "openai" if openai_avail else
-                    "gemini" if gemini_avail else
-                    "stability" if stability_avail else
-                    "none"
-                )
+                "ai_image_provider": "stability" if has_images else "none",
             },
-            "niches_available": len(engine.NICHE_KEYWORDS)
+            "niches_available": len(engine.NICHE_KEYWORDS),
         }
         
     except Exception as e:
