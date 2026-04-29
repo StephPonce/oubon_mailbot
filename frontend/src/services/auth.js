@@ -431,10 +431,10 @@ class AuthService {
     const storedUser = getStoredUser();
 
     return {
+      ...storedUser,
       user_id: payload.sub,
       email: payload.email,
       tier: payload.tier,
-      ...storedUser,
     };
   }
 
