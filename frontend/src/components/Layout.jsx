@@ -5,9 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Home, Package, Bot, Zap, Settings, LogOut, Activity, PanelLeftClose, PanelLeft, Store
-} from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, Activity, PanelLeftClose, PanelLeft, Store } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { FloatingOiChat } from './FloatingOiChat';

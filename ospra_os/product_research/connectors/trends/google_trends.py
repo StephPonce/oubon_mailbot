@@ -273,7 +273,7 @@ class GoogleTrendsConnector(BaseConnector):
                 lambda: pytrend.trending_searches(pn="united_states")
             )
 
-            if trending_df.empty:
+            if trending_df is None or trending_df.empty:
                 return []
 
             # Convert to ProductCandidates

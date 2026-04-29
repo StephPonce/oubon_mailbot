@@ -5,11 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Home, Package, Bot, Zap, Settings, LogOut,
-  TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock,
-  ChevronRight, Activity, PanelLeftClose, PanelLeft
-} from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock, ChevronRight, Activity, PanelLeftClose, PanelLeft, Store } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { api } from '../services/api';
@@ -52,6 +48,7 @@ function Sidebar({ currentPath }) {
     { path: '/products', icon: Package, label: 'Products' },
     { path: '/autopilot', icon: Bot, label: 'Auto-Pilot' },
     { path: '/actions', icon: Zap, label: 'Actions' },
+    { path: '/settings/stores', icon: Store, label: 'Stores' },
   ];
 
   const tierColors = {
