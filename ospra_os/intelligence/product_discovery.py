@@ -2914,10 +2914,12 @@ class ProductDiscoveryEngine:
                 twitter_weight as _twitter_w,
                 reddit_weight as _reddit_w,
                 tiktok_weight as _tiktok_w,
+                aliexpress_buyer_weight as _ae_buyer_w,
                 score_from_amazon_buzz as _amazon_s,
                 score_from_twitter_polarity as _twitter_s,
                 score_from_reddit_mentions as _reddit_s,
                 score_from_tiktok_engagement as _tiktok_s,
+                score_from_aliexpress_buyer as _ae_buyer_s,
             )
             # AE review-text helpers exist (aliexpress_review_weight,
             # score_from_aliexpress_reviews) but aren't called from the
@@ -2972,6 +2974,42 @@ class ProductDiscoveryEngine:
                     weight=_tiktok_w(int(tiktok_comment_count), int(tiktok_view_count)),
                 ))
 
+            # AliExpress buyer rating — Western-fallback sentiment input.
+            #
+            # Why this exists: most dropshipping products have NO Western
+            # public-social presence (no tweets, no Reddit threads, no
+            # Amazon listing). Without this branch they score sentiment=None,
+            # which floors OI at the demand+profit+sourcing budget (~35-50)
+            # regardless of how good the AE buyer evidence is. A product
+            # with 11k orders and 4.5★ on AE is strong buyer-side evidence
+            # — treating it as "no signal" is dishonest.
+            #
+            # Why it's a fallback (not always-on): AE ratings are
+            # systemically inflated (4.5+ is the de-facto floor on the
+            # platform), so combining them with Twitter/Reddit/Amazon
+            # would compress the dynamic range of the composite. By only
+            # contributing when Western sources are silent, the calibration
+            # of products WITH Western coverage is unchanged. Existing
+            # comparative rankings between high-coverage products stay
+            # the same.
+            #
+            # Confidence haircut: weight is multiplied by 0.6 to encode
+            # that AE buyer ratings are a weaker per-data-point signal
+            # than verified Amazon reviews or Reddit polarity. Even at
+            # max volume the AE buyer branch tops out at weight ≈ 0.6,
+            # vs amazon_weight which can hit 1.0 at ~500 reviews.
+            has_western_sentiment = bool(sentiment_inputs)
+            if not has_western_sentiment and aliexpress_found_real:
+                ae_rating_pct = float(ae_signals.get('rating_pct') or 0)
+                ae_rating_stars = float(aliexpress_rating_raw or 0)
+                ae_recent_sales = int(ae_signals.get('recent_sales') or 0)
+                if ae_rating_stars > 0:
+                    sentiment_inputs.append(SentimentInput(
+                        name='aliexpress_buyer',
+                        score=_ae_buyer_s(ae_rating_pct, ae_rating_stars),
+                        weight=_ae_buyer_w(ae_recent_sales) * 0.6,
+                    ))
+
             sentiment_result = _compose_sentiment(sentiment_inputs)
 
             # Persist on the product. ``sentiment_score`` is None whenever
@@ -2993,9 +3031,10 @@ class ProductDiscoveryEngine:
             has_amazon_signal = amazon_found_real and amazon_buzz_raw > 0
             sentiment_score = sentiment_result.sentiment_score
 
-            # AliExpress buyer-rating and CJ structural metadata are tracked
-            # on the product so the sourcing-score block below can use them.
-            # They are NO LONGER sentiment inputs.
+            # AliExpress buyer-rating is exposed on the product for the
+            # sourcing-score block AND, as of the AE-fallback branch above,
+            # contributes to the sentiment composite when Western public-
+            # social is silent. CJ structural metadata stays sourcing-only.
             product['aliexpress_buyer_rating'] = (
                 int(aliexpress_buzz_raw) if (aliexpress_found_real and aliexpress_buzz_raw > 0) else None
             )

@@ -115,6 +115,27 @@ def aliexpress_review_weight(review_count: int) -> float:
     return min(1.0, math.log10(1 + review_count) / 2.7)
 
 
+def aliexpress_buyer_weight(recent_sales: int) -> float:
+    """AliExpress buyer-rating weight, driven by order volume rather than
+    review count. Used by the buyer-rating sentiment branch (see
+    score_from_aliexpress_buyer) which kicks in when Western public-social
+    is silent.
+
+    Volume saturation: 1 sale → 0.05, 100 → 0.40, 1k → 0.65, 10k → 0.85, 100k → 1.0.
+
+    Lower ceiling than amazon_weight (which caps at 1.0 at ~500 reviews)
+    because AE buyer ratings are systemically inflated — 4.5+ stars is the
+    de-facto floor on AE — so even a high-volume signal carries less
+    information per data point. We compensate with a confidence haircut
+    at the call site (~0.6× multiplier) on top of this weight curve.
+    """
+    if not recent_sales or recent_sales <= 0:
+        return 0.0
+    # log10(1+1e5)/5 = 1.0 at 100k sales. Floor of 0.05 keeps low-volume
+    # products from contributing zero weight while still being audible.
+    return max(0.05, min(1.0, math.log10(1 + recent_sales) / 5.0))
+
+
 # ---------------------------------------------------------------------------
 # Per-source score normalizers
 # ---------------------------------------------------------------------------
@@ -176,6 +197,64 @@ def score_from_aliexpress_reviews(reviews: list[dict]) -> float:
     if avg <= 4:
         return 75.0
     return 90.0
+
+
+def score_from_aliexpress_buyer(rating_pct: float, rating_stars: float) -> float:
+    """AliExpress buyer-rating → 0-100 sentiment score.
+
+    Distinct from score_from_aliexpress_reviews (verbatim-text-based,
+    top-10 only). This branch consumes the rolled-up rating_pct and
+    rating_stars that AE returns on every product at normalize time —
+    so it works for the entire product set, not just the top 10.
+
+    AE ratings are systemically inflated (4.5+ is the floor for almost
+    everything), so we anchor the curve so 4.5★ = 65 (decent, not great)
+    and only reward 4.7★+ products. rating_pct (positive-review %) acts
+    as a tie-breaker to penalize products with high stars but suspicious
+    review distribution.
+
+    rating_stars: 0-5 from AE evaluate_rate
+    rating_pct:   0-100 — % of reviews that are 4-5★ (positive)
+
+    Score ladder:
+       <4.0★ → 35 (genuinely bad — rare on AE)
+        4.0★ → 50
+        4.3★ → 58
+        4.5★ → 65 (the AE baseline; weak signal)
+        4.7★ → 75
+        4.8★ → 82
+        4.9★ → 88
+        5.0★ → 92
+    """
+    stars = float(rating_stars or 0)
+    pct = float(rating_pct or 0)
+    if stars <= 0:
+        return 0.0
+    # Star-based base
+    if stars < 4.0:
+        base = 35.0
+    elif stars < 4.3:
+        base = 50.0
+    elif stars < 4.5:
+        base = 58.0
+    elif stars < 4.7:
+        base = 65.0
+    elif stars < 4.8:
+        base = 75.0
+    elif stars < 4.9:
+        base = 82.0
+    elif stars < 5.0:
+        base = 88.0
+    else:
+        base = 92.0
+    # rating_pct adjusts ±5: 90%+ positive nudges up, <80% nudges down.
+    if pct >= 90:
+        base += 5
+    elif pct >= 80:
+        base += 2
+    elif pct < 70 and pct > 0:
+        base -= 5
+    return max(0.0, min(100.0, base))
 
 
 def score_from_tiktok_engagement(comment_count: int, view_count: int = 0) -> float:
