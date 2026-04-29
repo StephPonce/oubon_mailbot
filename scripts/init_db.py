@@ -30,8 +30,13 @@ from ospra_os.database import Base, PasswordResetToken, User
 def init_database():
     """Initialize database and create all tables"""
     
-    # Get database URL from environment
-    database_url = os.getenv("OUBONSHOP_database_url", "sqlite:///./ospra_os.db")
+    # Match what the running backend reads (DATABASE_URL is the source of truth).
+    # OUBONSHOP_database_url is kept as a legacy fallback only.
+    database_url = (
+        os.getenv("DATABASE_URL")
+        or os.getenv("OUBONSHOP_database_url")
+        or "sqlite:///./ospra_os.db"
+    )
     
     print(f"[FIX] Initializing database: {database_url}")
     
