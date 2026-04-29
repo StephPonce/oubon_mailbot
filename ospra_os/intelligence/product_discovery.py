@@ -515,10 +515,31 @@ class ProductDiscoveryEngine:
         supplier_tasks = []
         task_labels = []
 
+        # ── Tier-aware supplier budget ────────────────────────────────────
+        # Was: hardcoded 3 keywords × 10 AliExpress + 15 CJ = 45 raw → ~23
+        # final after dedup/URL-validation/score attrition. Both NEST
+        # (max_products=10) and Stratosphere (max_products=300) hit the
+        # same 23-product wall — Stratosphere users were paying for nothing.
+        #
+        # Now: scale the fetch budget with max_products. Targeting raw ≈
+        # 2 × max_products so post-attrition (~50%) we can fill the request.
+        #
+        # Caps:
+        #   - AliExpress affiliate page_size hard cap is 50 (we use 40 to
+        #     leave headroom for the rare oversized response).
+        #   - 8 keywords is our trending-keyword pool ceiling — adding more
+        #     means trending_keywords padding kicks in (less relevant).
+        #   - CJ /list2 page_size accepts up to 200 but each call is one
+        #     request against their 1 req/sec rate limit; capping at 60
+        #     keeps us comfortably inside SUPPLIER_SOURCE_TIMEOUT.
+        ali_keywords = max(3, min(8, max_products // 25))   # 3 → 8 keywords
+        ali_per_kw   = max(10, min(40, max_products // 10)) # 10 → 40 per kw
+        cj_count     = max(15, min(60, max_products // 5))  # 15 → 60
+
         # AliExpress tasks - one per keyword (parallel keyword fetches)
         if self.aliexpress_available:
-            for keyword in trending_keywords[:3]:
-                supplier_tasks.append(self._fetch_aliexpress(keyword, count=10))
+            for keyword in trending_keywords[:ali_keywords]:
+                supplier_tasks.append(self._fetch_aliexpress(keyword, count=ali_per_kw))
                 task_labels.append(f"aliexpress:{keyword[:20]}")
 
         # CJ Dropshipping tasks
@@ -528,8 +549,14 @@ class ProductDiscoveryEngine:
         # If CJ's category search is empty, we'd rather know that cleanly than
         # fall through to keyword spam that triggers rate limits.
         if self.cj_available:
-            supplier_tasks.append(self._fetch_cj(keyword="", count=15, niche=niche))
+            supplier_tasks.append(self._fetch_cj(keyword="", count=cj_count, niche=niche))
             task_labels.append(f"cj:category:{niche}")
+
+        logger.info(
+            f"   📦 Supplier budget @ max_products={max_products}: "
+            f"AliExpress {ali_keywords}kw × {ali_per_kw} + CJ {cj_count} "
+            f"= {ali_keywords * ali_per_kw + cj_count} raw"
+        )
 
         # Execute ALL supplier fetches in parallel (each capped at SUPPLIER_SOURCE_TIMEOUT)
         logger.info(
