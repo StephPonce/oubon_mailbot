@@ -459,13 +459,12 @@ class OspraAPI {
    */
   async enhanceProductsWithAiImages(products, maxImages = 5) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/discovery/enhance-images`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products, max_images: maxImages })
-      });
-      const data = await response.json();
-      return data.products || products;
+      // authService.post auto-attaches Bearer + handles refresh/401
+      // (image enhancement spends Stability budget — must be authenticated)
+      return await authService.post('/api/discovery/enhance-images', {
+        products,
+        max_images: maxImages,
+      }).then(data => data.products || products);
     } catch (error) {
       console.error('enhanceProductsWithAiImages error:', error);
       return products;
@@ -485,8 +484,9 @@ class OspraAPI {
    */
   async getProductRecommendations(limit = 10) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/dashboard/v2/products?per_page=${limit}`);
-      const data = await response.json();
+      // /api/dashboard/v2/products requires auth — was 401-ing because the
+      // bare fetch sent no Bearer token. Same root cause as discoverProducts.
+      const data = await authService.get('/api/dashboard/v2/products', { per_page: limit });
       return data.products || data.data || data || [];
     } catch (error) {
       console.error('getProductRecommendations error:', error);
@@ -544,13 +544,12 @@ class OspraAPI {
    */
   async getDatabaseProducts(params = {}) {
     try {
-      const queryParams = new URLSearchParams();
-      if (params.niche) queryParams.append('niche', params.niche);
-      if (params.per_page) queryParams.append('per_page', params.per_page);
-      if (params.page) queryParams.append('page', params.page);
-      
-      const response = await fetch(`${API_BASE_URL}/api/dashboard/v2/products?${queryParams}`);
-      const data = await response.json();
+      // Authenticated route — see getProductRecommendations comment above.
+      const cleaned = {};
+      if (params.niche) cleaned.niche = params.niche;
+      if (params.per_page) cleaned.per_page = params.per_page;
+      if (params.page) cleaned.page = params.page;
+      const data = await authService.get('/api/dashboard/v2/products', cleaned);
       return data.products || data.data || data || [];
     } catch (error) {
       console.error('getDatabaseProducts error:', error);
@@ -767,18 +766,14 @@ class OspraAPI {
    */
   async generateProductImage(productTitle, niche = 'smart_home', originalImageUrl = null) {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/images/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product_title: productTitle,
-          niche: niche,
-          original_image_url: originalImageUrl,
-          tags: [niche],
-          force_regenerate: false
-        })
+      // Authenticated — image generation spends Stability budget per call.
+      return await authService.post('/api/images/generate', {
+        product_title: productTitle,
+        niche,
+        original_image_url: originalImageUrl,
+        tags: [niche],
+        force_regenerate: false,
       });
-      return response.json();
     } catch (error) {
       console.error('generateProductImage error:', error);
       return { success: false, ai_image_url: originalImageUrl };
@@ -1097,11 +1092,11 @@ Price: ${parseFloat(price).toFixed(2)}`;
   // ===========================================================================
   
   async getRateLimitStatus() {
+    // Authenticated — backend reads tier from JWT, not the query param.
+    // (We pass tier= for backwards-compat with older route definitions
+    // but the live route ignores it and uses current_user.tier.)
     const tier = authService.getTier();
-    const response = await fetch(
-      `${API_BASE_URL}/api/rate-limit/discovery/status?tier=${tier}`
-    );
-    return response.json();
+    return authService.get('/api/rate-limit/discovery/status', { tier });
   }
   
   async getUsageDashboard() {
