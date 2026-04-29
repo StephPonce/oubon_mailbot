@@ -341,8 +341,13 @@ class OspraAPI {
    */
   async discoverProducts(params = {}) {
     const niche = params.niche || 'smart_home';
-    // Backend limits count to 50 max (le=50 in FastAPI)
-    const count = Math.min(params.count || params.limit || 10, 50);
+    // Backend hard cap is 100 (le=100 in /api/discovery/quick). The actual
+    // per-tier ceiling (10 NEST → 100 STRATO) is enforced server-side in
+    // unified_discovery_routes._tier_from_payload + clamp_request_count, so
+    // we just send what the caller asks for and let the backend clamp + tag
+    // tier_meta.clamped on the response. Sending more than the user's tier
+    // allows is harmless — the backend trims and we surface the upgrade nudge.
+    const count = Math.min(params.count || params.limit || 10, 100);
     const includeAiImages = params.includeAiImages !== false; // Enable AI images by default
     const includeSentiment = params.includeSentiment !== false; // Enable sentiment by default
     const url = `${API_BASE_URL}/api/discovery/quick/${niche}?count=${count}&include_ai_images=${includeAiImages}&include_sentiment=${includeSentiment}`;
@@ -359,7 +364,12 @@ class OspraAPI {
     const promise = (async () => {
       try {
         console.log('[API] discoverProducts URL:', url);
-        const response = await fetch(url);
+        // Use authService.fetch so the Bearer token is attached automatically.
+        // Without auth the backend treats us as anonymous (current_user=None
+        // in unified_discovery_routes) and defaults the tier to NEST, capping
+        // every Stratosphere user at 10 products. Discovered the hard way.
+        // authService.fetch also handles token refresh + 401 redirect.
+        const response = await authService.fetch(url);
 
         if (!response.ok) {
           // Backend returns 503 with detailed diagnostics when no real products available.
