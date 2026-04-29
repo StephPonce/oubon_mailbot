@@ -59,6 +59,28 @@ def _tier_from_payload(user: Optional[TokenPayload]) -> TierEnum:
     except ValueError:
         return TierEnum.NEST
 
+
+def _cache_tier_from_core(tier: TierEnum):
+    """Map ospra_os.core.tiers.SubscriptionTier → product_cache.SubscriptionTier.
+
+    The cache module duplicates the enum to avoid pulling in SQLAlchemy at
+    import time, so we cannot use core's enum directly as the cache key. Both
+    enums share string values ("nest"/"flight"/"soar"/"stratosphere") so this
+    mapping is total and stable.
+
+    Why this matters — the cache is keyed by (niche, tier). If we keep passing
+    SubscriptionTier.NEST regardless of the caller, NEST-shaped responses
+    (clamped to 10 products, slow TTL) get served back to Stratosphere users
+    forever. Per-tier keys also let TIER_CACHE_TTL do its job — NEST holds for
+    4h, Stratosphere refreshes every 5min.
+    """
+    if not CACHE_AVAILABLE:
+        return None
+    try:
+        return SubscriptionTier(tier.value)
+    except (ValueError, AttributeError):
+        return SubscriptionTier.NEST
+
 # When True, empty discovery responses fall back to hardcoded demo products.
 # Default: False. Production MUST NOT silently return fake products — users need
 # honest errors so they can see which data sources are failing and fix them.
@@ -259,7 +281,9 @@ async def get_products(
         # ==== CACHING LAYER ====
         if CACHE_AVAILABLE and not force_refresh and not include_sentiment:
             cache = get_product_cache()
-            tier = SubscriptionTier.NEST
+            # Per-tier cache key — see _cache_tier_from_core docstring for why
+            # we don't hardcode NEST here.
+            tier = _cache_tier_from_core(user_tier)
 
             cached_entry = cache.get(niche, tier)
             if cached_entry and cached_entry.products and len(cached_entry.products) > 0:
@@ -376,7 +400,9 @@ async def get_products(
         # ==== CACHE REAL RESULTS ====
         if CACHE_AVAILABLE and not include_sentiment and not _is_demo_products(products):
             cache = get_product_cache()
-            tier = SubscriptionTier.NEST
+            # Same per-tier key as the read above — keeps NEST and Stratosphere
+            # entries separate so neither contaminates the other.
+            tier = _cache_tier_from_core(user_tier)
             cache.set(
                 niche=niche,
                 tier=tier,
@@ -387,7 +413,10 @@ async def get_products(
                     "is_demo": False,
                 },
             )
-            logger.info(f"[CACHE SET] /products?niche={niche} - {len(products)} real products cached")
+            logger.info(
+                f"[CACHE SET] /products?niche={niche} tier={tier.value} - "
+                f"{len(products)} real products cached"
+            )
 
         products = products[:count]
 
@@ -482,9 +511,12 @@ async def quick_discover(
 
         # ==== CACHING LAYER ====
         # Only serve cache if the cached entry contains REAL products (no demos).
+        # Cache key includes tier — see _cache_tier_from_core. Without this, a
+        # NEST request that fetched only 10 products poisons the niche-wide
+        # cache and Stratosphere users get 10 stale items forever.
         if CACHE_AVAILABLE and not force_refresh:
             cache = get_product_cache()
-            tier = SubscriptionTier.NEST
+            tier = _cache_tier_from_core(caller_tier)
 
             cached_entry = cache.get(niche, tier)
             if cached_entry and cached_entry.products and len(cached_entry.products) > 0:
@@ -603,7 +635,7 @@ async def quick_discover(
         # ==== CACHE REAL RESULTS ====
         if CACHE_AVAILABLE and not _is_demo_products(products):
             cache = get_product_cache()
-            tier = SubscriptionTier.NEST
+            tier = _cache_tier_from_core(caller_tier)
             cache_entry = cache.set(
                 niche=niche,
                 tier=tier,
@@ -617,8 +649,9 @@ async def quick_discover(
                 },
             )
             logger.info(
-                f"[CACHE SET] /quick/{niche} - {len(products)} real products "
-                f"(sentiment={include_sentiment}), TTL: {cache_entry.ttl_remaining_seconds}s"
+                f"[CACHE SET] /quick/{niche} tier={tier.value} - "
+                f"{len(products)} real products (sentiment={include_sentiment}), "
+                f"TTL: {cache_entry.ttl_remaining_seconds}s"
             )
 
         products = products[:count]
@@ -641,9 +674,11 @@ async def quick_discover(
             "sentiment_included": include_sentiment,
             "from_cache": False,
             "cache_age_seconds": 0,
-            "cache_ttl_remaining": TIER_CACHE_TTL.get(SubscriptionTier.NEST, 240) * 60
-            if CACHE_AVAILABLE
-            else 0,
+            "cache_ttl_remaining": (
+                TIER_CACHE_TTL.get(_cache_tier_from_core(caller_tier), 240) * 60
+                if CACHE_AVAILABLE
+                else 0
+            ),
             "response_time_ms": int(elapsed * 1000),
             "tier_meta": tier_meta,
         }
