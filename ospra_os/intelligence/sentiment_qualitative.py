@@ -251,6 +251,41 @@ def _collect_evidence(product: dict) -> dict:
         evidence["amazon"] = amazon_block
         evidence["data_sources_available"].append("amazon")
 
+    # AliExpress numeric buyer signals — NOT to be confused with the
+    # Phase H verbatim review text block above. These are the rolled-up
+    # rating_pct / rating_stars / recent_sales harvested from the AE
+    # affiliate API at normalize time, available on EVERY AE product
+    # without an extra paid fetch.
+    #
+    # Why this is included even though it's just numbers (no prose):
+    # for the bulk of long-tail dropshipping products there's no
+    # Twitter / Reddit / Amazon coverage at all (see audit Apr 2026).
+    # Without this branch _collect_evidence returns an empty
+    # data_sources_available list and the agent returns
+    # INSUFFICIENT_DATA on 100% of those products — even when AE shows
+    # 4.7★ with 11k recent sales. That's dishonest: AE buyer behavior
+    # IS evidence of product reception, just from a different population.
+    #
+    # The agent prompt should weight this as weaker than verbatim text
+    # (see _build_prompt — AE numbers are confidence-scored lower) but
+    # NOT treat its presence as "no data". Same philosophy as the
+    # AE-buyer fallback in the numeric sentiment composite.
+    ae_signals = (product.get("data_sources") or {}).get("aliexpress_signals") or {}
+    if ae_signals.get("found_real_rating") or ae_signals.get("rating_stars"):
+        evidence["aliexpress_buyer_signals"] = {
+            "rating_stars": ae_signals.get("rating_stars"),
+            "rating_pct_positive": ae_signals.get("rating_pct"),
+            "recent_sales": ae_signals.get("recent_sales"),
+            "buzz_score": ae_signals.get("buzz_score"),
+            "source_type": ae_signals.get("source_type"),
+            "note": (
+                "Numeric buyer signal only (no verbatim review text). "
+                "AE platform-wide rating baseline is ~4.5★, so treat <4.3 "
+                "as weak and >4.7 as a real positive lift."
+            ),
+        }
+        evidence["data_sources_available"].append("aliexpress_buyer_signals")
+
     return evidence
 
 
@@ -418,6 +453,41 @@ def _build_prompt(evidence: dict) -> str:
                 f"  • Viewer comment ({author}, {likes} likes): "
                 f"\"{c.get('text', '')}\""
             )
+
+    # AliExpress numeric buyer signals (rolled-up rating/sales).
+    # Distinct from the Phase H verbatim-text block above (which only
+    # exists for top-10 products). These numbers are present on EVERY
+    # AE-sourced product, so they're the floor of evidence we can
+    # always cite when no Western source has prose.
+    ae_buyer = evidence.get("aliexpress_buyer_signals") or {}
+    if ae_buyer:
+        stars = ae_buyer.get("rating_stars") or 0
+        pct = ae_buyer.get("rating_pct_positive") or 0
+        sales = ae_buyer.get("recent_sales") or 0
+        # Heuristic strength label so the agent knows whether to lean on it
+        if stars >= 4.7 and sales >= 1000:
+            strength = "STRONG"
+        elif stars >= 4.5 and sales >= 200:
+            strength = "MODERATE"
+        elif stars >= 4.3:
+            strength = "WEAK"
+        else:
+            strength = "POOR"
+        prompt_parts.append(
+            f"\n--- ALIEXPRESS BUYER SIGNALS [{strength}] ---"
+        )
+        prompt_parts.append(
+            f"  rating: {stars}★  positive_pct: {pct:.1f}%  recent_sales: {sales:,}"
+        )
+        if ae_buyer.get("buzz_score") is not None:
+            prompt_parts.append(f"  buzz_score: {ae_buyer.get('buzz_score'):.0f}/100")
+        prompt_parts.append(
+            "  NOTE: this is numeric evidence only — no verbatim review text. "
+            "AE platform-wide rating baseline is ~4.5★, so 4.5 = neutral, "
+            "<4.3 = weak negative, >4.7 with high recent_sales = real positive. "
+            "When THIS is your only source, set confidence ≤ 50 and recommend "
+            "WATCH (not BUY) unless rating is genuinely outstanding."
+        )
 
     # Phase G: Google Trends context — INTEREST signal, not sentiment.
     # The agent should use these terms to *interpret* sentiment evidence
