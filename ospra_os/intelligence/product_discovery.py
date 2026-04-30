@@ -66,6 +66,201 @@ def _with_timeout(coro, timeout: float):
     return asyncio.wait_for(coro, timeout=timeout)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# TITLE CLEANING — convert AliExpress keyword salad into readable product names
+# ─────────────────────────────────────────────────────────────────────────────
+# AE titles average 120+ chars and look like:
+#   "Silicone Suction Phone Holder Mat Multifunctional Suction Cup Wall Stand
+#    Square Anti-Slip Single-Sided Case Mount Back Sticker"
+#
+# These are SEO keyword stuffing for AE's internal search, not human-readable
+# product names. The cleaner extracts the head noun phrase and drops trailing
+# descriptors, capping at ~60 chars. We persist BOTH the original title (for
+# downstream agents that need full keyword context) and `clean_title` (for UI).
+
+import re as _re
+
+# Generic descriptors that show up at the END of AE titles after the real name.
+# Dropping these from the trailing portion produces shorter, cleaner labels.
+_TITLE_TRAILING_NOISE = {
+    'multifunctional', 'multi-functional', 'multi', 'functional',
+    'portable', 'durable', 'premium', 'professional',
+    'high-quality', 'quality', 'reusable', 'eco-friendly',
+    'waterproof', 'wireless', 'mini', 'large', 'small', 'medium',
+    'new', 'hot', 'fashion', 'trendy', 'creative',
+    'anti-slip', 'antislip', 'non-slip', 'nonslip',
+    'single-sided', 'double-sided',
+    'with', 'and', 'for', 'the', 'a', 'an', 'or', 'of',
+    'square', 'round', 'oval', 'rectangular',
+    'home', 'kitchen', 'office', 'outdoor', 'indoor', 'travel',
+    'usb', 'plastic', 'silicone', 'metal', 'wooden',
+    'black', 'white', 'red', 'blue', 'green', 'yellow', 'pink', 'gray', 'grey',
+    'set', 'pack', 'pcs', 'piece', 'pieces', 'kit',
+}
+
+# Brand prefixes are real signal — keep them.
+_TITLE_KEEP_PREFIX = {
+    'apple', 'samsung', 'xiaomi', 'huawei', 'sony', 'lg', 'nintendo',
+    'baseus', 'ugreen', 'anker', 'essager', 'rocoren',
+}
+
+
+def _clean_product_title(raw: str, max_chars: int = 60) -> str:
+    """Strip AE keyword stuffing and produce a human-readable label.
+
+    Strategy:
+      1. Strip leading/trailing whitespace + collapse internal whitespace
+      2. Take the first 8 tokens (the head noun phrase usually lives here)
+      3. Trim trailing generic descriptors that don't add product identity
+      4. Cap at max_chars on a word boundary
+      5. Title-case the result for consistency
+
+    This is deterministic and free — no AI call. Good enough for 95% of AE
+    titles. The ones it can't help (e.g., titles that lead with brand model
+    numbers like "5 in 1 USB C HUB") fall back to a length-only truncation.
+    """
+    if not raw or not isinstance(raw, str):
+        return ''
+    # Collapse whitespace and strip
+    cleaned = _re.sub(r'\s+', ' ', raw).strip()
+    if not cleaned:
+        return ''
+    # Remove all-caps SKU-like noise: "USB-C 4K HDMI" stays, but
+    # standalone codes like "VR-2034" or "M11" get pruned only if they
+    # appear after position 4 (head-position SKU is real signal).
+    tokens = cleaned.split(' ')
+    if len(tokens) <= 8:
+        head = tokens
+    else:
+        head = tokens[:8]
+    # Drop trailing noise tokens but never below 3 tokens (avoid "Phone")
+    while len(head) > 3 and head[-1].lower().strip(',.;:') in _TITLE_TRAILING_NOISE:
+        head.pop()
+    label = ' '.join(head)
+    # Cap at max_chars on a word boundary
+    if len(label) > max_chars:
+        truncated = label[:max_chars].rsplit(' ', 1)[0]
+        if truncated and len(truncated) >= 20:
+            label = truncated
+        else:
+            label = label[:max_chars]
+    # Title-case unless the token is an all-caps acronym (USB, HDMI, 4K, etc.)
+    out_tokens = []
+    for tok in label.split(' '):
+        if not tok:
+            continue
+        if tok.isupper() and len(tok) <= 5:
+            out_tokens.append(tok)  # Preserve acronyms
+        elif _re.match(r'^[A-Z]\w*[A-Z]\w*', tok):
+            out_tokens.append(tok)  # Preserve mixed-case brand-y tokens
+        else:
+            out_tokens.append(tok.capitalize())
+    return ' '.join(out_tokens).strip(',.;: ')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CATEGORY-AWARE PRICING — replaces hardcoded cost × 2.5 markup
+# ─────────────────────────────────────────────────────────────────────────────
+# AliExpress returns affiliate cost. We need a suggested retail price. The
+# old logic was `cost * 2.5` for everything, which produces:
+#   - $4 cost → $10 retail (60% margin) — fine for accessories
+#   - $40 cost → $100 retail (60% margin) — too expensive vs comp
+#   - $100 cost → $250 retail (60% margin) — uncompetitive
+#
+# Real dropshipping markup curves are reverse-elastic — cheaper items
+# tolerate larger multipliers, expensive items need tighter margins to
+# stay competitive. The brackets below match common competitor pricing.
+
+def _suggested_price_for_cost(cost_price: float) -> float:
+    """Return a category-aware suggested retail price.
+
+    Brackets:
+      < $3       → 4.0× (impulse buys, room for margin)
+      $3 - $10   → 3.0×
+      $10 - $25  → 2.5× (the old default — still right for this band)
+      $25 - $75  → 2.0×
+      >= $75     → 1.7× (high-ticket, price-sensitive)
+
+    Returns rounded-to-2dp. Returns 0.0 if cost is invalid.
+    """
+    try:
+        c = float(cost_price)
+    except (TypeError, ValueError):
+        return 0.0
+    if c <= 0:
+        return 0.0
+    if c < 3.0:
+        mult = 4.0
+    elif c < 10.0:
+        mult = 3.0
+    elif c < 25.0:
+        mult = 2.5
+    elif c < 75.0:
+        mult = 2.0
+    else:
+        mult = 1.7
+    return round(c * mult, 2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUZZY TITLE DEDUPLICATION
+# ─────────────────────────────────────────────────────────────────────────────
+# AE returns multiple SKUs for the same product (different colors, sizes,
+# sellers) with different product_ids but near-identical titles. The current
+# dedup is product_id only, so the same item appears 3-5 times in results.
+# Fuzzy title dedup drops near-duplicates AFTER scoring (so we keep the
+# higher-OI variant of each cluster).
+
+def _dedupe_by_title(products: List[Dict], threshold: float = 0.7) -> List[Dict]:
+    """Drop near-duplicate products by title token overlap.
+
+    For each pair, compute the Jaccard-ish ratio of shared 4+-char tokens
+    over the smaller token set. If ratio > threshold, drop the lower-scored
+    product. Linear in product count after sorting (we only compare each
+    product to those we've kept so far, so it's O(n × kept) ≈ O(n²) worst
+    case; with ~100 products this is fine).
+
+    Operates on `clean_title` if present, falling back to `title`.
+    """
+    if not products:
+        return products
+
+    def _tokens(p: Dict) -> set:
+        title = (p.get('clean_title') or p.get('title') or '').lower()
+        return {t.strip(',.;:') for t in title.split() if len(t.strip(',.;:')) > 3}
+
+    # Sort by oi_score desc so kept[] holds winners; drops are losers.
+    ordered = sorted(products, key=lambda p: p.get('oi_score', 0) or 0, reverse=True)
+    kept: List[Dict] = []
+    kept_token_sets: List[set] = []
+    dropped = 0
+
+    for p in ordered:
+        toks = _tokens(p)
+        if not toks:
+            kept.append(p)
+            kept_token_sets.append(toks)
+            continue
+        is_dup = False
+        for prior_toks in kept_token_sets:
+            if not prior_toks:
+                continue
+            overlap = len(toks & prior_toks)
+            min_len = min(len(toks), len(prior_toks))
+            if min_len > 0 and (overlap / min_len) > threshold:
+                is_dup = True
+                break
+        if is_dup:
+            dropped += 1
+        else:
+            kept.append(p)
+            kept_token_sets.append(toks)
+
+    if dropped:
+        logger.info(f"   🔁 Title dedup: kept {len(kept)} / dropped {dropped} near-duplicates")
+    return kept
+
+
 def _resolve_product_url(product: Dict) -> Optional[str]:
     """
     Resolve the outbound source URL for a product across supplier shapes.
@@ -925,7 +1120,34 @@ class ProductDiscoveryEngine:
                 f"   🔗 URL validation: kept {len(url_valid)} / dropped {url_dropped}"
             )
 
+        # Backfill clean_title for any product missing one (CJ products
+        # don't get cleaned at supplier-fetch time; AE products already do).
+        # Without this, the dedup below uses raw 120-char keyword salad and
+        # finds fewer matches.
+        for p in url_valid:
+            if not p.get('clean_title'):
+                p['clean_title'] = _clean_product_title(
+                    p.get('title', ''), max_chars=60
+                )
+
+        # Fuzzy-title dedup BEFORE the max_products slice — drop near-
+        # duplicates so we don't waste tier budget on multiple SKUs of
+        # the same product. Sorted by oi_score in the dedup helper, so
+        # the higher-OI variant wins each cluster.
+        url_valid = _dedupe_by_title(url_valid, threshold=0.7)
+
         final = url_valid[:max_products]
+
+        # Caption generation (Task #16). Generates a per-product Shopify
+        # caption via Claude on the top N products only — capped at 20
+        # to keep cost bounded (~$0.01/call × 20 = $0.20/discovery).
+        #
+        # Why here and not earlier: we want captions only for products
+        # the user is actually going to see (post-rank, post-dedup,
+        # post-URL-validation). Generating 100+ captions on raw fetch
+        # results would burn ~$1/discovery on products that get pruned.
+        if final:
+            await self._generate_captions_for_top(final, top_n=20)
 
         # Add metadata
         total_time = time.time() - start_time
@@ -1365,7 +1587,11 @@ class ProductDiscoveryEngine:
                 if cost_price == 0:
                     continue
                 
-                suggested_price = round(cost_price * 2.5, 2)
+                # Category-aware markup (replaces hardcoded cost × 2.5).
+                # See _suggested_price_for_cost docstring for the bracket
+                # rationale: cheap items tolerate higher markups, expensive
+                # ones need tighter margins to stay competitive.
+                suggested_price = _suggested_price_for_cost(cost_price)
                 profit = round(suggested_price - cost_price, 2)
                 
                 # === CAPTURE ALL PRODUCT IMAGES FOR AI ===
@@ -1417,10 +1643,17 @@ class ProductDiscoveryEngine:
                 # as a tertiary sentiment tier, capped (see _calculate_scores).
                 ae_evidence = self._build_aliexpress_evidence(item)
 
+                _raw_title = item.get('product_title', 'AliExpress Product')
                 product = {
                     "product_id": str(item.get('product_id', '')),
-                    "title": item.get('product_title', 'AliExpress Product'),
-                    "title_normalized": self._normalize_title(item.get('product_title', '')),
+                    # Original AE title — preserved for the qualitative agent
+                    # which wants full keyword context for sentiment matching.
+                    "title": _raw_title,
+                    # Human-readable label for UI display. AE titles are
+                    # 120+ chars of keyword stuffing; clean_title is
+                    # ~60 chars of the head noun phrase.
+                    "clean_title": _clean_product_title(_raw_title, max_chars=60),
+                    "title_normalized": self._normalize_title(_raw_title),
                     # PRICING - With transparency indicators
                     "cost_price": cost_price,
                     "supplier_cost": cost_price,
@@ -2181,6 +2414,81 @@ class ProductDiscoveryEngine:
             }
 
         return products
+
+    async def _generate_captions_for_top(self, products: List[Dict], top_n: int = 20) -> None:
+        """Generate per-product Shopify captions for the top N products.
+
+        Mutates products in-place: sets product['caption'] when generation
+        succeeds, leaves it None on failure. Capped at top_n to bound cost
+        (Claude haiku ~$0.01/call → top_n=20 = ~$0.20/discovery).
+
+        Failure modes (all degrade gracefully):
+          - Caption module not importable → all captions stay None
+          - Per-product Claude call errors out → that product's caption None
+          - Per-product Claude call times out → that product's caption None
+
+        Caption text design (anti-template) lives in
+        product_analysis_routes._generate_caption_with_claude — see comments
+        there for the prompt rationale (Tasks #16 / #63).
+        """
+        if not products:
+            return
+
+        # Lazy import to avoid an api↔intelligence circular import at startup
+        try:
+            from ospra_os.api.product_analysis_routes import _generate_caption_with_claude
+        except Exception as e:
+            logger.warning(f"   ⚠️ Caption generator unavailable: {e}")
+            return
+
+        cap_start = time.time()
+        target = products[:top_n]
+        logger.info(f"\n[CAPTIONS] Generating Shopify copy for top {len(target)} products...")
+
+        async def _one(p: Dict) -> tuple:
+            try:
+                title = p.get('title') or p.get('clean_title') or ''
+                niche = p.get('niche') or 'general'
+                price = float(p.get('suggested_price') or p.get('cost_price') or 0)
+                tags = p.get('tags') or []
+                if not isinstance(tags, list):
+                    tags = []
+                # Per-call timeout — Claude haiku is fast (~2s) but we don't
+                # want one stuck call to block the discovery response.
+                cap = await asyncio.wait_for(
+                    _generate_caption_with_claude(
+                        title=title,
+                        niche=niche,
+                        price=price,
+                        tags=tags,
+                    ),
+                    timeout=8.0,
+                )
+                return (p, cap, None)
+            except (asyncio.TimeoutError, Exception) as e:
+                return (p, None, str(e)[:120])
+
+        results = await asyncio.gather(*[_one(p) for p in target], return_exceptions=False)
+
+        ok = 0
+        for p, cap, err in results:
+            if cap and isinstance(cap, str) and cap.strip():
+                p['caption'] = cap.strip()
+                ok += 1
+            else:
+                p['caption'] = None
+                if err:
+                    logger.debug(f"   caption miss for '{(p.get('title') or '')[:30]}': {err}")
+
+        # Mark products beyond the cap so the UI can disambiguate
+        # "no caption yet" from "caption generation failed".
+        for p in products[top_n:]:
+            p.setdefault('caption', None)
+
+        logger.info(
+            f"   ✓ Captions: {ok}/{len(target)} generated "
+            f"(took {time.time() - cap_start:.2f}s)"
+        )
 
     async def _enrich_with_amazon_reviews(self, products: List[Dict], niche: str) -> List[Dict]:
         """
