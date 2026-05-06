@@ -285,6 +285,14 @@ async def get_products(
     min_score: float = Query(30.0, ge=0, le=100, description="Minimum OI score"),
     include_sentiment: bool = Query(True, description="Include social sentiment"),
     include_ai_images: bool = Query(False, description="Generate AI images for top products (~$0.04 each)"),
+    include_captions: bool = Query(
+        True,
+        description=(
+            "Generate Shopify captions via Claude for top 10 products. "
+            "Adds ~6-12s on a cold call (cached on subsequent hits). "
+            "Set false for fast internal probes / audit scripts."
+        ),
+    ),
     force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data"),
     current_user: Optional[TokenPayload] = Depends(get_current_user),
 ):
@@ -384,6 +392,7 @@ async def get_products(
                 max_products=fetch_count,
                 min_score=min_score,
                 include_sentiment=include_sentiment,
+                include_captions=include_captions,
             )
         except Exception as discovery_error:
             logger.error(f"[ERROR] Discovery engine failed: {discovery_error}", exc_info=True)
@@ -520,6 +529,14 @@ async def quick_discover(
             "Safely no-ops if xAI or Reddit aren't configured."
         ),
     ),
+    include_captions: bool = Query(
+        True,
+        description=(
+            "Generate Shopify captions via Claude for top 10 products. "
+            "Adds ~6-12s on a cold call (cached on subsequent hits). "
+            "Set false for fast internal probes / audit scripts."
+        ),
+    ),
     force_refresh: bool = Query(False, description="Bypass cache and fetch fresh data"),
     current_user: Optional[TokenPayload] = Depends(get_current_user),
 ):
@@ -621,6 +638,7 @@ async def quick_discover(
                 niche=niche,
                 max_products=fetch_count,
                 include_sentiment=include_sentiment,
+                include_captions=include_captions,
             )
         except Exception as discovery_error:
             logger.error(f"[ERROR] Discovery engine failed: {discovery_error}", exc_info=True)
@@ -825,10 +843,14 @@ async def get_multi_niche_products(
         
         for niche in niche_list:
             try:
+                # Multi-niche admin endpoint — keep it fast: no sentiment,
+                # no captions. Callers wanting full enrichment should hit
+                # /quick or /products per-niche.
                 products = await engine.discover_products(
                     niche=niche,
                     max_products=per_niche,
-                    include_sentiment=False
+                    include_sentiment=False,
+                    include_captions=False,
                 )
                 results[niche] = products
             except Exception as e:
@@ -1056,11 +1078,14 @@ async def warm_cache(
                     }
                     continue
 
-                # Fetch and cache
+                # Fetch and cache — warm admin path, skip slow enrichers.
+                # Real user calls hitting these niches will fan-out
+                # sentiment + captions on top of the cached supplier data.
                 products = await engine.discover_products(
                     niche=niche,
                     max_products=50,
-                    include_sentiment=False
+                    include_sentiment=False,
+                    include_captions=False,
                 )
 
                 if products:

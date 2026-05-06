@@ -666,7 +666,8 @@ class ProductDiscoveryEngine:
         niche: str = "smart_home",
         max_products: int = 20,
         min_score: float = 30.0,
-        include_sentiment: bool = True
+        include_sentiment: bool = True,
+        include_captions: bool = True,
     ) -> List[Dict]:
         """
         TREND-FIRST discovery flow with PARALLEL data source queries.
@@ -1139,15 +1140,20 @@ class ProductDiscoveryEngine:
         final = url_valid[:max_products]
 
         # Caption generation (Task #16). Generates a per-product Shopify
-        # caption via Claude on the top N products only — capped at 20
-        # to keep cost bounded (~$0.01/call × 20 = $0.20/discovery).
+        # caption via Claude on the top N products only.
         #
-        # Why here and not earlier: we want captions only for products
-        # the user is actually going to see (post-rank, post-dedup,
-        # post-URL-validation). Generating 100+ captions on raw fetch
-        # results would burn ~$1/discovery on products that get pruned.
-        if final:
-            await self._generate_captions_for_top(final, top_n=20)
+        # Cost cap: top_n=10 (was 20) × ~$0.01 = ~$0.10/discovery.
+        # Latency cap: even with parallel asyncio.gather, Claude haiku
+        # rate limits queue calls in practice — 10 captions land in
+        # ~6-12s, 20 captions land in ~15-25s. The drop from 20 → 10
+        # is the biggest single latency win available without further
+        # caching.
+        #
+        # Gated on include_captions so callers can disable for fast
+        # internal probes (audit scripts, smoke tests, prefetch warmers).
+        # Frontend defaults this to True so the UX still gets captions.
+        if final and include_captions:
+            await self._generate_captions_for_top(final, top_n=10)
 
         # Add metadata
         total_time = time.time() - start_time
