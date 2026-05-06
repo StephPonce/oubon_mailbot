@@ -7,12 +7,19 @@ than paying subscribers.
 
 Rate limits:
 - Nest: 3 discoveries/day, min 4 hours between
-- Flight: 10 discoveries/day, min 2 hours between  
+- Flight: 10 discoveries/day, min 2 hours between
 - Soar: Unlimited, min 30 min between
-- Stratosphere: Unlimited, min 5 min between (+ on-demand override)
+- Stratosphere: Unlimited, min 30 sec between (+ on-demand override)
+
+Dev mode:
+- When ENVIRONMENT=development the limiter is disabled entirely.
+  All check_rate_limit() calls return (True, None, None). Without
+  this the dev experience is brutal — every Retry click triggers
+  a 5-minute cooldown that 429s the dashboard polling endpoints.
 """
 
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 from collections import defaultdict
@@ -21,6 +28,23 @@ import json
 from ospra_os.core.tiers import SubscriptionTier, get_tier_feature
 
 logger = logging.getLogger(__name__)
+
+
+# Rate limiter is ENABLED only when ENVIRONMENT=production. Anything else
+# (development, staging, unset) disables it. Inverted from the natural
+# "enable in production" check because most dev .env files don't set
+# ENVIRONMENT at all, and we'd rather have a usable dev experience by
+# default than silently gate every Retry click on a 5-minute cooldown.
+#
+# To enable rate limiting in a non-prod environment for testing, set
+# ENVIRONMENT=production explicitly.
+_RATE_LIMITER_DISABLED = os.getenv("ENVIRONMENT", "").lower() != "production"
+if _RATE_LIMITER_DISABLED:
+    logger.warning(
+        "[RATE LIMITER] Disabled — ENVIRONMENT != 'production' "
+        f"(got '{os.getenv('ENVIRONMENT', '<unset>')}'). "
+        "Set ENVIRONMENT=production to enable per-tier discovery limits."
+    )
 
 
 # Rate limit configuration by tier
@@ -42,8 +66,13 @@ TIER_RATE_LIMITS = {
     },
     SubscriptionTier.STRATOSPHERE: {
         "max_per_day": -1,  # Unlimited
-        "min_interval_minutes": 5,
-        "allow_on_demand": True,  # Can bypass with on-demand flag
+        # Was 5 minutes — but Stratosphere users pay $199/mo and the
+        # 5-minute gap was throttling legitimate "I want to see fresh
+        # results" UX (and turning every dev session into a wait game).
+        # 30 seconds prevents accidental double-clicks without blocking
+        # genuine multiple-discovery workflows.
+        "min_interval_minutes": 0.5,  # 30 seconds
+        "allow_on_demand": True,
     },
 }
 
@@ -91,10 +120,14 @@ class TierRateLimiter:
     ) -> Tuple[bool, Optional[str], Optional[int]]:
         """
         Check if user can perform action.
-        
+
         Returns:
             (allowed, error_message, retry_after_minutes)
         """
+        # Dev-mode short-circuit — see _RATE_LIMITER_DISABLED docstring.
+        if _RATE_LIMITER_DISABLED:
+            return True, None, None
+
         limits = TIER_RATE_LIMITS.get(tier, TIER_RATE_LIMITS[SubscriptionTier.NEST])
         
         # Stratosphere with on-demand can bypass
@@ -119,7 +152,10 @@ class TierRateLimiter:
             time_since_last = datetime.now(timezone.utc) - last_request
             if time_since_last < min_interval:
                 remaining = min_interval - time_since_last
-                remaining_minutes = int(remaining.total_seconds() / 60) + 1
+                remaining_seconds = int(remaining.total_seconds()) + 1
+                if remaining_seconds < 60:
+                    return False, f"Please wait {remaining_seconds} seconds before next {action}.", 1
+                remaining_minutes = remaining_seconds // 60 + 1
                 return False, f"Please wait {remaining_minutes} minutes before next {action}.", remaining_minutes
         
         return True, None, None

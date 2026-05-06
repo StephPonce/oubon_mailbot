@@ -211,14 +211,25 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
-# Check if running in development mode (DEBUG=true increases rate limits)
+# Check if running in development mode. Two ways to opt into dev limits:
+#   1. DEBUG=true (legacy)
+#   2. ENVIRONMENT != "production" (matches the same convention used by
+#      ospra_os.middleware.rate_limiter so both limiters are in sync)
 import os
-_IS_DEBUG = os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+_IS_DEBUG = (
+    os.getenv("DEBUG", "").lower() in ("true", "1", "yes")
+    or os.getenv("ENVIRONMENT", "").lower() != "production"
+)
 
 # Rate limit configurations by tier
 # In DEBUG mode, limits are significantly increased for local development
 if _IS_DEBUG:
-    logger.info("[DEV] Rate limiting in DEBUG mode - limits increased for local development")
+    logger.warning(
+        "[DEV] Rate limiting in DEBUG mode — limits 20x higher than production. "
+        f"DEBUG={os.getenv('DEBUG', '<unset>')!r} "
+        f"ENVIRONMENT={os.getenv('ENVIRONMENT', '<unset>')!r}. "
+        "Set ENVIRONMENT=production to enable strict tier limits."
+    )
 
 TIER_LIMITS = {
     # Free tier (nest)
