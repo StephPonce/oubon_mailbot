@@ -350,7 +350,16 @@ class OspraAPI {
     const count = Math.min(params.count || params.limit || 10, 100);
     const includeAiImages = params.includeAiImages !== false; // Enable AI images by default
     const includeSentiment = params.includeSentiment !== false; // Enable sentiment by default
-    const url = `${API_BASE_URL}/api/discovery/quick/${niche}?count=${count}&include_ai_images=${includeAiImages}&include_sentiment=${includeSentiment}`;
+    // Captions are LAZY-LOADED. Reason: caption generation hits Claude
+    // ~10x in series under rate-limit, adding 6-12s to every cold load.
+    // The dashboard doesn't render captions on the card until the user
+    // expands the product, so we don't need them on first paint.
+    // Callers that DO want them eagerly can pass includeCaptions: true.
+    // When false here, the backend skips caption generation entirely;
+    // the product card lazy-fetches per-product via generateCaption()
+    // when the user opens the detail panel.
+    const includeCaptions = params.includeCaptions === true;
+    const url = `${API_BASE_URL}/api/discovery/quick/${niche}?count=${count}&include_ai_images=${includeAiImages}&include_sentiment=${includeSentiment}&include_captions=${includeCaptions}`;
 
     // ---------- REQUEST DEDUPLICATION ----------
     // If an identical request is already in-flight, return the same promise

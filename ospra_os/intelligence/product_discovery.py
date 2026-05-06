@@ -3155,24 +3155,38 @@ class ProductDiscoveryEngine:
             # AliExpress velocity — Western-trend fallback. Mirror of the
             # AE-buyer sentiment fallback: when no Western trend signal
             # (Google Trends / TikTok / Twitter buzz) fires, fall back to
-            # AE buzz_score gated on recent_sales volume. A product with
-            # buzz=85 and 11k recent sales is meaningfully trending even
-            # if Western public-social ignores it.
+            # AE buzz_score / recent_sales as a velocity proxy.
             #
-            # Why gated: buzz_score alone can be inflated by old reviews,
-            # so we require >1k recent sales to confirm the buzz reflects
-            # current buyer interest, not historical noise.
+            # Two-tier gating after audit Apr 2026 showed only 3/67
+            # products cleared the original "buzz>50 AND recent>1000"
+            # threshold. Most AE products have buzz in the 30-60 range
+            # because the buzz_score is a composite — a product with 200
+            # recent sales but no buzz_score still shouldn't score null.
             #
-            # Cap at 80: we have velocity but no direction (no week-over-
-            # week comparison from AE), so this branch can't claim
-            # peak-trending. Western signals are the only way to hit 90+.
+            # STRONG gate: buzz>50 AND recent>1000 → score 30 + buzz*0.5
+            #              (premium velocity — this is genuine momentum)
+            # WEAK gate:   recent>200 OR (buzz>30 AND recent>50)
+            #              → score capped at 60, scaled with sales
+            #              (sub-1k recent or modest buzz — we have a
+            #              velocity signal but not a strong one)
+            #
+            # Cap at 80 STRONG / 60 WEAK: we have velocity but no
+            # direction. Western signals remain the only path to 90+.
             if not has_trend_signal:
                 ae_buzz_for_trend = float(ae_signals.get('buzz_score') or 0)
                 ae_recent_for_trend = int(ae_signals.get('recent_sales') or 0)
                 if ae_buzz_for_trend > 50 and ae_recent_for_trend > 1000:
                     trend_score = min(80, 30 + ae_buzz_for_trend * 0.5)
                     has_trend_signal = True
-                    product['trend_source'] = 'aliexpress_velocity'
+                    product['trend_source'] = 'aliexpress_velocity_strong'
+                elif ae_recent_for_trend > 200 or (ae_buzz_for_trend > 30 and ae_recent_for_trend > 50):
+                    # Map sales count to a 0-30 lift, capped at 60 total.
+                    # 50 sales → +10, 200 → +18, 500 → +22, 2k+ → +30.
+                    import math as _m
+                    sales_lift = min(30, _m.log10(1 + ae_recent_for_trend) * 8)
+                    trend_score = min(60, 30 + sales_lift)
+                    has_trend_signal = True
+                    product['trend_source'] = 'aliexpress_velocity_weak'
 
             # Same fix as demand: don't pretend the 55-baseline is a real
             # score when no Google Trends / direction / viral / TikTok /
