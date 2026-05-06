@@ -211,6 +211,152 @@ def _suggested_price_for_cost(cost_price: float) -> float:
 # Fuzzy title dedup drops near-duplicates AFTER scoring (so we keep the
 # higher-OI variant of each cluster).
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ANTI-SATURATION SCORING — the differentiator
+# ─────────────────────────────────────────────────────────────────────────────
+# Sell-The-Trend, Minea, Dropispy, EcomHunt all surface "winners" — products
+# that already have many advertisers, many Shopify clones, many Amazon
+# listings competing for the same customer. By the time those tools flag a
+# product, the field is crowded and ad costs are bid up.
+#
+# Ospra's differentiator is supposed to be: find the WINNERS BEFORE the
+# field crowds. That requires a saturation score — measuring HOW CROWDED
+# the market is for a given product — and using it to discount the OI score.
+#
+# Higher saturation → bigger OI discount. A product with strong sentiment
+# AND low saturation rises to the top. A product with strong sentiment but
+# heavy saturation (200 advertisers, 100 Amazon clones, declining Trends)
+# drops below.
+#
+# Phase 1 (this file): proxies built from data we ALREADY collect:
+#   - AE order count (very high = late-stage saturated)
+#   - Amazon match count (many matching listings = crowded)
+#   - AE discount % (heavy discounts = price war = saturated)
+#   - Google Trends direction (rising = early, falling = late)
+#   - Twitter chatter volume (high = mainstream = saturated)
+#
+# Phase 2 (next session): when Meta Ad Library wires up, replace these
+# proxies with direct measures (advertiser_count, ad_age_distribution).
+# The function signature stays — only the inputs upgrade.
+
+def _compute_saturation(product: Dict) -> Dict:
+    """Compute market saturation for a product. Returns a dict so callers
+    can use both the scalar and the breakdown for explainability.
+
+    Returns:
+        {
+          'score': float,          # 0.0 (uncrowded) to 1.0 (saturated)
+          'confidence': float,     # 0.0 to 1.0 — how much input data we had
+          'signals': dict,         # per-signal contribution for UI/debug
+        }
+
+    When confidence is low (< 0.3), score defaults to 0.5 (unknown). We
+    can't penalize products for missing data — that would just hide
+    products with sparse signals.
+    """
+    signals: Dict[str, float] = {}
+    weighted_sum = 0.0
+    weight_total = 0.0
+
+    # 1. Amazon listing density — many matching Amazon listings = crowded.
+    # 0 matches → 0 sat, 50+ matches → 0.9 sat. (We only get match_count
+    # when amazon_evidence found real matches; absence is "unknown" not
+    # "uncrowded", so we don't penalize the missing case.)
+    amazon = product.get('amazon_evidence') or {}
+    if amazon.get('found_matches'):
+        match_count = int(amazon.get('match_count') or 0)
+        sat = min(0.9, match_count / 50.0)
+        signals['amazon_listing_density'] = round(sat, 3)
+        weighted_sum += sat * 0.30
+        weight_total += 0.30
+
+    # 2. AE total order volume — very high = late-stage saturated.
+    # Sweet spot is 200-2000 orders (early growth, not yet flooded).
+    # >50k orders typically means the product peaked 6+ months ago and
+    # the market is now race-to-bottom.
+    ali_orders = int(product.get('lastest_volume') or product.get('sales_count') or 0)
+    if ali_orders > 0:
+        if ali_orders >= 50000:
+            sat = 0.85
+        elif ali_orders >= 10000:
+            sat = 0.55
+        elif ali_orders >= 2000:
+            sat = 0.25  # ← sweet spot, growing but not crowded
+        elif ali_orders >= 200:
+            sat = 0.15  # ← very early, opportunity zone
+        else:
+            sat = 0.10  # too early, may not have proven demand yet
+        signals['ali_order_volume'] = round(sat, 3)
+        weighted_sum += sat * 0.25
+        weight_total += 0.25
+
+    # 3. AE discount % — heavy discounting suggests price war / supplier
+    # competition, which only emerges when many sellers chase the same
+    # product. 0% discount = no price pressure; 70%+ discount = deep
+    # commodity competition.
+    discount = float(product.get('discount_pct') or 0)
+    if discount > 0:
+        sat = min(0.9, discount / 80.0)
+        signals['ae_discount_pressure'] = round(sat, 3)
+        weighted_sum += sat * 0.15
+        weight_total += 0.15
+
+    # 4. Google Trends direction — rising = early-stage opportunity,
+    # plateau = mature, falling = past peak. We treat 'unknown' as
+    # missing rather than neutral so we don't dilute confidence with
+    # null inputs.
+    data_sources = product.get('data_sources') or {}
+    gt = data_sources.get('google_trends') or {}
+    trend_dir = (gt.get('direction') or product.get('trend_direction') or '').lower()
+    if trend_dir == 'rising':
+        sat = 0.15  # Early — saturation low
+        signals['trend_phase'] = round(sat, 3)
+        weighted_sum += sat * 0.20
+        weight_total += 0.20
+    elif trend_dir == 'falling':
+        sat = 0.85  # Past peak — saturation high
+        signals['trend_phase'] = round(sat, 3)
+        weighted_sum += sat * 0.20
+        weight_total += 0.20
+    elif trend_dir == 'stable':
+        sat = 0.55  # Plateau — moderate
+        signals['trend_phase'] = round(sat, 3)
+        weighted_sum += sat * 0.20
+        weight_total += 0.20
+
+    # 5. Twitter chatter volume — high tweet count = mainstream awareness
+    # = field is already paying attention. <20 tweets = niche, >200 = mass
+    # market discussion (likely already saturated).
+    twitter = product.get('twitter_evidence') or {}
+    if twitter.get('found_real_tweets'):
+        tweet_count = int(twitter.get('tweet_count') or 0)
+        sat = min(0.85, tweet_count / 200.0)
+        signals['twitter_chatter'] = round(sat, 3)
+        weighted_sum += sat * 0.10
+        weight_total += 0.10
+
+    if weight_total == 0:
+        # No saturation data at all — return unknown / neutral.
+        return {
+            'score': 0.5,
+            'confidence': 0.0,
+            'signals': {},
+            'note': 'no_saturation_data_available',
+        }
+
+    score = weighted_sum / weight_total
+    # Confidence = fraction of the ideal 1.0 weight we actually filled.
+    # Helps the UI show "saturation: HIGH (high confidence)" vs
+    # "saturation: HIGH (low confidence — only 1 signal)".
+    confidence = min(1.0, weight_total)
+
+    return {
+        'score': round(score, 3),
+        'confidence': round(confidence, 3),
+        'signals': signals,
+    }
+
+
 def _dedupe_by_title(products: List[Dict], threshold: float = 0.7) -> List[Dict]:
     """Drop near-duplicate products by title token overlap.
 
@@ -3726,6 +3872,49 @@ class ProductDiscoveryEngine:
             relevance_multiplier = 0.70 + (relevance / 100) * 0.30
 
             oi_score = base_score * relevance_multiplier
+
+            # ──────────────────────────────────────────────────────────────
+            # ANTI-SATURATION DISCOUNT — the differentiator
+            # ──────────────────────────────────────────────────────────────
+            # Two products with identical demand+trend+sentiment can have
+            # very different opportunity values. The one in an uncrowded
+            # market (few competitors, rising trend, low ad density) is
+            # worth chasing; the one in a saturated market is a money pit.
+            #
+            # Multiplier curve: oi *= (1 - saturation)^0.5
+            #   sat 0.0 (uncrowded) → 1.00× (full credit)
+            #   sat 0.3            → 0.84× (16% haircut)
+            #   sat 0.5 (unknown)  → 0.71× (29% haircut — neutral default)
+            #   sat 0.7 (crowded)  → 0.55× (45% haircut)
+            #   sat 0.9 (saturated)→ 0.32× (68% haircut — push to bottom)
+            #
+            # The square-root softens the penalty so we don't over-punish
+            # mid-saturation products while still meaningfully demoting
+            # the truly crowded ones.
+            #
+            # Confidence-aware: if we don't have enough saturation data
+            # (confidence < 0.3) we apply a neutral 0.85× multiplier
+            # rather than the unknown=0.5 → 0.71× hit. Otherwise products
+            # with sparse data get unfairly punished.
+            saturation_result = _compute_saturation(product)
+            sat_score = saturation_result['score']
+            sat_conf = saturation_result['confidence']
+
+            if sat_conf >= 0.3:
+                saturation_multiplier = (1.0 - sat_score) ** 0.5
+            else:
+                # Low-confidence path — slight haircut but don't penalize
+                # heavily for missing data.
+                saturation_multiplier = 0.85
+
+            oi_score = oi_score * saturation_multiplier
+
+            # Persist on the product so the UI can show "saturation: HIGH
+            # (12 Amazon clones, plateau trend)" alongside the score.
+            product['saturation_score'] = sat_score
+            product['saturation_confidence'] = sat_conf
+            product['saturation_signals'] = saturation_result.get('signals', {})
+            product['saturation_note'] = saturation_result.get('note')
 
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:
