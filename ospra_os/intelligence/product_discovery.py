@@ -1756,9 +1756,35 @@ class ProductDiscoveryEngine:
                 # original is missing.
                 affiliate_price_str = item.get('target_sale_price', '0')
                 list_price_str = item.get('target_original_price', '0')
+                # Additional candidates: AE often returns multiple price
+                # fields and which one matches what the buyer SEES on AE.com
+                # depends on locale, app vs web, deal eligibility, etc.
+                # Log all of them once per product so we can see which one
+                # actually corresponds to the consumer-facing price.
+                _app_sale_price = item.get('target_app_sale_price', '')
+                _sale_price_cny = item.get('sale_price', '')
+                _original_price_cny = item.get('original_price', '')
 
                 affiliate_price = float(affiliate_price_str) if affiliate_price_str else 0
                 list_price = float(list_price_str) if list_price_str else 0
+
+                # DEBUG: log all price fields for the first 3 products in each
+                # batch so we can compare against what AE shows in browser.
+                # Set ALIEXPRESS_PRICE_DEBUG=1 in .env to enable, or remove
+                # this block once we've nailed which field matches what.
+                if os.getenv('ALIEXPRESS_PRICE_DEBUG', '').lower() in ('1', 'true', 'yes'):
+                    if len(products) < 3:
+                        logger.info(
+                            f"\n[AE PRICE DEBUG] product_id={item.get('product_id')}\n"
+                            f"  title: {(item.get('product_title') or '')[:60]}\n"
+                            f"  target_sale_price       = {affiliate_price_str!r}\n"
+                            f"  target_original_price   = {list_price_str!r}\n"
+                            f"  target_app_sale_price   = {_app_sale_price!r}\n"
+                            f"  sale_price (CNY)        = {_sale_price_cny!r}\n"
+                            f"  original_price (CNY)    = {_original_price_cny!r}\n"
+                            f"  promotion_link          = {(item.get('promotion_link') or '')[:80]}\n"
+                            f"  → currently using {list_price!r} as cost_price"
+                        )
 
                 # Real cost = list price (what buyers pay on AE.com).
                 # Fall back to affiliate price only if list is missing.
