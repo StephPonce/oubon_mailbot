@@ -421,10 +421,18 @@ function ProductCard({ product, onClick }) {
               {product.rating.toFixed(1)}
             </span>
           )}
-          {product.commission_rate && (
+          {product.commission_rate && product.source === 'aliexpress' && (
+            <span
+              className="flex items-center gap-1 text-green-400/80"
+              title="AliExpress Standard Affiliate Program: flat 7% across all products in the standard product feed. To unlock variable commissions (10-30%), Ospra would need to query the AE Dropshipping API top-sellers feed instead — tracked as a follow-up. Until then, this number is constant and shouldn't drive product selection."
+            >
+              {product.commission_rate}% AE std
+            </span>
+          )}
+          {product.commission_rate && product.source !== 'aliexpress' && (
             <span
               className="flex items-center gap-1 text-green-400"
-              title="AliExpress affiliate commission rate. May be a flat-rate default for the program — does not always reflect per-product variance."
+              title="Supplier commission rate."
             >
               {product.commission_rate}% comm
             </span>
