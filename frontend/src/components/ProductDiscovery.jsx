@@ -407,9 +407,12 @@ function ProductCard({ product, onClick }) {
         {/* Quick Stats */}
         <div className="flex items-center gap-3 text-xs text-white/50">
           {product.sales_count > 0 && (
-            <span className="flex items-center gap-1">
+            <span
+              className="flex items-center gap-1"
+              title="AliExpress 'lastest_volume' field — recent orders (rolling ~30-day window). NOT lifetime cumulative sales (which AE shows as '5,000+ sold' on listings)."
+            >
               <ShoppingCart className="w-3 h-3" />
-              {product.sales_count.toLocaleString()}
+              {product.sales_count.toLocaleString()} <span className="text-white/40">recent</span>
             </span>
           )}
           {product.rating && (
@@ -419,7 +422,10 @@ function ProductCard({ product, onClick }) {
             </span>
           )}
           {product.commission_rate && (
-            <span className="flex items-center gap-1 text-green-400">
+            <span
+              className="flex items-center gap-1 text-green-400"
+              title="AliExpress affiliate commission rate. May be a flat-rate default for the program — does not always reflect per-product variance."
+            >
               {product.commission_rate}% comm
             </span>
           )}
@@ -719,7 +725,7 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
         </h4>
         <span
           className="text-[10px] text-white/40 italic"
-          title="Sentiment signals from live social platforms. Twitter data is paraphrased from Grok (not live scraped). Reddit data is real and clickable."
+          title="Sentiment signals from live social platforms. Twitter data is paraphrased from Grok (not live scraped). Amazon shows fuzzy-matched listings and per-product review text when available."
         >
           What we actually found
         </span>
@@ -1108,10 +1114,18 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
         )}
       </div>
 
+      {/* Reddit sub-section — REMOVED (May 2026 architecture pivot).
+          Reddit was a lagging indicator that didn't fire on niche dropship
+          products before they went viral. Replaced by Meta Ad Library +
+          TikTok Shop bestsellers as leading indicators. The data shape is
+          still propagated through the API for backwards compat with stored
+          products, but we don't render it in the UI anymore. */}
+      {false && (
+      <>
       {/* Divider */}
       <div className="border-t border-white/10" />
 
-      {/* ── REDDIT SUB-SECTION ──────────────────────────────────────────── */}
+      {/* ── REDDIT SUB-SECTION (LEGACY, HIDDEN) ─────────────────────────── */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -1243,6 +1257,8 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -1462,9 +1478,27 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
       color: 'text-cyan-400',
       value: product.trend_score,
       unavailable: product.trend_score === null || product.trend_score === undefined,
-      note: (product.trend_score === null || product.trend_score === undefined)
-        ? 'No Google Trends, TikTok, or viral indicator data.'
-        : null,
+      // Surface what the trend signal is actually based on, instead of just
+      // showing the score. trend_source is set by the backend in
+      // product_discovery.py when AE-velocity fallback fires:
+      //   'aliexpress_velocity_strong' = buzz>50 + recent>1k (real momentum)
+      //   'aliexpress_velocity_weak'   = recent>200 (some signal, lower confidence)
+      // When neither label is set, the score came from Google Trends / TikTok /
+      // Twitter buzz directly — those should already populate the social
+      // evidence panel. This avoids "Trend: 72.5 / no evidence shown".
+      note: (() => {
+        if (product.trend_score === null || product.trend_score === undefined) {
+          return 'No Google Trends, TikTok, or viral indicator data.';
+        }
+        const src = product.trend_source;
+        if (src === 'aliexpress_velocity_strong') {
+          return 'Based on AliExpress velocity (high buzz + recent sales). No Western trend signal yet.';
+        }
+        if (src === 'aliexpress_velocity_weak') {
+          return 'Based on AliExpress recent sales only. Weak signal — Western trend data absent.';
+        }
+        return null; // Score from Western signals — evidence panel shows the rest
+      })(),
     },
     {
       key: 'sentiment_score',
@@ -1932,11 +1966,7 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                   X/Twitter <Check className="w-3 h-3" />
                 </div>
               )}
-              {dataSources.reddit?.available && (
-                <div className="px-3 py-2 rounded-lg border bg-green-500/10 border-green-500/30 text-green-300 text-xs flex items-center gap-2">
-                  Reddit <Check className="w-3 h-3" />
-                </div>
-              )}
+              {/* Reddit chip removed per architecture pivot — see SocialEvidencePanel comment */}
               {/* Show source from product if no detailed data_sources */}
               {activeSourceKeys.length === 0 && product.source && (
                 <div className="px-3 py-2 rounded-lg border bg-blue-500/10 border-blue-500/30 text-blue-300 text-xs flex items-center gap-2">

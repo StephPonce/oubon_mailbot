@@ -670,21 +670,20 @@ class ProductDiscoveryEngine:
         else:
             self.sources_status['x_twitter'] = '[ERROR] No XAI_API_KEY'
         
-        # Reddit
+        # Reddit — DEPRECATED per architecture pivot (May 2026).
+        # Reddit is a LAGGING indicator — by the time a niche dropship product
+        # generates Reddit threads, it's already past the early-winner window
+        # we're trying to surface. Replaced by Meta Ad Library + TikTok Shop
+        # bestsellers as LEADING indicators of currently-winning products.
+        #
+        # Code remains in place (RedditConnector, _enrich_with_reddit_sentiment,
+        # reddit_evidence schema) so we can revive it cheaply if the product
+        # case changes. But the connector is hard-disabled here so no Reddit
+        # fan-out happens at discovery time, no env vars are required, and
+        # the UI won't render a stale "Reddit: Not yet checked" panel.
         self.reddit = None
         self.reddit_available = False
-        reddit_id = os.getenv('OUBONSHOP_REDDIT_CLIENT_ID')
-        reddit_secret = os.getenv('OUBONSHOP_REDDIT_SECRET')
-        if reddit_id and reddit_secret:
-            try:
-                from ospra_os.product_research.connectors.social.reddit import RedditConnector
-                self.reddit = RedditConnector(client_id=reddit_id, client_secret=reddit_secret)
-                self.reddit_available = True
-                self.sources_status['reddit'] = '[SUCCESS] Connected'
-            except Exception as e:
-                self.sources_status['reddit'] = f'[ERROR] {e}'
-        else:
-            self.sources_status['reddit'] = '[ERROR] No credentials'
+        self.sources_status['reddit'] = '[DEPRECATED] Removed per winner-first pivot'
 
         # Amazon reviews (via Apify) - primary social signal (Task #18)
         # Amazon aggregate rating × review count is the strongest purchase-intent
