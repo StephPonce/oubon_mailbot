@@ -1733,62 +1733,37 @@ class ProductDiscoveryEngine:
             )
             
             for item in results:
-                # PRICE FIELDS — AE affiliate API returns multiple price
-                # values per product. The semantics are NOT obvious and we
-                # got this wrong before:
+                # PRICE FIELDS — empirically verified from AE affiliate API
+                # debug output (May 2026). What each field actually means:
                 #
-                #   target_sale_price       — AFFILIATE-DISCOUNTED price.
-                #                             What a buyer would pay if they
-                #                             click an affiliate link. NOT
-                #                             your cost as a dropshipper.
-                #   target_original_price   — STANDARD list price. What the
-                #                             buyer actually pays on AE.com
-                #                             without an affiliate link.
-                #                             This is closer to your real
-                #                             merchant cost when you
-                #                             fulfill orders directly.
-                #   target_app_sale_price   — App-exclusive price (mobile).
+                #   target_sale_price       — ACTUAL CONSUMER PRICE in USD.
+                #                             What a returning AE buyer
+                #                             pays. This IS the dropship-
+                #                             er's real fulfillment cost.
+                #   target_app_sale_price   — Same as target_sale_price in
+                #                             practice (no app discount in
+                #                             observed data).
+                #   target_original_price   — STRIKETHROUGH MSRP. AE's
+                #                             marketing baseline — almost
+                #                             always inflated. Useful only
+                #                             for displaying a "% off"
+                #                             badge on the product card.
+                #                             NOT the cost basis.
+                #   sale_price              — CNY equivalent (chinese yuan).
                 #
-                # We use target_original_price as the cost basis because
-                # the dropshipper isn't fulfilling through their own
-                # affiliate link — they're placing orders the same way any
-                # buyer would. Falling back to target_sale_price only when
-                # original is missing.
-                affiliate_price_str = item.get('target_sale_price', '0')
-                list_price_str = item.get('target_original_price', '0')
-                # Additional candidates: AE often returns multiple price
-                # fields and which one matches what the buyer SEES on AE.com
-                # depends on locale, app vs web, deal eligibility, etc.
-                # Log all of them once per product so we can see which one
-                # actually corresponds to the consumer-facing price.
-                _app_sale_price = item.get('target_app_sale_price', '')
-                _sale_price_cny = item.get('sale_price', '')
-                _original_price_cny = item.get('original_price', '')
+                # Cost basis = target_sale_price. The earlier attempt to
+                # use target_original_price overshot — it returned the
+                # inflated strikethrough MSRP, making profit math fake-rosy.
+                #
+                # Note on the "$0.99 welcome deal" some users see on AE:
+                # that's a one-time per-buyer promotion not present in the
+                # API. Your AE account, after one purchase, sees the real
+                # target_sale_price. So $0.99 is irrelevant to merchant cost.
+                sale_price_str = item.get('target_sale_price', '0')
+                msrp_str = item.get('target_original_price', '0')
 
-                affiliate_price = float(affiliate_price_str) if affiliate_price_str else 0
-                list_price = float(list_price_str) if list_price_str else 0
-
-                # DEBUG: log all price fields for the first 3 products in each
-                # batch so we can compare against what AE shows in browser.
-                # Set ALIEXPRESS_PRICE_DEBUG=1 in .env to enable, or remove
-                # this block once we've nailed which field matches what.
-                if os.getenv('ALIEXPRESS_PRICE_DEBUG', '').lower() in ('1', 'true', 'yes'):
-                    if len(products) < 3:
-                        logger.info(
-                            f"\n[AE PRICE DEBUG] product_id={item.get('product_id')}\n"
-                            f"  title: {(item.get('product_title') or '')[:60]}\n"
-                            f"  target_sale_price       = {affiliate_price_str!r}\n"
-                            f"  target_original_price   = {list_price_str!r}\n"
-                            f"  target_app_sale_price   = {_app_sale_price!r}\n"
-                            f"  sale_price (CNY)        = {_sale_price_cny!r}\n"
-                            f"  original_price (CNY)    = {_original_price_cny!r}\n"
-                            f"  promotion_link          = {(item.get('promotion_link') or '')[:80]}\n"
-                            f"  → currently using {list_price!r} as cost_price"
-                        )
-
-                # Real cost = list price (what buyers pay on AE.com).
-                # Fall back to affiliate price only if list is missing.
-                cost_price = list_price if list_price > 0 else affiliate_price
+                cost_price = float(sale_price_str) if sale_price_str else 0
+                msrp_price = float(msrp_str) if msrp_str else 0
                 if cost_price == 0:
                     continue
 
@@ -1828,26 +1803,18 @@ class ProductDiscoveryEngine:
                 
                 logger.debug(f"[IMAGES] {item.get('product_title', '')[:30]}: {len(all_images)} images captured")
                 
-                # original_price retained for backwards-compat with downstream
-                # consumers, but it's now equal to cost_price (which IS the
-                # list price). The strikethrough/MSRP from AE is unreliable —
-                # AE products often show inflated "original" prices for
-                # marketing, so using that as the discount baseline produced
-                # fake "% off" badges. We zero out discount_pct here unless
-                # the affiliate-vs-list gap is meaningful.
-                original_price = cost_price
+                # original_price = the AE strikethrough MSRP. Used only for
+                # showing the "Save $X" badge in the product card, NOT as
+                # the cost basis. AE marketing inflates this number, so the
+                # discount % computed from it is mostly theatrical — but
+                # users still expect to see it.
+                original_price = msrp_price if msrp_price > cost_price else cost_price
 
-                # New definition of discount_pct: the gap between the
-                # affiliate-promoted price and the list price. This DOES
-                # signal something — when AE is heavily promoting via
-                # affiliates, it often means inventory/competition pressure.
-                # Used by the saturation algorithm to detect price wars.
-                # Capped at 90% so a missing affiliate_price doesn't produce
-                # a misleading 100% discount signal.
+                # discount_pct displays AE's marketing % off. Capped at 90%
+                # to avoid 100% artifacts when MSRP is suspiciously high.
                 discount_pct = 0
-                if affiliate_price > 0 and list_price > affiliate_price:
-                    affiliate_gap_pct = round(((list_price - affiliate_price) / list_price) * 100, 0)
-                    discount_pct = min(90, affiliate_gap_pct)
+                if msrp_price > cost_price and msrp_price > 0:
+                    discount_pct = min(90, round(((msrp_price - cost_price) / msrp_price) * 100, 0))
 
                 # Task #19: Harvest AE buyer-derived signals we already have
                 # in the affiliate response but weren't using for sentiment.
@@ -1871,19 +1838,15 @@ class ProductDiscoveryEngine:
                     # ~60 chars of the head noun phrase.
                     "clean_title": _clean_product_title(_raw_title, max_chars=60),
                     "title_normalized": self._normalize_title(_raw_title),
-                    # PRICING — With transparency indicators
-                    # cost_price is what the dropshipper actually pays:
-                    # the AE list price (target_original_price) that any
-                    # buyer sees on the public AE.com listing. NOT the
-                    # affiliate-discounted price (target_sale_price).
+                    # PRICING
+                    # cost_price = target_sale_price = real merchant cost
+                    # when fulfilling AE orders (returning-buyer price).
+                    # original_price = target_original_price = AE's
+                    # strikethrough MSRP (theatrical, used only for the
+                    # "% off" badge).
                     "cost_price": cost_price,
                     "supplier_cost": cost_price,
-                    # affiliate_price exposed so the UI can show "AE
-                    # affiliate price: $X (what your customer sees if they
-                    # click the AE link)" for transparency. NOT used as
-                    # the cost basis for profit math.
-                    "affiliate_price": affiliate_price,
-                    "list_price": list_price,
+                    "msrp": msrp_price,        # the AE strikethrough number
                     "original_price": original_price,
                     "discount_pct": discount_pct,
                     "suggested_price": suggested_price,
