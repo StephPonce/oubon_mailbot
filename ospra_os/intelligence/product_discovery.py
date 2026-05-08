@@ -1736,36 +1736,52 @@ class ProductDiscoveryEngine:
                 # PRICE FIELDS — empirically verified from AE affiliate API
                 # debug output (May 2026). What each field actually means:
                 #
-                #   target_sale_price       — ACTUAL CONSUMER PRICE in USD.
-                #                             What a returning AE buyer
-                #                             pays. This IS the dropship-
-                #                             er's real fulfillment cost.
+                #   target_sale_price       — AFFILIATE-PROMOTED PRICE.
+                #                             What customers pay if they
+                #                             arrive via an affiliate link.
+                #                             ~35-45% off the AE retail.
+                #                             NOT what the dropshipper pays
+                #                             when fulfilling, because AE
+                #                             ToS forbids self-referral.
+                #   target_original_price   — INFLATED MSRP / marketing
+                #                             baseline. Almost always
+                #                             higher than the actual
+                #                             consumer-facing retail.
                 #   target_app_sale_price   — Same as target_sale_price in
-                #                             practice (no app discount in
-                #                             observed data).
-                #   target_original_price   — STRIKETHROUGH MSRP. AE's
-                #                             marketing baseline — almost
-                #                             always inflated. Useful only
-                #                             for displaying a "% off"
-                #                             badge on the product card.
-                #                             NOT the cost basis.
-                #   sale_price              — CNY equivalent (chinese yuan).
+                #                             observed data.
                 #
-                # Cost basis = target_sale_price. The earlier attempt to
-                # use target_original_price overshot — it returned the
-                # inflated strikethrough MSRP, making profit math fake-rosy.
+                # The CONSUMER-FACING RETAIL PRICE (what AE shows visitors
+                # at AE.com without an affiliate link) IS NOT EXPOSED in
+                # any field of the affiliate API response. It's calculated
+                # dynamically by AE based on user state.
                 #
-                # Note on the "$0.99 welcome deal" some users see on AE:
-                # that's a one-time per-buyer promotion not present in the
-                # API. Your AE account, after one purchase, sees the real
-                # target_sale_price. So $0.99 is irrelevant to merchant cost.
-                sale_price_str = item.get('target_sale_price', '0')
+                # Heuristic: estimated_retail = affiliate_price × 1.65,
+                # capped at MSRP. Empirically AE's affiliate discount is
+                # 35-45% off retail. For the Tuya bulb sample:
+                #   $5.33 × 1.65 = $8.79 ≈ AE-shown retail of $8.98 ✓
+                #
+                # This is a SHORT-TERM heuristic. The real fix is wiring
+                # the AE DS API (Task #24, get_hot_products in
+                # api/aliexpress_product_routes.py) which returns explicit
+                # merchant prices. Until that lands, the heuristic gives
+                # us numbers that are approximately right for product
+                # economics decisions.
+                affiliate_price_str = item.get('target_sale_price', '0')
                 msrp_str = item.get('target_original_price', '0')
 
-                cost_price = float(sale_price_str) if sale_price_str else 0
+                affiliate_price = float(affiliate_price_str) if affiliate_price_str else 0
                 msrp_price = float(msrp_str) if msrp_str else 0
-                if cost_price == 0:
+                if affiliate_price == 0:
                     continue
+
+                # Estimated retail = the customer-facing price the user's
+                # buyers would pay if they bought direct on AE. Used as
+                # the cost basis until AE DS API gives us the real merchant
+                # price. Capped at MSRP so we never overshoot the inflated
+                # marketing baseline. Floored at affiliate_price so we
+                # don't undershoot known data.
+                _retail_estimate = min(msrp_price or affiliate_price * 2.0, affiliate_price * 1.65)
+                cost_price = max(affiliate_price, round(_retail_estimate, 2))
 
                 # Category-aware markup (replaces hardcoded cost × 2.5).
                 # See _suggested_price_for_cost docstring for the bracket
@@ -1839,14 +1855,18 @@ class ProductDiscoveryEngine:
                     "clean_title": _clean_product_title(_raw_title, max_chars=60),
                     "title_normalized": self._normalize_title(_raw_title),
                     # PRICING
-                    # cost_price = target_sale_price = real merchant cost
-                    # when fulfilling AE orders (returning-buyer price).
-                    # original_price = target_original_price = AE's
-                    # strikethrough MSRP (theatrical, used only for the
-                    # "% off" badge).
+                    # cost_price = HEURISTIC estimate of consumer-facing
+                    # AE retail (affiliate_price × 1.65, capped at MSRP).
+                    # The real fulfillment cost depends on the merchant's
+                    # AE Choice membership tier. Will be replaced with
+                    # explicit merchant price from AE DS API (Task #24).
                     "cost_price": cost_price,
                     "supplier_cost": cost_price,
-                    "msrp": msrp_price,        # the AE strikethrough number
+                    # affiliate_price = what customers pay via affiliate
+                    # link. Surfaced for transparency but NOT used as cost.
+                    "affiliate_price": affiliate_price,
+                    "msrp": msrp_price,            # AE strikethrough/MSRP
+                    "cost_basis": "heuristic_retail_estimate",  # vs "ae_ds_merchant" later
                     "original_price": original_price,
                     "discount_pct": discount_pct,
                     "suggested_price": suggested_price,
