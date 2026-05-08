@@ -623,25 +623,31 @@ class OspraAPI {
   // ===========================================================================
   // AI ACTIONS
   // ===========================================================================
-  
+  // Backend mounts the actions router at `/api/actions/*` (see
+  // ospra_os/api/actions_routes.py:42). Frontend was previously calling
+  // `/api/ai/actions/*` — a stale prefix from an earlier iteration that
+  // 404-spammed the console for days. Action verbs were also misaligned
+  // (accept→approve, decline→skip, propose→POST /api/actions).
+
   async getPendingActions(filters = {}) {
-    return authService.get('/api/ai/actions', filters);
+    return authService.get('/api/actions', filters);
   }
-  
+
   async getActionStats() {
-    return authService.get('/api/ai/actions/stats/summary');
+    return authService.get('/api/actions/stats');
   }
-  
+
   async acceptAction(actionId) {
-    return authService.post(`/api/ai/actions/${actionId}/accept`);
+    return authService.post(`/api/actions/${actionId}/approve`);
   }
-  
+
   async declineAction(actionId, reason) {
-    return authService.post(`/api/ai/actions/${actionId}/decline`, { reason });
+    return authService.post(`/api/actions/${actionId}/skip`, { reason });
   }
-  
+
   async proposeAction(action) {
-    return authService.post('/api/ai/actions/propose', action);
+    // Backend uses POST /api/actions to create new actions (not /propose).
+    return authService.post('/api/actions', action);
   }
   
   // ===========================================================================
