@@ -54,3 +54,6 @@ data/*.bak
 coverage.json
 .coverage
 htmlcov/
+
+# SQLite scratch files
+ospra_os.db*
