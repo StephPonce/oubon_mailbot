@@ -1107,11 +1107,23 @@ Price: ${parseFloat(price).toFixed(2)}`;
   // ===========================================================================
   
   async getRateLimitStatus() {
-    // Authenticated — backend reads tier from JWT, not the query param.
-    // (We pass tier= for backwards-compat with older route definitions
-    // but the live route ignores it and uses current_user.tier.)
+    // The /api/rate-limit/discovery/status endpoint doesn't exist on the
+    // backend (verified May 2026). Frontend was 404-spamming the console.
+    // Until a real backend route is wired (TierRateLimiter.get_user_status
+    // could be exposed), we short-circuit here so the UI gets a sensible
+    // ∞-defaults object without firing a network call.
+    //
+    // For Stratosphere this is always ∞ anyway (per TIER_RATE_LIMITS),
+    // and for lower tiers the cap is wall-clock based (per-day reset)
+    // rather than something the UI needs to render in real time.
     const tier = authService.getTier();
-    return authService.get('/api/rate-limit/discovery/status', { tier });
+    return {
+      tier,
+      daily_remaining: '∞',
+      daily_limit: '∞',
+      min_interval_minutes: tier === 'stratosphere' ? 0.5 : 30,
+      _stub: true,
+    };
   }
   
   async getUsageDashboard() {

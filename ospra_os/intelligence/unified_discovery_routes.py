@@ -833,24 +833,26 @@ async def enhance_images(request: EnhanceImagesRequest):
 @router.get("/multi-niche")
 async def get_multi_niche_products(
     niches: str = Query("smart_home,tech,kitchen", description="Comma-separated niches"),
-    per_niche: int = Query(5, ge=1, le=20, description="Products per niche")
+    per_niche: int = Query(5, ge=1, le=20, description="Products per niche"),
+    include_sentiment: bool = Query(False, description="Include sentiment enrichment (slower)"),
+    include_captions: bool = Query(False, description="Generate captions for top products (slower)"),
 ):
     """Get products across multiple niches."""
     try:
         niche_list = [n.strip() for n in niches.split(',')]
         engine = get_engine()
         results = {}
-        
+
         for niche in niche_list:
             try:
-                # Multi-niche admin endpoint — keep it fast: no sentiment,
-                # no captions. Callers wanting full enrichment should hit
-                # /quick or /products per-niche.
+                # Defaults to fast mode (no sentiment, no captions) since
+                # this endpoint is typically used for batch listing. Callers
+                # can opt into enrichment via query params if they need it.
                 products = await engine.discover_products(
                     niche=niche,
                     max_products=per_niche,
-                    include_sentiment=False,
-                    include_captions=False,
+                    include_sentiment=include_sentiment,
+                    include_captions=include_captions,
                 )
                 results[niche] = products
             except Exception as e:

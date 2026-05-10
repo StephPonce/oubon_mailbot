@@ -1993,10 +1993,25 @@ class ProductDiscoveryEngine:
             if products:
                 logger.info(f"   [SUCCESS] CJ: {len(products)} products found")
             else:
-                logger.warning(f"   [WARNING] CJ: No products for '{keyword}' / niche '{niche}'")
+                # [CJ_DIAGNOSTIC] Improved logging — when CJ returns nothing,
+                # surface enough context to distinguish "token broken" from
+                # "no inventory for this niche". Helps debug when discovery
+                # silently drops CJ from the result mix.
+                client_available = bool(getattr(self, 'cj_available', False))
+                token_present = bool(
+                    os.getenv('CJ_API_TOKEN') or os.getenv('OUBONSHOP_CJ_API_TOKEN')
+                )
+                category_mapped = bool(niche and getattr(self, 'cj_client', None)
+                                       and niche in getattr(self.cj_client, 'CATEGORY_MAP', {}))
+                logger.warning(
+                    f"   [WARNING] CJ: 0 products. "
+                    f"keyword={keyword!r} niche={niche!r} | "
+                    f"client_available={client_available} token_present={token_present} "
+                    f"category_mapped={category_mapped}"
+                )
 
         except Exception as e:
-            logger.error(f"[ERROR] CJ fetch error: {e}")
+            logger.error(f"[ERROR] CJ fetch error: {e}", exc_info=True)
 
         return products
     

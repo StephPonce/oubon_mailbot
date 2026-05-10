@@ -176,12 +176,10 @@ class SentimentRefresher:
                         timeout=PER_PRODUCT_TIMEOUT_SECONDS,
                     )
 
-            if getattr(engine, 'reddit_available', False):
-                async with self._semaphore:
-                    products = await asyncio.wait_for(
-                        engine._enrich_with_reddit_sentiment(products, niche),
-                        timeout=PER_PRODUCT_TIMEOUT_SECONDS,
-                    )
+            # Reddit enrichment removed per architecture pivot (May 2026).
+            # reddit_available is now hard-False at engine init; this branch
+            # never fires. Kept as a comment so the refresher flow stays
+            # easy to grep for if Reddit is ever revived.
 
         except asyncio.TimeoutError:
             logger.warning(
