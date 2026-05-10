@@ -1927,48 +1927,54 @@ class ProductDiscoveryEngine:
     async def _fetch_cj(self, keyword: str, count: int, niche: str = None) -> List[Dict]:
         """Fetch from CJ Dropshipping using smart search with keyword mappings.
 
-        Strategy (Fix #7 / Step D):
-        1. If niche provided, try category search (fast, no rate limit risk).
-        2. If category returns empty (deprecated category id, empty inventory,
-           etc.), fall back to keyword search using the FIRST niche keyword
-           from NICHE_KEYWORDS. We verified live that keyword search works even
-           when the category map is broken.
-        3. If an explicit keyword was passed, use smart_search.
+        Strategy (May 2026 — Task #31 stopgap):
 
-        All CJ calls share a serialized lock (client.py step A), so the
-        fallback chain costs at most 2 sequential CJ requests (~6s total).
+        After the May 11 diagnostic showed CJ category 1489 ("smart_home")
+        returns 0 products (CJ rotated the ID without notice), we no longer
+        rely on the CATEGORY_MAP. We go straight to keyword search using
+        the FIRST entry from NICHE_KEYWORDS — which the live test confirmed
+        returns 5 products for "wifi smart plug" and similar.
+
+        Order of operations:
+        1. If an explicit keyword is passed, use it (legacy callers).
+        2. Otherwise pull NICHE_KEYWORDS[niche][0] as the search term.
+        3. Fall back to category search as a LAST resort when no keyword
+           and no niche keyword list.
+
+        All CJ calls share a serialized lock (client.py step A), so this
+        is bounded to ~6s per CJ source.
+
+        Future fix (Task #31 phase 2): query CJ's /category endpoint live
+        to refresh CATEGORY_MAP, then re-enable category-first lookups.
         """
         products = []
 
         try:
             results = []
 
-            # Step 1: Category-based search (most reliable when map is correct)
-            if niche:
-                logger.info(f"   [INFO] CJ: Trying category search for niche '{niche}'")
-                results = await self.cj_client.search_by_niche(niche, page_size=count)
-
-            # Step 2: Keyword fallback when category is empty.
-            # Triggered when the discovery engine passed niche but no keyword,
-            # AND category returned nothing. Use the first NICHE_KEYWORDS entry
-            # as a concrete search term (e.g. "wifi smart plug" for smart_home).
-            if not results and niche and not keyword:
+            # Pick a search term. Caller's explicit keyword wins; otherwise
+            # use the first niche keyword which we know returns products.
+            search_keyword = keyword
+            if not search_keyword and niche:
                 niche_keywords = self.NICHE_KEYWORDS.get(niche, [])
                 if niche_keywords:
-                    fallback_kw = niche_keywords[0]
-                    logger.info(
-                        f"   [INFO] CJ: Category empty, falling back to keyword '{fallback_kw}' "
-                        f"(niche={niche})"
-                    )
-                    fallback_results = await self.cj_client.smart_search(fallback_kw, page_size=count)
-                    # Use normalized keys (product_id / cj_pid), not the legacy
-                    # source_id / name which never exist on CJ-normalized products.
-                    seen_ids = {p.get('product_id') or p.get('cj_pid') or p.get('title') for p in results}
-                    for p in fallback_results:
-                        pid = p.get('product_id') or p.get('cj_pid') or p.get('title')
-                        if pid not in seen_ids:
-                            results.append(p)
-                            seen_ids.add(pid)
+                    search_keyword = niche_keywords[0]
+
+            # Step 1: Keyword search (now the primary path).
+            if search_keyword:
+                logger.info(
+                    f"   [INFO] CJ: keyword search for '{search_keyword}' "
+                    f"(niche={niche}, page_size={count})"
+                )
+                results = await self.cj_client.smart_search(search_keyword, page_size=count)
+                logger.info(f"   [INFO] CJ: keyword search returned {len(results)} products")
+
+            # Step 2: Category fallback (last resort — usually empty due to
+            # stale CATEGORY_MAP, but kept for niches with no NICHE_KEYWORDS).
+            if not results and niche:
+                logger.info(f"   [INFO] CJ: keyword empty, trying category for '{niche}'")
+                results = await self.cj_client.search_by_niche(niche, page_size=count)
+                logger.info(f"   [INFO] CJ: category search returned {len(results)} products")
 
             # Step 3: Explicit keyword path (legacy — still used when discovery
             # or other callers pass a non-empty keyword directly)
@@ -2093,6 +2099,19 @@ class ProductDiscoveryEngine:
                 # Debug: log best attempt even if below threshold
                 if best_match and best_score > 0.20:
                     logger.debug(f"   [NEAR-MISS] {ali_product.get('title', '')[:25]}... ~ {best_match.get('title', '')[:25]}... ({best_score:.0%})")
+
+        # CJ visibility logging — surface what happened to CJ products
+        # at INFO level. Was DEBUG, which was invisible in default uvicorn
+        # logs and made the "where did the CJ products go" mystery hard
+        # to debug. Task #31.
+        cj_matched_count = len(matched_cj_ids)
+        cj_unmatched_count = len(cj_products) - cj_matched_count
+        if cj_products:
+            logger.info(
+                f"   [CJ MERGE] {len(cj_products)} CJ products → "
+                f"{cj_matched_count} merged into AE products, "
+                f"{cj_unmatched_count} kept as CJ-only"
+            )
 
         # Add remaining CJ products (not matched)
         for cj_product in cj_products:
