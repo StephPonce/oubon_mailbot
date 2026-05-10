@@ -434,6 +434,11 @@ async def _analyze_with_claude(
 
     prompt = _build_analysis_prompt(title, product, brand_name, brand_descriptor)
 
+    # Timeout tightened from 30s → 20s. The global request timeout
+    # middleware kicks in at ~30s, so a 30s Claude timeout left zero
+    # headroom — when Claude was slow we 504'd the entire request
+    # instead of degrading to the rule-based fallback. With 20s we get
+    # ~8s of headroom for the fallback to run before global timeout.
     async with httpx.AsyncClient() as client:
         response = await client.post(
             "https://api.anthropic.com/v1/messages",
@@ -448,7 +453,7 @@ async def _analyze_with_claude(
                 "temperature": ANALYSIS_TEMPERATURE,
                 "messages": [{"role": "user", "content": prompt}]
             },
-            timeout=30.0
+            timeout=20.0
         )
 
         if response.status_code == 200:

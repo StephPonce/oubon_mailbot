@@ -232,8 +232,7 @@ async def get_dashboard_products(
     start_time = time.time()
 
     try:
-        from ospra_os.intelligence.product_discovery import discover_products
-        from ospra_os.product_research.product_cache import get_products_with_cache
+        from ospra_os.product_research.product_cache import get_product_cache
         from ospra_os.core.tiers import SubscriptionTier
 
         # Get user's subscription tier
@@ -241,18 +240,48 @@ async def get_dashboard_products(
         if isinstance(user_tier, str):
             user_tier = SubscriptionTier(user_tier)
 
-        # Only Stratosphere can force refresh
-        can_force = user_tier == SubscriptionTier.STRATOSPHERE
-        actual_force = force_refresh and can_force
+        # CACHE-ONLY. This endpoint MUST NOT trigger a fresh discovery —
+        # discovery with full enrichment (sentiment + captions + images)
+        # takes 60-90s on a cold cache, which exceeds Vite's proxy timeout
+        # (120s) under load AND blocks the asyncio event loop for other
+        # requests. The recurring 504 on this endpoint and the cascading
+        # event-loop hang were both caused by this auto-discovery trigger.
+        #
+        # Discovery is now strictly opt-in via /api/discovery/quick/{niche}
+        # (the dashboard's main product grid). This /v2/products endpoint
+        # only ever returns what's already in the cache — empty list if
+        # nothing has been discovered yet. Frontend should fall back to
+        # the discovery endpoint when this returns empty.
+        cache = get_product_cache()
+        cached = cache.get(niche, user_tier)
 
-        # Get products with tier-based caching
-        result = await get_products_with_cache(
-            niche=niche,
-            tier=user_tier,
-            discovery_func=discover_products,
-            count=per_page,
-            force_refresh=actual_force
-        )
+        if cached and cached.products:
+            result = {
+                "products": cached.products,
+                "total": len(cached.products),
+                "from_cache": True,
+                "cache_age_seconds": cached.age_seconds,
+                "cache_ttl_remaining": cached.ttl_remaining_seconds,
+                "tier": user_tier.value,
+                "niche": niche,
+            }
+        else:
+            # No cache. Return empty rather than triggering 90s discovery
+            # which would 504. Frontend should fall back to discovery
+            # endpoint if it actually wants fresh data.
+            result = {
+                "products": [],
+                "total": 0,
+                "from_cache": False,
+                "cache_age_seconds": 0,
+                "cache_ttl_remaining": 0,
+                "tier": user_tier.value,
+                "niche": niche,
+                "note": (
+                    "No cached products for this niche/tier. Call "
+                    "/api/discovery/quick/{niche} to populate."
+                ),
+            }
 
         load_time = time.time() - start_time
 
@@ -585,26 +614,33 @@ async def ignore_email(
     try:
         import sqlite3
         import os
+        import asyncio
         from datetime import datetime
 
         # Connect to email database
         db_path = os.path.join(os.getcwd(), "data", "mailbot.db")
 
         if os.path.exists(db_path):
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+            # Synchronous sqlite3 wrapped in asyncio.to_thread so the
+            # SQL roundtrip doesn't block the asyncio event loop.
+            # Sync SQL in async handlers was causing the event loop to
+            # freeze under load (Task #30 — recurring uvicorn hang).
+            def _ignore_email_sync():
+                conn = sqlite3.connect(db_path)
+                try:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE emails
+                        SET status = 'ignored',
+                            updated_at = ?
+                        WHERE id = ? OR message_id = ?
+                    """, (datetime.now(timezone.utc).isoformat(), message_id, message_id))
+                    conn.commit()
+                    return cursor.rowcount
+                finally:
+                    conn.close()
 
-            # Update email status to ignored
-            cursor.execute("""
-                UPDATE emails
-                SET status = 'ignored',
-                    updated_at = ?
-                WHERE id = ? OR message_id = ?
-            """, (datetime.now(timezone.utc).isoformat(), message_id, message_id))
-
-            conn.commit()
-            rows_affected = cursor.rowcount
-            conn.close()
+            rows_affected = await asyncio.to_thread(_ignore_email_sync)
 
             return {
                 "success": True,
@@ -652,30 +688,39 @@ async def analyze_product_intelligence(
     """
     try:
         # Resolve the product. Tolerate both numeric ids and slugs.
+        # Synchronous SQLAlchemy query wrapped in asyncio.to_thread so it
+        # runs on a worker thread instead of blocking the asyncio event
+        # loop. Sync DB calls in async handlers were causing the event
+        # loop to freeze (Task #30 — recurring uvicorn hang).
         from ospra_os.database import Product, get_session
-        session = get_session()
-        try:
-            product_row = (
-                session.query(Product).filter(Product.id == product_id).first()
-                if product_id.isdigit()
-                else None
-            )
-            if product_row is None:
-                # Slug / external-id form — fall through to a stub payload
-                # rather than 500'ing on unknown ids.
+        import asyncio
+
+        def _fetch_product_row(pid: str):
+            session = get_session()
+            try:
+                row = (
+                    session.query(Product).filter(Product.id == pid).first()
+                    if pid.isdigit()
+                    else None
+                )
+                if row is None:
+                    return None
                 return {
-                    "success": False,
-                    "product_id": product_id,
-                    "error": "product not found",
+                    "title": row.product_name,
+                    "niche": getattr(row, "niche", "general"),
+                    "cost_price": getattr(row, "supplier_cost", 0),
+                    "suggested_price": getattr(row, "suggested_price", 0),
                 }
-            product_payload = {
-                "title": product_row.product_name,
-                "niche": getattr(product_row, "niche", "general"),
-                "cost_price": getattr(product_row, "supplier_cost", 0),
-                "suggested_price": getattr(product_row, "suggested_price", 0),
+            finally:
+                session.close()
+
+        product_payload = await asyncio.to_thread(_fetch_product_row, product_id)
+        if product_payload is None:
+            return {
+                "success": False,
+                "product_id": product_id,
+                "error": "product not found",
             }
-        finally:
-            session.close()
 
         from ospra_os.intelligence.ai_product_analyzer import AIProductAnalyzer
         analyzer = AIProductAnalyzer()
