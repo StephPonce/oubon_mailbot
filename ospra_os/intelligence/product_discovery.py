@@ -1098,9 +1098,29 @@ class ProductDiscoveryEngine:
 
         scored_products = self._calculate_scores(all_products)
 
+        # CJ accounting before min_score filter (Task #31).
+        # CJ-only products have no AE buyer signals, no Amazon evidence —
+        # their base score is mostly profit (15%) + sourcing (20%) = 35%
+        # max, which sits RIGHT AT the default min_score threshold of 30.
+        # After saturation discount, CJ products often fall below 30 and
+        # get filtered out here, never reaching URL validation. This was
+        # the hidden funnel leak.
+        def _cj_count_in(plist):
+            return sum(
+                1 for p in plist
+                if p.get('source') == 'cj_dropshipping'
+                or 'cj_dropshipping' in (p.get('available_on') or [])
+            )
+
+        cj_before_filter = _cj_count_in(scored_products)
         # Filter and sort
         filtered = [p for p in scored_products if p.get('oi_score', 0) >= min_score]
         ranked = sorted(filtered, key=lambda x: x.get('oi_score', 0), reverse=True)
+        cj_after_filter = _cj_count_in(filtered)
+        logger.info(
+            f"   [CJ FUNNEL] before min_score={min_score} filter: {cj_before_filter} → "
+            f"after: {cj_after_filter} (dropped by score floor: {cj_before_filter - cj_after_filter})"
+        )
 
         # =====================================================================
         # STEP 5a: ALIEXPRESS REVIEW TEXT (Phase H)
@@ -1244,10 +1264,23 @@ class ProductDiscoveryEngine:
                     f"(took {time.time() - qual_start:.2f}s)"
                 )
 
+        # CJ-survival accounting at each downstream step (Task #31).
+        # Track how many CJ products go in vs come out of each stage so we
+        # can see exactly where they vanish.
+        def _cj_count(plist):
+            return sum(
+                1 for p in plist
+                if p.get('source') == 'cj_dropshipping'
+                or 'cj_dropshipping' in (p.get('available_on') or [])
+            )
+
+        cj_entering_url_validation = _cj_count(ranked)
+
         # URL VALIDATION: drop products with no usable outbound source URL so
         # the frontend never receives an unclickable product card.
         url_valid: List[Dict] = []
         url_dropped = 0
+        cj_url_dropped = 0
         for product in ranked:
             resolved = _resolve_product_url(product)
             if resolved:
@@ -1256,15 +1289,29 @@ class ProductDiscoveryEngine:
                 url_valid.append(product)
             else:
                 url_dropped += 1
+                is_cj = (
+                    product.get('source') == 'cj_dropshipping'
+                    or 'cj_dropshipping' in (product.get('available_on') or [])
+                )
+                if is_cj:
+                    cj_url_dropped += 1
                 logger.warning(
                     f"   ⚠️ Dropping product with no usable URL: "
+                    f"{'CJ' if is_cj else 'AE'} "
                     f"{product.get('product_id') or product.get('title', '?')[:60]}"
                 )
 
         if url_dropped:
             logger.info(
-                f"   🔗 URL validation: kept {len(url_valid)} / dropped {url_dropped}"
+                f"   🔗 URL validation: kept {len(url_valid)} / dropped {url_dropped} "
+                f"(of which CJ: {cj_url_dropped})"
             )
+
+        cj_after_url_validation = _cj_count(url_valid)
+        logger.info(
+            f"   [CJ FUNNEL] entering URL validation: {cj_entering_url_validation} → "
+            f"surviving: {cj_after_url_validation}"
+        )
 
         # Backfill clean_title for any product missing one (CJ products
         # don't get cleaned at supplier-fetch time; AE products already do).
@@ -1276,13 +1323,27 @@ class ProductDiscoveryEngine:
                     p.get('title', ''), max_chars=60
                 )
 
+        cj_entering_dedup = _cj_count(url_valid)
+
         # Fuzzy-title dedup BEFORE the max_products slice — drop near-
         # duplicates so we don't waste tier budget on multiple SKUs of
         # the same product. Sorted by oi_score in the dedup helper, so
         # the higher-OI variant wins each cluster.
         url_valid = _dedupe_by_title(url_valid, threshold=0.7)
 
+        cj_after_dedup = _cj_count(url_valid)
+        logger.info(
+            f"   [CJ FUNNEL] entering dedup: {cj_entering_dedup} → "
+            f"surviving dedup: {cj_after_dedup}"
+        )
+
         final = url_valid[:max_products]
+
+        cj_in_final = _cj_count(final)
+        logger.info(
+            f"   [CJ FUNNEL] after max_products slice ({max_products}): "
+            f"{cj_in_final} CJ products in final response"
+        )
 
         # Caption generation (Task #16). Generates a per-product Shopify
         # caption via Claude on the top N products only.
