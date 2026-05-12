@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File, 
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
+import asyncio
 import os
 import secrets
 import logging
@@ -309,7 +310,11 @@ async def fetch_user_info(access_token: str, open_id: str) -> dict:
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        # Sync requests.post in an async helper would block the asyncio
+        # event loop. Run on a worker thread instead. Task #30.
+        response = await asyncio.to_thread(
+            requests.post, url, headers=headers, json=data, timeout=30
+        )
 
         if response.status_code == 200:
             result = response.json()
@@ -359,7 +364,11 @@ async def fetch_user_info_from_api(token: str) -> dict:
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        # Sync requests.post → asyncio.to_thread so the AI/HTTP roundtrip
+        # doesn't block the asyncio event loop. Task #30.
+        response = await asyncio.to_thread(
+            requests.post, url, headers=headers, json=data, timeout=30
+        )
 
         if response.status_code == 200:
             result = response.json()
@@ -405,7 +414,11 @@ async def fetch_user_videos_from_api(token: str, max_count: int = 20) -> List[di
     }
 
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=30)
+        # Sync requests.post → asyncio.to_thread to keep the event loop
+        # free while the TikTok roundtrip is in flight. Task #30.
+        response = await asyncio.to_thread(
+            requests.post, url, headers=headers, json=data, timeout=30
+        )
 
         if response.status_code == 200:
             result = response.json()
@@ -468,8 +481,11 @@ async def upload_video_to_tiktok(
     }
 
     try:
-        # Initialize upload
-        response = requests.post(init_url, headers=headers, json=init_data, timeout=30)
+        # Initialize upload — sync requests.post would block the event
+        # loop; offload to a worker thread. Task #30.
+        response = await asyncio.to_thread(
+            requests.post, init_url, headers=headers, json=init_data, timeout=30
+        )
 
         if response.status_code != 200:
             logger.error(f"Init upload failed: {response.status_code} - {response.text}")
@@ -494,11 +510,14 @@ async def upload_video_to_tiktok(
             "Content-Length": str(len(video_data))
         }
 
-        upload_response = requests.put(
+        # Video upload can take 120s — definitely needs to run on a
+        # worker thread, not the event loop. Task #30.
+        upload_response = await asyncio.to_thread(
+            requests.put,
             upload_url,
             headers=upload_headers,
             data=video_data,
-            timeout=120
+            timeout=120,
         )
 
         if upload_response.status_code not in [200, 201]:

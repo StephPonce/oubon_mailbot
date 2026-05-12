@@ -209,6 +209,7 @@ async def test_aliexpress(settings: Settings = Depends(get_settings)):
     This is for debugging only.
     """
     from .connectors.suppliers.aliexpress import AliExpressConnector
+    import asyncio
     import time
     import hmac
     import hashlib
@@ -245,12 +246,15 @@ async def test_aliexpress(settings: Settings = Depends(get_settings)):
 
     params["sign"] = signature
 
-    # Make request
+    # Make request — sync requests.get would block the asyncio event loop
+    # for the duration of the AE roundtrip. Offload to a worker thread.
+    # Task #30.
     try:
-        response = requests.get(
+        response = await asyncio.to_thread(
+            requests.get,
             "https://api-sg.aliexpress.com/sync",
             params=params,
-            timeout=10
+            timeout=10,
         )
 
         return {
