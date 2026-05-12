@@ -17,6 +17,8 @@ Endpoints:
 - GET /api/ml/training-status/{task_type} - Get fine-tuning status
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -167,14 +169,20 @@ async def generate_ai_response(
         if request.force_tier:
             force_tier = ModelTier(request.force_tier)
 
-        # Generate
-        response = ai_client.generate(
+        # Generate — ai_client.generate() is a synchronous method that
+        # internally uses `requests.post()`. Calling it directly from an
+        # async route handler blocks the asyncio event loop for the
+        # entire AI call (potentially 10-30s), freezing every other
+        # in-flight request. Wrap in asyncio.to_thread so the SQL
+        # roundtrip runs on a worker thread. Task #30 audit finding.
+        response = await asyncio.to_thread(
+            ai_client.generate,
             prompt=request.prompt,
             task_type=request.task_type,
             system_prompt=request.system_prompt,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
-            force_tier=force_tier
+            force_tier=force_tier,
         )
 
         return GenerateResponse(
@@ -209,7 +217,11 @@ async def score_product(
     Returns score (1-100), reasoning, and recommendations.
     """
     try:
-        result = ai_client.score_product(
+        # ai_client.score_product() is synchronous and uses requests.post()
+        # internally. Wrap in asyncio.to_thread so it doesn't block the
+        # event loop while the AI call (10-30s) is in flight. Task #30.
+        result = await asyncio.to_thread(
+            ai_client.score_product,
             product_name=request.product_name,
             category=request.category,
             price=request.price,
@@ -239,7 +251,11 @@ async def generate_email_response(
     Returns drafted email response.
     """
     try:
-        response = ai_client.generate_email_response(
+        # ai_client.generate_email_response() is synchronous (requests.post
+        # under the hood). Wrap in asyncio.to_thread so the AI roundtrip
+        # runs on a worker thread instead of blocking the event loop. #30.
+        response = await asyncio.to_thread(
+            ai_client.generate_email_response,
             customer_email=request.customer_email,
             context=request.context,
             tone=request.tone
@@ -267,7 +283,11 @@ async def generate_ad_copy(
     Returns headline, body, and CTA.
     """
     try:
-        result = ai_client.generate_ad_copy(
+        # ai_client.generate_ad_copy() is synchronous (requests.post under
+        # the hood). Wrap in asyncio.to_thread so the AI call runs on a
+        # worker thread instead of freezing the event loop. Task #30.
+        result = await asyncio.to_thread(
+            ai_client.generate_ad_copy,
             product_name=request.product_name,
             key_features=request.key_features,
             target_audience=request.target_audience,
