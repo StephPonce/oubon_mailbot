@@ -2,6 +2,7 @@
 TikTok Ads Automation
 """
 from typing import Dict, List, Optional
+import asyncio
 import os
 import requests
 
@@ -52,13 +53,13 @@ class TikTokAdsManager:
             print(f" Creating TikTok ad campaign for: {product_name}")
 
             # Step 1: Create Campaign
-            campaign = self._create_campaign(
+            campaign = await self._create_campaign(
                 name=f"Product: {product_name}",
                 objective='TRAFFIC'  # Drive traffic to website
             )
 
             # Step 2: Create Ad Group
-            ad_group = self._create_ad_group(
+            ad_group = await self._create_ad_group(
                 campaign_id=campaign['campaign_id'],
                 name=f"{product_name} - Ad Group",
                 daily_budget=daily_budget,
@@ -67,7 +68,7 @@ class TikTokAdsManager:
             )
 
             # Step 3: Create Ad
-            ad = self._create_ad(
+            ad = await self._create_ad(
                 ad_group_id=ad_group['adgroup_id'],
                 name=f"{product_name} - Ad",
                 video_id=video_id,
@@ -93,8 +94,8 @@ class TikTokAdsManager:
                 'error': str(e)
             }
 
-    def _create_campaign(self, name: str, objective: str) -> Dict:
-        """Create campaign"""
+    async def _create_campaign(self, name: str, objective: str) -> Dict:
+        """Create campaign. Async so sync HTTP doesn't block event loop. #30"""
         url = f"{self.BASE_URL}/campaign/create/"
 
         payload = {
@@ -105,7 +106,9 @@ class TikTokAdsManager:
             'operation_status': 'DISABLE'  # Start paused
         }
 
-        response = requests.post(url, headers=self.headers, json=payload)
+        response = await asyncio.to_thread(
+            requests.post, url, headers=self.headers, json=payload
+        )
         data = response.json()
 
         if data.get('code') != 0:
@@ -113,7 +116,7 @@ class TikTokAdsManager:
 
         return data['data']
 
-    def _create_ad_group(
+    async def _create_ad_group(
         self,
         campaign_id: str,
         name: str,
@@ -121,7 +124,7 @@ class TikTokAdsManager:
         targeting: Dict,
         landing_page_url: str
     ) -> Dict:
-        """Create ad group"""
+        """Create ad group. Async so sync HTTP doesn't block event loop. #30"""
         url = f"{self.BASE_URL}/adgroup/create/"
 
         payload = {
@@ -146,7 +149,9 @@ class TikTokAdsManager:
             'landing_page_url': landing_page_url
         }
 
-        response = requests.post(url, headers=self.headers, json=payload)
+        response = await asyncio.to_thread(
+            requests.post, url, headers=self.headers, json=payload
+        )
         data = response.json()
 
         if data.get('code') != 0:
@@ -154,7 +159,7 @@ class TikTokAdsManager:
 
         return data['data']
 
-    def _create_ad(
+    async def _create_ad(
         self,
         ad_group_id: str,
         name: str,
@@ -162,7 +167,7 @@ class TikTokAdsManager:
         ad_text: str,
         landing_page_url: str
     ) -> Dict:
-        """Create ad"""
+        """Create ad. Async so sync HTTP doesn't block event loop. #30"""
         url = f"{self.BASE_URL}/ad/create/"
 
         payload = {
@@ -177,7 +182,9 @@ class TikTokAdsManager:
             'operation_status': 'DISABLE'  # Start paused
         }
 
-        response = requests.post(url, headers=self.headers, json=payload)
+        response = await asyncio.to_thread(
+            requests.post, url, headers=self.headers, json=payload
+        )
         data = response.json()
 
         if data.get('code') != 0:
@@ -226,7 +233,9 @@ class TikTokAdsManager:
                 'end_date': '2024-12-31'
             }
 
-            response = requests.post(url, headers=self.headers, json=payload)
+            response = await asyncio.to_thread(
+                requests.post, url, headers=self.headers, json=payload
+            )
             data = response.json()
 
             if data.get('code') != 0:
@@ -249,7 +258,9 @@ class TikTokAdsManager:
                 'operation_status': 'DISABLE'
             }
 
-            response = requests.post(url, headers=self.headers, json=payload)
+            response = await asyncio.to_thread(
+                requests.post, url, headers=self.headers, json=payload
+            )
             data = response.json()
 
             return data.get('code') == 0
@@ -269,7 +280,9 @@ class TikTokAdsManager:
                 'operation_status': 'ENABLE'
             }
 
-            response = requests.post(url, headers=self.headers, json=payload)
+            response = await asyncio.to_thread(
+                requests.post, url, headers=self.headers, json=payload
+            )
             data = response.json()
 
             return data.get('code') == 0
@@ -296,11 +309,14 @@ class TikTokAdsManager:
                 files = {'video_file': video_file}
                 data = {'advertiser_id': self.advertiser_id}
 
-                response = requests.post(
+                # Video upload is a slow multipart POST — must not block
+                # the event loop. Task #30.
+                response = await asyncio.to_thread(
+                    requests.post,
                     init_url,
                     headers={'Access-Token': self.access_token},
                     data=data,
-                    files=files
+                    files=files,
                 )
 
                 result = response.json()

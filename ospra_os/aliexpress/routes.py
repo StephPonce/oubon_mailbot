@@ -23,6 +23,7 @@ the credential and the others read ``None``. Worse, on a single worker the
 globals were lost on every restart and every read returned None until the
 next manual reauth.
 """
+import asyncio
 import os
 import logging
 from fastapi import APIRouter, HTTPException, Depends, Query
@@ -247,9 +248,12 @@ async def oauth_callback(
             }
         )
 
-    # Exchange code for token
+    # Exchange code for token — oauth.exchange_code_for_token() is
+    # synchronous and calls requests.post() against AE's token endpoint
+    # (15s timeout). Wrap in asyncio.to_thread so the OAuth callback
+    # handler doesn't block the event loop while AE responds. Task #30.
     try:
-        result = oauth.exchange_code_for_token(code)
+        result = await asyncio.to_thread(oauth.exchange_code_for_token, code)
 
         if result.get("success"):
             # Persist the platform credential. Other modules read it via
