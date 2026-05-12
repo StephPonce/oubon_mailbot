@@ -184,8 +184,16 @@ async def analyze_product(request: ProductAnalysisRequest, current_user: User = 
     """
     Generate comprehensive AI analysis for a product.
     Uses Claude (Anthropic) or falls back to rule-based analysis.
+
+    Task #34: structured error reporting + retry-friendly response.
+    Previously this endpoint silently swallowed all Claude failures with
+    a generic "AI Analysis failed" toast — users couldn't tell apart
+    timeout, rate limit, JSON parse failure, content-policy reject, or
+    transient network blip. Different failure modes need different
+    responses (retry vs upgrade vs ignore).
     """
     product = request.product_data
+    product_title_short = (request.product_title or '')[:60]
 
     # Resolve tenant brand from the authenticated user (Oubon defaults apply
     # when the user has not set a custom brand_name / brand_descriptor).
@@ -194,7 +202,11 @@ async def analyze_product(request: ProductAnalysisRequest, current_user: User = 
         getattr(current_user, "brand_descriptor", None) or DEFAULT_BRAND_DESCRIPTOR
     )
 
-    # Try Claude API
+    # Try Claude API with structured error capture
+    claude_error_kind = None  # None | 'no_api_key' | 'timeout' | 'rate_limit' | 'auth' | 'http' | 'json_parse' | 'network' | 'unknown'
+    claude_error_detail = None
+    claude_retryable = False  # Frontend can show "Try again" only when this is True
+
     if ANTHROPIC_API_KEY:
         try:
             analysis = await _analyze_with_claude(
@@ -205,13 +217,63 @@ async def analyze_product(request: ProductAnalysisRequest, current_user: User = 
                 force_refresh=request.force_refresh,
             )
             if analysis:
-                return {"success": True, "analysis": analysis, "source": "claude"}
+                return {
+                    "success": True,
+                    "analysis": analysis,
+                    "source": "claude",
+                    "product_title": product_title_short,
+                }
+            # _analyze_with_claude returned None — non-200 response or
+            # JSON parse failure. The logger.error inside the helper already
+            # captured the specific reason, but we don't currently get the
+            # error type back. Mark as unknown for now.
+            claude_error_kind = 'unknown'
+            claude_error_detail = 'Claude returned no analysis (check backend logs)'
+            claude_retryable = True
         except Exception as e:
-            logger.warning(f"Claude analysis failed: {e}")
+            # Classify the exception so the frontend can react sensibly.
+            err_name = type(e).__name__
+            err_msg = str(e)[:200]
+            if 'TimeoutException' in err_name or 'Timeout' in err_name:
+                claude_error_kind = 'timeout'
+                claude_retryable = True
+            elif '429' in err_msg or 'rate' in err_msg.lower():
+                claude_error_kind = 'rate_limit'
+                claude_retryable = True
+            elif '401' in err_msg or '403' in err_msg or 'auth' in err_msg.lower():
+                claude_error_kind = 'auth'
+                claude_retryable = False
+            elif 'Connect' in err_name or 'Network' in err_name:
+                claude_error_kind = 'network'
+                claude_retryable = True
+            else:
+                claude_error_kind = 'unknown'
+                claude_retryable = True
+            claude_error_detail = f"{err_name}: {err_msg}"
+            logger.warning(
+                f"[AI-ANALYSIS] {claude_error_kind} for {product_title_short!r}: {claude_error_detail}"
+            )
+    else:
+        claude_error_kind = 'no_api_key'
+        claude_error_detail = 'ANTHROPIC_API_KEY not configured'
+        claude_retryable = False
 
-    # Fallback to rule-based analysis
+    # Fallback to rule-based analysis. Still returns success=True because
+    # SOMETHING is better than nothing, but include the Claude error so the
+    # frontend can show a "Generated from rule-based analysis (Claude
+    # unavailable — Try again)" banner.
     analysis = _generate_fallback_analysis(request.product_title, product)
-    return {"success": True, "analysis": analysis, "source": "fallback"}
+    return {
+        "success": True,
+        "analysis": analysis,
+        "source": "fallback",
+        "product_title": product_title_short,
+        "claude_error": {
+            "kind": claude_error_kind,
+            "detail": claude_error_detail,
+            "retryable": claude_retryable,
+        },
+    }
 
 
 @router.post("/refresh-sentiment")

@@ -12,10 +12,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  Search, Package, TrendingUp, Rocket, BarChart3, Tag, Loader2, Filter, 
-  ArrowRight, Eye, AlertTriangle, RefreshCw, X, ExternalLink, Brain,
-  ShoppingCart, Copy, Check, ChevronRight, Star, Link2, Database, 
+import {
+  Search, Package, TrendingUp, Rocket, BarChart3, Tag, Loader2, Filter,
+  ArrowRight, Eye, AlertTriangle, AlertCircle, RefreshCw, X, ExternalLink, Brain,
+  ShoppingCart, Copy, Check, ChevronRight, Star, Link2, Database,
   Zap, Target, Sparkles, DollarSign, Camera, Wand2, MessageSquare,
   ImageIcon, ToggleLeft, ToggleRight, Info, ChevronLeft
 } from 'lucide-react';
@@ -1374,6 +1374,11 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   const [currentAiImageUrl, setCurrentAiImageUrl] = useState(product.ai_image_url);
   const [enhancedImages, setEnhancedImages] = useState(product.enhanced_images || []);
   const [analysisError, setAnalysisError] = useState(null);
+  // Task #34: track WHICH source produced the analysis + Claude error
+  // details so the UI can show "Claude unavailable — try again" banners
+  // instead of swallowing all failures behind a generic toast.
+  const [analysisSource, setAnalysisSource] = useState(null);  // 'claude' | 'fallback' | null
+  const [claudeError, setClaudeError] = useState(null);  // { kind, detail, retryable } | null
   
   // AUTO-GENERATE ANALYSIS ON MOUNT
   useEffect(() => {
@@ -1700,6 +1705,7 @@ Free shipping on orders over $50. 30-day hassle-free returns.`;
   const generateAIAnalysis = async (forceRefresh = false) => {
     setGeneratingAnalysis(true);
     setAnalysisError(null);
+    setClaudeError(null);
 
     try {
       // Routes through authService.post() so the JWT is attached.
@@ -1712,6 +1718,14 @@ Free shipping on orders over $50. 30-day hassle-free returns.`;
       if (!data || data.success === false) {
         throw new Error(data?.error || 'Analysis failed');
       }
+
+      // Task #34: track source + Claude error context.
+      // Backend now returns source='claude' (full AI) or source='fallback'
+      // (rule-based) with optional claude_error{kind,detail,retryable} when
+      // Claude was attempted and failed. UI surfaces this so user knows
+      // whether retry is worth it.
+      setAnalysisSource(data.source || null);
+      setClaudeError(data.claude_error || null);
 
       if (data.success && data.analysis) {
         // Format the analysis nicely
@@ -2093,12 +2107,56 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                 <p className="text-white/60 text-sm">Generating AI analysis...</p>
               </div>
             ) : aiAnalysis ? (
-              <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-                <pre className="text-white/80 text-sm whitespace-pre-wrap font-sans">{aiAnalysis}</pre>
+              <div className="space-y-2">
+                {/* Task #34: surface WHEN the analysis came from the rule-
+                    based fallback instead of Claude, with a retry button
+                    when the failure was transient. Was: silent fallback
+                    that users couldn't distinguish from the real Claude
+                    output. */}
+                {analysisSource === 'fallback' && claudeError && (
+                  <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
+                    <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-yellow-200 text-sm font-medium">
+                        Rule-based analysis (Claude unavailable)
+                      </p>
+                      <p className="text-yellow-200/70 text-xs mt-0.5">
+                        {claudeError.kind === 'timeout' && 'Claude timed out. Network or service slowness.'}
+                        {claudeError.kind === 'rate_limit' && 'Claude rate-limited. Wait ~1 min then retry.'}
+                        {claudeError.kind === 'auth' && 'Claude auth failed. Check ANTHROPIC_API_KEY in .env.'}
+                        {claudeError.kind === 'network' && 'Network error reaching Claude.'}
+                        {claudeError.kind === 'no_api_key' && 'ANTHROPIC_API_KEY not configured on backend.'}
+                        {claudeError.kind === 'unknown' && (claudeError.detail || 'Unexpected error.')}
+                      </p>
+                    </div>
+                    {claudeError.retryable && (
+                      <button
+                        onClick={() => generateAIAnalysis(true)}
+                        disabled={generatingAnalysis}
+                        className="text-xs px-3 py-1.5 rounded-md bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-100 font-medium disabled:opacity-50 flex-shrink-0"
+                      >
+                        Try Claude again
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+                  <pre className="text-white/80 text-sm whitespace-pre-wrap font-sans">{aiAnalysis}</pre>
+                </div>
               </div>
             ) : analysisError ? (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-                <p className="text-red-300 text-sm">{analysisError}</p>
+              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-red-300 text-sm">{analysisError}</p>
+                </div>
+                <button
+                  onClick={() => generateAIAnalysis(true)}
+                  disabled={generatingAnalysis}
+                  className="text-xs px-3 py-1.5 rounded-md bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-100 font-medium disabled:opacity-50 flex-shrink-0"
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               <p className="text-white/40 text-sm text-center py-8">
