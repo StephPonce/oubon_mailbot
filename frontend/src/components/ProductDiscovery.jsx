@@ -1122,6 +1122,95 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
         )}
       </div>
 
+      {/* ── ALIEXPRESS BUYER SIGNALS SUB-SECTION (Task #25) ─────────────────
+          Surfaces the AE rating + recent_sales + buzz_score data that the
+          sentiment scorer uses as a fallback when Western public-social is
+          silent. Without this section, products with sentiment_score=70
+          (from AE buyer fallback) looked "fake-high" because the Social
+          Evidence panel showed empty Twitter/Amazon panes. Now the AE
+          evidence is visible alongside Western evidence — the score has
+          a visible backing. */}
+      {(() => {
+        // Read AE signals from product.data_sources or top-level fields.
+        const dataSources = product?.data_sources || {};
+        const aeSignals = dataSources.aliexpress_signals || dataSources.aliexpress || {};
+        const rating = aeSignals.rating_stars || product.aliexpress_rating;
+        const ratingPct = aeSignals.rating_pct;
+        const recentSales = aeSignals.recent_sales || product.sales_count || aeSignals.orders;
+        const buzz = aeSignals.buzz_score || product.aliexpress_buzz;
+        const foundReal = aeSignals.found_real_rating || (rating && rating > 0);
+
+        // Don't render the section if we have nothing to show.
+        if (!rating && !recentSales && !buzz) return null;
+
+        // Strength classifier matches the qualitative agent's logic.
+        let strength = 'POOR';
+        let strengthTone = 'red';
+        if (rating >= 4.7 && recentSales >= 1000) { strength = 'STRONG'; strengthTone = 'emerald'; }
+        else if (rating >= 4.5 && recentSales >= 200) { strength = 'MODERATE'; strengthTone = 'cyan'; }
+        else if (rating >= 4.3) { strength = 'WEAK'; strengthTone = 'yellow'; }
+
+        const toneClasses = {
+          emerald: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
+          cyan: 'bg-cyan-500/10 text-cyan-300 border-cyan-500/30',
+          yellow: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+          red: 'bg-red-500/10 text-red-300 border-red-500/30',
+        };
+
+        return (
+          <>
+            <div className="border-t border-white/10" />
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-orange-500/30 flex items-center justify-center text-[10px] font-bold text-white">
+                    A
+                  </div>
+                  <span className="text-white/80 text-sm font-medium">AliExpress Buyer Signals</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium border ${toneClasses[strengthTone]}`}
+                    title="Strength of the AE buyer-side signal. STRONG = high rating + high recent sales. WEAK = numbers exist but below the 'real positive' bar."
+                  >
+                    {strength}
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+                  <div className="text-white/40 text-[10px]">Rating</div>
+                  <div className="text-white/90 font-semibold">
+                    {rating ? `${Number(rating).toFixed(2)}★` : '—'}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+                  <div className="text-white/40 text-[10px]">Recent sales</div>
+                  <div className="text-white/90 font-semibold">
+                    {recentSales ? Number(recentSales).toLocaleString() : '—'}
+                  </div>
+                </div>
+                <div className="bg-white/5 rounded-lg px-2.5 py-1.5">
+                  <div className="text-white/40 text-[10px]">Buzz score</div>
+                  <div className="text-white/90 font-semibold">
+                    {buzz ? `${Math.round(Number(buzz))}/100` : '—'}
+                  </div>
+                </div>
+              </div>
+              {ratingPct ? (
+                <p className="text-white/40 text-[10px] mt-2 italic">
+                  {Number(ratingPct).toFixed(1)}% of reviews are 4-5★.
+                  {' '}AE platform-wide baseline is ~4.5★ — treat &lt;4.3★ as weak,
+                  &gt;4.7★ as a real positive.
+                </p>
+              ) : (
+                <p className="text-white/40 text-[10px] mt-2 italic">
+                  Numeric buyer signal only (no verbatim review text in this view).
+                </p>
+              )}
+            </div>
+          </>
+        );
+      })()}
+
       {/* Reddit sub-section — REMOVED (May 2026 architecture pivot).
           Reddit was a lagging indicator that didn't fire on niche dropship
           products before they went viral. Replaced by Meta Ad Library +
@@ -1486,14 +1575,10 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
       color: 'text-cyan-400',
       value: product.trend_score,
       unavailable: product.trend_score === null || product.trend_score === undefined,
-      // Surface what the trend signal is actually based on, instead of just
-      // showing the score. trend_source is set by the backend in
-      // product_discovery.py when AE-velocity fallback fires:
-      //   'aliexpress_velocity_strong' = buzz>50 + recent>1k (real momentum)
-      //   'aliexpress_velocity_weak'   = recent>200 (some signal, lower confidence)
-      // When neither label is set, the score came from Google Trends / TikTok /
-      // Twitter buzz directly — those should already populate the social
-      // evidence panel. This avoids "Trend: 72.5 / no evidence shown".
+      // Pass the source through so the renderer can show an AE badge.
+      // trend_source is set by the backend in product_discovery.py when
+      // AE-velocity fallback fires.
+      source: product.trend_source,
       note: (() => {
         if (product.trend_score === null || product.trend_score === undefined) {
           return 'No Google Trends, TikTok, or viral indicator data.';
@@ -1505,7 +1590,7 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
         if (src === 'aliexpress_velocity_weak') {
           return 'Based on AliExpress recent sales only. Weak signal — Western trend data absent.';
         }
-        return null; // Score from Western signals — evidence panel shows the rest
+        return null;
       })(),
     },
     {
@@ -1516,11 +1601,61 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
       value: product.sentiment_score,
       estimated: false,
       unavailable: product.sentiment_score === null || product.sentiment_score === undefined,
-      note: product.sentiment_weight_redistributed ? "Weight redistributed to other signals" : null,
+      // sentiment_source is set by the backend's sentiment composite
+      // (sentiment_composite.py) — currently only emitted as
+      // primary_source name like 'aliexpress_buyer'. We map that to the
+      // AE badge here so users see WHERE the sentiment score came from.
+      source: (() => {
+        const primary = product.sentiment_source;
+        if (primary === 'aliexpress_buyer') return 'aliexpress_buyer_strong';
+        return primary;
+      })(),
+      note: (() => {
+        if (product.sentiment_score === null || product.sentiment_score === undefined) {
+          return product.sentiment_weight_redistributed
+            ? 'No social signal found. Weight redistributed.'
+            : null;
+        }
+        if (product.sentiment_source === 'aliexpress_buyer') {
+          return 'Based on AliExpress buyer rating + sales volume. No Western social signal found.';
+        }
+        return null;
+      })(),
     },
-    { key: 'viral_score', label: 'Viral Potential', icon: Sparkles, color: 'text-pink-400', value: product.viral_score, estimated: product.viral_score === 50 },
-    { key: 'profit_score', label: 'Profit Margin', icon: DollarSign, color: 'text-purple-400', value: product.profit_score, estimated: false },
-  ], [product.demand_score, product.trend_score, product.sentiment_score, product.sentiment_weight_redistributed, product.viral_score, product.profit_score]);
+    {
+      key: 'viral_score',
+      label: 'Viral Potential',
+      icon: Sparkles,
+      color: 'text-pink-400',
+      value: product.viral_score,
+      estimated: product.viral_score === 50,
+      // Treat default 50 ("Est.") as effectively unavailable — show "No
+      // TikTok / viral data yet" instead of a fake bar at 50. Was: bar
+      // rendered at 50 with a tiny "(Est.)" tag that users missed.
+      unavailable: product.viral_score === null || product.viral_score === undefined || product.viral_score === 50,
+      note: (product.viral_score === 50 || product.viral_score === null || product.viral_score === undefined)
+        ? 'No TikTok / Pinterest viral signal yet.'
+        : null,
+    },
+    {
+      key: 'profit_score',
+      label: 'Profit Margin',
+      icon: DollarSign,
+      color: 'text-purple-400',
+      value: product.profit_score,
+      estimated: false,
+      unavailable: product.profit_score === null || product.profit_score === undefined,
+    },
+  ], [
+    product.demand_score,
+    product.trend_score,
+    product.trend_source,
+    product.sentiment_score,
+    product.sentiment_source,
+    product.sentiment_weight_redistributed,
+    product.viral_score,
+    product.profit_score,
+  ]);
 
   const generateSEOCaption = async () => {
     setGeneratingCaption(true);
@@ -1806,6 +1941,22 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                 }
 
                 const value = Math.min(100, Math.max(0, item.value || 0));
+                // Source badge for AE-fallback scores. Without this, scores
+                // like Trend=72 or Sentiment=70 looked like they came from
+                // Western signals (which were empty) — making users think
+                // the scores were fake. The badge tells the truth: this
+                // came from AE buyer data, weaker signal than Western.
+                const aeBadge = (() => {
+                  const src = item.source;
+                  if (!src) return null;
+                  if (src === 'aliexpress_velocity_strong' || src === 'aliexpress_buyer_strong') {
+                    return { label: 'AE', tone: 'amber', tip: 'From AliExpress buyer behavior (strong)' };
+                  }
+                  if (src === 'aliexpress_velocity_weak' || src === 'aliexpress_buyer_weak') {
+                    return { label: 'AE', tone: 'yellow', tip: 'From AliExpress buyer behavior (weak)' };
+                  }
+                  return null;
+                })();
                 return (
                   <div key={item.key} className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-white/5">
@@ -1813,9 +1964,21 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-white/70 text-sm">
+                        <span className="text-white/70 text-sm flex items-center gap-1.5">
                           {item.label}
                           {item.estimated && <span className="text-yellow-400 text-xs ml-1">(Est.)</span>}
+                          {aeBadge && (
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded font-semibold tracking-wider ${
+                                aeBadge.tone === 'amber'
+                                  ? 'bg-amber-500/15 text-amber-300/90 border border-amber-500/30'
+                                  : 'bg-yellow-500/10 text-yellow-300/80 border border-yellow-500/20'
+                              }`}
+                              title={aeBadge.tip}
+                            >
+                              {aeBadge.label}
+                            </span>
+                          )}
                         </span>
                         <span className={`font-bold ${item.color}`}>{value}</span>
                       </div>
@@ -1830,6 +1993,14 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                           style={{ width: `${value}%` }}
                         />
                       </div>
+                      {/* Note now renders on the has-value branch too. Before,
+                          the note was only shown when the score was null —
+                          which meant "Based on AliExpress velocity..." text
+                          never appeared because the score was always present
+                          when the AE fallback fired. Bug #26. */}
+                      {item.note && (
+                        <p className="text-white/40 text-[10px] mt-1 italic">{item.note}</p>
+                      )}
                     </div>
                   </div>
                 );
