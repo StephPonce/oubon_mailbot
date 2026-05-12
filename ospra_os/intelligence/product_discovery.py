@@ -1098,28 +1098,44 @@ class ProductDiscoveryEngine:
 
         scored_products = self._calculate_scores(all_products)
 
-        # CJ accounting before min_score filter (Task #31).
-        # CJ-only products have no AE buyer signals, no Amazon evidence —
-        # their base score is mostly profit (15%) + sourcing (20%) = 35%
-        # max, which sits RIGHT AT the default min_score threshold of 30.
-        # After saturation discount, CJ products often fall below 30 and
-        # get filtered out here, never reaching URL validation. This was
-        # the hidden funnel leak.
-        def _cj_count_in(plist):
-            return sum(
-                1 for p in plist
-                if p.get('source') == 'cj_dropshipping'
-                or 'cj_dropshipping' in (p.get('available_on') or [])
+        # Per-source min_score (Task #31 — confirmed CJ killer May 11).
+        # CJ-only products have no AE buyer signals (no AliExpress velocity,
+        # no Amazon fuzzy-match, no AE buyer rating). Their OI ceiling is
+        # mathematically just profit (15%) + sourcing (20%) = 35 max,
+        # which collapses below min_score=30 after the anti-saturation and
+        # relevance multipliers. Result: 100% of CJ products silently
+        # filtered out, even when they're legit US-warehouse early-stage
+        # products that should be visible in discovery.
+        #
+        # Fix: CJ-only products use 50% of the min_score floor (default
+        # 15 vs 30 for AE). They're not lower-quality products — they're
+        # measured by a different yardstick. Cross-referenced products
+        # (AE+CJ both) use the full AE floor since they have AE signals.
+        def _is_cj_only(p):
+            available = p.get('available_on') or []
+            return (
+                p.get('source') == 'cj_dropshipping'
+                or (available == ['cj_dropshipping'])
             )
 
+        def _cj_count_in(plist):
+            return sum(1 for p in plist if _is_cj_only(p))
+
+        cj_min_score = min_score * 0.5  # 15 when min_score is 30
+
         cj_before_filter = _cj_count_in(scored_products)
-        # Filter and sort
-        filtered = [p for p in scored_products if p.get('oi_score', 0) >= min_score]
+
+        def _passes_filter(p):
+            threshold = cj_min_score if _is_cj_only(p) else min_score
+            return (p.get('oi_score', 0) or 0) >= threshold
+
+        filtered = [p for p in scored_products if _passes_filter(p)]
         ranked = sorted(filtered, key=lambda x: x.get('oi_score', 0), reverse=True)
         cj_after_filter = _cj_count_in(filtered)
         logger.info(
-            f"   [CJ FUNNEL] before min_score={min_score} filter: {cj_before_filter} → "
-            f"after: {cj_after_filter} (dropped by score floor: {cj_before_filter - cj_after_filter})"
+            f"   [CJ FUNNEL] before filter (AE floor={min_score}, CJ floor={cj_min_score}): "
+            f"{cj_before_filter} CJ → after: {cj_after_filter} "
+            f"(dropped: {cj_before_filter - cj_after_filter})"
         )
 
         # =====================================================================
