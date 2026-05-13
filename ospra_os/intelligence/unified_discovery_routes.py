@@ -1036,6 +1036,51 @@ async def test_cj_directly(
         return {"success": False, "error": str(e)}
 
 
+@router.get("/test-meta-ads")
+async def test_meta_ads(
+    keyword: str = Query("smart plug", description="Ad Library search term"),
+    country: str = Query("US", description="ISO alpha-2 country code"),
+    max_ads: int = Query(20, ge=1, le=100),
+    active_only: bool = Query(True),
+):
+    """
+    Task #10: smoke-test the Meta Ad Library connector.
+
+    Returns:
+      - availability status (APIFY_API_TOKEN present?)
+      - the connector's full payload: raw ads, aggregated advertisers,
+        and the subset that pass the "proven winner" heuristic
+        (≥14 days active × ≥3 creative variants × Shopify landing URL)
+      - a manual_url the operator can paste in a browser to cross-check
+    """
+    try:
+        from ospra_os.product_research.connectors.apify.meta_ads_library import (
+            get_meta_ads_library,
+        )
+        client = get_meta_ads_library()
+        if not client.is_available():
+            return {
+                "success": False,
+                "available": False,
+                "error": "APIFY_API_TOKEN not configured",
+            }
+        result = await client.search_active_ads(
+            keyword=keyword,
+            country=country,
+            max_ads=max_ads,
+            active_only=active_only,
+        )
+        # Trim ads down for the test response — full payload is huge
+        if result.get("ads"):
+            result["ads_sample"] = result["ads"][:5]
+            result["ads_truncated"] = max(0, len(result["ads"]) - 5)
+            del result["ads"]
+        return {"success": True, **result}
+    except Exception as e:
+        logger.error(f"[ERROR] Meta Ad Library test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.get("/test-ae-ds")
 async def test_ae_ds(
     product_id: str = Query("", description="AE product_id to fetch detail for"),

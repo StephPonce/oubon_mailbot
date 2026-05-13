@@ -298,28 +298,96 @@ class AdIntelligence:
             'analyzed_at': datetime.now(timezone.utc).isoformat()
         }
 
-    async def search_facebook_ads(self, competitor_name: str) -> dict:
+    async def search_facebook_ads(
+        self,
+        competitor_name: str,
+        *,
+        country: str = "US",
+        max_ads: int = 50,
+        active_only: bool = True,
+    ) -> dict:
         """
-        Search Facebook Ad Library for competitor ads
+        Search Facebook Ad Library for ads matching a keyword / competitor name.
 
-        Note: This would integrate with Facebook Ad Library API
-        For MVP, returns placeholder structure
+        Task #10: replaces the NOT_IMPLEMENTED stub. Backed by the Apify
+        Meta Ads Library scraper — Meta's official `/ads_archive` Graph
+        endpoint only returns political/issue ads in the US, which is
+        useless for commerce discovery. See `MetaAdsLibraryApify` for
+        the rationale.
+
+        Returns the connector's payload as-is on success (includes
+        ads[], advertisers[], winners[]) plus a `manual_url` for the
+        operator to cross-check in a browser. On failure, falls back
+        to the same {status: NOT_AVAILABLE, manual_url} shape the stub
+        used so existing callers don't break.
 
         Args:
-            competitor_name: Competitor business name
+            competitor_name: Brand name or keyword (Apify hits Ad
+                Library full-text search — both work)
+            country: ISO 3166-1 alpha-2, default "US"
+            max_ads: Per-call cost control (Apify is per-result billed)
+            active_only: If True, exclude ads that have stopped running.
 
         Returns:
-            Ad search results
+            On success:
+              { 'available': True, 'competitor_name', 'country',
+                'ad_count', 'ads': [...], 'advertisers': [...],
+                'winners': [...], 'manual_url' }
+            On failure:
+              { 'available': False, 'competitor_name',
+                'status': 'NOT_AVAILABLE', 'error',
+                'manual_url' }
         """
-        # TODO: Implement Facebook Ad Library API integration
-        # https://www.facebook.com/ads/library/api/
+        manual_url = (
+            f"https://www.facebook.com/ads/library/"
+            f"?active_status={'active' if active_only else 'all'}"
+            f"&ad_type=all&country={country}"
+            f"&q={competitor_name.replace(' ', '%20')}"
+        )
 
+        try:
+            from ospra_os.product_research.connectors.apify.meta_ads_library import (
+                get_meta_ads_library,
+            )
+            client = get_meta_ads_library()
+        except Exception as exc:
+            logger.warning("Meta Ad Library connector unavailable: %s", exc)
+            return {
+                "available": False,
+                "competitor_name": competitor_name,
+                "status": "NOT_AVAILABLE",
+                "error": f"connector_import_failed: {exc}",
+                "manual_url": manual_url,
+            }
+
+        if not client.is_available():
+            return {
+                "available": False,
+                "competitor_name": competitor_name,
+                "status": "NOT_AVAILABLE",
+                "error": "APIFY_API_TOKEN not configured",
+                "manual_url": manual_url,
+            }
+
+        result = await client.search_active_ads(
+            keyword=competitor_name,
+            country=country,
+            max_ads=max_ads,
+            active_only=active_only,
+        )
+        # Preserve the available=False path so legacy callers can branch
+        if not result.get("available"):
+            return {
+                **result,
+                "competitor_name": competitor_name,
+                "status": "NOT_AVAILABLE",
+                "manual_url": manual_url,
+            }
         return {
-            'competitor_name': competitor_name,
-            'status': 'NOT_IMPLEMENTED',
-            'message': 'Facebook Ad Library API integration pending',
-            'manual_url': f"https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&q={competitor_name.replace(' ', '%20')}",
-            'note': 'Visit the manual URL to view ads in browser'
+            **result,
+            "competitor_name": competitor_name,
+            "status": "OK",
+            "manual_url": manual_url,
         }
 
     async def update_competitor_ad_data(

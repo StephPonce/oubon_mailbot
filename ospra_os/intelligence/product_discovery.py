@@ -591,6 +591,10 @@ class ProductDiscoveryEngine:
         else:
             self.sources_status['tiktok_shop'] = '[INFO] Not configured (set TIKTOK_SHOP_APP_KEY/_ACCESS_TOKEN)'
 
+        # Meta Ad Library scraper — Task #10 / winner-proof source #1.
+        # Initialized in the Apify block below so it shares the token.
+        self.meta_ads_scraper = None
+
         if self.apify_token:
             try:
                 from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
@@ -600,6 +604,27 @@ class ProductDiscoveryEngine:
                 self.sources_status['tiktok'] = '[SUCCESS] Connected (Apify)'
                 self.sources_status['amazon'] = '[SUCCESS] Connected (Apify)'
                 logger.info("[SUCCESS] TikTok + Amazon scrapers loaded")
+
+                # Meta Ad Library — proven-winner signal (advertisers
+                # actively spending = product is paying for itself).
+                # Best-effort like Pinterest: log + skip on ImportError.
+                try:
+                    from ospra_os.product_research.connectors.apify.meta_ads_library import (
+                        get_meta_ads_library,
+                    )
+                    self.meta_ads_scraper = get_meta_ads_library()
+                    if self.meta_ads_scraper.is_available():
+                        self.sources_status['meta_ads'] = '[SUCCESS] Connected (Apify)'
+                        logger.info("[SUCCESS] Meta Ad Library scraper loaded")
+                    else:
+                        self.sources_status['meta_ads'] = '[WARNING] Token check failed'
+                        self.meta_ads_scraper = None
+                except ImportError as exc:
+                    self.sources_status['meta_ads'] = f'[INFO] Connector not installed: {exc}'
+                    logger.info(f"[INFO] Meta Ad Library: connector not available ({exc})")
+                except Exception as exc:
+                    self.sources_status['meta_ads'] = f'[ERROR] {exc}'
+                    logger.warning(f"[WARNING] Meta Ad Library init failed: {exc}")
 
                 # Pinterest is best-effort. Older codebases or deploys
                 # that don't have the actor configured will hit ImportError
@@ -625,6 +650,7 @@ class ProductDiscoveryEngine:
             self.sources_status['tiktok'] = '[ERROR] No APIFY_API_TOKEN'
             self.sources_status['amazon'] = '[ERROR] No APIFY_API_TOKEN'
             self.sources_status['pinterest'] = '[ERROR] No APIFY_API_TOKEN'
+            self.sources_status['meta_ads'] = '[ERROR] No APIFY_API_TOKEN'
     
     def _init_supplier_sources(self):
         """Initialize SUPPLIER sources (where to buy)"""
@@ -1567,6 +1593,14 @@ class ProductDiscoveryEngine:
             trend_tasks.append(self._fetch_pinterest_trends(niche))
             trend_labels.append("pinterest_trends")
 
+        # Meta Ad Library task — Task #10 / winner-proof source #1.
+        # Surfaces keywords from advertisers actively spending against
+        # this niche. Different from Pinterest/Google in that "active
+        # advertising" is a money-backed signal, not just attention.
+        if self.apify_available and getattr(self, "meta_ads_scraper", None):
+            trend_tasks.append(self._fetch_meta_ads_trends(niche))
+            trend_labels.append("meta_ads_library")
+
         # TikTok Shop Partner API task — first-party data with real
         # units_sold_7d. Most user shops won't have this OAuth-configured,
         # so guarded behind ``self.tiktok_shop_connector``.
@@ -1836,6 +1870,121 @@ class ProductDiscoveryEngine:
         except Exception as e:
             logger.debug(f"Pinterest trends fetch failed: {e}")
             return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'pinterest_trends'}
+
+    async def _fetch_meta_ads_trends(self, niche: str) -> dict:
+        """
+        Task #10: Meta Ad Library as a winner-proof source.
+
+        Pulls active ads matching the niche keyword and surfaces three
+        derived signals:
+
+        1. `keywords` — common phrases from creative titles / bodies of
+           proven-winner advertisers. These get merged into the
+           trending-keywords pool so AE/CJ supplier searches pick them
+           up downstream.
+        2. `winners` — list of advertiser pages that pass the
+           14d-active × 3-variants × Shopify-landing heuristic. The
+           scoring pass can later inflate products that match by name.
+        3. `ad_count` — total active ads in the niche. Useful as a
+           saturation signal (lots of competition = harder market).
+
+        Returns the same dict shape as `_fetch_pinterest_trends` so the
+        merge loop in `_get_trending_keywords` treats it identically.
+
+        Caveat: each Apify call costs $0.30-$1.00 per 1k ads. We cap at
+        50 ads per discovery cycle. If the niche has very low ad
+        density, we may return zero winners — that's a real signal
+        ("nobody's running ads = blue ocean"), not a failure.
+        """
+        if not getattr(self, "meta_ads_scraper", None):
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'meta_ads'}
+
+        # The connector hits Ad Library full-text search — niche keys
+        # like "smart_home" become "smart home" before query.
+        query = niche.replace("_", " ").strip() or "trending"
+
+        try:
+            result = await self.meta_ads_scraper.search_active_ads(
+                keyword=query,
+                country="US",
+                max_ads=50,
+                active_only=True,
+            )
+        except Exception as e:
+            logger.debug(f"Meta Ad Library fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'meta_ads'}
+
+        if not result.get("available"):
+            return {
+                'keywords': [],
+                'trend_direction': 'UNKNOWN',
+                'source': 'meta_ads',
+                'error': result.get("error"),
+            }
+
+        # Extract keyword candidates from the creative titles of the
+        # advertisers that pass the winner heuristic. Falls back to
+        # all advertisers if no clear winners (still better signal
+        # than nothing).
+        winners = result.get("winners") or []
+        seed_pool = winners or result.get("advertisers") or []
+        keywords: list[str] = []
+        for adv in seed_pool[:10]:
+            name = (adv.get("page_name") or "").strip()
+            if name:
+                # Page names are often "Brand X Co" — strip generic
+                # suffixes that don't help downstream search.
+                tokens = [
+                    t for t in name.split()
+                    if len(t) > 2 and t.lower() not in {
+                        "the", "and", "shop", "store", "co", "inc",
+                        "llc", "ltd",
+                    }
+                ]
+                if tokens:
+                    keywords.append(" ".join(tokens[:3]))
+
+        # Pull standout phrases from creative bodies as a secondary
+        # keyword source. Most ad copy starts with a hook phrase that
+        # describes the product positioning ("Stop snoring tonight",
+        # "Pet hair gone in seconds", etc).
+        for ad in (result.get("ads_sample") or [])[:5]:
+            body = (ad.get("creative_body") or "").strip()
+            if body:
+                first = body.split(".")[0]  # first sentence
+                if 6 <= len(first) <= 60:
+                    keywords.append(first)
+
+        # Many advertisers = market is hot. Few = blue ocean. We map
+        # that to a direction the merge loop already understands.
+        ad_count = int(result.get("ad_count", 0))
+        if ad_count == 0:
+            direction = "UNKNOWN"
+        elif ad_count >= 25:
+            direction = "RISING"
+        elif ad_count >= 5:
+            direction = "STABLE"
+        else:
+            direction = "FALLING"
+
+        # Stash the structured winner data on the engine so the scoring
+        # pass can read it later (Phase 2 — Task #15 will use this to
+        # inflate scores of products matching winning advertisers).
+        self._meta_winners_cache = {
+            'niche': niche,
+            'winners': winners,
+            'advertisers': result.get("advertisers") or [],
+            'ad_count': ad_count,
+            'fetched_at': datetime.now().isoformat(),
+        }
+
+        return {
+            'keywords': keywords,
+            'trend_direction': direction,
+            'source': 'meta_ads',
+            'ad_count': ad_count,
+            'winner_count': len(winners),
+        }
 
     async def _fetch_amazon_trends(self, niche: str) -> List[str]:
         """Fetch bestseller keywords from Amazon (wrapper for parallel execution)."""
