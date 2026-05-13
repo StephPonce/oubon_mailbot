@@ -322,13 +322,19 @@ function SupplierBadges({ product }) {
 // ============================================================================
 // COMPONENT: Product Card - CLICKABLE, Oi Score + supplier badges
 // ============================================================================
-function ProductCard({ product, onClick }) {
+// Task #35: ProductCard is rendered up to 20-50× per discovery result.
+// Every parent re-render (filter change, modal toggle, image enhancement
+// progress tick) used to rebuild every card from scratch. Wrapping in
+// React.memo with a referential equality check on `product` means cards
+// only re-render when their backing product object actually changes —
+// the dominant interaction perf win for this page.
+const ProductCard = React.memo(function ProductCard({ product, onClick }) {
   const [imageError, setImageError] = useState(false);
   const displayImage = product.ai_image_url || product.image_url;
   const hasAiImage = !!product.ai_image_url;
 
   return (
-    <div 
+    <div
       onClick={onClick}
       className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 overflow-hidden hover:border-purple-500/40 hover:scale-[1.02] transition-all cursor-pointer group"
     >
@@ -338,6 +344,11 @@ function ProductCard({ product, onClick }) {
           <img
             src={resolveImageUrl(displayImage)}
             alt={product.title}
+            // Task #35: lazy-load below-the-fold cards so initial paint
+            // doesn't block on 20+ AE CDN image fetches. decoding="async"
+            // also lets the browser do JPEG decode off the main thread.
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={() => setImageError(true)}
           />
@@ -441,7 +452,7 @@ function ProductCard({ product, onClick }) {
       </div>
     </div>
   );
-}
+});
 
 // ============================================================================
 // COMPONENT: Image Gallery with Toggle - Shows ALL enhanced images
@@ -2616,16 +2627,48 @@ export function ProductDiscovery() {
   };
 
   const loadProducts = async (nicheOverride = null) => {
-    setLoading(true);
     setHasMockData(false);
     setHasEstimatedScores(false);
     setDiscoveryError(null);
 
-    try {
-      // Use override niche if provided (from niche chip click), else use current niche
-      const niche = nicheOverride || currentNiche;
-      if (nicheOverride) setCurrentNiche(nicheOverride);
+    // Use override niche if provided (from niche chip click), else use current niche
+    const niche = nicheOverride || currentNiche;
+    if (nicheOverride) setCurrentNiche(nicheOverride);
 
+    // Task #35 — render-while-revalidate. The discovery API takes 30-60s on
+    // a cold call; previously the page sat on a skeleton the entire time.
+    // Read the last successful response for this niche from localStorage and
+    // paint immediately so the user has something to look at while the live
+    // call is in flight. We still fire the fetch on every load — the cache
+    // is purely a paint optimisation, not a freshness contract.
+    const cacheKey = `ospra_products_v1:${niche}`;
+    let usedCache = false;
+    try {
+      const raw = localStorage.getItem(cacheKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const age = Date.now() - (parsed.savedAt || 0);
+        // Show cached data for up to 24h, but never paint anything older
+        // than that — stale prices/scores feel like a bug.
+        if (Array.isArray(parsed.products) && parsed.products.length > 0
+            && age < 24 * 60 * 60 * 1000) {
+          setProducts(parsed.products);
+          setLoading(false);
+          usedCache = true;
+          console.log(
+            `[ProductDiscovery] Painted ${parsed.products.length} cached `
+            + `products for ${niche} (age: ${Math.round(age/1000)}s) — `
+            + `refreshing in background`
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('[ProductDiscovery] cache read failed:', e);
+    }
+    // Only show skeleton when we didn't have a cache hit
+    if (!usedCache) setLoading(true);
+
+    try {
       console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
 
       // Fetch products (same niche for all filter types).
@@ -2699,6 +2742,23 @@ export function ProductDiscovery() {
       setHasMockData(mockCount > 0);
       setHasEstimatedScores(estimatedCount > normalizedProducts.length / 2);
       setProducts(normalizedProducts);
+
+      // Task #35 — persist for the next visit's render-while-revalidate.
+      // Only cache when we got real data (not mock/empty), so cold-load
+      // failures don't poison the cache and keep painting bad data.
+      if (normalizedProducts.length > 0 && mockCount === 0) {
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            savedAt: Date.now(),
+            niche,
+            products: normalizedProducts,
+          }));
+        } catch (e) {
+          // Quota exceeded or storage disabled — non-fatal
+          console.warn('[ProductDiscovery] cache write failed:', e);
+        }
+      }
+
       trackInteraction('filter', { filter, niche, result_count: normalizedProducts.length, mock_count: mockCount });
 
       // console.log(`[ProductDiscovery] Set ${normalizedProducts.length} products to state`);
