@@ -1187,6 +1187,79 @@ class ProductDiscoveryEngine:
                 )
 
         # =====================================================================
+        # STEP 5b: ALIEXPRESS DS API — REAL MERCHANT PRICES (Task #24)
+        # =====================================================================
+        # Up to this point every AE product was priced off the affiliate API's
+        # `target_sale_price × 1.65` heuristic — empirically wrong by $2-10.
+        # AE's Dropshipping Solution API exposes the real merchant cost
+        # (`sku_price`) per SKU plus a per-product variable commission rate.
+        # We only enrich the top 10 ranked products because each DS detail
+        # call is one rate-limited round-trip (~250ms) and the user only
+        # ever looks at top-of-list anyway. Lower-ranked products keep the
+        # heuristic estimate.
+        try:
+            from ospra_os.aliexpress.ds_client import get_ds_client
+            ds_client = get_ds_client()
+        except Exception as exc:
+            logger.debug(f"   AE DS client import failed (non-fatal): {exc}")
+            ds_client = None
+
+        if ds_client and ds_client.is_available() and ranked:
+            ds_start = time.time()
+            # Only AE-sourced products; CJ-only items don't have AE IDs.
+            ds_top = [
+                p for p in ranked[:10]
+                if p.get("product_id") and (
+                    p.get("source") == "aliexpress"
+                    or "aliexpress" in (p.get("available_on") or [])
+                )
+            ]
+            logger.info(
+                f"\n[AE-DS] STEP 5b: Real merchant prices for top "
+                f"{len(ds_top)} AE products..."
+            )
+            if ds_top:
+                try:
+                    enriched = await _with_timeout(
+                        ds_client.enrich_pricing(ds_top, limit=len(ds_top)),
+                        SENTIMENT_SOURCE_TIMEOUT,
+                    )
+                    # `enrich_pricing` overwrites `cost_price` in place but
+                    # downstream fields (`suggested_price`, `profit`,
+                    # `discount_pct`, `original_price`) were computed from
+                    # the old heuristic. Recompute them so the UI's price
+                    # card stays internally consistent. Only touch products
+                    # the DS API actually had data for.
+                    for product in ds_top:
+                        if product.get("cost_basis") != "ae_ds_merchant_price":
+                            continue
+                        new_cost = float(product.get("cost_price") or 0)
+                        if new_cost <= 0:
+                            continue
+                        new_suggested = _suggested_price_for_cost(new_cost)
+                        product["suggested_price"] = new_suggested
+                        product["profit"] = round(new_suggested - new_cost, 2)
+                        msrp = float(product.get("msrp") or 0)
+                        product["original_price"] = msrp if msrp > new_cost else new_cost
+                        if msrp > new_cost and msrp > 0:
+                            product["discount_pct"] = min(
+                                90,
+                                round(((msrp - new_cost) / msrp) * 100, 0),
+                            )
+                        else:
+                            product["discount_pct"] = 0
+                    logger.info(
+                        f"   ✓ AE DS pricing: {enriched}/{len(ds_top)} enriched "
+                        f"(took {time.time() - ds_start:.2f}s)"
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        f"   ⏱️ AE DS enrichment timed out — keeping heuristic prices"
+                    )
+                except Exception as exc:
+                    logger.warning(f"   AE DS enrichment failed: {exc}")
+
+        # =====================================================================
         # STEP 5c: YOUTUBE REVIEW VIDEOS + VIEWER COMMENTS (Phase I)
         # =====================================================================
         # YouTube is where buyers go to watch a product BEFORE buying. Top

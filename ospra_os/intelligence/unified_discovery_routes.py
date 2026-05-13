@@ -1036,6 +1036,55 @@ async def test_cj_directly(
         return {"success": False, "error": str(e)}
 
 
+@router.get("/test-ae-ds")
+async def test_ae_ds(
+    product_id: str = Query("", description="AE product_id to fetch detail for"),
+    feed_name: str = Query("DS_Global_topsellers", description="DS feed name"),
+    feed_page_size: int = Query(5, ge=1, le=20),
+):
+    """
+    Task #24: smoke-test the AE Dropshipping Solution client.
+
+    Returns:
+      - availability status (token + app key)
+      - a sample of the configured DS feed
+      - detailed merchant pricing for `product_id` (if provided)
+    """
+    try:
+        from ospra_os.aliexpress.ds_client import get_ds_client
+        client = get_ds_client()
+
+        out = {
+            "success": True,
+            "available": client.is_available(),
+            "feed_name": feed_name,
+        }
+        if not client.is_available():
+            out["error"] = (
+                "AE DS API not configured — need ALIEXPRESS_APP_KEY/SECRET "
+                "and a non-expired dropship token (api_type='dropship')."
+            )
+            return out
+
+        # Sample the configured feed so the operator can see live data
+        feed_products = await client.get_hot_products(
+            feed_name=feed_name,
+            page_size=feed_page_size,
+        )
+        out["feed_sample_count"] = len(feed_products)
+        out["feed_sample"] = feed_products[:feed_page_size]
+
+        # If a product_id is provided, fetch its merchant pricing detail
+        if product_id:
+            detail = await client.get_product_details(product_id)
+            out["product_detail"] = detail or {"error": "no detail returned"}
+            out["product_id"] = product_id
+        return out
+    except Exception as e:
+        logger.error(f"[ERROR] AE DS test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.post("/refresh-cj-categories")
 async def refresh_cj_categories(
     force: bool = Query(False, description="Refresh even if cache is fresh"),
