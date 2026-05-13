@@ -21,8 +21,9 @@ import logging
 import asyncio
 import json
 import aiohttp
-from typing import List, Dict, Optional
-from datetime import datetime
+from pathlib import Path
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime, timezone
 import time
 from dotenv import load_dotenv
 
@@ -32,6 +33,16 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 CJ_API_BASE = "https://developers.cjdropshipping.com/api2.0/v1"
+
+# Task #36: live CATEGORY_MAP cache. The hard-coded `CJDropshippingClient.CATEGORY_MAP`
+# below was hand-curated against a snapshot of CJ's category IDs that has since
+# drifted — half the IDs return zero products. We now also refresh from CJ's
+# `/product/getCategory` endpoint at most once per `CJ_CATEGORY_REFRESH_SECONDS`
+# and persist the flattened name→id index here so subsequent boots use the
+# live snapshot. The hard-coded map stays in place as a fallback.
+CJ_CATEGORY_CACHE_DIR = Path(os.getenv("OSPRA_CACHE_DIR", "/tmp/ospra_cache"))
+CJ_CATEGORY_CACHE_FILE = CJ_CATEGORY_CACHE_DIR / "cj_categories.json"
+CJ_CATEGORY_REFRESH_SECONDS = 7 * 24 * 60 * 60  # 7 days
 
 
 class CJDropshippingClient:
@@ -120,6 +131,13 @@ class CJDropshippingClient:
         # trigger a 429 cascade. Lock is async and created lazily so __init__
         # works outside an event loop.
         self._request_lock: Optional[asyncio.Lock] = None
+
+        # Task #36: live category index loaded from disk cache (populated by
+        # `refresh_category_map()`). `None` until first lookup; lookups fall
+        # back to the hard-coded CATEGORY_MAP / KEYWORD_MAP when this is
+        # empty or doesn't contain the niche.
+        self._dynamic_category_map: Optional[Dict[str, str]] = None
+        self._dynamic_category_loaded_at: Optional[float] = None
 
         if self._available:
             logger.info("[SUCCESS] CJ Dropshipping client initialized (serialized, rate limit: 0.33 req/sec)")
@@ -317,7 +335,8 @@ class CJDropshippingClient:
 
         This is more reliable than keyword search for CJ.
         """
-        category_id = self.CATEGORY_MAP.get(niche.lower())
+        # Task #36: use live CJ map first, fall back to hard-coded snapshot
+        category_id = self._get_category_id(niche)
 
         if category_id:
             logger.info(f"[INFO] CJ niche search: {niche} -> category {category_id}")
@@ -397,12 +416,15 @@ class CJDropshippingClient:
         else:
             # 2. No mapping - try to infer category from query words
             for word in query_lower.split():
-                # Check if any word matches a niche category
-                if word in self.CATEGORY_MAP:
-                    logger.info(f"[INFO] CJ: Found category '{word}' in query")
+                # Task #36: check dynamic + hard-coded map for the niche keyword
+                resolved_cat = self._get_category_id(word)
+                if resolved_cat:
+                    logger.info(
+                        f"[INFO] CJ: Found category '{word}' -> {resolved_cat}"
+                    )
                     cat_products = await self.search_products(
                         keyword="",
-                        category_id=self.CATEGORY_MAP[word],
+                        category_id=resolved_cat,
                         page_size=page_size
                     )
                     for p in cat_products:
@@ -453,6 +475,175 @@ class CJDropshippingClient:
         if result:
             logger.info(f"[SUCCESS] CJ: Retrieved {len(result) if isinstance(result, list) else 'unknown'} categories")
         return result if isinstance(result, list) else []
+
+    # ------------------------------------------------------------------
+    # Task #36: dynamic CATEGORY_MAP refresh
+    # ------------------------------------------------------------------
+    # The hard-coded `CATEGORY_MAP` above was hand-curated and has drifted
+    # away from CJ's live category tree (smart_home → 1489 returns 0
+    # products as of the 2026-04 audit). The methods below pull the live
+    # tree from `/product/getCategory`, flatten it to a name → id index,
+    # persist it to `CJ_CATEGORY_CACHE_FILE`, and use it as the primary
+    # lookup with the hard-coded map as a fallback for niches the live
+    # tree doesn't carry the same name for.
+
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        """Lowercase and collapse to alpha+underscore so 'Smart Home' ==
+        'smart_home' == 'smart-home' == 'smart  home'."""
+        if not name:
+            return ""
+        n = name.strip().lower()
+        # Replace separators with underscore
+        for ch in (" ", "-", "/", "&", ",", "."):
+            n = n.replace(ch, "_")
+        # Collapse repeats
+        while "__" in n:
+            n = n.replace("__", "_")
+        return n.strip("_")
+
+    def _walk_category_tree(self, nodes, out: Dict[str, str]) -> None:
+        """Defensively walk CJ's category response and emit (name → id)
+        pairs at every depth. Handles several response shapes seen in the
+        wild (first/second/third-level keys, generic id/name/children)."""
+        if not nodes:
+            return
+        if isinstance(nodes, dict):
+            nodes = [nodes]
+        if not isinstance(nodes, list):
+            return
+
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+
+            # Try every known key naming for (id, name) at each depth.
+            for id_key, name_key, children_key in (
+                ("categoryFirstId", "categoryFirstName", "categoryFirstList"),
+                ("categorySecondId", "categorySecondName", "categorySecondList"),
+                ("categoryThirdId", "categoryThirdName", "categoryThirdList"),
+                ("categoryId", "categoryName", "children"),
+                ("id", "name", "children"),
+            ):
+                cid = node.get(id_key)
+                cname = node.get(name_key)
+                if cid and cname:
+                    norm = self._normalize_name(str(cname))
+                    if norm and norm not in out:
+                        out[norm] = str(cid)
+                if children_key in node:
+                    self._walk_category_tree(node.get(children_key), out)
+
+    def _load_cached_category_map(self) -> Optional[Dict[str, str]]:
+        """Read the persisted name→id index from disk. Returns None if
+        missing or unparseable."""
+        try:
+            if not CJ_CATEGORY_CACHE_FILE.exists():
+                return None
+            with CJ_CATEGORY_CACHE_FILE.open("r") as fh:
+                payload = json.load(fh)
+            if not isinstance(payload, dict):
+                return None
+            mapping = payload.get("map")
+            saved_at = payload.get("saved_at")
+            if not isinstance(mapping, dict):
+                return None
+            self._dynamic_category_loaded_at = float(saved_at) if saved_at else None
+            return {str(k): str(v) for k, v in mapping.items()}
+        except Exception as exc:
+            logger.warning(f"[CJ-CAT] Failed to load cached category map: {exc}")
+            return None
+
+    def _save_cached_category_map(self, mapping: Dict[str, str]) -> None:
+        """Persist the flattened name→id index alongside a timestamp."""
+        try:
+            CJ_CATEGORY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "saved_at": time.time(),
+                "saved_at_iso": datetime.now(timezone.utc).isoformat(),
+                "entry_count": len(mapping),
+                "map": mapping,
+            }
+            with CJ_CATEGORY_CACHE_FILE.open("w") as fh:
+                json.dump(payload, fh, indent=2, sort_keys=True)
+            logger.info(
+                f"[CJ-CAT] Cached {len(mapping)} CJ categories to "
+                f"{CJ_CATEGORY_CACHE_FILE}"
+            )
+        except Exception as exc:
+            logger.warning(f"[CJ-CAT] Failed to write category cache: {exc}")
+
+    async def refresh_category_map(self, force: bool = False) -> Dict[str, str]:
+        """Pull `/product/getCategory` and rebuild the dynamic name→id
+        index. Persists to `CJ_CATEGORY_CACHE_FILE` and updates the
+        in-memory `_dynamic_category_map`. Idempotent — repeated calls
+        within `CJ_CATEGORY_REFRESH_SECONDS` short-circuit unless
+        `force=True`."""
+        if not self._available:
+            logger.warning("[CJ-CAT] Cannot refresh — CJ token not configured")
+            return self._dynamic_category_map or {}
+
+        # Honour the TTL unless caller forces a refresh
+        if not force and self._dynamic_category_loaded_at:
+            age = time.time() - self._dynamic_category_loaded_at
+            if age < CJ_CATEGORY_REFRESH_SECONDS:
+                logger.debug(
+                    f"[CJ-CAT] Skipping refresh — cache is {age/3600:.1f}h old "
+                    f"(refresh interval: {CJ_CATEGORY_REFRESH_SECONDS/3600:.0f}h)"
+                )
+                return self._dynamic_category_map or {}
+
+        logger.info("[CJ-CAT] Refreshing CJ CATEGORY_MAP from /product/getCategory")
+        raw = await self.get_categories()
+        if not raw:
+            logger.warning("[CJ-CAT] /getCategory returned no data — keeping existing map")
+            return self._dynamic_category_map or {}
+
+        mapping: Dict[str, str] = {}
+        self._walk_category_tree(raw, mapping)
+
+        if not mapping:
+            logger.warning("[CJ-CAT] Could not parse category tree — keeping existing map")
+            return self._dynamic_category_map or {}
+
+        self._dynamic_category_map = mapping
+        self._dynamic_category_loaded_at = time.time()
+        self._save_cached_category_map(mapping)
+        logger.info(
+            f"[CJ-CAT] Built dynamic CJ category index with {len(mapping)} entries"
+        )
+        return mapping
+
+    def _get_category_id(self, niche: str) -> Optional[str]:
+        """Resolve a niche keyword to a CJ categoryId. Checks the
+        dynamic map first (loaded from disk on demand), then falls
+        through to the hard-coded `CATEGORY_MAP`. Returns None if no
+        match exists in either layer."""
+        if not niche:
+            return None
+
+        # Lazy-load the disk cache once per process
+        if self._dynamic_category_map is None:
+            cached = self._load_cached_category_map()
+            if cached is not None:
+                self._dynamic_category_map = cached
+                logger.debug(
+                    f"[CJ-CAT] Loaded {len(cached)} cached CJ categories from disk"
+                )
+
+        # Try a few normalisations against the dynamic map
+        if self._dynamic_category_map:
+            for candidate in (
+                self._normalize_name(niche),
+                self._normalize_name(niche.replace("_", " ")),
+                niche.lower(),
+            ):
+                cid = self._dynamic_category_map.get(candidate)
+                if cid:
+                    return cid
+
+        # Fallback: hard-coded map (legacy snapshot of CJ IDs)
+        return self.CATEGORY_MAP.get(niche.lower())
     
     async def get_variants(self, pid: str) -> List[Dict]:
         """Get product variants (colors, sizes, etc.)"""

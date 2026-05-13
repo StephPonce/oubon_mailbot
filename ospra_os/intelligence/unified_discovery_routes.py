@@ -986,16 +986,34 @@ async def test_cj_directly(
         # Test category search
         logger.info(f"[TEST] CJ category search: {niche}")
         category_products = await client.search_by_niche(niche, page_size=limit)
+        # Task #36: surface which layer resolved the niche
+        resolved_id = client._get_category_id(niche)
         results["category_search"] = {
             "niche": niche,
-            "category_id": client.CATEGORY_MAP.get(niche.lower(), "not_mapped"),
+            "category_id": resolved_id or "not_mapped",
+            "resolved_via": (
+                "dynamic" if (
+                    client._dynamic_category_map and
+                    resolved_id and
+                    resolved_id in client._dynamic_category_map.values()
+                ) else (
+                    "hard_coded" if resolved_id else "none"
+                )
+            ),
             "count": len(category_products),
             "products": category_products[:3]  # First 3 for preview
         }
-        
-        # List available category mappings
-        results["categories_available"] = client.CATEGORY_MAP
-        
+
+        # Hard-coded fallback map (legacy snapshot — still consulted)
+        results["categories_available_hardcoded"] = client.CATEGORY_MAP
+        # Task #36: dynamic map status (live snapshot from /getCategory)
+        results["categories_available_dynamic"] = {
+            "loaded": client._dynamic_category_map is not None,
+            "entry_count": len(client._dynamic_category_map or {}),
+            "loaded_at": client._dynamic_category_loaded_at,
+            "sample_keys": list((client._dynamic_category_map or {}).keys())[:20],
+        }
+
         # Try to get CJ's actual categories
         try:
             cj_categories = await client.get_categories()
@@ -1015,6 +1033,43 @@ async def test_cj_directly(
         
     except Exception as e:
         logger.error(f"[ERROR] CJ test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/refresh-cj-categories")
+async def refresh_cj_categories(
+    force: bool = Query(False, description="Refresh even if cache is fresh"),
+):
+    """
+    Task #36: pull CJ's live category tree from /product/getCategory,
+    flatten it to a name→id index, and persist it to the on-disk cache
+    used by `CJDropshippingClient._get_category_id`.
+
+    By default this is a no-op if the cache is younger than 7 days;
+    pass `force=true` to bypass the TTL.
+    """
+    try:
+        from ospra_os.integrations.cj_dropshipping.client import get_cj_client
+
+        client = get_cj_client()
+        if not client.is_available():
+            return {
+                "success": False,
+                "error": "CJ Dropshipping not configured - check CJ_ACCESS_TOKEN",
+            }
+
+        before = len(client._dynamic_category_map or {})
+        mapping = await client.refresh_category_map(force=force)
+        return {
+            "success": True,
+            "forced": force,
+            "entry_count": len(mapping),
+            "entries_added": max(0, len(mapping) - before),
+            "loaded_at": client._dynamic_category_loaded_at,
+            "sample_keys": list(mapping.keys())[:25],
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] CJ category refresh failed: {e}")
         return {"success": False, "error": str(e)}
 
 
