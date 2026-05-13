@@ -1036,6 +1036,73 @@ async def test_cj_directly(
         return {"success": False, "error": str(e)}
 
 
+@router.get("/test-amazon-new-releases")
+async def test_amazon_new_releases(
+    niche: str = Query("smart_home"),
+    max_items: int = Query(10, ge=1, le=50),
+):
+    """
+    Option A smoke-test: Amazon New Releases RSS for a niche.
+    Public feed, no auth required.
+    """
+    try:
+        from ospra_os.product_research.connectors.amazon_movers_rss import (
+            get_amazon_movers_rss,
+        )
+        scraper = get_amazon_movers_rss()
+        payload = await scraper.fetch(niche, feed_type="new_releases", max_items=max_items)
+        keywords = scraper.extract_keywords(payload, top_n=10) if payload.get("available") else []
+        return {
+            "success": payload.get("available", False),
+            "niche": niche,
+            "category": payload.get("category"),
+            "feed_type": "new_releases",
+            "item_count": payload.get("item_count", 0),
+            "cached": payload.get("cached", False),
+            "items_sample": (payload.get("items") or [])[:5],
+            "extracted_keywords": keywords,
+            "error": payload.get("error"),
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] Amazon New Releases test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/test-etsy-trending")
+async def test_etsy_trending(
+    niche: str = Query("home_decor"),
+    max_items: int = Query(10, ge=1, le=50),
+):
+    """
+    Option B smoke-test: Etsy trending products via Apify.
+    Returns 'no_etsy_category_for_niche' for niches without a mapping.
+    """
+    try:
+        from ospra_os.product_research.connectors.apify.etsy_trending import (
+            get_etsy_trending,
+        )
+        scraper = get_etsy_trending()
+        if not scraper.is_available():
+            return {
+                "success": False,
+                "error": "APIFY_API_TOKEN not configured",
+            }
+        payload = await scraper.fetch_trending(niche, max_items=max_items)
+        keywords = scraper.extract_keywords(payload, top_n=10) if payload.get("available") else []
+        return {
+            "success": payload.get("available", False),
+            "niche": niche,
+            "category": payload.get("category"),
+            "item_count": payload.get("item_count", 0),
+            "items_sample": (payload.get("items") or [])[:5],
+            "extracted_keywords": keywords,
+            "error": payload.get("error"),
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] Etsy trending test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.get("/test-tiktok-shop")
 async def test_tiktok_shop(
     niche: str = Query("smart_home", description="Niche to query"),

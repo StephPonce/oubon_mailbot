@@ -642,6 +642,28 @@ class ProductDiscoveryEngine:
                     self.sources_status['meta_ads'] = f'[ERROR] {exc}'
                     logger.warning(f"[WARNING] Meta Ad Library init failed: {exc}")
 
+                # Option B: Etsy trending — supplementary signal for
+                # handmade/lifestyle niches (decor, jewelry, beauty)
+                # where Amazon's data is weak. Niches Etsy doesn't
+                # cover well (tech, fitness) are skipped at fetch time.
+                self.etsy_trending = None
+                try:
+                    from ospra_os.product_research.connectors.apify.etsy_trending import (
+                        get_etsy_trending,
+                    )
+                    self.etsy_trending = get_etsy_trending()
+                    if self.etsy_trending.is_available():
+                        self.sources_status['etsy'] = '[SUCCESS] Connected (Apify)'
+                        logger.info("[SUCCESS] Etsy trending scraper loaded")
+                    else:
+                        self.sources_status['etsy'] = '[WARNING] Token check failed'
+                        self.etsy_trending = None
+                except ImportError as exc:
+                    self.sources_status['etsy'] = f'[INFO] Connector not installed: {exc}'
+                except Exception as exc:
+                    self.sources_status['etsy'] = f'[ERROR] {exc}'
+                    logger.warning(f"[WARNING] Etsy trending init failed: {exc}")
+
                 # Pinterest is best-effort. Older codebases or deploys
                 # that don't have the actor configured will hit ImportError
                 # — that's fine, we just log + skip.
@@ -1625,6 +1647,22 @@ class ProductDiscoveryEngine:
             trend_tasks.append(self._fetch_amazon_movers_rss(niche))
             trend_labels.append("amazon_movers_rss")
 
+            # Option A: Amazon New Releases RSS — products launched in
+            # the last 30 days. Catches products even earlier in their
+            # lifecycle than Movers (before they've had time to rank).
+            # Same connector, different feed_type — free, public.
+            trend_tasks.append(self._fetch_amazon_new_releases_rss(niche))
+            trend_labels.append("amazon_new_releases_rss")
+
+        # Option B: Etsy trending — supplementary signal for handmade /
+        # lifestyle niches (decor, jewelry, beauty). The connector
+        # internally skips niches it doesn't have an Etsy category
+        # mapping for (tech, fitness, gaming), so we can register the
+        # task unconditionally and let it no-op cleanly.
+        if self.apify_available and getattr(self, "etsy_trending", None):
+            trend_tasks.append(self._fetch_etsy_trending(niche))
+            trend_labels.append("etsy_trending")
+
         # TikTok Shop Partner API task — first-party data with real
         # units_sold_7d. Most user shops won't have this OAuth-configured,
         # so guarded behind ``self.tiktok_shop_connector``.
@@ -1702,12 +1740,44 @@ class ProductDiscoveryEngine:
                     if kw and qs:
                         self._google_trends_related[kw.lower().strip()] = qs
 
+                # Option C: also surface the "rising" subset of related
+                # queries as additional trending keywords. The connector
+                # already extracts them (with type="rising" tag) but the
+                # discovery layer was only using the momentum dict —
+                # leaving the strongest "growing fast right now" signal
+                # unused. Now we merge them into the keyword pool so the
+                # AE/CJ supplier-search funnel picks them up downstream.
+                #
+                # Cap at 5 rising terms per base keyword to avoid one
+                # noisy base topic dominating the pool.
+                rising_related: list[str] = []
+                for _, qs in rqs.items():
+                    if not qs:
+                        continue
+                    # `qs` is the list of {query, value, type} dicts the
+                    # connector produced. Each entry tagged type='rising'
+                    # is one Google flagged as gaining momentum.
+                    for q in qs:
+                        if isinstance(q, dict) and q.get("type") == "rising":
+                            term = (q.get("query") or "").strip()
+                            if term and term not in rising_related:
+                                rising_related.append(term)
+                                if len(rising_related) >= 5:
+                                    break
+                    if len(rising_related) >= 5:
+                        break
+
+                # Merge into the returned keyword list. Dedupe happens
+                # naturally in the merge loop in `_get_trending_keywords`.
+                combined = list(rising_keywords) + rising_related
+
                 return {
-                    'keywords': rising_keywords,
+                    'keywords': combined,
                     'trend_direction': trend_data.get('trend_direction', 'STABLE'),
                     'source': 'google_trends',
                     'momentum': momentum,
                     'related_queries': rqs,
+                    'rising_related_count': len(rising_related),
                 }
         except Exception as e:
             logger.debug(f"Google Trends fetch failed for '{keyword}': {e}")
@@ -2068,6 +2138,113 @@ class ProductDiscoveryEngine:
             'keywords': keywords,
             'trend_direction': 'RISING' if keywords else 'UNKNOWN',
             'source': 'amazon_movers',
+            'item_count': payload.get("item_count", 0),
+        }
+
+    async def _fetch_amazon_new_releases_rss(self, niche: str) -> dict:
+        """
+        Option A: Amazon New Releases RSS — products launched in the
+        last 30 days for the niche category.
+
+        Different from Movers in *what* it surfaces:
+          - Movers: products gaining sales rank (could be old products
+            spiking due to a viral moment)
+          - New Releases: products that didn't exist a month ago
+            (genuine first-mover opportunities, by definition
+            un-saturated since competitors haven't even seen them yet)
+
+        Same connector and same parse path as the movers fetcher; just
+        a different feed_type. Returns the standard (keywords,
+        trend_direction, source) shape.
+        """
+        scraper = getattr(self, "amazon_movers_rss", None)
+        if scraper is None:
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'amazon_new_releases'}
+
+        try:
+            payload = await scraper.fetch(niche, feed_type="new_releases", max_items=20)
+        except Exception as e:
+            logger.debug(f"Amazon New Releases RSS fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'amazon_new_releases'}
+
+        if not payload.get("available"):
+            return {
+                'keywords': [],
+                'trend_direction': 'UNKNOWN',
+                'source': 'amazon_new_releases',
+                'error': payload.get("error"),
+            }
+
+        keywords = scraper.extract_keywords(payload, top_n=8)
+
+        # Stash items so the scoring pass can read them later
+        self._amazon_new_releases_cache = {
+            'niche': niche,
+            'category': payload.get("category"),
+            'items': payload.get("items") or [],
+            'item_count': payload.get("item_count", 0),
+            'fetched_at': payload.get("fetched_at"),
+        }
+
+        # New releases are by definition early-stage = RISING
+        return {
+            'keywords': keywords,
+            'trend_direction': 'RISING' if keywords else 'UNKNOWN',
+            'source': 'amazon_new_releases',
+            'item_count': payload.get("item_count", 0),
+        }
+
+    async def _fetch_etsy_trending(self, niche: str) -> dict:
+        """
+        Option B: Etsy trending products as a supplementary signal.
+
+        Etsy is strong for handmade / lifestyle niches (home decor,
+        jewelry, beauty accessories) where Amazon's bestseller signal
+        is weak. The connector maps Ospra niches → Etsy categories and
+        returns trending product titles as keyword seeds.
+
+        Niches without a clean Etsy mapping (tech, fitness, gaming)
+        return UNKNOWN with no error — they just skip Etsy quietly.
+        Same {keywords, trend_direction, source} shape as the other
+        trend tasks so the merge loop treats it identically.
+        """
+        scraper = getattr(self, "etsy_trending", None)
+        if scraper is None:
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'etsy'}
+
+        try:
+            payload = await scraper.fetch_trending(niche, max_items=20)
+        except Exception as e:
+            logger.debug(f"Etsy trending fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'etsy'}
+
+        if not payload.get("available"):
+            # `no_etsy_category_for_niche` is expected for many niches —
+            # log it at debug, not warning.
+            err = payload.get("error")
+            if err == "no_etsy_category_for_niche":
+                logger.debug(f"Etsy skipped for niche '{niche}' (no mapping)")
+            return {
+                'keywords': [],
+                'trend_direction': 'UNKNOWN',
+                'source': 'etsy',
+                'error': err,
+            }
+
+        keywords = scraper.extract_keywords(payload, top_n=8)
+
+        # Stash items so the scoring pass can read them later
+        self._etsy_trending_cache = {
+            'niche': niche,
+            'category': payload.get("category"),
+            'items': payload.get("items") or [],
+            'item_count': payload.get("item_count", 0),
+        }
+
+        return {
+            'keywords': keywords,
+            'trend_direction': 'RISING' if keywords else 'UNKNOWN',
+            'source': 'etsy',
             'item_count': payload.get("item_count", 0),
         }
 

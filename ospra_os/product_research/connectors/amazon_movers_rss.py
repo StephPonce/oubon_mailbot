@@ -55,6 +55,21 @@ logger = logging.getLogger(__name__)
 
 AMAZON_RSS_URL = "https://www.amazon.com/gp/movers-and-shakers/{category}/index.rss"
 
+# Multi-feed support (option A extension). Amazon publishes several public
+# RSS feeds under the same URL shape — just different path segments. They
+# share identical RSS structure, so the same parser handles all of them.
+#
+#   movers       — biggest 24h sales-rank gains (velocity leaders)
+#   new_releases — products launched in the last 30 days
+#   bestsellers  — all-time top sellers in the category (paid Apify path
+#                  already exists for this; the RSS version is the free
+#                  alternative, useful for redundancy/fallback)
+AMAZON_RSS_FEEDS: dict[str, str] = {
+    "movers":       "https://www.amazon.com/gp/movers-and-shakers/{category}/index.rss",
+    "new_releases": "https://www.amazon.com/gp/new-releases/{category}/index.rss",
+    "bestsellers":  "https://www.amazon.com/gp/bestsellers/{category}/index.rss",
+}
+
 # Map Ospra niches to Amazon category slugs. The slugs are what appears
 # in the URL path of the public Movers page (visit
 # amazon.com/gp/movers-and-shakers, copy the URL of a category).
@@ -257,12 +272,20 @@ class AmazonMoversRSS:
         self,
         niche_or_category: str,
         *,
+        feed_type: str = "movers",
         max_items: int = 30,
         use_cache: bool = True,
     ) -> dict[str, Any]:
-        """Pull the Movers feed for `niche_or_category`. Accepts either
-        an Ospra niche key (`smart_home`, `pet`) or a raw Amazon slug
-        (`electronics`, `pet-supplies`). Returns:
+        """Pull a public Amazon RSS feed for `niche_or_category`.
+
+        `feed_type` controls which Amazon feed to hit:
+          - "movers" (default) — biggest 24h sales-rank gains
+          - "new_releases" — products launched in the last 30 days
+          - "bestsellers" — all-time top sellers (RSS version of the
+            paid Apify path — useful as a free fallback)
+
+        Accepts either an Ospra niche key (`smart_home`, `pet`) or a
+        raw Amazon slug (`electronics`, `pet-supplies`). Returns:
 
           {
             "available": bool,
@@ -288,9 +311,25 @@ class AmazonMoversRSS:
                 "error": f"no category mapping for niche '{niche_or_category}'",
             }
 
+        # Validate feed_type and pick the right URL template
+        feed_template = AMAZON_RSS_FEEDS.get(feed_type)
+        if feed_template is None:
+            return {
+                "available": False,
+                "category": category,
+                "niche": niche_or_category,
+                "error": (
+                    f"unknown feed_type '{feed_type}'. "
+                    f"Valid: {sorted(AMAZON_RSS_FEEDS.keys())}"
+                ),
+            }
+
+        # Cache key includes feed_type so different feeds don't shadow each other
+        cache_key = f"{feed_type}:{category}"
+
         # Cache check
         if use_cache:
-            cached = _RSS_CACHE.get(category)
+            cached = _RSS_CACHE.get(cache_key)
             if cached and (time.time() - cached[0]) < _RSS_CACHE_TTL:
                 payload = dict(cached[1])
                 payload["cached"] = True
@@ -300,7 +339,7 @@ class AmazonMoversRSS:
                     payload["item_count"] = len(payload["items"])
                 return payload
 
-        url = AMAZON_RSS_URL.format(category=quote(category, safe=""))
+        url = feed_template.format(category=quote(category, safe=""))
 
         # Throttle to be polite — one request/second/process
         async with _get_lock():
@@ -358,6 +397,7 @@ class AmazonMoversRSS:
             "available": True,
             "category": category,
             "niche": niche_or_category,
+            "feed_type": feed_type,
             "items": items,
             "item_count": len(items),
             "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -368,7 +408,7 @@ class AmazonMoversRSS:
         # Only cache successful, non-empty responses — caching an empty
         # list would suppress retries when the feed briefly hiccups.
         if items:
-            _RSS_CACHE[category] = (time.time(), payload)
+            _RSS_CACHE[cache_key] = (time.time(), payload)
 
         return payload
 
