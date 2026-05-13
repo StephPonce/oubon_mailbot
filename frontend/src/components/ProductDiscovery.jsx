@@ -1390,12 +1390,49 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   // instead of swallowing all failures behind a generic toast.
   const [analysisSource, setAnalysisSource] = useState(null);  // 'claude' | 'fallback' | null
   const [claudeError, setClaudeError] = useState(null);  // { kind, detail, retryable } | null
-  
+
+  // Task #38 — marketing angle generator state. Only relevant when the
+  // product is saturated (score ≥ 0.6). `angles` is an array of dicts
+  // with title/description/target_audience/pain_point/benefits/cta/etc.
+  const [marketingAngles, setMarketingAngles] = useState([]);
+  const [generatingAngles, setGeneratingAngles] = useState(false);
+  const [anglesError, setAnglesError] = useState(null);
+
   // AUTO-GENERATE ANALYSIS ON MOUNT
   useEffect(() => {
     generateSEOCaption();
     generateAIAnalysis(); // Auto-generate analysis when panel opens
   }, [product.id]);
+
+  // Task #38 — async handler for the "Generate Marketing Angles" button.
+  // We only show the button when the product is saturated, so by the
+  // time this runs we already know the backend will accept it (no need
+  // to set force=true). The handler is local to the panel so error
+  // state doesn't leak across product cards.
+  const generateMarketingAngles = async ({ force = false } = {}) => {
+    setGeneratingAngles(true);
+    setAnglesError(null);
+    try {
+      const result = await api.generateMarketingAngles(product, {
+        numAngles: 3,
+        force,
+      });
+      if (result?.success && Array.isArray(result.angles)) {
+        setMarketingAngles(result.angles);
+      } else {
+        setAnglesError(
+          result?.message || result?.error || 'Could not generate marketing angles'
+        );
+        setMarketingAngles([]);
+      }
+    } catch (error) {
+      console.error('[PRODUCT-DETAIL] marketing angles error:', error);
+      setAnglesError(error?.message || 'Network error');
+      setMarketingAngles([]);
+    } finally {
+      setGeneratingAngles(false);
+    }
+  };
   
   // Load cached images ONLY (no auto-enhancement to avoid spending money)
   useEffect(() => {
@@ -2327,6 +2364,158 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                 </button>
               </div>
             </div>
+
+            {/* Task #38 — Marketing Angles. Shown when the saturation
+                model rates this product ≥ 0.6 (i.e. crowded enough that
+                the obvious positioning has competitors). Hidden for
+                low-saturation products since their natural angle wins.
+                A small "Generate anyway" link is provided for users who
+                want angles regardless. */}
+            {(() => {
+              const sat = typeof product.saturation_score === 'number'
+                ? product.saturation_score
+                : null;
+              const isSaturated = sat !== null && sat >= 0.6;
+              if (!isSaturated && marketingAngles.length === 0 && !anglesError && !generatingAngles) {
+                // Low-sat products get a quiet override link, not a full panel
+                return (
+                  <button
+                    onClick={() => generateMarketingAngles({ force: true })}
+                    className="text-xs text-white/40 hover:text-purple-300 text-left"
+                  >
+                    Generate marketing angles anyway →
+                  </button>
+                );
+              }
+              return (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400" />
+                      <span className="font-semibold text-amber-200 text-sm">
+                        {isSaturated
+                          ? `Saturated market${sat !== null ? ` (${Math.round(sat * 100)}% crowded)` : ''}`
+                          : 'Marketing Angles'}
+                      </span>
+                    </div>
+                    {marketingAngles.length === 0 && !generatingAngles && (
+                      <button
+                        onClick={() => generateMarketingAngles({ force: !isSaturated })}
+                        className="px-3 py-1 rounded-lg bg-amber-500/20 text-amber-200 text-xs hover:bg-amber-500/30 flex items-center gap-1 font-medium"
+                      >
+                        <Sparkles className="w-3 h-3" />
+                        Generate Angles
+                      </button>
+                    )}
+                    {marketingAngles.length > 0 && (
+                      <button
+                        onClick={() => generateMarketingAngles({ force: !isSaturated })}
+                        disabled={generatingAngles}
+                        className="px-3 py-1 rounded-lg bg-white/10 text-white/70 text-xs hover:bg-white/20 flex items-center gap-1"
+                      >
+                        {generatingAngles ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
+
+                  {isSaturated && marketingAngles.length === 0 && !generatingAngles && (
+                    <p className="text-xs text-white/60">
+                      Many other dropshippers are already selling this. Claude can
+                      suggest alternative positioning so you don't compete head-on.
+                    </p>
+                  )}
+
+                  {generatingAngles && (
+                    <div className="flex items-center gap-2 text-amber-200/80 text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Generating differentiated angles...
+                    </div>
+                  )}
+
+                  {anglesError && !generatingAngles && (
+                    <div className="text-xs text-red-300/90 bg-red-500/10 border border-red-500/30 rounded-lg p-2">
+                      {anglesError}
+                    </div>
+                  )}
+
+                  {/* Render generated angles as horizontal cards. Each card
+                      surfaces the angle name, headline, target audience,
+                      pain-point, and CTA — enough to drive a campaign brief. */}
+                  {marketingAngles.length > 0 && (
+                    <div className="space-y-3">
+                      {marketingAngles.map((a, idx) => (
+                        <div
+                          key={`${a.angle}-${idx}`}
+                          className="rounded-lg bg-white/5 border border-white/10 p-3 space-y-2"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] uppercase tracking-wider text-amber-300/80 font-semibold">
+                                {(a.angle || '').replace(/_/g, ' ')}
+                              </div>
+                              <div className="text-sm font-semibold text-white">
+                                {a.title}
+                              </div>
+                            </div>
+                          </div>
+
+                          {a.target_audience && (
+                            <div className="text-xs text-white/70">
+                              <span className="text-white/50">Audience:</span>{' '}
+                              {a.target_audience}
+                            </div>
+                          )}
+                          {a.pain_point && (
+                            <div className="text-xs text-white/70">
+                              <span className="text-white/50">Pain point:</span>{' '}
+                              {a.pain_point}
+                            </div>
+                          )}
+
+                          {Array.isArray(a.benefits) && a.benefits.length > 0 && (
+                            <ul className="text-xs text-white/70 list-disc pl-4 space-y-0.5">
+                              {a.benefits.slice(0, 4).map((b, i) => (
+                                <li key={i}>{b}</li>
+                              ))}
+                            </ul>
+                          )}
+
+                          {a.ad_copy && (
+                            <div className="text-xs italic text-white/60 border-l-2 border-amber-500/40 pl-2">
+                              "{a.ad_copy}"
+                            </div>
+                          )}
+
+                          {a.cta && (
+                            <div className="inline-block text-[10px] uppercase tracking-wider font-bold text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
+                              CTA: {a.cta}
+                            </div>
+                          )}
+
+                          {Array.isArray(a.hashtags) && a.hashtags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {a.hashtags.slice(0, 6).map((h, i) => (
+                                <span
+                                  key={i}
+                                  className="text-[10px] text-purple-300/80 bg-purple-500/10 rounded px-1.5 py-0.5"
+                                >
+                                  {h.startsWith('#') ? h : `#${h}`}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Deploy Button */}
             <button

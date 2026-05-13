@@ -943,6 +943,35 @@ class OspraAPI {
    * Generate SEO-optimized product caption.
    * Calls POST /api/oi/generate-caption (requires auth).
    */
+  // Task #38: ask Claude for 3-5 differentiated marketing angles for a
+  // saturated product. Backend gates on saturation_score >= 0.6 by default
+  // — pass {force: true} to override (e.g. user explicitly clicks
+  // "Generate anyway" on a low-saturation product). Returns
+  // { success, angles: [...], saturation_score, error?, message? }.
+  async generateMarketingAngles(product, opts = {}) {
+    try {
+      const data = await authService.post('/api/oi/generate-marketing-angles', {
+        product_id: String(product.product_id || product.id || ''),
+        product_title: product.title || product.name || '',
+        product_niche: product.niche || 'smart_home',
+        product_description: product.description || product.title || '',
+        saturation_score: product.saturation_score,
+        brand_voice: opts.brandVoice || 'professional',
+        target_audience: opts.targetAudience || 'general',
+        num_angles: Math.max(1, Math.min(5, opts.numAngles ?? 3)),
+        force: !!opts.force,
+      });
+      return data;
+    } catch (error) {
+      console.error('[API] generateMarketingAngles error:', error);
+      return {
+        success: false,
+        error: 'request_failed',
+        message: error?.message || 'Network error',
+      };
+    }
+  }
+
   async generateCaption(productTitle, niche, price, tags = null) {
     try {
       // Send the actual product tags when available — the previous

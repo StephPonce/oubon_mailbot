@@ -55,6 +55,17 @@ ANALYSIS_TEMPERATURE = 0.2          # low-but-nonzero: stable w/o degenerate tok
 ANALYSIS_CACHE_TTL = int(os.getenv("ANALYSIS_CACHE_TTL_SECONDS", "900"))  # 15min
 _analysis_cache: Dict[str, tuple] = {}  # key -> (result, expires_at)
 
+# Task #38: marketing angle generator config.
+# `saturation_score` is computed on the 0.0-1.0 scale (see
+# `_compute_saturation` in product_discovery.py). 0.6 is where products
+# stop looking like blue ocean and start having real competition —
+# that's also where alternative positioning genuinely starts mattering.
+# Cached separately from the analysis cache because the inputs differ:
+# angles only need title + niche + audience, not the full scoring blob.
+SATURATION_THRESHOLD = float(os.getenv("MARKETING_ANGLES_SATURATION_THRESHOLD", "0.6"))
+MARKETING_ANGLES_CACHE_TTL = int(os.getenv("MARKETING_ANGLES_CACHE_TTL_SECONDS", "1800"))  # 30min
+_marketing_angles_cache: Dict[str, tuple] = {}
+
 
 def _round_num(v, decimals: int = 2):
     """Deterministic number formatter used in prompt construction."""
@@ -141,6 +152,33 @@ class CaptionRequest(BaseModel):
     product_niche: str = "general"
     price: float = 0
     tags: Optional[List[str]] = []
+
+
+# Task #38: marketing angle generator request.
+# `saturation_score` is the 0.0-1.0 float computed by
+# ``_compute_saturation`` in product_discovery.py. The frontend reads it
+# off the product dict and passes it back so the endpoint can decide
+# whether to short-circuit ("product isn't saturated — angles unnecessary")
+# without re-running the full saturation calculation.
+class MarketingAngleRequest(BaseModel):
+    product_id: str
+    product_title: str
+    product_niche: str = "smart_home"
+    product_description: Optional[str] = ""
+    saturation_score: Optional[float] = None
+    # User-supplied positioning. Lets a tenant generate angles in their
+    # own voice ("luxury" / "casual" / "tech-enthusiast") rather than the
+    # generic "professional" default.
+    brand_voice: Optional[str] = "professional"
+    target_audience: Optional[str] = "general"
+    # How many distinct angles to produce. Default 3 balances cost (each
+    # angle is one Claude call) vs giving the user real choice.
+    num_angles: int = 3
+    # When False (default) the endpoint refuses to run for products with
+    # saturation_score < SATURATION_THRESHOLD on the assumption that
+    # un-saturated products don't need angles. Pass True from the UI's
+    # "Generate anyway" button to override.
+    force: bool = False
 
 
 # Phase K (on-demand): the route accepts a product dict produced by
@@ -406,6 +444,109 @@ async def generate_caption(request: CaptionRequest, current_user: User = Depends
         request.tags
     )
     return {"success": True, "caption": caption, "source": "template"}
+
+
+@router.post("/generate-marketing-angles")
+async def generate_marketing_angles(
+    request: MarketingAngleRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Task #38: generate 3-5 differentiated marketing angles for a saturated
+    product.
+
+    For products in a crowded niche (high saturation_score), this surfaces
+    alternative positioning strategies — e.g. a smart bulb saturated as
+    "tech accessory" might still be virgin territory as "elderly care
+    nightlight" or "sleep therapy" or "energy-savings". Each angle ships
+    with copy, audience, pain-point, CTA, ad copy, and hashtags — enough
+    to drive a Meta/TikTok campaign without further wordsmithing.
+
+    The heavy lifting lives in
+    ``ospra_os.intelligence.marketing_angle_generator.MarketingAngleGenerator``
+    which has fallback templates if Claude is unavailable.
+    """
+    # Saturation gate. Un-saturated products don't need alternative angles
+    # (the obvious positioning still works), and every Claude call costs
+    # money — short-circuit unless the caller forces it.
+    sat = request.saturation_score
+    if not request.force and sat is not None and sat < SATURATION_THRESHOLD:
+        return {
+            "success": False,
+            "error": "not_saturated",
+            "saturation_score": sat,
+            "threshold": SATURATION_THRESHOLD,
+            "message": (
+                f"Product saturation {sat:.2f} is below the {SATURATION_THRESHOLD:.2f} "
+                f"threshold — alternative angles aren't needed. Pass force=true to override."
+            ),
+        }
+
+    # Cache key — deterministic over the inputs that affect the prompt.
+    # NOTE we DON'T include user_id because angle templates are voice-
+    # and audience-driven, not tenant-specific. Two users hitting the
+    # same product with the same voice share the cached output.
+    cache_key_parts = {
+        "title": request.product_title,
+        "niche": request.product_niche,
+        "voice": request.brand_voice,
+        "audience": request.target_audience,
+        "n": request.num_angles,
+    }
+    cache_key = hashlib.sha256(
+        json.dumps(cache_key_parts, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    cached = _marketing_angles_cache.get(cache_key)
+    if cached and time.time() < cached[1]:
+        return {**cached[0], "cached": True}
+
+    try:
+        # Lazy import — MarketingAngleGenerator pulls in the AI factory
+        # which initializes provider clients. Don't pay that cost at
+        # import time of this routes module.
+        from ospra_os.intelligence.marketing_angle_generator import (
+            MarketingAngleGenerator,
+        )
+        generator = MarketingAngleGenerator(ai_provider="claude")
+        angles = await generator.generate_multiple_angles(
+            product_name=request.product_title,
+            product_description=request.product_description or request.product_title,
+            niche=request.product_niche,
+            num_angles=max(1, min(5, int(request.num_angles))),
+            user_brand_voice=request.brand_voice or "professional",
+            user_target_audience=request.target_audience or "general",
+        )
+    except Exception as exc:
+        logger.error(f"[ANGLES] generation failed: {exc}")
+        return {
+            "success": False,
+            "error": "generation_failed",
+            "detail": str(exc),
+        }
+
+    if not angles:
+        return {
+            "success": False,
+            "error": "no_angles_returned",
+            "message": "Claude returned no usable angles — try again or pass a different niche.",
+        }
+
+    payload = {
+        "success": True,
+        "product_id": request.product_id,
+        "product_title": request.product_title,
+        "niche": request.product_niche,
+        "saturation_score": sat,
+        "angles": angles,
+        "count": len(angles),
+        "source": "claude",
+        "cached": False,
+    }
+    _marketing_angles_cache[cache_key] = (
+        payload,
+        time.time() + MARKETING_ANGLES_CACHE_TTL,
+    )
+    return payload
 
 
 # ============================================================================
