@@ -1036,6 +1036,120 @@ async def test_cj_directly(
         return {"success": False, "error": str(e)}
 
 
+@router.get("/test-tiktok-shop")
+async def test_tiktok_shop(
+    niche: str = Query("smart_home", description="Niche to query"),
+    keyword: str = Query("", description="Optional explicit keyword override"),
+    max_items: int = Query(10, ge=1, le=50),
+):
+    """
+    Task #11: smoke-test the TikTok Shop integrations.
+
+    Exercises two layers:
+      1. The Apify TikTok scraper (`tiktok_scraper.discover_products`)
+         which works without TikTok Shop Partner credentials. This is
+         the discovery-relevant path.
+      2. The Partner API connector (`tiktok_shop_connector.get_trending`)
+         which only runs when TIKTOK_SHOP_APP_KEY + TIKTOK_SHOP_ACCESS_TOKEN
+         are configured. Gracefully reports "not configured" otherwise.
+
+    Returns a side-by-side comparison so operators can see which path is
+    contributing data and which needs OAuth setup.
+    """
+    result = {
+        "success": True,
+        "niche": niche,
+        "keyword": keyword or niche.replace("_", " "),
+        "apify_scraper": {"available": False, "products": [], "error": None},
+        "partner_api": {"available": False, "products": [], "error": None},
+    }
+
+    # Layer 1 — Apify scraper (always available if APIFY_API_TOKEN set)
+    try:
+        from ospra_os.product_research.connectors.apify import TikTokShopScraper
+        scraper = TikTokShopScraper()
+        if scraper.is_available():
+            products = await scraper.discover_products(
+                niche=niche,
+                max_products=max_items,
+                keyword=keyword or None,
+            )
+            result["apify_scraper"] = {
+                "available": True,
+                "product_count": len(products or []),
+                "products_sample": (products or [])[:5],
+            }
+        else:
+            result["apify_scraper"]["error"] = "APIFY_API_TOKEN not configured"
+    except Exception as e:
+        result["apify_scraper"]["error"] = str(e)
+
+    # Layer 2 — Partner API (requires per-seller OAuth credentials)
+    try:
+        if os.getenv("TIKTOK_SHOP_APP_KEY") and os.getenv("TIKTOK_SHOP_ACCESS_TOKEN"):
+            from ospra_os.product_research.connectors.tiktok_shop import (
+                TikTokShopConnector,
+            )
+            connector = TikTokShopConnector()
+            candidates = await connector.get_trending(category=None, limit=max_items)
+            result["partner_api"] = {
+                "available": True,
+                "product_count": len(candidates or []),
+                "products_sample": [
+                    {
+                        "name": getattr(c, "name", None),
+                        "price": getattr(c, "price", None),
+                        "trend_score": getattr(c, "trend_score", None),
+                        "url": getattr(c, "url", None),
+                    }
+                    for c in (candidates or [])[:5]
+                ],
+            }
+        else:
+            result["partner_api"]["error"] = (
+                "TIKTOK_SHOP_APP_KEY / TIKTOK_SHOP_ACCESS_TOKEN not configured — "
+                "apply at partner.tiktokshop.com to enable this layer"
+            )
+    except Exception as e:
+        result["partner_api"]["error"] = str(e)
+
+    return result
+
+
+@router.get("/test-amazon-movers")
+async def test_amazon_movers(
+    niche: str = Query("smart_home", description="Ospra niche or raw Amazon category slug"),
+    max_items: int = Query(10, ge=1, le=50),
+):
+    """
+    Task #12: smoke-test the Amazon Movers & Shakers RSS connector.
+
+    Public feed, no auth required. Returns the top movers (products
+    with biggest 24h rank gains) in the niche's Amazon category, the
+    extracted trending keywords, and the cache status.
+    """
+    try:
+        from ospra_os.product_research.connectors.amazon_movers_rss import (
+            get_amazon_movers_rss,
+        )
+        scraper = get_amazon_movers_rss()
+        payload = await scraper.fetch(niche, max_items=max_items)
+        keywords = scraper.extract_keywords(payload, top_n=10) if payload.get("available") else []
+        return {
+            "success": payload.get("available", False),
+            "niche": niche,
+            "category": payload.get("category"),
+            "item_count": payload.get("item_count", 0),
+            "cached": payload.get("cached", False),
+            "items_sample": (payload.get("items") or [])[:5],
+            "extracted_keywords": keywords,
+            "error": payload.get("error"),
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] Amazon Movers test failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
 @router.get("/test-meta-ads")
 async def test_meta_ads(
     keyword: str = Query("smart plug", description="Ad Library search term"),

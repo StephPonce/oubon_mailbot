@@ -595,6 +595,22 @@ class ProductDiscoveryEngine:
         # Initialized in the Apify block below so it shares the token.
         self.meta_ads_scraper = None
 
+        # Task #12 — Amazon Movers & Shakers RSS. Public feed, no token,
+        # no rate limit. Initialized eagerly because it's always
+        # available; gracefully no-ops if Amazon temporarily blocks us
+        # (handled inside the connector).
+        self.amazon_movers_rss = None
+        try:
+            from ospra_os.product_research.connectors.amazon_movers_rss import (
+                get_amazon_movers_rss,
+            )
+            self.amazon_movers_rss = get_amazon_movers_rss()
+            self.sources_status['amazon_movers'] = '[SUCCESS] Connected (public RSS)'
+            logger.info("[SUCCESS] Amazon Movers RSS loaded (free, no auth)")
+        except Exception as exc:
+            self.sources_status['amazon_movers'] = f'[ERROR] {exc}'
+            logger.warning(f"[WARNING] Amazon Movers RSS init failed: {exc}")
+
         if self.apify_token:
             try:
                 from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
@@ -1601,6 +1617,14 @@ class ProductDiscoveryEngine:
             trend_tasks.append(self._fetch_meta_ads_trends(niche))
             trend_labels.append("meta_ads_library")
 
+        # Amazon Movers & Shakers RSS — Task #12 / winner-proof source #3.
+        # Public feed of products with the biggest 24h sales-rank gains.
+        # Free, fast, no quota. Niche → category mapping in the connector;
+        # niches without a clean mapping skip this source.
+        if getattr(self, "amazon_movers_rss", None):
+            trend_tasks.append(self._fetch_amazon_movers_rss(niche))
+            trend_labels.append("amazon_movers_rss")
+
         # TikTok Shop Partner API task — first-party data with real
         # units_sold_7d. Most user shops won't have this OAuth-configured,
         # so guarded behind ``self.tiktok_shop_connector``.
@@ -1984,6 +2008,67 @@ class ProductDiscoveryEngine:
             'source': 'meta_ads',
             'ad_count': ad_count,
             'winner_count': len(winners),
+        }
+
+    async def _fetch_amazon_movers_rss(self, niche: str) -> dict:
+        """
+        Task #12: Amazon Movers & Shakers RSS as a winner-proof source.
+
+        Amazon's public RSS feed lists the products with the biggest
+        24-hour sales-rank gains per category. Velocity leaders =
+        actively gaining momentum NOW. Free, no auth, no quota.
+
+        Strategy: pull the top 20 movers for the niche's Amazon
+        category, extract the head noun-phrase from each title as a
+        trending-keyword candidate, and stash the raw items on the
+        engine so the scoring pass can fuzzy-match products against
+        the rising rank list (Phase 2 — Task #15).
+
+        Returns the same {keywords, trend_direction, source} shape as
+        `_fetch_google_trends` so the merge loop in
+        `_get_trending_keywords` treats it identically.
+
+        Trend direction interpretation:
+          - Items found  → RISING (movers feed is, by definition,
+            ranked by upward velocity)
+          - No items     → UNKNOWN (niche has no clean Amazon mapping
+            or the feed temporarily failed)
+        """
+        scraper = getattr(self, "amazon_movers_rss", None)
+        if scraper is None:
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'amazon_movers'}
+
+        try:
+            payload = await scraper.fetch(niche, max_items=20)
+        except Exception as e:
+            logger.debug(f"Amazon Movers RSS fetch failed: {e}")
+            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'amazon_movers'}
+
+        if not payload.get("available"):
+            return {
+                'keywords': [],
+                'trend_direction': 'UNKNOWN',
+                'source': 'amazon_movers',
+                'error': payload.get("error"),
+            }
+
+        keywords = scraper.extract_keywords(payload, top_n=8)
+
+        # Stash the structured movers list on the engine so the scoring
+        # pass can read it. Same pattern as `_meta_winners_cache`.
+        self._amazon_movers_cache = {
+            'niche': niche,
+            'category': payload.get("category"),
+            'items': payload.get("items") or [],
+            'item_count': payload.get("item_count", 0),
+            'fetched_at': payload.get("fetched_at"),
+        }
+
+        return {
+            'keywords': keywords,
+            'trend_direction': 'RISING' if keywords else 'UNKNOWN',
+            'source': 'amazon_movers',
+            'item_count': payload.get("item_count", 0),
         }
 
     async def _fetch_amazon_trends(self, niche: str) -> List[str]:
