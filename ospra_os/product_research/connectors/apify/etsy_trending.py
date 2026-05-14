@@ -299,11 +299,20 @@ class EtsyTrendingApify:
                     continue
                 if len(t) <= 2:
                     continue
-                # Skip Etsy noise tokens
+                # Skip Etsy noise tokens. Includes:
+                #   - Standard English stopwords (the/and/for/with/from)
+                #   - Etsy-specific descriptor noise that shows up across
+                #     virtually every trending listing and doesn't help
+                #     downstream supplier search (custom/personalized/gift)
+                #   - Promo leakage — when "SALE 50% off Foo" gets stripped
+                #     by the promo-prefix regex it sometimes leaves "off"
+                #     behind as the first token, producing keywords like
+                #     "off Leather Wallet". Add it to the stoplist.
                 if t.lower() in {
                     "the", "and", "for", "with", "from", "your", "you",
                     "custom", "personalized", "made", "gift", "perfect",
                     "great", "best", "new", "set", "pcs",
+                    "off", "free", "shipping",  # promo-prefix leakage
                 }:
                     continue
                 tokens.append(t)

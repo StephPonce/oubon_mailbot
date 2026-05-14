@@ -1036,6 +1036,177 @@ async def test_cj_directly(
         return {"success": False, "error": str(e)}
 
 
+@router.get("/sources-health")
+async def sources_health(
+    niche: str = Query("smart_home", description="Niche to test all sources against"),
+    timeout_per_source: int = Query(15, ge=5, le=60),
+):
+    """
+    Unified health check — pings every wired discovery source in parallel
+    and returns a single dashboard view.
+
+    Useful for "is everything connected right now?" debugging without
+    visiting 7 separate test endpoints. Each source returns one of:
+      - status='ok'         (live data returned)
+      - status='no_data'    (connected, returned empty)
+      - status='not_configured' (missing env var / token)
+      - status='error'      (raised exception)
+
+    Failures of any one source do not affect the others — each runs
+    independently with its own timeout.
+    """
+    import asyncio
+
+    # Each entry: (label, async_callable_returning_health_dict)
+    async def _check_meta_ads():
+        try:
+            from ospra_os.product_research.connectors.apify.meta_ads_library import (
+                get_meta_ads_library,
+            )
+            client = get_meta_ads_library()
+            if not client.is_available():
+                return {"status": "not_configured", "detail": "APIFY_API_TOKEN missing"}
+            r = await client.search_active_ads(niche.replace("_", " "), max_ads=5)
+            return {
+                "status": "ok" if r.get("available") else "no_data",
+                "ad_count": r.get("ad_count", 0),
+                "winners": len(r.get("winners") or []),
+                "error": r.get("error"),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_amazon_movers():
+        try:
+            from ospra_os.product_research.connectors.amazon_movers_rss import (
+                get_amazon_movers_rss,
+            )
+            scraper = get_amazon_movers_rss()
+            r = await scraper.fetch(niche, feed_type="movers", max_items=5)
+            return {
+                "status": "ok" if r.get("available") else "no_data",
+                "item_count": r.get("item_count", 0),
+                "cached": r.get("cached", False),
+                "error": r.get("error"),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_amazon_new_releases():
+        try:
+            from ospra_os.product_research.connectors.amazon_movers_rss import (
+                get_amazon_movers_rss,
+            )
+            scraper = get_amazon_movers_rss()
+            r = await scraper.fetch(niche, feed_type="new_releases", max_items=5)
+            return {
+                "status": "ok" if r.get("available") else "no_data",
+                "item_count": r.get("item_count", 0),
+                "error": r.get("error"),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_etsy():
+        try:
+            from ospra_os.product_research.connectors.apify.etsy_trending import (
+                get_etsy_trending,
+            )
+            scraper = get_etsy_trending()
+            if not scraper.is_available():
+                return {"status": "not_configured", "detail": "APIFY_API_TOKEN missing"}
+            r = await scraper.fetch_trending(niche, max_items=5)
+            if r.get("error") == "no_etsy_category_for_niche":
+                return {"status": "skipped", "detail": f"no Etsy mapping for '{niche}'"}
+            return {
+                "status": "ok" if r.get("available") else "no_data",
+                "item_count": r.get("item_count", 0),
+                "error": r.get("error"),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_tiktok_shop():
+        try:
+            from ospra_os.product_research.connectors.apify import TikTokShopScraper
+            scraper = TikTokShopScraper()
+            apify_ok = scraper.is_available()
+            partner_ok = bool(
+                os.getenv("TIKTOK_SHOP_APP_KEY") and os.getenv("TIKTOK_SHOP_ACCESS_TOKEN")
+            )
+            return {
+                "status": "ok" if apify_ok else "not_configured",
+                "apify_scraper": apify_ok,
+                "partner_api_credentials": partner_ok,
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_ae_ds():
+        try:
+            from ospra_os.aliexpress.ds_client import get_ds_client
+            client = get_ds_client()
+            return {
+                "status": "ok" if client.is_available() else "not_configured",
+                "detail": (
+                    "AE Dropshipping token + app key configured"
+                    if client.is_available()
+                    else "Need ALIEXPRESS_APP_KEY/SECRET + dropship OAuth token"
+                ),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    async def _check_cj():
+        try:
+            from ospra_os.integrations.cj_dropshipping.client import get_cj_client
+            client = get_cj_client()
+            cat_loaded = client._dynamic_category_map is None  # not yet loaded vs loaded
+            return {
+                "status": "ok" if client.is_available() else "not_configured",
+                "dynamic_categories_loaded": not cat_loaded,
+                "hardcoded_fallback_count": len(client.CATEGORY_MAP),
+            }
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    sources = {
+        "meta_ads_library":      _check_meta_ads(),
+        "amazon_movers_rss":     _check_amazon_movers(),
+        "amazon_new_releases":   _check_amazon_new_releases(),
+        "etsy_trending":         _check_etsy(),
+        "tiktok_shop":           _check_tiktok_shop(),
+        "aliexpress_ds_api":     _check_ae_ds(),
+        "cj_dropshipping":       _check_cj(),
+    }
+
+    # Run all checks in parallel with a per-source timeout
+    async def _with_timeout(coro):
+        try:
+            return await asyncio.wait_for(coro, timeout=timeout_per_source)
+        except asyncio.TimeoutError:
+            return {"status": "timeout", "detail": f"exceeded {timeout_per_source}s"}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+
+    keys = list(sources.keys())
+    results = await asyncio.gather(*[_with_timeout(c) for c in sources.values()])
+    health = dict(zip(keys, results))
+
+    # Summary line for at-a-glance
+    counts = {"ok": 0, "no_data": 0, "skipped": 0, "not_configured": 0, "error": 0, "timeout": 0}
+    for r in results:
+        counts[r.get("status", "error")] = counts.get(r.get("status", "error"), 0) + 1
+
+    return {
+        "success": True,
+        "niche": niche,
+        "summary": counts,
+        "total_sources": len(sources),
+        "sources": health,
+    }
+
+
 @router.get("/test-amazon-new-releases")
 async def test_amazon_new_releases(
     niche: str = Query("smart_home"),
