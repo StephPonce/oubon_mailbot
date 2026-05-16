@@ -24,7 +24,6 @@ This site exercises each scope in a way that's **visible on camera**
 | Login Kit | `user.info.basic` | OAuth flow + Dashboard page |
 | Login Kit | `user.info.profile` | Dashboard page (verified status, bio, profile URL) |
 | Login Kit | `user.info.stats` | Dashboard page (follower/like/video counts) |
-| Content Posting API | `video.list` | Videos page (renders user's recent videos) |
 | Content Posting API | `video.upload` | Upload page (uploads file as DRAFT) |
 | Content Posting API | `video.publish` | Upload page (publishes directly) |
 
@@ -52,7 +51,6 @@ scope list per the reviewer's explicit instruction.
    - `user.info.basic`
    - `user.info.profile`
    - `user.info.stats`
-   - `video.list`
    - `video.upload`
    - `video.publish`
 5. Copy the **sandbox** Client Key and Client Secret from the
@@ -134,9 +132,9 @@ You'll be redirected to TikTok's sandbox auth. Log in with your test
 account. Review the consent screen — point out the scopes being
 requested.
 
-> "Here you can see TikTok showing all six scopes I'm requesting:
-> user.info.basic, user.info.profile, user.info.stats, video.list,
-> video.upload, and video.publish. I'm clicking Authorize."
+> "Here you can see TikTok showing all five scopes I'm requesting:
+> user.info.basic, user.info.profile, user.info.stats, video.upload,
+> and video.publish. I'm clicking Authorize."
 
 Approve. You'll be redirected back to your localhost dashboard.
 
@@ -176,35 +174,13 @@ Point at the four stat cards.
 
 ---
 
-**1:55 – `video.list`** (45 seconds)
+**1:55 – `video.upload` (DRAFT mode)** (45 seconds)
 
-Click **Next: list videos →** at the bottom (or click "Videos" in
-the nav).
+Click **Next: upload a video →** at the bottom of the Dashboard.
 
-> "Next product — Content Posting API. First scope is **video.list**.
-> This page calls POST /v2/video/list/ with the video.list scope.
-> The API returns this user's recent videos with their cover images,
-> view counts, and like counts."
-
-Show the videos grid. If the sandbox account has no videos, that's
-fine — the banner still shows the scope is being called, and you
-can open the raw API response in the expandable section at the
-bottom of the page.
-
-> "You can see the raw API response here in the expandable section,
-> confirming the scope is granted and the call succeeds."
-
-Open the "Raw API response" details and show the JSON.
-
----
-
-**2:40 – `video.upload` (DRAFT mode)** (45 seconds)
-
-Click **Next: upload a video →** in the nav.
-
-> "Finally, the upload scopes. Content Posting API has two scopes
-> for posting — video.upload posts as a draft, and video.publish
-> posts directly to the user's profile. I'll demonstrate both."
+> "Next product — Content Posting API. Two scopes here, both for
+> posting — video.upload posts as a draft, and video.publish posts
+> directly to the user's profile. I'll demonstrate both."
 
 Click **Choose File** and select a short test video (any .mp4 ≤ 50MB
 will do — TikTok recommends keeping demo uploads short).
@@ -221,7 +197,7 @@ Click the **video.upload** button. Wait for the success banner.
 
 ---
 
-**3:25 – `video.publish` (direct post)** (45 seconds)
+**2:40 – `video.publish` (direct post)** (45 seconds)
 
 > "Now video.publish. Same form, different endpoint. This time the
 > request goes to POST /v2/post/publish/video/init/ with the
@@ -236,10 +212,10 @@ Optionally select a different video, or use the same one. Click
 
 ---
 
-**4:10 – Wrap** (15 seconds)
+**3:25 – Wrap** (15 seconds)
 
-> "That covers all six scopes I requested: user.info.basic,
-> user.info.profile, user.info.stats, video.list, video.upload, and
+> "That covers all five scopes I requested: user.info.basic,
+> user.info.profile, user.info.stats, video.upload, and
 > video.publish. Share Kit is intentionally removed since this is a
 > web app. Thanks for reviewing."
 

@@ -21,7 +21,6 @@
  *     - user.info.stats       (follower/following/likes/video counts)
  *
  *   Content Posting API:
- *     - video.list            (read user's videos)
  *     - video.upload          (upload to user's account as DRAFT)
  *     - video.publish         (publish directly to user's profile)
  *
@@ -60,7 +59,6 @@ const SCOPES = [
   'user.info.basic',
   'user.info.profile',
   'user.info.stats',
-  'video.list',
   'video.upload',
   'video.publish',
 ].join(',');
@@ -210,7 +208,6 @@ function page({ title, scope, body, user }) {
     <nav>
       <a href="/">Home</a>
       ${user ? `<a href="/dashboard">Dashboard</a>` : ''}
-      ${user ? `<a href="/videos">Videos</a>` : ''}
       ${user ? `<a href="/upload">Upload</a>` : ''}
       ${user ? `<a href="/logout">Logout</a>` : ''}
     </nav>
@@ -248,7 +245,7 @@ app.get('/', (req, res) => {
         </p>
         <div class="row">
           <a class="btn" href="/auth/login">Continue with TikTok</a>
-          <span class="muted">— required scopes: user.info.basic, user.info.profile, user.info.stats, video.list, video.upload, video.publish</span>
+          <span class="muted">— required scopes: user.info.basic, user.info.profile, user.info.stats, video.upload, video.publish</span>
         </div>
       </div>
     `,
@@ -270,7 +267,9 @@ app.get('/auth/login', (req, res) => {
     state,
   });
   const authorizeUrl = `${AUTH_BASE}/v2/auth/authorize/?${params.toString()}`;
-  console.log('[Login Kit] Redirecting user to TikTok authorize URL');
+  console.log('\n[Login Kit] Redirecting user to TikTok authorize URL:');
+  console.log(authorizeUrl);
+  console.log('');
   res.redirect(authorizeUrl);
 });
 
@@ -402,7 +401,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
           </div>
 
           <div class="row">
-            <a class="btn" href="/videos">Next: list videos →</a>
+            <a class="btn" href="/upload">Next: upload a video →</a>
           </div>
         </div>
 
@@ -422,71 +421,7 @@ app.get('/dashboard', requireAuth, async (req, res) => {
   }
 });
 
-// Step 4 — video.list: list the connected user's videos
-app.get('/videos', requireAuth, async (req, res) => {
-  const { access_token } = req.session.tokens;
-
-  // /v2/video/list/ is a POST endpoint per TikTok's docs even though
-  // it's a read operation. `fields` are passed as a query parameter.
-  const fields = [
-    'id', 'title', 'video_description', 'cover_image_url',
-    'share_url', 'create_time', 'duration',
-    'view_count', 'like_count', 'comment_count', 'share_count',
-  ].join(',');
-
-  try {
-    const resp = await axios.post(
-      `${API_BASE}/v2/video/list/?fields=${fields}`,
-      { max_count: 20 },
-      { headers: { Authorization: `Bearer ${access_token}`, 'Content-Type': 'application/json' } },
-    );
-    const videos = resp.data?.data?.videos || [];
-
-    res.send(page({
-      title: 'Videos',
-      scope: 'video.list',
-      user: req.session.user,
-      body: `
-        <div class="card">
-          <h2>Your TikTok videos</h2>
-          <p class="muted">Fetched from <code>POST /v2/video/list/</code> using the
-          <code>video.list</code> scope. Showing the ${videos.length} most-recent videos.</p>
-
-          ${videos.length === 0
-            ? '<p class="muted">No videos on this sandbox test account yet. Upload one via the next step ↓</p>'
-            : `<div class="videos">${videos.map(v => `
-                <div class="video">
-                  <img src="${v.cover_image_url || ''}" alt="" />
-                  <div class="meta">
-                    <div><strong>${(v.title || v.video_description || 'Untitled').slice(0, 40)}</strong></div>
-                    <div class="muted">${v.view_count ?? 0} views · ${v.like_count ?? 0} likes</div>
-                  </div>
-                </div>
-              `).join('')}</div>`
-          }
-
-          <div class="row">
-            <a class="btn" href="/upload">Next: upload a video →</a>
-          </div>
-        </div>
-
-        <details class="card"><summary class="muted">Raw API response</summary>
-          <pre class="raw">${JSON.stringify(resp.data, null, 2)}</pre>
-        </details>
-      `,
-    }));
-  } catch (e) {
-    console.error('[video.list] failed:', e.response?.data || e.message);
-    res.status(500).send(page({
-      title: 'video.list failed',
-      body: `<div class="card"><h2>❌ video.list failed</h2>
-        <pre class="raw">${JSON.stringify(e.response?.data || e.message, null, 2)}</pre>
-        <a class="btn secondary" href="/dashboard">Back to dashboard</a></div>`,
-    }));
-  }
-});
-
-// Step 5 — upload form: render the page that exercises video.upload + video.publish
+// Step 4 — upload form: render the page that exercises video.upload + video.publish
 app.get('/upload', requireAuth, (req, res) => {
   const flash = req.session.flash;
   req.session.flash = null;
