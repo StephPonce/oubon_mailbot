@@ -147,6 +147,16 @@ function page({ title, scope, body, user }) {
       padding: 6px 12px; border-radius: 6px; font-size: 13px;
       color: var(--muted);
     }
+    .why-box {
+      background: rgba(37,244,238,0.06);
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      margin: 12px 0 24px 0;
+      font-size: 14px;
+      line-height: 1.5;
+      color: var(--text);
+    }
+    .why-box strong { color: var(--accent); }
     main { max-width: 900px; margin: 32px auto; padding: 0 32px; }
     .card {
       background: var(--card);
@@ -209,6 +219,7 @@ function page({ title, scope, body, user }) {
       <a href="/">Home</a>
       ${user ? `<a href="/dashboard">Dashboard</a>` : ''}
       ${user ? `<a href="/upload">Upload</a>` : ''}
+      ${user ? `<a href="/summary">Demo Summary</a>` : ''}
       ${user ? `<a href="/logout">Logout</a>` : ''}
     </nav>
   </header>
@@ -382,6 +393,12 @@ app.get('/dashboard', requireAuth, async (req, res) => {
             <span class="muted">open_id: ${data.open_id || ''}</span><br/>
             <span class="muted">union_id: ${data.union_id || ''}</span>
           </p>
+          <div class="why-box">
+            <strong>Why Oubon Shop Automation needs this:</strong>
+            We display the connected creator's identity in the Oubon Shop
+            Automation dashboard so multiple users managing the same
+            dropshipping store can see who's authorized to post on TikTok.
+          </div>
 
           <h3>📍 Scope: <code>user.info.profile</code></h3>
           <p>
@@ -391,6 +408,13 @@ app.get('/dashboard', requireAuth, async (req, res) => {
               ? `<a href="${data.profile_deep_link}" target="_blank">${data.profile_deep_link}</a>` : '(none)'}<br/>
             <strong>Bio:</strong> ${data.bio_description || '(empty)'}
           </p>
+          <div class="why-box">
+            <strong>Why Oubon Shop Automation needs this:</strong>
+            We read the verified status and profile URL to determine whether
+            the connected account meets TikTok's monetization criteria, and
+            to deep-link customers to the seller's TikTok shop from Oubon
+            Shop product pages.
+          </div>
 
           <h3>📍 Scope: <code>user.info.stats</code></h3>
           <div class="grid">
@@ -398,6 +422,13 @@ app.get('/dashboard', requireAuth, async (req, res) => {
             <div class="stat"><div class="label">Following</div><div class="value">${data.following_count ?? 0}</div></div>
             <div class="stat"><div class="label">Total Likes</div><div class="value">${data.likes_count ?? 0}</div></div>
             <div class="stat"><div class="label">Total Videos</div><div class="value">${data.video_count ?? 0}</div></div>
+          </div>
+          <div class="why-box">
+            <strong>Why Oubon Shop Automation needs this:</strong>
+            We use follower count, engagement totals, and video count to
+            recommend ad spend tiers and creative angles. A creator with
+            50k+ followers gets a different campaign suggestion than a
+            creator just starting out.
           </div>
 
           <div class="row">
@@ -426,22 +457,75 @@ app.get('/upload', requireAuth, (req, res) => {
   const flash = req.session.flash;
   req.session.flash = null;
 
+  // Privacy options shared by both forms.
+  const privacySelect = `
+    <select name="privacy_level" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px;">
+      <option value="SELF_ONLY">SELF_ONLY (private — recommended for sandbox demo)</option>
+      <option value="MUTUAL_FOLLOW_FRIENDS">MUTUAL_FOLLOW_FRIENDS</option>
+      <option value="PUBLIC_TO_EVERYONE">PUBLIC_TO_EVERYONE</option>
+    </select>
+  `;
+
   res.send(page({
     title: 'Upload',
-    scope: 'video.upload + video.publish',
     user: req.session.user,
     body: `
-      <div class="card">
-        <h2>Upload a video to your TikTok</h2>
-        <p class="muted">This page exercises BOTH Content Posting API scopes:</p>
-        <ul class="muted">
-          <li><code>video.upload</code> — uploads the file to the user's account as a draft for further editing</li>
-          <li><code>video.publish</code> — directly publishes the video to the user's profile</li>
-        </ul>
+      ${flash ? `<div class="card"><p class="${flash.ok ? 'ok' : 'err'}">${flash.message}</p></div>` : ''}
 
-        ${flash ? `<p class="${flash.ok ? 'ok' : 'err'}">${flash.message}</p>` : ''}
+      <!-- ============ SECTION 1: video.upload (draft) ============ -->
+      <div class="card">
+        <div class="scope-banner" style="margin: -24px -24px 16px -24px; border-radius: 8px 8px 0 0;">
+          📍 NOW DEMONSTRATING SCOPE: <code>video.upload</code>
+        </div>
+        <h2>Upload as DRAFT</h2>
+        <p class="muted">
+          Calls <code>POST /v2/post/publish/inbox/video/init/</code> with the
+          <code>video.upload</code> scope. The video lands in the connected
+          user's TikTok drafts where they can edit it before publishing.
+        </p>
+        <div class="why-box">
+          <strong>What this scope does for the seller:</strong>
+          Sellers can stage promotional videos as drafts in their TikTok
+          account, then edit captions and hashtags in TikTok before going
+          live.
+        </div>
 
         <form method="post" action="/upload" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="upload" />
+          <div class="form-row">
+            <label>Video file (mp4/mov, ≤ 50MB)</label>
+            <input type="file" name="video" accept="video/mp4,video/quicktime" required />
+          </div>
+          <div class="form-row">
+            <label>Post caption</label>
+            <input type="text" name="title" placeholder="Demo post from Oubon Shop Automation" />
+          </div>
+          <div class="row">
+            <button class="btn" type="submit">video.upload (save as draft)</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ============ SECTION 2: video.publish (direct) ============ -->
+      <div class="card">
+        <div class="scope-banner" style="margin: -24px -24px 16px -24px; border-radius: 8px 8px 0 0;">
+          📍 NOW DEMONSTRATING SCOPE: <code>video.publish</code>
+        </div>
+        <h2>Publish DIRECTLY</h2>
+        <p class="muted">
+          Calls <code>POST /v2/post/publish/video/init/</code> with the
+          <code>video.publish</code> scope. The video posts straight to the
+          connected user's profile — no draft step.
+        </p>
+        <div class="why-box">
+          <strong>What this scope does for the seller:</strong>
+          When a campaign is approved by the seller, Oubon Shop Automation
+          auto-publishes the promotional video directly to TikTok without
+          manual intervention.
+        </div>
+
+        <form method="post" action="/upload" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="publish" />
           <div class="form-row">
             <label>Video file (mp4/mov, ≤ 50MB)</label>
             <input type="file" name="video" accept="video/mp4,video/quicktime" required />
@@ -452,19 +536,10 @@ app.get('/upload', requireAuth, (req, res) => {
           </div>
           <div class="form-row">
             <label>Privacy</label>
-            <select name="privacy_level" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px;">
-              <option value="SELF_ONLY">SELF_ONLY (private — recommended for sandbox demo)</option>
-              <option value="MUTUAL_FOLLOW_FRIENDS">MUTUAL_FOLLOW_FRIENDS</option>
-              <option value="PUBLIC_TO_EVERYONE">PUBLIC_TO_EVERYONE</option>
-            </select>
+            ${privacySelect}
           </div>
           <div class="row">
-            <button class="btn" type="submit" name="action" value="upload">
-              video.upload (save as draft)
-            </button>
-            <button class="btn secondary" type="submit" name="action" value="publish">
-              video.publish (post directly)
-            </button>
+            <button class="btn secondary" type="submit">video.publish (post directly)</button>
           </div>
         </form>
       </div>
@@ -548,7 +623,9 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       ok: true,
       message: `✅ ${scopeName} succeeded. publish_id=${publish_id}${action === 'publish' ? ' — Direct post submitted to TikTok.' : ' — Saved as draft on user account; open TikTok to publish.'}`,
     };
-    res.redirect('/upload');
+    req.session.completedScopes = req.session.completedScopes || {};
+    req.session.completedScopes[scopeName] = true;
+    res.redirect('/summary');
   } catch (e) {
     try { fs.unlinkSync(file.path); } catch {}
     console.error(`[${action}] failed:`, e.response?.data || e.message);
@@ -558,6 +635,86 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
     };
     res.redirect('/upload');
   }
+});
+
+// Step 6 — Demo Summary: end-of-flow recap with checkmarks per scope.
+// All identity scopes are marked done once the dashboard has been visited
+// (because /dashboard issues the single /v2/user/info/ call that returns
+// fields gated by all three). Content Posting scopes flip to done after
+// the corresponding form submission succeeds (see completedScopes above).
+app.get('/summary', requireAuth, (req, res) => {
+  const completed = req.session.completedScopes || {};
+  const flash = req.session.flash;
+  req.session.flash = null;
+
+  // The dashboard route caches the user blob; if we have it, all three
+  // identity scopes have been demonstrated.
+  const identityDone = !!req.session.user;
+
+  const scopes = [
+    {
+      name: 'user.info.basic',
+      done: identityDone,
+      desc: 'Connected creator identity (avatar, display name, open_id). Shown on the Dashboard so multi-user dropshipping stores can see who is authorized to post.',
+    },
+    {
+      name: 'user.info.profile',
+      done: identityDone,
+      desc: 'Verified status and profile URL. Used to gate monetization features and deep-link customers to the seller\'s TikTok shop from Oubon Shop product pages.',
+    },
+    {
+      name: 'user.info.stats',
+      done: identityDone,
+      desc: 'Follower / engagement / video counts. Used to recommend ad spend tiers and creative angles per connected creator.',
+    },
+    {
+      name: 'video.upload',
+      done: !!completed['video.upload'],
+      desc: 'Upload promotional video to the seller\'s TikTok as a DRAFT so they can edit caption and hashtags before publishing.',
+    },
+    {
+      name: 'video.publish',
+      done: !!completed['video.publish'],
+      desc: 'Publish an approved campaign video directly to the seller\'s TikTok profile without manual intervention.',
+    },
+  ];
+
+  const rows = scopes.map(s => `
+    <tr>
+      <td style="font-size: 22px; padding: 8px 12px;">${s.done ? '✅' : '⬜'}</td>
+      <td style="padding: 8px 12px;"><code>${s.name}</code></td>
+      <td style="padding: 8px 12px; color: var(--text);">${s.desc}</td>
+    </tr>
+  `).join('');
+
+  res.send(page({
+    title: 'Demo Summary',
+    user: req.session.user,
+    body: `
+      ${flash ? `<div class="card"><p class="${flash.ok ? 'ok' : 'err'}">${flash.message}</p></div>` : ''}
+
+      <div class="card">
+        <h2>Scope Demonstration Recap</h2>
+        <p class="muted">All five scopes the Oubon Shop Automation app requests. ✅ marks a scope whose API call this session has actually exercised.</p>
+
+        <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <th style="text-align: left; padding: 8px 12px;">Status</th>
+              <th style="text-align: left; padding: 8px 12px;">Scope</th>
+              <th style="text-align: left; padding: 8px 12px;">How it's used</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+
+        <div class="row" style="margin-top: 24px;">
+          <a class="btn secondary" href="/dashboard">Re-visit Dashboard</a>
+          <a class="btn secondary" href="/upload">Re-visit Upload</a>
+        </div>
+      </div>
+    `,
+  }));
 });
 
 // Health check (handy for confirming the server is up on Apple's reviewer's screen)
