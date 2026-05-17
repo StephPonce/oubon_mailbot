@@ -228,6 +228,20 @@ function page({ title, scope, body, user }) {
   <main>
     ${body}
   </main>
+  <footer style="max-width: 900px; margin: 48px auto 32px; padding: 24px 32px 0; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; line-height: 1.6;">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center;">
+      <div>
+        <strong style="color: var(--text);">Oubon Shop Automation</strong> — TikTok integration demo (sandbox).
+        Owned and operated by Stephen Ponce.
+      </div>
+      <div style="display: flex; gap: 16px;">
+        <a href="/permissions" style="color: var(--accent); text-decoration: none;">Permissions</a>
+        <a href="/terms" style="color: var(--accent); text-decoration: none;">Terms of Service</a>
+        <a href="/privacy" style="color: var(--accent); text-decoration: none;">Privacy Policy</a>
+        <a href="mailto:sponce96@icloud.com" style="color: var(--accent); text-decoration: none;">Contact</a>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
 }
@@ -256,8 +270,16 @@ app.get('/', (req, res) => {
         </p>
         <div class="row">
           <a class="btn" href="/auth/login">Continue with TikTok</a>
-          <span class="muted">— required scopes: user.info.basic, user.info.profile, user.info.stats, video.upload, video.publish</span>
+          <a class="btn secondary" href="/permissions">View permissions requested</a>
         </div>
+        <p class="muted" style="margin-top: 16px;">
+          By continuing you agree to the
+          <a href="/terms">Terms of Service</a> and
+          <a href="/privacy">Privacy Policy</a>.
+          Five scopes are requested: <code>user.info.basic</code>,
+          <code>user.info.profile</code>, <code>user.info.stats</code>,
+          <code>video.upload</code>, <code>video.publish</code>.
+        </p>
       </div>
     `,
   }));
@@ -712,6 +734,184 @@ app.get('/summary', requireAuth, (req, res) => {
           <a class="btn secondary" href="/dashboard">Re-visit Dashboard</a>
           <a class="btn secondary" href="/upload">Re-visit Upload</a>
         </div>
+      </div>
+    `,
+  }));
+});
+
+// ============================================================
+// Compliance pages — required by TikTok app review.
+// All three are public (no auth required) so reviewers can
+// reach them without logging in.
+// ============================================================
+
+// /permissions — explicit enumeration of the 5 scopes the app
+// requests, using TikTok's own official descriptions verbatim.
+// Linked from the footer of every page so reviewers see it.
+app.get('/permissions', (req, res) => {
+  res.send(page({
+    title: 'Permissions Requested',
+    user: req.session.user,
+    body: `
+      <div class="card">
+        <h2>Permissions This App Requests</h2>
+        <p class="muted">
+          Oubon Shop Automation requests the following five TikTok scopes
+          during sign-in. Each scope's official TikTok description is
+          shown below, along with how this app uses it.
+        </p>
+
+        <div class="why-box">
+          <strong><code>user.info.basic</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
+          <em>Read a user's profile info (open id, avatar, display name ...)</em>
+          <p style="margin: 8px 0 0 0;">We display the connected creator's identity in the Oubon
+          Shop Automation dashboard so multiple users managing the same dropshipping store
+          can see who's authorized to post on TikTok.</p>
+        </div>
+
+        <div class="why-box">
+          <strong><code>user.info.profile</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
+          <em>Read access to profile_web_link, profile_deep_link, bio_description, is_verified.</em>
+          <p style="margin: 8px 0 0 0;">We read verified status and profile URL to determine whether
+          the connected account meets TikTok's monetization criteria, and to deep-link
+          customers to the seller's TikTok shop from Oubon Shop product pages.</p>
+        </div>
+
+        <div class="why-box">
+          <strong><code>user.info.stats</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
+          <em>Read access to a user's statistic data, such as likes count, follower count, following count, and video count.</em>
+          <p style="margin: 8px 0 0 0;">We use follower count, engagement totals, and video count to
+          recommend ad spend tiers and creative angles. A creator with 50k+ followers
+          gets a different campaign suggestion than one just starting out.</p>
+        </div>
+
+        <div class="why-box">
+          <strong><code>video.upload</code></strong> &nbsp; <span class="muted">— Included in Content Posting API</span><br/>
+          <em>Share content to creator's account as a draft to further edit and post in TikTok.</em>
+          <p style="margin: 8px 0 0 0;">Sellers stage promotional videos as drafts in their TikTok
+          account, then edit captions and hashtags in TikTok before going live.</p>
+        </div>
+
+        <div class="why-box">
+          <strong><code>video.publish</code></strong> &nbsp; <span class="muted">— Included in Content Posting API</span><br/>
+          <em>Directly post content to a user's TikTok profile.</em>
+          <p style="margin: 8px 0 0 0;">When a campaign is approved by the seller, Oubon Shop
+          Automation auto-publishes the promotional video directly to TikTok without manual
+          intervention.</p>
+        </div>
+
+        <p class="muted" style="margin-top: 24px;">
+          Share Kit is intentionally <strong>not</strong> requested — this is a server-side
+          web application and Share Kit's web-share dialog is not appropriate for the
+          background automation use case.
+        </p>
+      </div>
+    `,
+  }));
+});
+
+// /terms — Terms of Service.
+app.get('/terms', (req, res) => {
+  res.send(page({
+    title: 'Terms of Service',
+    user: req.session.user,
+    body: `
+      <div class="card">
+        <h2>Terms of Service</h2>
+        <p class="muted">Last updated: 2026-05-17</p>
+
+        <h3>1. Acceptance</h3>
+        <p>By using Oubon Shop Automation ("the Service"), you agree to these Terms.
+        If you do not agree, do not use the Service.</p>
+
+        <h3>2. What the Service does</h3>
+        <p>The Service is a dropshipping automation tool that, with the user's explicit
+        OAuth authorization, posts promotional videos to a connected TikTok account and
+        reads basic profile/stats information from that account to recommend marketing
+        campaigns.</p>
+
+        <h3>3. TikTok integration</h3>
+        <p>The Service requests the following five TikTok scopes via Login Kit and
+        Content Posting API: <code>user.info.basic</code>, <code>user.info.profile</code>,
+        <code>user.info.stats</code>, <code>video.upload</code>, <code>video.publish</code>.
+        See the <a href="/permissions">Permissions</a> page for full details. You may
+        revoke this authorization at any time from your TikTok account settings.</p>
+
+        <h3>4. Acceptable use</h3>
+        <p>You agree to use the Service only to post content you own or have the right
+        to distribute, and only in compliance with TikTok's
+        <a href="https://www.tiktok.com/legal/community-guidelines" target="_blank" rel="noopener">Community Guidelines</a>
+        and <a href="https://www.tiktok.com/legal/terms-of-service" target="_blank" rel="noopener">Terms of Service</a>.</p>
+
+        <h3>5. No warranty</h3>
+        <p>The Service is provided as-is, without warranty of any kind. We are not
+        responsible for content posted through the Service or for any TikTok account
+        actions resulting from its use.</p>
+
+        <h3>6. Termination</h3>
+        <p>You may stop using the Service at any time. We may suspend access for
+        abuse, security concerns, or violation of these Terms.</p>
+
+        <h3>7. Contact</h3>
+        <p>Questions: <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a></p>
+      </div>
+    `,
+  }));
+});
+
+// /privacy — Privacy Policy.
+app.get('/privacy', (req, res) => {
+  res.send(page({
+    title: 'Privacy Policy',
+    user: req.session.user,
+    body: `
+      <div class="card">
+        <h2>Privacy Policy</h2>
+        <p class="muted">Last updated: 2026-05-17</p>
+
+        <h3>1. Data we collect</h3>
+        <p>When you connect your TikTok account, we receive — only with your explicit
+        OAuth consent — the following from TikTok's <code>/v2/user/info/</code>
+        endpoint:</p>
+        <ul>
+          <li><strong>Identity</strong> (<code>user.info.basic</code>): open_id, union_id, avatar URL, display name</li>
+          <li><strong>Profile</strong> (<code>user.info.profile</code>): username, bio, profile URL, verified status</li>
+          <li><strong>Stats</strong> (<code>user.info.stats</code>): follower / following / likes / video counts</li>
+        </ul>
+        <p>When you upload or publish a video through the Service, the video file you
+        provide is sent to TikTok via the Content Posting API
+        (<code>video.upload</code> / <code>video.publish</code> scopes). We do not
+        retain the video file after the upload completes.</p>
+
+        <h3>2. How we use it</h3>
+        <p>The identity/profile/stats fields are displayed to you in the Service's
+        dashboard so you can confirm which TikTok account is connected and which
+        campaigns are appropriate for it. We do not sell, share, or use this data
+        for advertising.</p>
+
+        <h3>3. Storage</h3>
+        <p>OAuth access tokens are stored in your browser session only for the duration
+        of your sign-in. Profile data fetched from TikTok is cached in memory for the
+        same session. Nothing is persisted to disk in this demo environment, and no
+        third party receives your TikTok data from us.</p>
+
+        <h3>4. Sharing</h3>
+        <p>We share data only with TikTok itself (to authenticate and to post videos
+        on your behalf). We do not share your TikTok data with any other third party.</p>
+
+        <h3>5. Your rights</h3>
+        <p>You may revoke this app's access at any time at
+        <a href="https://www.tiktok.com/setting/connected-apps" target="_blank" rel="noopener">tiktok.com/setting/connected-apps</a>.
+        Revocation immediately stops the Service from making any further calls on
+        your behalf. To request deletion of any session-cached data, email
+        <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a>.</p>
+
+        <h3>6. Children</h3>
+        <p>The Service is not intended for users under 13. Do not connect a TikTok
+        account belonging to a minor.</p>
+
+        <h3>7. Contact</h3>
+        <p>Privacy questions: <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a></p>
       </div>
     `,
   }));
