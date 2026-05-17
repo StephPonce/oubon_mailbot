@@ -157,6 +157,33 @@ function page({ title, scope, body, user }) {
       color: var(--text);
     }
     .why-box strong { color: var(--accent); }
+    .downstream-panel {
+      background: var(--bg);
+      border: 1px solid var(--accent2);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 16px 0 32px 0;
+      font-size: 14px;
+      line-height: 1.55;
+      position: relative;
+    }
+    .downstream-panel h4 { color: var(--accent2); font-size: 16px; }
+    .downstream-badge {
+      position: absolute;
+      top: -10px; right: 12px;
+      background: var(--bg);
+      color: var(--accent2);
+      padding: 2px 8px;
+      font-size: 11px;
+      border: 1px solid var(--accent2);
+      border-radius: 4px;
+    }
+    .downstream-badge code {
+      background: rgba(254,44,85,0.15);
+      padding: 1px 4px;
+      border-radius: 3px;
+      color: var(--accent2);
+    }
     main { max-width: 900px; margin: 32px auto; padding: 0 32px; }
     .card {
       background: var(--card);
@@ -397,6 +424,47 @@ app.get('/dashboard', requireAuth, async (req, res) => {
     const data = resp.data?.data?.user || {};
     req.session.user = data;
 
+    // === Downstream UI helpers — actually CONSUME the scope data,
+    // === not just describe it. These panels make the demo show the
+    // === reviewer how each scope's data drives the product.
+
+    // (a) Monetization Eligibility — uses user.info.profile fields
+    const hasProfileUrl = !!data.profile_deep_link;
+    const isVerified    = !!data.is_verified;
+    const followers     = Number(data.follower_count ?? 0);
+    let eligTier, eligAction;
+    if (isVerified) {
+      eligTier   = 'VERIFIED';
+      eligAction = 'Eligible for Creator Marketplace. Enable monetization features in the Oubon dashboard.';
+    } else if (followers >= 10000) {
+      eligTier   = 'GROWING';
+      eligAction = 'Apply for TikTok Creator Fund — you meet the 10k follower threshold. Verification will unlock tier 1 monetization.';
+    } else {
+      eligTier   = 'STARTER';
+      eligAction = `Keep posting consistently — ${10000 - followers} more followers until Creator Fund eligibility.`;
+    }
+
+    // (b) Ad Spend Recommendation — uses user.info.stats fields
+    let spendTier, spendBudget, spendFormat, spendImpr, nextThreshold;
+    if (followers >= 100000) {
+      spendTier = 'MACRO';   spendBudget = '$200+/day';   spendFormat = 'multi-creative A/B testing';  spendImpr = '20k+ impressions/day';
+      nextThreshold = null;
+    } else if (followers >= 10000) {
+      spendTier = 'MID';     spendBudget = '$75–$150/day'; spendFormat = 'lifestyle-driven content';   spendImpr = '5k–15k impressions/day';
+      nextThreshold = `When you cross 100k followers you'll unlock MACRO tier ($200+/day budget, multi-creative A/B testing).`;
+    } else if (followers >= 1000) {
+      spendTier = 'MICRO';   spendBudget = '$20–$50/day';  spendFormat = 'product demo format';        spendImpr = '1k–3k impressions/day';
+      nextThreshold = `When you cross 10k followers you'll unlock MID tier ($75–$150/day budget, lifestyle content).`;
+    } else {
+      spendTier = 'NANO';    spendBudget = '$5–$15/day';   spendFormat = 'educational tutorial format'; spendImpr = '200–800 impressions/day';
+      nextThreshold = `When you cross 1k followers you'll unlock MICRO tier ($20–$50/day budget, product demos).`;
+    }
+    const likes = Number(data.likes_count ?? 0);
+    const videos = Number(data.video_count ?? 0);
+    const engagementSignal = videos > 0
+      ? `${likes.toLocaleString()} total likes across ${videos} video${videos === 1 ? '' : 's'} → avg ${Math.round(likes / videos).toLocaleString()} likes per video.`
+      : 'No videos posted yet — first uploads will calibrate the engagement signal.';
+
     res.send(page({
       title: 'Dashboard',
       scope: 'user.info.basic + user.info.profile + user.info.stats',
@@ -438,6 +506,23 @@ app.get('/dashboard', requireAuth, async (req, res) => {
             Shop product pages.
           </div>
 
+          <div class="downstream-panel">
+            <div class="downstream-badge">← This panel uses <code>user.info.profile</code></div>
+            <h4 style="margin: 0 0 12px 0;">💰 Monetization Eligibility Check</h4>
+            <p>
+              ${hasProfileUrl
+                ? `✓ Profile URL configured`
+                : `⚠ Profile URL missing — set up a public TikTok URL for customer deep-linking`}<br/>
+              ${isVerified
+                ? `✓ Verified account — eligible for tier 1 monetization`
+                : `⚠ Not verified — TikTok requires 10k+ followers + clean content for verification`}
+            </p>
+            <p style="margin: 12px 0 4px 0;"><strong>Eligibility tier:</strong>
+              <span style="color: var(--accent); font-weight: 600;">${eligTier}</span>
+            </p>
+            <p class="muted" style="margin: 0;"><strong>Recommended action:</strong> ${eligAction}</p>
+          </div>
+
           <h3>📍 Scope: <code>user.info.stats</code></h3>
           <div class="grid">
             <div class="stat"><div class="label">Followers</div><div class="value">${data.follower_count ?? 0}</div></div>
@@ -451,6 +536,22 @@ app.get('/dashboard', requireAuth, async (req, res) => {
             recommend ad spend tiers and creative angles. A creator with
             50k+ followers gets a different campaign suggestion than a
             creator just starting out.
+          </div>
+
+          <div class="downstream-panel">
+            <div class="downstream-badge">← This panel uses <code>user.info.stats</code></div>
+            <h4 style="margin: 0 0 12px 0;">📊 Ad Spend Recommendation</h4>
+            <p style="margin: 0 0 8px 0;"><strong>Tier:</strong>
+              <span style="color: var(--accent); font-weight: 600;">${spendTier}</span>
+              &nbsp;(${followers.toLocaleString()} follower${followers === 1 ? '' : 's'})
+            </p>
+            <p style="margin: 0 0 4px 0;"><strong>Suggested budget:</strong> ${spendBudget}</p>
+            <p style="margin: 0 0 4px 0;"><strong>Creative format:</strong> ${spendFormat}</p>
+            <p style="margin: 0 0 12px 0;"><strong>Projected reach:</strong> ${spendImpr}</p>
+            <p class="muted" style="margin: 0 0 8px 0;"><strong>Engagement signal:</strong> ${engagementSignal}</p>
+            ${nextThreshold
+              ? `<p class="muted" style="margin: 0;">→ ${nextThreshold}</p>`
+              : `<p class="muted" style="margin: 0;">→ You're at the top tier. Focus on creative diversification.</p>`}
           </div>
 
           <div class="row">
@@ -478,6 +579,12 @@ app.get('/dashboard', requireAuth, async (req, res) => {
 app.get('/upload', requireAuth, (req, res) => {
   const flash = req.session.flash;
   req.session.flash = null;
+
+  // === Suggested caption uses connected user's follower_count
+  // === (user.info.stats) — proves the upload UI is wired to scope data.
+  const userFollowers = Number(req.session.user?.follower_count ?? 0);
+  const suggestedCaption =
+    `Smart home product review for my ${userFollowers.toLocaleString()}-strong fam! Check the link in bio.`;
 
   // Privacy options shared by both forms.
   const privacySelect = `
@@ -519,8 +626,8 @@ app.get('/upload', requireAuth, (req, res) => {
             <input type="file" name="video" accept="video/mp4,video/quicktime" required />
           </div>
           <div class="form-row">
-            <label>Post caption</label>
-            <input type="text" name="title" placeholder="Demo post from Oubon Shop Automation" />
+            <label>Post caption <span style="font-size: 11px; color: var(--accent2); margin-left: 8px;">← pre-filled from <code>user.info.stats</code> follower_count</span></label>
+            <input type="text" name="title" value="${suggestedCaption}" placeholder="Demo post from Oubon Shop Automation" />
           </div>
           <div class="row">
             <button class="btn" type="submit">video.upload (save as draft)</button>
@@ -553,8 +660,8 @@ app.get('/upload', requireAuth, (req, res) => {
             <input type="file" name="video" accept="video/mp4,video/quicktime" required />
           </div>
           <div class="form-row">
-            <label>Post caption</label>
-            <input type="text" name="title" placeholder="Demo post from Oubon Shop Automation" />
+            <label>Post caption <span style="font-size: 11px; color: var(--accent2); margin-left: 8px;">← pre-filled from <code>user.info.stats</code> follower_count</span></label>
+            <input type="text" name="title" value="${suggestedCaption}" placeholder="Demo post from Oubon Shop Automation" />
           </div>
           <div class="form-row">
             <label>Privacy</label>
