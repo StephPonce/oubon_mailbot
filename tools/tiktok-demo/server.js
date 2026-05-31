@@ -1,31 +1,18 @@
 /**
- * Oubon Shop Automation — TikTok Developer Demo Site
- * ===================================================
+ * Oubon Shop Automation — merchant control panel
+ * ================================================
  *
- * Purpose: pass TikTok's app review by demonstrating EVERY requested
- * scope end-to-end in the sandbox environment. Built specifically to
- * address the prior rejection:
+ * Shopify dropshipping merchants connect their TikTok account, then
+ * create promotional video campaigns for products they sell. Campaigns
+ * can be saved as TikTok drafts or published directly to the connected
+ * creator's profile.
  *
- *   "Scopes mismatch — All selected products and scopes must be
- *    clearly demonstrated in the video... You are required to use
- *    sandbox to demonstrate the integration. Please remove Share
- *    Kit, as it is only applicable to mobile apps."
- *
- * Scopes demonstrated (Share Kit was removed per the rejection):
- *
- *   Login Kit:
- *     - user.info.basic       (open_id, avatar, display_name)
- *
- *   Identity (Login Kit beyond basic):
- *     - user.info.profile     (profile_web_link, bio, is_verified)
- *     - user.info.stats       (follower/following/likes/video counts)
- *
- *   Content Posting API:
- *     - video.upload          (upload to user's account as DRAFT)
- *     - video.publish         (publish directly to user's profile)
- *
- * Each route renders a banner naming the scope being exercised so the
- * reviewer can verify every scope is actually used in the video.
+ * TikTok scopes used:
+ *   - user.info.basic        identity (open_id, avatar, display name)
+ *   - user.info.profile      verified status, profile URL
+ *   - user.info.stats        follower / following / likes / video count
+ *   - video.upload           save campaign video as a TikTok draft
+ *   - video.publish          publish campaign video directly
  */
 
 require('dotenv').config();
@@ -40,7 +27,6 @@ const path = require('path');
 const app = express();
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
-// Make sure uploads dir exists
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -50,11 +36,9 @@ const CLIENT_SECRET   = process.env.TIKTOK_CLIENT_SECRET   || '';
 const REDIRECT_URI    = process.env.TIKTOK_REDIRECT_URI    || 'http://localhost:3000/auth/tiktok/callback';
 const API_BASE        = process.env.TIKTOK_API_BASE        || 'https://open.tiktokapis.com';
 const AUTH_BASE       = process.env.TIKTOK_AUTH_BASE       || 'https://www.tiktok.com';
-const SESSION_SECRET  = process.env.SESSION_SECRET         || 'demo-session-secret-change-me';
+const SESSION_SECRET  = process.env.SESSION_SECRET         || 'change-me-in-env';
 const PORT            = parseInt(process.env.PORT || '3000', 10);
 
-// All scopes we need to demonstrate. Order matters for clarity in the
-// authorization URL (TikTok shows them to the user during consent).
 const SCOPES = [
   'user.info.basic',
   'user.info.profile',
@@ -65,14 +49,75 @@ const SCOPES = [
 
 if (!CLIENT_KEY || !CLIENT_SECRET) {
   console.error('\n[FATAL] TIKTOK_CLIENT_KEY and TIKTOK_CLIENT_SECRET must be set.');
-  console.error('Copy .env.example to .env and fill in your sandbox credentials from');
-  console.error('the TikTok Developer Portal.\n');
   process.exit(1);
 }
+
+// --- Mock product catalog -------------------------------------------
+// Hard-coded for the merchant view. In the real Ospra OS system these
+// come from the linked Shopify storefront via the Admin API.
+const PRODUCTS = [
+  {
+    id: 'p001',
+    name: 'AuraGlow Sunset Lamp',
+    price: 29.99,
+    image: 'https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=400&q=80&auto=format&fit=crop',
+    tagline: 'Cinematic sunset projection for any room.',
+    description: '360° rotating warm-light projector that turns any wall into a cinematic sunset. Plugs in via USB-C. Adjustable color temperature.',
+  },
+  {
+    id: 'p002',
+    name: 'ChillCloud Mini Humidifier',
+    price: 18.49,
+    image: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=400&q=80&auto=format&fit=crop',
+    tagline: 'Desk-sized humidifier with ambient LED.',
+    description: 'Whisper-quiet 300ml ultrasonic humidifier. 7-color ambient LED. Auto-off when empty. USB-powered.',
+  },
+  {
+    id: 'p003',
+    name: 'GripFlex Magnetic Wallet',
+    price: 24.00,
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=400&q=80&auto=format&fit=crop',
+    tagline: 'MagSafe wallet + phone stand in one.',
+    description: 'MagSafe-compatible card holder that flips out into a phone stand. Carbon fiber finish. Holds 3 cards.',
+  },
+  {
+    id: 'p004',
+    name: 'PocketPress Garment Steamer',
+    price: 34.99,
+    image: 'https://images.unsplash.com/photo-1532634922-8fe0b757fb13?w=400&q=80&auto=format&fit=crop',
+    tagline: 'Travel-sized steamer that heats in 30 sec.',
+    description: 'Handheld garment steamer. 30-second heat-up. 100ml tank for ~10 minutes of steam. USB-C rechargeable.',
+  },
+  {
+    id: 'p005',
+    name: 'NimbusPet Self-Cleaning Brush',
+    price: 22.50,
+    image: 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?w=400&q=80&auto=format&fit=crop',
+    tagline: 'One-button hair release for cats & dogs.',
+    description: 'Slicker brush with retractable bristles. One-button hair ejection. Comfortable for short and long-haired pets.',
+  },
+  {
+    id: 'p006',
+    name: 'BrewMate Travel Tumbler',
+    price: 19.99,
+    image: 'https://images.unsplash.com/photo-1572119865084-43c285814d63?w=400&q=80&auto=format&fit=crop',
+    tagline: '12-hour hot, 24-hour cold, leak-proof.',
+    description: '470ml stainless steel insulated tumbler. Double-wall vacuum insulation. Leak-proof magnetic lid. 8 colors.',
+  },
+];
+
+const findProduct = (id) => PRODUCTS.find(p => p.id === id);
 
 // --- Middleware ------------------------------------------------------
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+// Serve favicon.png + any other static assets from ./public so the demo
+// pages can reference /favicon.png. This is required for TikTok app review
+// — the reviewer checks that the same icon submitted to the TikTok portal
+// also appears as the favicon on the connecting website. Without static
+// serving, /favicon.png 404s and the icon-consistency check fails.
+// (`path` is already imported at the top of this file.)
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(session({
   secret: SESSION_SECRET,
   resave: false,
@@ -80,31 +125,44 @@ app.use(session({
   cookie: { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 },
 }));
 
-// --- Tiny HTML helper ------------------------------------------------
-// One layout to keep the demo recording visually consistent. The
-// "Now demonstrating: <scope>" banner is the most important part —
-// it's what the reviewer is looking for.
-function page({ title, scope, body, user }) {
-  const scopeBanner = scope
-    ? `<div class="scope-banner">📍 NOW DEMONSTRATING SCOPE: <code>${scope}</code></div>`
+// --- HTML layout -----------------------------------------------------
+function page({ title, body, user, active }) {
+  const navLink = (href, label, key) => {
+    const cls = active === key ? 'active' : '';
+    return `<a href="${href}" class="${cls}">${label}</a>`;
+  };
+
+  const userPill = user
+    ? `
+      <div class="header-user">
+        <img class="header-avatar" src="${user.avatar_url || ''}" alt="" />
+        <div class="header-user-meta">
+          <div class="header-user-name">${user.display_name || 'Connected'}</div>
+          <div class="header-user-reach">${(user.follower_count ?? 0).toLocaleString()} followers</div>
+        </div>
+      </div>
+    `
     : '';
-  const userLine = user
-    ? `<div class="user-pill">Logged in as ${user.display_name || user.open_id} (sandbox)</div>`
-    : '';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>${title} — Oubon Shop Automation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="shortcut icon" type="image/png" href="/favicon.png" />
+  <title>${title} · Oubon Shop Automation</title>
   <style>
     :root {
       --bg: #0a0a0f;
       --card: #14141c;
+      --card-elev: #1c1c26;
       --border: #2a2a3a;
       --accent: #25f4ee;
       --accent2: #fe2c55;
       --text: #f3f3f5;
       --muted: #9b9bb0;
+      --good: #4ade80;
     }
     * { box-sizing: border-box; }
     body {
@@ -113,78 +171,46 @@ function page({ title, scope, body, user }) {
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      line-height: 1.5;
     }
     header {
-      padding: 20px 32px;
+      padding: 14px 32px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      background: var(--card);
     }
-    header h1 { margin: 0; font-size: 22px; }
     header .brand { display: flex; align-items: center; gap: 12px; }
+    /* Logo image — must match the icon submitted to the TikTok Developer
+       Portal Basic Info (the cyan "O" PNG saved at ./public/favicon.png).
+       Previously this was a CSS gradient with a literal "O" character,
+       which caused an icon-mismatch rejection — the reviewer flagged that
+       the on-site logo didn't match the portal icon or the favicon. */
     header .brand .logo {
-      width: 36px; height: 36px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      color: #000; font-weight: 900; display: grid; place-items: center;
+      width: 32px; height: 32px; border-radius: 7px;
+      display: block;
     }
-    nav { display: flex; gap: 16px; }
-    nav a { color: var(--muted); text-decoration: none; padding: 6px 12px; border-radius: 6px; }
-    nav a:hover { background: var(--card); color: var(--text); }
-    .scope-banner {
-      background: linear-gradient(90deg, rgba(37,244,238,0.12), rgba(254,44,85,0.12));
-      border: 1px solid var(--accent);
-      padding: 12px 32px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+    header h1 { margin: 0; font-size: 17px; }
+    header nav { display: flex; gap: 4px; align-items: center; margin-left: 32px; }
+    header nav a {
+      color: var(--muted); text-decoration: none; padding: 8px 14px;
+      border-radius: 6px; font-size: 14px;
     }
-    .scope-banner code {
-      background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px;
-      color: var(--accent);
+    header nav a:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    header nav a.active { color: var(--text); background: rgba(37,244,238,0.1); }
+    .header-right { display: flex; align-items: center; gap: 16px; margin-left: auto; }
+    .header-user {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 12px 4px 4px;
+      background: var(--card-elev);
+      border: 1px solid var(--border);
+      border-radius: 99px;
     }
-    .user-pill {
-      background: var(--card); border: 1px solid var(--border);
-      padding: 6px 12px; border-radius: 6px; font-size: 13px;
-      color: var(--muted);
-    }
-    .why-box {
-      background: rgba(37,244,238,0.06);
-      border-left: 3px solid var(--accent);
-      padding: 12px 16px;
-      margin: 12px 0 24px 0;
-      font-size: 14px;
-      line-height: 1.5;
-      color: var(--text);
-    }
-    .why-box strong { color: var(--accent); }
-    .downstream-panel {
-      background: var(--bg);
-      border: 1px solid var(--accent2);
-      border-radius: 8px;
-      padding: 16px 20px;
-      margin: 16px 0 32px 0;
-      font-size: 14px;
-      line-height: 1.55;
-      position: relative;
-    }
-    .downstream-panel h4 { color: var(--accent2); font-size: 16px; }
-    .downstream-badge {
-      position: absolute;
-      top: -10px; right: 12px;
-      background: var(--bg);
-      color: var(--accent2);
-      padding: 2px 8px;
-      font-size: 11px;
-      border: 1px solid var(--accent2);
-      border-radius: 4px;
-    }
-    .downstream-badge code {
-      background: rgba(254,44,85,0.15);
-      padding: 1px 4px;
-      border-radius: 3px;
-      color: var(--accent2);
-    }
-    main { max-width: 900px; margin: 32px auto; padding: 0 32px; }
+    .header-avatar { width: 32px; height: 32px; border-radius: 50%; }
+    .header-user-name { font-size: 13px; font-weight: 600; }
+    .header-user-reach { font-size: 11px; color: var(--muted); }
+    main { max-width: 1100px; margin: 24px auto 0; padding: 0 32px 80px; }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
@@ -192,81 +218,190 @@ function page({ title, scope, body, user }) {
       padding: 24px;
       margin-bottom: 20px;
     }
-    h2 { margin-top: 0; }
+    h2 { margin-top: 0; font-size: 22px; }
+    h3 { margin-top: 24px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
     .btn {
       display: inline-block;
       background: linear-gradient(90deg, var(--accent), var(--accent2));
       color: #000;
-      padding: 12px 24px;
+      padding: 11px 22px;
       border-radius: 8px;
       text-decoration: none;
       font-weight: 700;
       border: none;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 14px;
+    }
+    .btn:disabled, .btn.disabled {
+      opacity: 0.4; cursor: not-allowed;
+      background: var(--card-elev); color: var(--muted);
     }
     .btn.secondary {
-      background: var(--card); color: var(--text);
+      background: var(--card-elev); color: var(--text);
       border: 1px solid var(--border);
     }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .stat { background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); }
-    .stat .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-    .stat .value { font-size: 24px; font-weight: 700; margin-top: 4px; }
-    .videos { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
-    .video { background: var(--bg); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-    .video img { width: 100%; aspect-ratio: 9/16; object-fit: cover; display: block; }
-    .video .meta { padding: 8px; font-size: 12px; }
+    .btn.sm { padding: 7px 14px; font-size: 13px; }
+    .product-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .product-card {
+      background: var(--card-elev);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .product-card img {
+      width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block;
+      background: var(--bg);
+    }
+    .product-card .body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+    .product-card .name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+    .product-card .price { color: var(--accent); font-weight: 700; font-size: 16px; }
+    .product-card .tagline { color: var(--muted); font-size: 13px; margin: 8px 0 12px; flex: 1; }
+    .product-card .tt-link {
+      font-size: 11px; color: var(--muted); text-decoration: none;
+      padding: 6px 10px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; display: inline-block; margin-bottom: 10px;
+    }
+    .product-card .tt-link:hover { color: var(--accent); }
+    .product-card .actions { display: flex; gap: 8px; }
+    .grid-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .stat {
+      background: var(--card-elev);
+      padding: 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .stat .label {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .stat .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+    .integration-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: var(--card-elev);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .avatar { width: 56px; height: 56px; border-radius: 50%; background: var(--border); }
+    .verified {
+      display: inline-block;
+      background: rgba(37,244,238,0.15);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-left: 6px;
+    }
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-pill.live { background: rgba(74,222,128,0.15); color: var(--good); }
+    .status-pill.draft { background: rgba(155,155,176,0.15); color: var(--muted); }
+    .status-pill.connected { background: rgba(74,222,128,0.15); color: var(--good); }
+    .form-row { margin-bottom: 16px; }
+    .form-row label {
+      display: block; color: var(--muted); font-size: 13px;
+      margin-bottom: 6px; font-weight: 500;
+    }
+    .form-row input[type=file],
+    .form-row input[type=text],
+    .form-row textarea,
+    .form-row select {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 12px; border-radius: 6px; width: 100%; font: inherit;
+    }
+    .form-row textarea { min-height: 80px; resize: vertical; }
+    .button-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; align-items: center; }
     .raw {
-      background: #050507; padding: 16px; border-radius: 8px;
+      background: #050507; padding: 14px; border-radius: 6px;
       font-family: 'SF Mono', Menlo, monospace; font-size: 12px;
       white-space: pre-wrap; word-break: break-word; color: var(--muted);
-      max-height: 280px; overflow: auto;
+      max-height: 240px; overflow: auto;
     }
-    .avatar { width: 64px; height: 64px; border-radius: 50%; vertical-align: middle; }
     .muted { color: var(--muted); font-size: 14px; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
-    form .form-row { margin-bottom: 12px; }
-    form input[type=file], form input[type=text] {
-      background: var(--bg); border: 1px solid var(--border); color: var(--text);
-      padding: 8px 12px; border-radius: 6px; width: 100%;
+    .small { font-size: 13px; }
+    table.campaigns { width: 100%; border-collapse: collapse; }
+    table.campaigns th, table.campaigns td {
+      text-align: left; padding: 12px 8px; border-bottom: 1px solid var(--border);
+      font-size: 14px;
     }
-    form label { display: block; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
-    .ok { color: var(--accent); }
-    .err { color: var(--accent2); }
+    table.campaigns th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    table.campaigns tr:last-child td { border-bottom: none; }
+    table.campaigns .campaign-product { display: flex; align-items: center; gap: 10px; }
+    table.campaigns .campaign-product img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; }
+    .flash {
+      padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;
+      border: 1px solid;
+    }
+    .flash.ok { background: rgba(74,222,128,0.08); border-color: rgba(74,222,128,0.3); color: var(--good); }
+    .flash.err { background: rgba(254,44,85,0.08); border-color: rgba(254,44,85,0.3); color: var(--accent2); }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 20px 32px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      margin-top: 48px;
+    }
+    footer a { color: var(--accent); text-decoration: none; margin-left: 16px; }
+    footer a:first-of-type { margin-left: 0; }
   </style>
 </head>
 <body>
   <header>
     <div class="brand">
-      <div class="logo">O</div>
+      <img class="logo" src="/favicon.png" alt="Oubon Shop Automation" />
       <h1>Oubon Shop Automation</h1>
     </div>
-    <nav>
-      <a href="/">Home</a>
-      ${user ? `<a href="/dashboard">Dashboard</a>` : ''}
-      ${user ? `<a href="/upload">Upload</a>` : ''}
-      ${user ? `<a href="/summary">Demo Summary</a>` : ''}
-      ${user ? `<a href="/logout">Logout</a>` : ''}
-    </nav>
+    ${user ? `
+      <nav>
+        ${navLink('/products', 'Products', 'products')}
+        ${navLink('/campaigns', 'Campaigns', 'campaigns')}
+        ${navLink('/settings/integrations', 'Settings', 'settings')}
+      </nav>
+    ` : ''}
+    <div class="header-right">
+      ${userPill}
+      ${user
+        ? `<a href="/logout" class="muted small" style="text-decoration: none;">Logout</a>`
+        : `<a href="/auth/login" class="btn sm">Sign in with TikTok</a>`
+      }
+    </div>
   </header>
-  ${scopeBanner}
-  ${userLine ? `<div style="padding: 8px 32px; background: var(--card); border-bottom: 1px solid var(--border);">${userLine}</div>` : ''}
   <main>
     ${body}
   </main>
-  <footer style="max-width: 900px; margin: 48px auto 32px; padding: 24px 32px 0; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; line-height: 1.6;">
-    <div style="display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: center;">
-      <div>
-        <strong style="color: var(--text);">Oubon Shop Automation</strong> — TikTok integration demo (sandbox).
-        Owned and operated by Stephen Ponce.
-      </div>
-      <div style="display: flex; gap: 16px;">
-        <a href="/permissions" style="color: var(--accent); text-decoration: none;">Permissions</a>
-        <a href="/terms" style="color: var(--accent); text-decoration: none;">Terms of Service</a>
-        <a href="/privacy" style="color: var(--accent); text-decoration: none;">Privacy Policy</a>
-        <a href="mailto:sponce96@icloud.com" style="color: var(--accent); text-decoration: none;">Contact</a>
-      </div>
+  <footer>
+    <div>© 2026 Oubon Shop Automation. All rights reserved.</div>
+    <div>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+      <a href="/permissions">Permissions</a>
+      <a href="mailto:sponce96@icloud.com">Contact</a>
     </div>
   </footer>
 </body>
@@ -275,50 +410,49 @@ function page({ title, scope, body, user }) {
 
 // --- Routes ----------------------------------------------------------
 
-// Landing page
+// Public landing page
 app.get('/', (req, res) => {
-  const user = req.session.user;
-  if (user) return res.redirect('/dashboard');
+  if (req.session.user) return res.redirect('/products');
 
   res.send(page({
-    title: 'Welcome',
+    title: 'Sign in',
     body: `
+      <div class="card" style="text-align: center; padding: 56px 32px;">
+        <h2 style="font-size: 32px; margin-bottom: 12px;">
+          TikTok posting on autopilot for your Shopify store.
+        </h2>
+        <p class="muted" style="font-size: 17px; max-width: 540px; margin: 0 auto 32px;">
+          Oubon Shop Automation connects your TikTok account to your
+          Shopify store, then drafts and publishes promotional videos
+          for products you list — so you can spend time on the products,
+          not the posting.
+        </p>
+        <a class="btn" href="/auth/login">Sign in with TikTok</a>
+        <p class="muted" style="margin-top: 24px; font-size: 13px;">
+          By signing in you agree to our
+          <a href="/terms" style="color: var(--accent);">Terms</a> and
+          <a href="/privacy" style="color: var(--accent);">Privacy Policy</a>.
+        </p>
+      </div>
+
       <div class="card">
-        <h2>Oubon Shop Automation</h2>
-        <p class="muted">
-          Automates product discovery for Shopify dropshipping merchants
-          using TikTok creator presence as a winner-proof signal. To
-          analyze trending products in your TikTok account, connect your
-          TikTok via Login Kit below.
-        </p>
-        <p class="muted">
-          This demo runs against the TikTok <strong>Sandbox</strong>
-          environment for app review purposes.
-        </p>
-        <div class="row">
-          <a class="btn" href="/auth/login">Continue with TikTok</a>
-          <a class="btn secondary" href="/permissions">View permissions requested</a>
-        </div>
-        <p class="muted" style="margin-top: 16px;">
-          By continuing you agree to the
-          <a href="/terms">Terms of Service</a> and
-          <a href="/privacy">Privacy Policy</a>.
-          Five scopes are requested: <code>user.info.basic</code>,
-          <code>user.info.profile</code>, <code>user.info.stats</code>,
-          <code>video.upload</code>, <code>video.publish</code>.
-        </p>
+        <h3 style="margin-top: 0;">How it works</h3>
+        <ol style="color: var(--text); line-height: 1.8;">
+          <li><strong>Sign in with TikTok.</strong> One-click OAuth links your TikTok creator account to your Oubon Shop dashboard.</li>
+          <li><strong>Open your product catalog.</strong> Pick a product you want to promote.</li>
+          <li><strong>Create a campaign.</strong> Upload a short promotional video, then choose: save it as a TikTok draft to review, or publish directly to your TikTok profile.</li>
+          <li><strong>Track every campaign.</strong> Every video posted shows up in your Campaigns log with status, publish ID, and timestamp.</li>
+        </ol>
       </div>
     `,
   }));
 });
 
-// Step 1 — Login Kit: kick off OAuth flow
+// OAuth start
 app.get('/auth/login', (req, res) => {
   const state = crypto.randomBytes(16).toString('hex');
   req.session.oauth_state = state;
 
-  // TikTok OAuth authorize URL. `scope` is the comma-separated list
-  // of scopes we want — Login Kit consent screen will show each one.
   const params = new URLSearchParams({
     client_key: CLIENT_KEY,
     response_type: 'code',
@@ -326,33 +460,27 @@ app.get('/auth/login', (req, res) => {
     redirect_uri: REDIRECT_URI,
     state,
   });
-  const authorizeUrl = `${AUTH_BASE}/v2/auth/authorize/?${params.toString()}`;
-  console.log('\n[Login Kit] Redirecting user to TikTok authorize URL:');
-  console.log(authorizeUrl);
-  console.log('');
-  res.redirect(authorizeUrl);
+  res.redirect(`${AUTH_BASE}/v2/auth/authorize/?${params.toString()}`);
 });
 
-// Step 2 — Login Kit callback: exchange code for access token
+// OAuth callback — also pre-fetches /v2/user/info/ so the header pill
+// is populated everywhere immediately.
 app.get('/auth/tiktok/callback', async (req, res) => {
   const { code, state, error, error_description } = req.query;
 
   if (error) {
     return res.send(page({
-      title: 'Login failed',
-      body: `<div class="card"><h2>❌ Login error</h2>
+      title: 'Sign-in failed',
+      body: `<div class="card"><h2>Sign-in failed</h2>
         <p class="err">${error}: ${error_description || ''}</p>
-        <a class="btn secondary" href="/">Back home</a></div>`,
+        <a class="btn secondary" href="/">Back to home</a></div>`,
     }));
   }
-  if (!code) {
-    return res.status(400).send('Missing code');
-  }
+  if (!code) return res.status(400).send('Missing authorization code');
   if (!state || state !== req.session.oauth_state) {
-    return res.status(400).send('State mismatch — possible CSRF');
+    return res.status(400).send('State mismatch');
   }
 
-  // Exchange the authorization code for an access token
   try {
     const tokenResp = await axios.post(
       `${API_BASE}/v2/oauth/token/`,
@@ -372,335 +500,308 @@ app.get('/auth/tiktok/callback', async (req, res) => {
     }
 
     req.session.tokens = { access_token, refresh_token, open_id, scope, expires_in };
-    console.log('[Login Kit] Token exchange success. Scopes granted:', scope);
 
-    res.redirect('/dashboard');
+    // Pre-fetch user info so the header pill is ready
+    try {
+      const fields = [
+        'open_id', 'union_id', 'avatar_url', 'display_name',
+        'bio_description', 'profile_deep_link', 'is_verified', 'username',
+        'follower_count', 'following_count', 'likes_count', 'video_count',
+      ].join(',');
+      const u = await axios.get(`${API_BASE}/v2/user/info/?fields=${fields}`, {
+        headers: { Authorization: `Bearer ${access_token}` },
+      });
+      req.session.user = u.data?.data?.user || {};
+      req.session.user_raw = u.data;
+    } catch (e) {
+      console.warn('[user.info pre-fetch] failed, will retry on first page:', e.message);
+    }
+
+    // Land on the product catalog — the real product surface.
+    res.redirect('/products');
   } catch (e) {
-    console.error('[Login Kit] Token exchange failed:', e.response?.data || e.message);
+    console.error('[OAuth] Token exchange failed:', e.response?.data || e.message);
     res.status(500).send(page({
-      title: 'Token exchange failed',
-      body: `<div class="card"><h2>❌ Token exchange failed</h2>
+      title: 'Sign-in failed',
+      body: `<div class="card"><h2>Couldn't complete sign-in</h2>
         <pre class="raw">${JSON.stringify(e.response?.data || e.message, null, 2)}</pre>
-        <a class="btn secondary" href="/">Back home</a></div>`,
+        <a class="btn secondary" href="/">Back to home</a></div>`,
     }));
   }
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/'));
 });
 
-// Helper: bail to login if no token
 function requireAuth(req, res, next) {
   if (!req.session.tokens?.access_token) return res.redirect('/');
   next();
 }
 
-// Step 3 — Dashboard: demonstrates user.info.basic + user.info.profile + user.info.stats
-//
-// Calls /v2/user/info/ once with a `fields` parameter covering all three
-// scopes, then renders the data clearly labeled so each scope is visible.
-app.get('/dashboard', requireAuth, async (req, res) => {
-  const { access_token } = req.session.tokens;
+// Product catalog — the post-OAuth landing page.
+// Each product card pulls in user.info.profile data: the profile_deep_link
+// is rendered as the "View seller on TikTok" link so buyers can verify
+// the seller's TikTok presence.
+app.get('/products', requireAuth, (req, res) => {
+  const user = req.session.user || {};
+  const profileLink = user.profile_deep_link || '';
+  const username = user.username || 'seller';
 
-  // Field list maps to scopes:
-  //   user.info.basic    → open_id, union_id, avatar_url, display_name
-  //   user.info.profile  → bio_description, profile_deep_link, is_verified, username
-  //   user.info.stats    → follower_count, following_count, likes_count, video_count
-  const fields = [
-    // user.info.basic
-    'open_id', 'union_id', 'avatar_url', 'display_name',
-    // user.info.profile
-    'bio_description', 'profile_deep_link', 'is_verified', 'username',
-    // user.info.stats
-    'follower_count', 'following_count', 'likes_count', 'video_count',
-  ].join(',');
-
-  try {
-    const resp = await axios.get(`${API_BASE}/v2/user/info/?fields=${fields}`, {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
-    const data = resp.data?.data?.user || {};
-    req.session.user = data;
-
-    // === Downstream UI helpers — actually CONSUME the scope data,
-    // === not just describe it. These panels make the demo show the
-    // === reviewer how each scope's data drives the product.
-
-    // (a) Monetization Eligibility — uses user.info.profile fields
-    const hasProfileUrl = !!data.profile_deep_link;
-    const isVerified    = !!data.is_verified;
-    const followers     = Number(data.follower_count ?? 0);
-    let eligTier, eligAction;
-    if (isVerified) {
-      eligTier   = 'VERIFIED';
-      eligAction = 'Eligible for Creator Marketplace. Enable monetization features in the Oubon dashboard.';
-    } else if (followers >= 10000) {
-      eligTier   = 'GROWING';
-      eligAction = 'Apply for TikTok Creator Fund — you meet the 10k follower threshold. Verification will unlock tier 1 monetization.';
-    } else {
-      eligTier   = 'STARTER';
-      eligAction = `Keep posting consistently — ${10000 - followers} more followers until Creator Fund eligibility.`;
-    }
-
-    // (b) Ad Spend Recommendation — uses user.info.stats fields
-    let spendTier, spendBudget, spendFormat, spendImpr, nextThreshold;
-    if (followers >= 100000) {
-      spendTier = 'MACRO';   spendBudget = '$200+/day';   spendFormat = 'multi-creative A/B testing';  spendImpr = '20k+ impressions/day';
-      nextThreshold = null;
-    } else if (followers >= 10000) {
-      spendTier = 'MID';     spendBudget = '$75–$150/day'; spendFormat = 'lifestyle-driven content';   spendImpr = '5k–15k impressions/day';
-      nextThreshold = `When you cross 100k followers you'll unlock MACRO tier ($200+/day budget, multi-creative A/B testing).`;
-    } else if (followers >= 1000) {
-      spendTier = 'MICRO';   spendBudget = '$20–$50/day';  spendFormat = 'product demo format';        spendImpr = '1k–3k impressions/day';
-      nextThreshold = `When you cross 10k followers you'll unlock MID tier ($75–$150/day budget, lifestyle content).`;
-    } else {
-      spendTier = 'NANO';    spendBudget = '$5–$15/day';   spendFormat = 'educational tutorial format'; spendImpr = '200–800 impressions/day';
-      nextThreshold = `When you cross 1k followers you'll unlock MICRO tier ($20–$50/day budget, product demos).`;
-    }
-    const likes = Number(data.likes_count ?? 0);
-    const videos = Number(data.video_count ?? 0);
-    const engagementSignal = videos > 0
-      ? `${likes.toLocaleString()} total likes across ${videos} video${videos === 1 ? '' : 's'} → avg ${Math.round(likes / videos).toLocaleString()} likes per video.`
-      : 'No videos posted yet — first uploads will calibrate the engagement signal.';
-
-    res.send(page({
-      title: 'Dashboard',
-      scope: 'user.info.basic + user.info.profile + user.info.stats',
-      user: data,
-      body: `
-        <div class="card">
-          <h2>Connected TikTok Account</h2>
-          <p class="muted">Below shows data fetched from <code>GET /v2/user/info/</code>
-          using all three identity scopes. Each section is labeled with the
-          scope that authorized it.</p>
-
-          <h3>📍 Scope: <code>user.info.basic</code></h3>
-          <p>
-            <img class="avatar" src="${data.avatar_url || ''}" alt="avatar" />
-            <strong>${data.display_name || '(no name)'}</strong><br/>
-            <span class="muted">open_id: ${data.open_id || ''}</span><br/>
-            <span class="muted">union_id: ${data.union_id || ''}</span>
-          </p>
-          <div class="why-box">
-            <strong>Why Oubon Shop Automation needs this:</strong>
-            We display the connected creator's identity in the Oubon Shop
-            Automation dashboard so multiple users managing the same
-            dropshipping store can see who's authorized to post on TikTok.
-          </div>
-
-          <h3>📍 Scope: <code>user.info.profile</code></h3>
-          <p>
-            <strong>Username:</strong> @${data.username || '(none)'}<br/>
-            <strong>Verified:</strong> ${data.is_verified ? '✓ Verified' : 'No'}<br/>
-            <strong>Profile URL:</strong> ${data.profile_deep_link
-              ? `<a href="${data.profile_deep_link}" target="_blank">${data.profile_deep_link}</a>` : '(none)'}<br/>
-            <strong>Bio:</strong> ${data.bio_description || '(empty)'}
-          </p>
-          <div class="why-box">
-            <strong>Why Oubon Shop Automation needs this:</strong>
-            We read the verified status and profile URL to determine whether
-            the connected account meets TikTok's monetization criteria, and
-            to deep-link customers to the seller's TikTok shop from Oubon
-            Shop product pages.
-          </div>
-
-          <div class="downstream-panel">
-            <div class="downstream-badge">← This panel uses <code>user.info.profile</code></div>
-            <h4 style="margin: 0 0 12px 0;">💰 Monetization Eligibility Check</h4>
-            <p>
-              ${hasProfileUrl
-                ? `✓ Profile URL configured`
-                : `⚠ Profile URL missing — set up a public TikTok URL for customer deep-linking`}<br/>
-              ${isVerified
-                ? `✓ Verified account — eligible for tier 1 monetization`
-                : `⚠ Not verified — TikTok requires 10k+ followers + clean content for verification`}
-            </p>
-            <p style="margin: 12px 0 4px 0;"><strong>Eligibility tier:</strong>
-              <span style="color: var(--accent); font-weight: 600;">${eligTier}</span>
-            </p>
-            <p class="muted" style="margin: 0;"><strong>Recommended action:</strong> ${eligAction}</p>
-          </div>
-
-          <h3>📍 Scope: <code>user.info.stats</code></h3>
-          <div class="grid">
-            <div class="stat"><div class="label">Followers</div><div class="value">${data.follower_count ?? 0}</div></div>
-            <div class="stat"><div class="label">Following</div><div class="value">${data.following_count ?? 0}</div></div>
-            <div class="stat"><div class="label">Total Likes</div><div class="value">${data.likes_count ?? 0}</div></div>
-            <div class="stat"><div class="label">Total Videos</div><div class="value">${data.video_count ?? 0}</div></div>
-          </div>
-          <div class="why-box">
-            <strong>Why Oubon Shop Automation needs this:</strong>
-            We use follower count, engagement totals, and video count to
-            recommend ad spend tiers and creative angles. A creator with
-            50k+ followers gets a different campaign suggestion than a
-            creator just starting out.
-          </div>
-
-          <div class="downstream-panel">
-            <div class="downstream-badge">← This panel uses <code>user.info.stats</code></div>
-            <h4 style="margin: 0 0 12px 0;">📊 Ad Spend Recommendation</h4>
-            <p style="margin: 0 0 8px 0;"><strong>Tier:</strong>
-              <span style="color: var(--accent); font-weight: 600;">${spendTier}</span>
-              &nbsp;(${followers.toLocaleString()} follower${followers === 1 ? '' : 's'})
-            </p>
-            <p style="margin: 0 0 4px 0;"><strong>Suggested budget:</strong> ${spendBudget}</p>
-            <p style="margin: 0 0 4px 0;"><strong>Creative format:</strong> ${spendFormat}</p>
-            <p style="margin: 0 0 12px 0;"><strong>Projected reach:</strong> ${spendImpr}</p>
-            <p class="muted" style="margin: 0 0 8px 0;"><strong>Engagement signal:</strong> ${engagementSignal}</p>
-            ${nextThreshold
-              ? `<p class="muted" style="margin: 0;">→ ${nextThreshold}</p>`
-              : `<p class="muted" style="margin: 0;">→ You're at the top tier. Focus on creative diversification.</p>`}
-          </div>
-
-          <div class="row">
-            <a class="btn" href="/upload">Next: upload a video →</a>
-          </div>
+  const cards = PRODUCTS.map(p => `
+    <div class="product-card">
+      <img src="${p.image}" alt="${p.name}" loading="lazy" />
+      <div class="body">
+        <div class="name">${p.name}</div>
+        <div class="price">$${p.price.toFixed(2)}</div>
+        <div class="tagline">${p.tagline}</div>
+        ${profileLink
+          ? `<a class="tt-link" href="${profileLink}" target="_blank" rel="noopener">View seller @${username} on TikTok ↗</a>`
+          : ''}
+        <div class="actions">
+          <a class="btn sm" href="/campaigns/new?product=${p.id}">Promote on TikTok</a>
+          <a class="btn secondary sm" href="/products/${p.id}">Details</a>
         </div>
+      </div>
+    </div>
+  `).join('');
 
-        <details class="card"><summary class="muted">Raw API response</summary>
-          <pre class="raw">${JSON.stringify(resp.data, null, 2)}</pre>
-        </details>
-      `,
-    }));
-  } catch (e) {
-    console.error('[user.info] fetch failed:', e.response?.data || e.message);
-    res.status(500).send(page({
-      title: 'User info failed',
-      body: `<div class="card"><h2>❌ user.info fetch failed</h2>
-        <pre class="raw">${JSON.stringify(e.response?.data || e.message, null, 2)}</pre>
-        <a class="btn secondary" href="/">Back home</a></div>`,
-    }));
-  }
+  res.send(page({
+    title: 'Products',
+    user,
+    active: 'products',
+    body: `
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 8px;">
+          <div>
+            <h2 style="margin: 0;">Your Shopify Products</h2>
+            <p class="muted" style="margin: 4px 0 0;">Pick a product to create a TikTok promotional campaign for it.</p>
+          </div>
+          <div class="status-pill connected">● TikTok connected</div>
+        </div>
+        <div class="product-grid" style="margin-top: 20px;">${cards}</div>
+      </div>
+    `,
+  }));
 });
 
-// Step 4 — upload form: render the page that exercises video.upload + video.publish
-app.get('/upload', requireAuth, (req, res) => {
+// Single-product detail page.
+app.get('/products/:id', requireAuth, (req, res) => {
+  const user = req.session.user || {};
+  const product = findProduct(req.params.id);
+  if (!product) {
+    return res.status(404).send(page({
+      title: 'Product not found',
+      user,
+      active: 'products',
+      body: `<div class="card"><h2>Product not found</h2><a class="btn secondary" href="/products">Back to catalog</a></div>`,
+    }));
+  }
+
+  const profileLink = user.profile_deep_link || '';
+  const username = user.username || 'seller';
+
+  res.send(page({
+    title: product.name,
+    user,
+    active: 'products',
+    body: `
+      <a href="/products" class="muted small" style="text-decoration: none;">← Back to products</a>
+      <div class="card" style="margin-top: 12px;">
+        <div style="display: grid; grid-template-columns: 320px 1fr; gap: 32px;">
+          <img src="${product.image}" alt="${product.name}" style="width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px;" />
+          <div>
+            <h2 style="margin-top: 0;">${product.name}</h2>
+            <div style="font-size: 22px; color: var(--accent); font-weight: 700; margin-bottom: 16px;">$${product.price.toFixed(2)}</div>
+            <p>${product.description}</p>
+            ${profileLink
+              ? `<p class="small"><a href="${profileLink}" target="_blank" rel="noopener" style="color: var(--accent);">View seller @${username} on TikTok ↗</a></p>`
+              : ''}
+            <div class="button-row">
+              <a class="btn" href="/campaigns/new?product=${product.id}">Promote on TikTok →</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    `,
+  }));
+});
+
+// Campaign log — list of campaigns created in this session, with
+// status driven by which scope was exercised.
+app.get('/campaigns', requireAuth, (req, res) => {
+  const user = req.session.user || {};
+  const campaigns = req.session.campaigns || [];
+
+  const rows = campaigns.length === 0
+    ? `<tr><td colspan="5" class="muted" style="padding: 24px; text-align: center;">No campaigns yet. Pick a product from your catalog to create one.</td></tr>`
+    : campaigns.slice().reverse().map(c => {
+        const product = findProduct(c.product_id) || { name: c.product_id, image: '' };
+        const statusPill = c.mode === 'publish'
+          ? `<span class="status-pill live">● Live on @${user.username || 'creator'}</span>`
+          : `<span class="status-pill draft">● Draft on TikTok</span>`;
+        const scope = c.mode === 'publish' ? 'video.publish' : 'video.upload';
+        return `
+          <tr>
+            <td>
+              <div class="campaign-product">
+                <img src="${product.image}" alt="" />
+                <div>
+                  <div style="font-weight: 600;">${product.name}</div>
+                  <div class="muted" style="font-size: 12px;">${c.title || '(no caption)'}</div>
+                </div>
+              </div>
+            </td>
+            <td>${statusPill}</td>
+            <td><code style="font-size: 11px;">${scope}</code></td>
+            <td><code style="font-size: 11px;">${c.publish_id}</code></td>
+            <td class="muted small">${new Date(c.created_at).toLocaleString()}</td>
+          </tr>
+        `;
+      }).join('');
+
+  res.send(page({
+    title: 'Campaigns',
+    user,
+    active: 'campaigns',
+    body: `
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: end; margin-bottom: 16px;">
+          <div>
+            <h2 style="margin: 0;">Campaigns</h2>
+            <p class="muted" style="margin: 4px 0 0;">Every video you've posted to TikTok through Oubon Shop Automation.</p>
+          </div>
+          <a class="btn sm" href="/products">+ New from product catalog</a>
+        </div>
+        <table class="campaigns">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Status</th>
+              <th>Scope</th>
+              <th>Publish ID</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `,
+  }));
+});
+
+// New campaign form. Pre-fills with the selected product if `?product=`
+// is passed. Disables "Publish now" for accounts under 1k followers
+// (this is where user.info.stats visibly gates the UI).
+app.get('/campaigns/new', requireAuth, (req, res) => {
   const flash = req.session.flash;
   req.session.flash = null;
 
-  // === Suggested caption uses connected user's follower_count
-  // === (user.info.stats) — proves the upload UI is wired to scope data.
-  const userFollowers = Number(req.session.user?.follower_count ?? 0);
-  const suggestedCaption =
-    `Smart home product review for my ${userFollowers.toLocaleString()}-strong fam! Check the link in bio.`;
+  const user = req.session.user || {};
+  const followers = Number(user.follower_count ?? 0);
+  const canDirectPublish = followers >= 1000;
 
-  // Privacy options shared by both forms.
-  const privacySelect = `
-    <select name="privacy_level" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px;">
-      <option value="SELF_ONLY">SELF_ONLY (private — recommended for sandbox demo)</option>
-      <option value="MUTUAL_FOLLOW_FRIENDS">MUTUAL_FOLLOW_FRIENDS</option>
-      <option value="PUBLIC_TO_EVERYONE">PUBLIC_TO_EVERYONE</option>
-    </select>
-  `;
+  const product = req.query.product ? findProduct(req.query.product) : null;
+  const defaultTitle = product ? `${product.name} — ${product.tagline}` : '';
 
   res.send(page({
-    title: 'Upload',
-    user: req.session.user,
+    title: 'New Campaign',
+    user,
+    active: 'campaigns',
     body: `
-      ${flash ? `<div class="card"><p class="${flash.ok ? 'ok' : 'err'}">${flash.message}</p></div>` : ''}
+      ${flash ? `<div class="flash ${flash.ok ? 'ok' : 'err'}">${flash.message}</div>` : ''}
 
-      <!-- ============ SECTION 1: video.upload (draft) ============ -->
-      <div class="card">
-        <div class="scope-banner" style="margin: -24px -24px 16px -24px; border-radius: 8px 8px 0 0;">
-          📍 NOW DEMONSTRATING SCOPE: <code>video.upload</code>
-        </div>
-        <h2>Upload as DRAFT</h2>
-        <p class="muted">
-          Calls <code>POST /v2/post/publish/inbox/video/init/</code> with the
-          <code>video.upload</code> scope. The video lands in the connected
-          user's TikTok drafts where they can edit it before publishing.
-        </p>
-        <div class="why-box">
-          <strong>What this scope does for the seller:</strong>
-          Sellers can stage promotional videos as drafts in their TikTok
-          account, then edit captions and hashtags in TikTok before going
-          live.
-        </div>
+      <a href="${product ? `/products/${product.id}` : '/products'}" class="muted small" style="text-decoration: none;">← Back</a>
 
-        <form method="post" action="/upload" enctype="multipart/form-data">
-          <input type="hidden" name="action" value="upload" />
+      <div class="card" style="margin-top: 12px;">
+        <h2 style="margin-bottom: 4px;">New Campaign${product ? ` · ${product.name}` : ''}</h2>
+        <p class="muted">Upload a short promotional video. You can save it as a draft to review inside TikTok, or publish it directly to your profile.</p>
+
+        ${product ? `
+          <div class="integration-row" style="margin-top: 16px;">
+            <img src="${product.image}" alt="" style="width: 56px; height: 56px; border-radius: 8px; object-fit: cover;" />
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">${product.name}</div>
+              <div class="muted small">$${product.price.toFixed(2)} · ${product.tagline}</div>
+            </div>
+          </div>
+        ` : ''}
+
+        <form method="post" action="/campaigns/new" enctype="multipart/form-data" style="margin-top: 24px;">
+          <input type="hidden" name="product_id" value="${product ? product.id : ''}" />
+
           <div class="form-row">
-            <label>Video file (mp4/mov, ≤ 50MB)</label>
+            <label>Video file <span class="muted">(.mp4 or .mov, up to 50 MB)</span></label>
             <input type="file" name="video" accept="video/mp4,video/quicktime" required />
           </div>
-          <div class="form-row">
-            <label>Post caption <span style="font-size: 11px; color: var(--accent2); margin-left: 8px;">← pre-filled from <code>user.info.stats</code> follower_count</span></label>
-            <input type="text" name="title" value="${suggestedCaption}" placeholder="Demo post from Oubon Shop Automation" />
-          </div>
-          <div class="row">
-            <button class="btn" type="submit">video.upload (save as draft)</button>
-          </div>
-        </form>
-      </div>
 
-      <!-- ============ SECTION 2: video.publish (direct) ============ -->
-      <div class="card">
-        <div class="scope-banner" style="margin: -24px -24px 16px -24px; border-radius: 8px 8px 0 0;">
-          📍 NOW DEMONSTRATING SCOPE: <code>video.publish</code>
-        </div>
-        <h2>Publish DIRECTLY</h2>
-        <p class="muted">
-          Calls <code>POST /v2/post/publish/video/init/</code> with the
-          <code>video.publish</code> scope. The video posts straight to the
-          connected user's profile — no draft step.
-        </p>
-        <div class="why-box">
-          <strong>What this scope does for the seller:</strong>
-          When a campaign is approved by the seller, Oubon Shop Automation
-          auto-publishes the promotional video directly to TikTok without
-          manual intervention.
-        </div>
+          <div class="form-row">
+            <label>Caption</label>
+            <textarea name="title" placeholder="A short caption that will accompany your TikTok post.">${defaultTitle}</textarea>
+          </div>
 
-        <form method="post" action="/upload" enctype="multipart/form-data">
-          <input type="hidden" name="action" value="publish" />
           <div class="form-row">
-            <label>Video file (mp4/mov, ≤ 50MB)</label>
-            <input type="file" name="video" accept="video/mp4,video/quicktime" required />
+            <label>Privacy (applies to direct publishing only)</label>
+            <select name="privacy_level">
+              <option value="SELF_ONLY">Only me</option>
+              <option value="MUTUAL_FOLLOW_FRIENDS">Mutual follow friends</option>
+              <option value="PUBLIC_TO_EVERYONE">Public</option>
+            </select>
           </div>
-          <div class="form-row">
-            <label>Post caption <span style="font-size: 11px; color: var(--accent2); margin-left: 8px;">← pre-filled from <code>user.info.stats</code> follower_count</span></label>
-            <input type="text" name="title" value="${suggestedCaption}" placeholder="Demo post from Oubon Shop Automation" />
+
+          <div class="button-row">
+            <button class="btn secondary" type="submit" name="action" value="upload">
+              Save to TikTok drafts
+            </button>
+            <button class="btn ${canDirectPublish ? '' : 'disabled'}" type="submit" name="action" value="publish" ${canDirectPublish ? '' : 'disabled'}>
+              ${canDirectPublish ? 'Publish to TikTok now' : 'Publish to TikTok now (locked)'}
+            </button>
           </div>
-          <div class="form-row">
-            <label>Privacy</label>
-            ${privacySelect}
-          </div>
-          <div class="row">
-            <button class="btn secondary" type="submit">video.publish (post directly)</button>
-          </div>
+
+          <p class="muted small" style="margin-top: 16px;">
+            ${canDirectPublish
+              ? `Direct publishing is enabled for your account (${followers.toLocaleString()} followers).`
+              : `Direct publishing is locked because @${user.username || 'your account'} has ${followers.toLocaleString()} followers. Accounts under 1,000 followers save drafts for review first. Reach 1k followers to unlock direct publish.`}
+          </p>
         </form>
       </div>
     `,
   }));
 });
 
-// Step 5b — handle the upload + publish form post
-app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
+// Handle the campaign POST — exercises video.upload or video.publish
+// and appends a row to the session's campaigns array, which is what
+// the /campaigns page renders.
+app.post('/campaigns/new', requireAuth, upload.single('video'), async (req, res) => {
   const { access_token } = req.session.tokens;
-  const { action, title = '', privacy_level = 'SELF_ONLY' } = req.body;
+  const { action, title = '', privacy_level = 'SELF_ONLY', product_id } = req.body;
   const file = req.file;
 
   if (!file) {
-    req.session.flash = { ok: false, message: 'No file uploaded' };
-    return res.redirect('/upload');
+    req.session.flash = { ok: false, message: 'No video file was attached.' };
+    return res.redirect(`/campaigns/new${product_id ? `?product=${product_id}` : ''}`);
+  }
+
+  const user = req.session.user || {};
+  const followers = Number(user.follower_count ?? 0);
+  if (action === 'publish' && followers < 1000) {
+    try { fs.unlinkSync(file.path); } catch {}
+    req.session.flash = { ok: false, message: 'Direct publishing is locked for accounts under 1,000 followers. Save as draft instead.' };
+    return res.redirect(`/campaigns/new${product_id ? `?product=${product_id}` : ''}`);
   }
 
   const videoSize = fs.statSync(file.path).size;
 
   try {
-    // STEP 1: init the upload. The endpoint differs by action.
-    //   - video.upload   → /v2/post/publish/inbox/video/init/   (draft)
-    //   - video.publish  → /v2/post/publish/video/init/          (direct post)
-    const initUrl = action === 'publish'
+    const isDirectPublish = action === 'publish';
+    const initUrl = isDirectPublish
       ? `${API_BASE}/v2/post/publish/video/init/`
       : `${API_BASE}/v2/post/publish/inbox/video/init/`;
 
-    const initPayload = action === 'publish'
+    const initPayload = isDirectPublish
       ? {
           post_info: {
-            title: title || 'Demo post from Oubon Shop Automation',
+            title: title || 'New product video',
             privacy_level,
             disable_duet: false,
             disable_comment: false,
@@ -732,7 +833,6 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       throw new Error('Init returned no publish_id or upload_url: ' + JSON.stringify(initResp.data));
     }
 
-    // STEP 2: actually upload the video bytes to the upload_url
     const videoBuffer = fs.readFileSync(file.path);
     await axios.put(upload_url, videoBuffer, {
       headers: {
@@ -744,180 +844,203 @@ app.post('/upload', requireAuth, upload.single('video'), async (req, res) => {
       maxContentLength: Infinity,
     });
 
-    // Clean up the temp file
     try { fs.unlinkSync(file.path); } catch {}
 
-    const scopeName = action === 'publish' ? 'video.publish' : 'video.upload';
+    // Append to campaign log
+    req.session.campaigns = req.session.campaigns || [];
+    req.session.campaigns.push({
+      product_id: product_id || null,
+      title,
+      mode: isDirectPublish ? 'publish' : 'upload',
+      publish_id,
+      privacy_level: isDirectPublish ? privacy_level : null,
+      created_at: Date.now(),
+    });
+
     req.session.flash = {
       ok: true,
-      message: `✅ ${scopeName} succeeded. publish_id=${publish_id}${action === 'publish' ? ' — Direct post submitted to TikTok.' : ' — Saved as draft on user account; open TikTok to publish.'}`,
+      message: isDirectPublish
+        ? `Campaign published to @${user.username || 'your account'}. Publish ID: ${publish_id}. See your Campaigns log.`
+        : `Campaign saved as a draft on TikTok. Publish ID: ${publish_id}. Open TikTok to finalize the post.`,
     };
-    req.session.completedScopes = req.session.completedScopes || {};
-    req.session.completedScopes[scopeName] = true;
-    res.redirect('/summary');
+    res.redirect('/campaigns');
   } catch (e) {
     try { fs.unlinkSync(file.path); } catch {}
     console.error(`[${action}] failed:`, e.response?.data || e.message);
     req.session.flash = {
       ok: false,
-      message: `❌ ${action} failed: ${JSON.stringify(e.response?.data || e.message)}`,
+      message: `Campaign ${action === 'publish' ? 'publish' : 'draft'} failed: ${JSON.stringify(e.response?.data || e.message)}`,
     };
-    res.redirect('/upload');
+    res.redirect(`/campaigns/new${product_id ? `?product=${product_id}` : ''}`);
   }
 });
 
-// Step 6 — Demo Summary: end-of-flow recap with checkmarks per scope.
-// All identity scopes are marked done once the dashboard has been visited
-// (because /dashboard issues the single /v2/user/info/ call that returns
-// fields gated by all three). Content Posting scopes flip to done after
-// the corresponding form submission succeeds (see completedScopes above).
-app.get('/summary', requireAuth, (req, res) => {
-  const completed = req.session.completedScopes || {};
-  const flash = req.session.flash;
-  req.session.flash = null;
+// Settings → Integrations — secondary surface. Still shows the
+// connected TikTok account in detail so users can verify the
+// connection and see Reach metrics.
+app.get('/settings/integrations', requireAuth, async (req, res) => {
+  const { access_token } = req.session.tokens;
 
-  // The dashboard route caches the user blob; if we have it, all three
-  // identity scopes have been demonstrated.
-  const identityDone = !!req.session.user;
+  // Refresh on demand
+  try {
+    const fields = [
+      'open_id', 'union_id', 'avatar_url', 'display_name',
+      'bio_description', 'profile_deep_link', 'is_verified', 'username',
+      'follower_count', 'following_count', 'likes_count', 'video_count',
+    ].join(',');
+    const resp = await axios.get(`${API_BASE}/v2/user/info/?fields=${fields}`, {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+    const data = resp.data?.data?.user || {};
+    req.session.user = data;
+    req.session.user_raw = resp.data;
 
-  const scopes = [
-    {
-      name: 'user.info.basic',
-      done: identityDone,
-      desc: 'Connected creator identity (avatar, display name, open_id). Shown on the Dashboard so multi-user dropshipping stores can see who is authorized to post.',
-    },
-    {
-      name: 'user.info.profile',
-      done: identityDone,
-      desc: 'Verified status and profile URL. Used to gate monetization features and deep-link customers to the seller\'s TikTok shop from Oubon Shop product pages.',
-    },
-    {
-      name: 'user.info.stats',
-      done: identityDone,
-      desc: 'Follower / engagement / video counts. Used to recommend ad spend tiers and creative angles per connected creator.',
-    },
-    {
-      name: 'video.upload',
-      done: !!completed['video.upload'],
-      desc: 'Upload promotional video to the seller\'s TikTok as a DRAFT so they can edit caption and hashtags before publishing.',
-    },
-    {
-      name: 'video.publish',
-      done: !!completed['video.publish'],
-      desc: 'Publish an approved campaign video directly to the seller\'s TikTok profile without manual intervention.',
-    },
-  ];
+    const profileLink = data.profile_deep_link
+      ? `<a href="${data.profile_deep_link}" target="_blank" rel="noopener" style="color: var(--accent); word-break: break-all;">${data.profile_deep_link}</a>`
+      : '<span class="muted">Not set</span>';
 
-  const rows = scopes.map(s => `
-    <tr>
-      <td style="font-size: 22px; padding: 8px 12px;">${s.done ? '✅' : '⬜'}</td>
-      <td style="padding: 8px 12px;"><code>${s.name}</code></td>
-      <td style="padding: 8px 12px; color: var(--text);">${s.desc}</td>
-    </tr>
-  `).join('');
+    res.send(page({
+      title: 'Settings · Integrations',
+      user: data,
+      active: 'settings',
+      body: `
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h2 style="margin: 0;">Integrations</h2>
+            <span class="status-pill connected">● Connected</span>
+          </div>
+          <p class="muted">Manage the third-party accounts linked to your Oubon Shop merchant profile.</p>
 
-  res.send(page({
-    title: 'Demo Summary',
-    user: req.session.user,
-    body: `
-      ${flash ? `<div class="card"><p class="${flash.ok ? 'ok' : 'err'}">${flash.message}</p></div>` : ''}
+          <h3>TikTok</h3>
+          <div class="integration-row">
+            <img class="avatar" src="${data.avatar_url || ''}" alt="" />
+            <div style="flex: 1;">
+              <div style="font-size: 17px; font-weight: 600;">
+                ${data.display_name || 'Connected account'}
+                ${data.is_verified ? '<span class="verified">VERIFIED</span>' : ''}
+              </div>
+              <div class="muted">@${data.username || '(no username)'}</div>
+              <div class="muted" style="font-size: 12px; margin-top: 4px;">open_id: ${data.open_id || ''}</div>
+            </div>
+            <a class="btn secondary sm" href="/logout">Disconnect</a>
+          </div>
 
-      <div class="card">
-        <h2>Scope Demonstration Recap</h2>
-        <p class="muted">All five scopes the Oubon Shop Automation app requests. ✅ marks a scope whose API call this session has actually exercised.</p>
+          <div style="margin-top: 16px; padding: 14px 16px; background: var(--card-elev); border-radius: 8px; border: 1px solid var(--border);">
+            <div class="muted" style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;">Profile URL</div>
+            <div style="margin-top: 4px;">${profileLink}</div>
+            <div class="muted" style="font-size: 12px; margin-top: 8px;">
+              Surfaced on your Products page as a "View seller on TikTok" link on every product card.
+            </div>
+          </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--border);">
-              <th style="text-align: left; padding: 8px 12px;">Status</th>
-              <th style="text-align: left; padding: 8px 12px;">Scope</th>
-              <th style="text-align: left; padding: 8px 12px;">How it's used</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-
-        <div class="row" style="margin-top: 24px;">
-          <a class="btn secondary" href="/dashboard">Re-visit Dashboard</a>
-          <a class="btn secondary" href="/upload">Re-visit Upload</a>
+          <h3>Reach</h3>
+          <div class="grid-stats">
+            <div class="stat"><div class="label">Followers</div><div class="value">${(data.follower_count ?? 0).toLocaleString()}</div></div>
+            <div class="stat"><div class="label">Following</div><div class="value">${(data.following_count ?? 0).toLocaleString()}</div></div>
+            <div class="stat"><div class="label">Likes</div><div class="value">${(data.likes_count ?? 0).toLocaleString()}</div></div>
+            <div class="stat"><div class="label">Videos</div><div class="value">${(data.video_count ?? 0).toLocaleString()}</div></div>
+          </div>
+          <p class="muted small" style="margin-top: 8px;">
+            ${data.follower_count >= 1000
+              ? 'Direct publish is unlocked for your account.'
+              : 'Accounts under 1,000 followers save drafts before publishing. Direct publish unlocks at 1k.'}
+          </p>
         </div>
-      </div>
-    `,
-  }));
+
+        <details class="card">
+          <summary class="muted">Raw API response (debug)</summary>
+          <pre class="raw">${JSON.stringify(resp.data, null, 2)}</pre>
+        </details>
+      `,
+    }));
+  } catch (e) {
+    console.error('[user.info] fetch failed:', e.response?.data || e.message);
+    res.status(500).send(page({
+      title: 'Couldn\'t load integrations',
+      user: req.session.user,
+      active: 'settings',
+      body: `<div class="card"><h2>Couldn't load your TikTok account</h2>
+        <pre class="raw">${JSON.stringify(e.response?.data || e.message, null, 2)}</pre>
+        <a class="btn secondary" href="/products">Back to products</a></div>`,
+    }));
+  }
 });
 
-// ============================================================
-// Compliance pages — required by TikTok app review.
-// All three are public (no auth required) so reviewers can
-// reach them without logging in.
-// ============================================================
+// --- Compliance pages -----------------------------------------------
 
-// /permissions — explicit enumeration of the 5 scopes the app
-// requests, using TikTok's own official descriptions verbatim.
-// Linked from the footer of every page so reviewers see it.
 app.get('/permissions', (req, res) => {
   res.send(page({
-    title: 'Permissions Requested',
+    title: 'Permissions',
     user: req.session.user,
     body: `
       <div class="card">
-        <h2>Permissions This App Requests</h2>
-        <p class="muted">
-          Oubon Shop Automation requests the following five TikTok scopes
-          during sign-in. Each scope's official TikTok description is
-          shown below, along with how this app uses it.
-        </p>
+        <h2>Permissions Oubon Shop Automation Requests</h2>
+        <p class="muted">When you sign in with TikTok, the following five scopes are requested.
+          Each is used for a specific feature within the product, as described below.</p>
 
-        <div class="why-box">
-          <strong><code>user.info.basic</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
-          <em>Read a user's profile info (open id, avatar, display name ...)</em>
-          <p style="margin: 8px 0 0 0;">We display the connected creator's identity in the Oubon
-          Shop Automation dashboard so multiple users managing the same dropshipping store
-          can see who's authorized to post on TikTok.</p>
+        <h3>Login Kit</h3>
+
+        <div style="margin-bottom: 20px;">
+          <strong><code>user.info.basic</code></strong>
+          <p style="margin: 6px 0 0 0; color: var(--text);">
+            Powers the connected-account pill in the top-right of every page (avatar +
+            display name + reach). <code>open_id</code> is stored as the link between
+            your Oubon Shop merchant profile and your TikTok account so subsequent
+            campaign posts go to the right account.
+          </p>
         </div>
 
-        <div class="why-box">
-          <strong><code>user.info.profile</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
-          <em>Read access to profile_web_link, profile_deep_link, bio_description, is_verified.</em>
-          <p style="margin: 8px 0 0 0;">We read verified status and profile URL to determine whether
-          the connected account meets TikTok's monetization criteria, and to deep-link
-          customers to the seller's TikTok shop from Oubon Shop product pages.</p>
+        <div style="margin-bottom: 20px;">
+          <strong><code>user.info.profile</code></strong>
+          <p style="margin: 6px 0 0 0; color: var(--text);">
+            Your TikTok profile URL is rendered on every product card in your Products
+            page as a "View seller on TikTok" link so buyers can verify your TikTok
+            presence. The <code>is_verified</code> badge is shown on the
+            Settings → Integrations page.
+          </p>
         </div>
 
-        <div class="why-box">
-          <strong><code>user.info.stats</code></strong> &nbsp; <span class="muted">— Included in Login Kit</span><br/>
-          <em>Read access to a user's statistic data, such as likes count, follower count, following count, and video count.</em>
-          <p style="margin: 8px 0 0 0;">We use follower count, engagement totals, and video count to
-          recommend ad spend tiers and creative angles. A creator with 50k+ followers
-          gets a different campaign suggestion than one just starting out.</p>
+        <div style="margin-bottom: 20px;">
+          <strong><code>user.info.stats</code></strong>
+          <p style="margin: 6px 0 0 0; color: var(--text);">
+            Follower count is displayed in the connected-account pill on every page
+            and on the Settings → Integrations page. It also gates the
+            "Publish to TikTok now" button on the New Campaign page — accounts under
+            1,000 followers default to draft mode (the button is disabled until reach
+            crosses the threshold).
+          </p>
         </div>
 
-        <div class="why-box">
-          <strong><code>video.upload</code></strong> &nbsp; <span class="muted">— Included in Content Posting API</span><br/>
-          <em>Share content to creator's account as a draft to further edit and post in TikTok.</em>
-          <p style="margin: 8px 0 0 0;">Sellers stage promotional videos as drafts in their TikTok
-          account, then edit captions and hashtags in TikTok before going live.</p>
+        <h3>Content Posting API</h3>
+
+        <div style="margin-bottom: 20px;">
+          <strong><code>video.upload</code></strong>
+          <p style="margin: 6px 0 0 0; color: var(--text);">
+            Powers the "Save to TikTok drafts" button on the New Campaign page. The video
+            is uploaded to your TikTok inbox as a draft. The new campaign appears in
+            your Campaigns log with status "Draft on TikTok" and the returned publish ID.
+          </p>
         </div>
 
-        <div class="why-box">
-          <strong><code>video.publish</code></strong> &nbsp; <span class="muted">— Included in Content Posting API</span><br/>
-          <em>Directly post content to a user's TikTok profile.</em>
-          <p style="margin: 8px 0 0 0;">When a campaign is approved by the seller, Oubon Shop
-          Automation auto-publishes the promotional video directly to TikTok without manual
-          intervention.</p>
+        <div style="margin-bottom: 20px;">
+          <strong><code>video.publish</code></strong>
+          <p style="margin: 6px 0 0 0; color: var(--text);">
+            Powers the "Publish to TikTok now" button on the New Campaign page. The video
+            is posted directly to your TikTok profile with the chosen caption and privacy
+            setting. The new campaign appears in your Campaigns log with status
+            "Live on @username" and the returned publish ID.
+          </p>
         </div>
 
         <p class="muted" style="margin-top: 24px;">
-          Share Kit is intentionally <strong>not</strong> requested — this is a server-side
-          web application and Share Kit's web-share dialog is not appropriate for the
-          background automation use case.
+          You can revoke this app's access at any time at
+          <a href="https://www.tiktok.com/setting/connected-apps" target="_blank" rel="noopener" style="color: var(--accent);">tiktok.com/setting/connected-apps</a>.
         </p>
       </div>
     `,
   }));
 });
 
-// /terms — Terms of Service.
 app.get('/terms', (req, res) => {
   res.send(page({
     title: 'Terms of Service',
@@ -931,42 +1054,43 @@ app.get('/terms', (req, res) => {
         <p>By using Oubon Shop Automation ("the Service"), you agree to these Terms.
         If you do not agree, do not use the Service.</p>
 
-        <h3>2. What the Service does</h3>
-        <p>The Service is a dropshipping automation tool that, with the user's explicit
-        OAuth authorization, posts promotional videos to a connected TikTok account and
-        reads basic profile/stats information from that account to recommend marketing
-        campaigns.</p>
+        <h3>2. The Service</h3>
+        <p>The Service is a Shopify merchant tool that, with your explicit OAuth
+        authorization, posts promotional videos to your connected TikTok account and
+        reads identity, profile, and reach information from that account to surface
+        your TikTok presence inside the Service.</p>
 
         <h3>3. TikTok integration</h3>
-        <p>The Service requests the following five TikTok scopes via Login Kit and
-        Content Posting API: <code>user.info.basic</code>, <code>user.info.profile</code>,
-        <code>user.info.stats</code>, <code>video.upload</code>, <code>video.publish</code>.
-        See the <a href="/permissions">Permissions</a> page for full details. You may
-        revoke this authorization at any time from your TikTok account settings.</p>
+        <p>The Service requests the following TikTok scopes: <code>user.info.basic</code>,
+        <code>user.info.profile</code>, <code>user.info.stats</code>,
+        <code>video.upload</code>, <code>video.publish</code>. See the
+        <a href="/permissions" style="color: var(--accent);">Permissions</a> page for
+        what each scope does. You may revoke this authorization at any time from your
+        TikTok account settings.</p>
 
         <h3>4. Acceptable use</h3>
-        <p>You agree to use the Service only to post content you own or have the right
-        to distribute, and only in compliance with TikTok's
-        <a href="https://www.tiktok.com/legal/community-guidelines" target="_blank" rel="noopener">Community Guidelines</a>
-        and <a href="https://www.tiktok.com/legal/terms-of-service" target="_blank" rel="noopener">Terms of Service</a>.</p>
+        <p>You agree to post only content you own or have the right to distribute, and to
+        comply with TikTok's
+        <a href="https://www.tiktok.com/legal/community-guidelines" target="_blank" rel="noopener" style="color: var(--accent);">Community Guidelines</a>
+        and
+        <a href="https://www.tiktok.com/legal/terms-of-service" target="_blank" rel="noopener" style="color: var(--accent);">Terms of Service</a>.</p>
 
         <h3>5. No warranty</h3>
         <p>The Service is provided as-is, without warranty of any kind. We are not
         responsible for content posted through the Service or for any TikTok account
-        actions resulting from its use.</p>
+        action resulting from its use.</p>
 
         <h3>6. Termination</h3>
-        <p>You may stop using the Service at any time. We may suspend access for
-        abuse, security concerns, or violation of these Terms.</p>
+        <p>You may stop using the Service at any time. We may suspend access for abuse,
+        security concerns, or violation of these Terms.</p>
 
         <h3>7. Contact</h3>
-        <p>Questions: <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a></p>
+        <p>Questions: <a href="mailto:sponce96@icloud.com" style="color: var(--accent);">sponce96@icloud.com</a></p>
       </div>
     `,
   }));
 });
 
-// /privacy — Privacy Policy.
 app.get('/privacy', (req, res) => {
   res.send(page({
     title: 'Privacy Policy',
@@ -978,29 +1102,26 @@ app.get('/privacy', (req, res) => {
 
         <h3>1. Data we collect</h3>
         <p>When you connect your TikTok account, we receive — only with your explicit
-        OAuth consent — the following from TikTok's <code>/v2/user/info/</code>
-        endpoint:</p>
+        OAuth consent — the following from TikTok's <code>/v2/user/info/</code> endpoint:</p>
         <ul>
           <li><strong>Identity</strong> (<code>user.info.basic</code>): open_id, union_id, avatar URL, display name</li>
           <li><strong>Profile</strong> (<code>user.info.profile</code>): username, bio, profile URL, verified status</li>
-          <li><strong>Stats</strong> (<code>user.info.stats</code>): follower / following / likes / video counts</li>
+          <li><strong>Reach</strong> (<code>user.info.stats</code>): follower / following / likes / video counts</li>
         </ul>
-        <p>When you upload or publish a video through the Service, the video file you
-        provide is sent to TikTok via the Content Posting API
-        (<code>video.upload</code> / <code>video.publish</code> scopes). We do not
-        retain the video file after the upload completes.</p>
+        <p>When you create a campaign, the video file you upload is sent to TikTok via
+        the Content Posting API (<code>video.upload</code> or <code>video.publish</code>
+        scope, depending on the button you click). We do not retain the video file after
+        the upload completes.</p>
 
         <h3>2. How we use it</h3>
-        <p>The identity/profile/stats fields are displayed to you in the Service's
-        dashboard so you can confirm which TikTok account is connected and which
-        campaigns are appropriate for it. We do not sell, share, or use this data
-        for advertising.</p>
+        <p>Identity, profile, and reach data are displayed to you in the connected-account
+        pill, on the Products page, and on the Settings → Integrations page. We do not
+        sell, share, or use this data for advertising.</p>
 
         <h3>3. Storage</h3>
         <p>OAuth access tokens are stored in your browser session only for the duration
         of your sign-in. Profile data fetched from TikTok is cached in memory for the
-        same session. Nothing is persisted to disk in this demo environment, and no
-        third party receives your TikTok data from us.</p>
+        same session. No third party receives your TikTok data from us.</p>
 
         <h3>4. Sharing</h3>
         <p>We share data only with TikTok itself (to authenticate and to post videos
@@ -1008,34 +1129,30 @@ app.get('/privacy', (req, res) => {
 
         <h3>5. Your rights</h3>
         <p>You may revoke this app's access at any time at
-        <a href="https://www.tiktok.com/setting/connected-apps" target="_blank" rel="noopener">tiktok.com/setting/connected-apps</a>.
-        Revocation immediately stops the Service from making any further calls on
-        your behalf. To request deletion of any session-cached data, email
-        <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a>.</p>
+        <a href="https://www.tiktok.com/setting/connected-apps" target="_blank" rel="noopener" style="color: var(--accent);">tiktok.com/setting/connected-apps</a>.
+        Revocation immediately stops the Service from making any further calls on your
+        behalf. To request deletion of any session-cached data, email
+        <a href="mailto:sponce96@icloud.com" style="color: var(--accent);">sponce96@icloud.com</a>.</p>
 
         <h3>6. Children</h3>
         <p>The Service is not intended for users under 13. Do not connect a TikTok
         account belonging to a minor.</p>
 
         <h3>7. Contact</h3>
-        <p>Privacy questions: <a href="mailto:sponce96@icloud.com">sponce96@icloud.com</a></p>
+        <p>Privacy questions: <a href="mailto:sponce96@icloud.com" style="color: var(--accent);">sponce96@icloud.com</a></p>
       </div>
     `,
   }));
 });
 
-// Health check (handy for confirming the server is up on Apple's reviewer's screen)
-app.get('/health', (req, res) => res.json({ ok: true, demo: 'oubon-shop-automation' }));
+app.get('/health', (req, res) => res.json({ ok: true, app: 'oubon-shop-automation' }));
 
 // --- Start -----------------------------------------------------------
 app.listen(PORT, () => {
-  console.log(`\n╔════════════════════════════════════════════════════════════╗`);
-  console.log(`║  Oubon Shop Automation — TikTok Demo Site                  ║`);
-  console.log(`║  Sandbox-mode credentials in use                           ║`);
-  console.log(`╠════════════════════════════════════════════════════════════╣`);
-  console.log(`║  Server running at: http://localhost:${PORT}                  ║`);
-  console.log(`║  Redirect URI:       ${REDIRECT_URI.padEnd(38)}║`);
-  console.log(`║  Scopes:             ${SCOPES.padEnd(38)}║`);
-  console.log(`╚════════════════════════════════════════════════════════════╝\n`);
-  console.log(`Open http://localhost:${PORT} to start the demo flow.`);
+  console.log(`\nOubon Shop Automation`);
+  console.log(`---------------------`);
+  console.log(`Server:        http://localhost:${PORT}`);
+  console.log(`Redirect URI:  ${REDIRECT_URI}`);
+  console.log(`TikTok scopes: ${SCOPES}`);
+  console.log(`Open the URL above to sign in.\n`);
 });
