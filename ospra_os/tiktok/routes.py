@@ -205,7 +205,15 @@ async def get_user_profile(
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
 
-@router.get("/videos")
+# Endpoint deactivated for TikTok app review (May 2026).
+# Requires `video.list` scope which is NOT in the approved scope list:
+#   user.info.basic, user.info.profile, user.info.stats,
+#   video.publish, video.upload
+# Leaving an active route that references an unapproved scope was flagged
+# by the TikTok reviewer as a scope mismatch. Re-enable by uncommenting the
+# `@router.get("/videos")` decorator below if `video.list` is approved
+# in a future review cycle.
+# @router.get("/videos")
 async def get_user_videos(
     authorization: str = Query(..., description="Bearer token", alias="Authorization"),
     max_count: int = Query(20, ge=1, le=50, description="Maximum videos to return")
@@ -213,7 +221,7 @@ async def get_user_videos(
     """
     Get authenticated user's TikTok videos
 
-    Requires: video.list scope
+    Requires: video.list scope (NOT currently approved — see comment above).
     """
     try:
         # Extract token from "Bearer <token>"

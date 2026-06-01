@@ -24,6 +24,13 @@ import Dashboard from './components/Dashboard';
 // that route. Suspense fallback below paints a centered spinner so the
 // hand-off is invisible to the user on a warm cache.
 const ProductDiscovery = lazy(() => import('./components/ProductDiscovery'));
+// Winners tab fully retired: Products IS winner-first discovery.
+// The /api/discovery/quick backend endpoint now runs winner-first sourcing
+// (Meta Ad Library + TikTok Shop + Amazon Movers + Etsy in parallel, then
+// per-winner AE+CJ search). WinnerDiscovery.jsx + /api/discovery/winners*
+// routes are all deleted — see CLAUDE.md standing rule.
+// Task #13 — self-learning loop visibility dashboard
+const LearningDashboard = lazy(() => import('./components/LearningDashboard'));
 const AutopilotControl = lazy(() => import('./components/AutopilotControl'));
 const ActionQueue = lazy(() => import('./components/ActionQueue'));
 const Settings = lazy(() => import('./components/Settings'));
@@ -94,16 +101,24 @@ function AppRoutes() {
             </ProtectedRoute>
           } 
         />
-        <Route 
-          path="/products" 
+        <Route
+          path="/products"
           element={
             <ProtectedRoute>
               <ProductDiscovery />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/autopilot" 
+        <Route
+          path="/learning"
+          element={
+            <ProtectedRoute>
+              <LearningDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/autopilot"
           element={
             <ProtectedRoute>
               <AutopilotControl />

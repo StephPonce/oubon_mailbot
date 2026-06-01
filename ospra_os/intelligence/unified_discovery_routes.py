@@ -28,6 +28,7 @@ PERFORMANCE OPTIMIZATIONS:
 - Instant cache hits for repeat requests
 """
 
+from datetime import datetime
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -1066,7 +1067,12 @@ async def sources_health(
             client = get_meta_ads_library()
             if not client.is_available():
                 return {"status": "not_configured", "detail": "APIFY_API_TOKEN missing"}
-            r = await client.search_active_ads(niche.replace("_", " "), max_ads=5)
+            # max_ads=20 (not 5): the Apify actor errors when the search
+            # window is too small for some keywords (e.g. "smart home"),
+            # returning a single {"error": ...} envelope that we cannot
+            # parse. 20 is the same window the manual /test-meta-ads probe
+            # uses successfully.
+            r = await client.search_active_ads(niche.replace("_", " "), max_ads=20)
             return {
                 "status": "ok" if r.get("available") else "no_data",
                 "ad_count": r.get("ad_count", 0),
@@ -1668,3 +1674,5 @@ async def health_check():
     except Exception as e:
         logger.error(f"[ERROR] Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e)}
+
+

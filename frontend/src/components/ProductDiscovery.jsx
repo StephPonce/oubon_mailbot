@@ -2861,11 +2861,12 @@ export function ProductDiscovery() {
       console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
 
       // Fetch products (same niche for all filter types).
-      // Request the Stratosphere ceiling (100). The backend clamps to the
-      // caller's tier ceiling (NEST=10, FLIGHT=25, SOAR=50, STRATOSPHERE=100)
-      // and sets tier_meta.clamped so `tierNudge` can prompt an upgrade when
-      // the request would have returned more at a higher tier.
-      const response = await api.discoverProducts({ niche, count: 100 });
+      // Initial load fetches 20 to stay under Safari's ~60s fetch timeout.
+      // User can click "Load more" to fetch additional pages up to their
+      // tier ceiling (NEST=10, FLIGHT=25, SOAR=50, STRATOSPHERE=100).
+      // AI image generation is MANUAL CLICK ONLY (Stability ~$0.06/img,
+      // per CLAUDE.md standing rule) — defaults to OFF in api layer.
+      const response = await api.discoverProducts({ niche, count: 20 });
       console.log('[ProductDiscovery] API Response:', response);
 
       // Structured error from backend (503 with diagnostics) — surface it to the user.

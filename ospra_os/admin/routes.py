@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
 async def get_email_stats(settings: Settings) -> Dict[str, Any]:
     """Get email automation statistics."""
     try:
-        from app.analytics import get_analytics_summary
+        from ospra_os.analytics.email_analytics import get_analytics_summary
         return get_analytics_summary(settings.database_url)
     except Exception as e:
         print(f"[WARNING]  Email stats error: {e}")

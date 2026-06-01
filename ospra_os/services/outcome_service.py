@@ -117,6 +117,113 @@ class OutcomeService:
         print(f"[SUCCESS] Outcome record created: ID {outcome.id}")
         return outcome
 
+    def create_winner_pick_outcome(
+        self,
+        user_id: int,
+        niche: str,
+        winner_snapshot: Dict,
+        supplier_snapshot: Dict,
+        supplier_type: str,  # "ae" | "cj"
+        ai_reasoning: Optional[str] = None,
+    ) -> RecommendationOutcome:
+        """
+        Self-learning Phase 1: capture a /winners selection BEFORE the
+        product is deployed to Shopify.
+
+        The new winner-first discovery flow (POST /api/discovery/winners/select)
+        creates a RecommendationOutcome with product_id=NULL but full signal
+        snapshot in confidence_breakdown. Later, when the user actually
+        deploys the product to Shopify, the row gets updated with the
+        Shopify product_id so evaluate_outcomes() can link in
+        ProductPerformance data and classify the outcome.
+
+        This bypasses the Action/Product requirement of create_outcome_record
+        because at /winners-pick time, the user hasn't actually deployed
+        anything yet — they've just told us "this is the pick I'm pursuing."
+        Capturing the signal snapshot at THIS moment is what gives the
+        learning loop something to evaluate later.
+
+        Args:
+            user_id: Authed user making the pick
+            niche: Discovery niche (e.g. "smart_home")
+            winner_snapshot: Meta winner data — page_name, ad_count,
+                variant_count, max_days_active, has_shopify_landing,
+                extracted_keywords, brand_tokens, sample_landing_url,
+                surfaced_by_query
+            supplier_snapshot: The AE or CJ product chosen — product_id,
+                title, cost_price, suggested_price, winner_match_score,
+                semantic_score, supplier_url
+            supplier_type: "ae" or "cj"
+            ai_reasoning: Optional human-readable explanation
+
+        Returns:
+            RecommendationOutcome row with product_id=NULL, ready to be
+            linked when deployment happens.
+        """
+        # Confidence breakdown is the full signal snapshot — this is what
+        # LearningProcessor will eventually analyze to compute per-signal
+        # predictive accuracy.
+        confidence_breakdown = {
+            "discovery_flow": "winner_first",
+            "niche": niche,
+            "supplier_type": supplier_type,
+            "winner": winner_snapshot,
+            "supplier_match": supplier_snapshot,
+            "captured_at": datetime.now().isoformat(),
+        }
+
+        # Confidence score: use the supplier match's score (0-100) as the
+        # primary confidence signal. If semantic was applied, prefer that
+        # since it's more rigorous than keyword overlap.
+        confidence_score = float(
+            supplier_snapshot.get("semantic_score")
+            or supplier_snapshot.get("winner_match_score")
+            or 0
+        )
+
+        # Projection: derive a naive monthly revenue projection from the
+        # supplier's suggested price × an assumed conversion baseline.
+        # This is a placeholder that the learning loop will improve as
+        # actual data accumulates.
+        suggested_price = float(supplier_snapshot.get("suggested_price") or 0)
+        cost_price = float(supplier_snapshot.get("cost_price") or 0)
+        margin = (suggested_price - cost_price) if suggested_price > cost_price else 0
+        # Assume 1 sale/day baseline for newly-listed dropship products
+        projected_daily_sales = 1.0 if margin > 0 else 0.0
+        projected_monthly_revenue = projected_daily_sales * 30 * suggested_price
+        projected_margin = (
+            (margin / suggested_price * 100) if suggested_price > 0 else 0
+        )
+
+        outcome = RecommendationOutcome(
+            user_id=user_id,
+            action_id=None,       # No upstream action — direct pick
+            product_id=None,      # Filled in later when deployed
+            recommendation_type="winner_first_pick",
+            confidence_score=confidence_score,
+            confidence_breakdown=confidence_breakdown,
+            ai_reasoning=ai_reasoning or (
+                f"Winner-first pick: {winner_snapshot.get('page_name')} "
+                f"on Meta ({winner_snapshot.get('ad_count', 0)} active ads, "
+                f"{winner_snapshot.get('variant_count', 0)} variants, "
+                f"{winner_snapshot.get('max_days_active', 0)}d active). "
+                f"Sourced from {supplier_type.upper()}: "
+                f"{supplier_snapshot.get('title', '')[:80]}"
+            ),
+            projected_daily_sales=projected_daily_sales,
+            projected_monthly_revenue=projected_monthly_revenue,
+            projected_margin=projected_margin,
+            projected_roi=None,   # Need ad spend data to compute
+            was_accepted=True,
+            accepted_at=datetime.now(),
+            outcome=PerformanceOutcome.pending.value,
+            tracking_started_at=datetime.now(),
+        )
+        self.db.add(outcome)
+        self.db.commit()
+        self.db.refresh(outcome)
+        return outcome
+
     def record_rejection(
         self,
         action: Action,

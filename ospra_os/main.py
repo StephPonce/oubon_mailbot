@@ -1357,17 +1357,14 @@ async def _run_startup_deferred():
 
     settings = get_settings()
 
-    # Initialize follow-up tracking database
-    try:
-        from app.models import init_followup_db
-        init_followup_db(settings.database_url)
-        logger.info("Follow-up database initialized")
-    except Exception as e:
-        logger.warning(f"Follow-up database initialization failed: {e}")
+    # Follow-up tracking tables (EmailFollowup) are created by the main
+    # init_database() call in _run_startup_critical — they live in
+    # ospra_os.database.email_models now, so the old app.models.init_followup_db
+    # bootstrap is redundant and was removed during the app/ -> ospra_os/ migration.
 
-    # Initialize analytics database
+    # Initialize analytics database (email_metrics / daily_stats tables)
     try:
-        from app.analytics import init_analytics_db
+        from ospra_os.analytics.email_analytics import init_analytics_db
         init_analytics_db(settings.database_url)
         logger.info("Analytics database initialized")
     except Exception as e:

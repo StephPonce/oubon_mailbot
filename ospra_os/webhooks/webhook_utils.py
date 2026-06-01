@@ -262,6 +262,124 @@ async def record_learning_event(
 
 
 # ============================================================================
+# Self-learning Phase 5B: real-time ProductPerformance upsert from webhooks
+# ============================================================================
+# SalesSyncService pulls ProductPerformance data every 6h via Shopify Admin
+# API. That works but creates a 0-6h delay between an order landing and
+# the discovery engine's learning loop seeing the revenue. For real-time
+# attribution we ALSO upsert ProductPerformance directly from the
+# webhooks/* handlers — idempotent on (product_id, date) so the periodic
+# sync overwrite is safe.
+# ============================================================================
+
+async def upsert_product_performance_from_order(
+    *,
+    order_id: str,
+    line_items: list,
+    store_id: Optional[int],
+    user_id: int,
+    is_refund: bool = False,
+):
+    """Real-time upsert: take a Shopify order's line_items and update
+    today's ProductPerformance row for each (product) involved.
+
+    Looks up our internal Product row by source_product_id matching the
+    Shopify product_id from the line item. If no Product row exists
+    (i.e. the buyer ordered something that wasn't surfaced by our
+    discovery engine), we silently skip — those non-Ospra products
+    aren't part of the learning loop.
+
+    Idempotency: tracks processed order_ids in details JSON to avoid
+    double-counting if the same webhook fires multiple times. SalesSyncService
+    overwrite is also safe because it sets absolute values (not increments).
+    """
+    if not user_id or not line_items:
+        return
+
+    try:
+        from ospra_os.database.connection import SessionLocal
+        from ospra_os.database.performance_models import ProductPerformance
+        from ospra_os.database.product_models import Product
+        from datetime import date as _date
+
+        db = SessionLocal()
+        try:
+            today = _date.today()
+            for item in line_items:
+                shopify_product_id = str(item.get('product_id') or '')
+                if not shopify_product_id:
+                    continue
+
+                # Find our internal Product by source_product_id
+                product = (
+                    db.query(Product)
+                    .filter(Product.source_product_id == shopify_product_id)
+                    .first()
+                )
+                if not product:
+                    # Order item wasn't from an Ospra-discovered product — skip
+                    # (their data won't help the learning loop)
+                    continue
+
+                quantity = int(item.get('quantity') or 1)
+                unit_price = float(item.get('price') or 0)
+                line_revenue = unit_price * quantity
+
+                # Find or create today's ProductPerformance row for this product
+                perf = (
+                    db.query(ProductPerformance)
+                    .filter(
+                        ProductPerformance.product_id == product.id,
+                        ProductPerformance.date == today,
+                    )
+                    .first()
+                )
+
+                if perf is None:
+                    perf = ProductPerformance(
+                        product_id=product.id,
+                        store_id=store_id or product.store_id,
+                        user_id=user_id,
+                        date=today,
+                        orders=0,
+                        units_sold=0,
+                        gross_revenue=0.0,
+                        refunds=0.0,
+                        net_revenue=0.0,
+                        sync_source='webhook_realtime',
+                        synced_at=datetime.now(timezone.utc),
+                    )
+                    db.add(perf)
+
+                if is_refund:
+                    # Refund webhook: increment refunds, decrement net_revenue
+                    perf.refunds = (perf.refunds or 0) + line_revenue
+                    perf.net_revenue = (perf.gross_revenue or 0) - (perf.refunds or 0)
+                else:
+                    perf.orders = (perf.orders or 0) + 1
+                    perf.units_sold = (perf.units_sold or 0) + quantity
+                    perf.gross_revenue = (perf.gross_revenue or 0) + line_revenue
+                    perf.net_revenue = (perf.gross_revenue or 0) - (perf.refunds or 0)
+
+                perf.synced_at = datetime.now(timezone.utc)
+                perf.sync_source = 'webhook_realtime'
+
+                logger.info(
+                    f"📈 [perf-upsert] product #{product.id} ({product.product_name[:40]}) "
+                    f"{'refund' if is_refund else 'order'} order={order_id} "
+                    f"+{quantity} units / ${line_revenue:.2f}"
+                )
+
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        # Don't crash the webhook handler — log and continue. The 6h
+        # SalesSyncService will reconcile any missed orders.
+        logger.error(f"Failed to upsert product performance from order {order_id}: {e}")
+
+
+# ============================================================================
 # NOTIFICATION CREATION
 # ============================================================================
 

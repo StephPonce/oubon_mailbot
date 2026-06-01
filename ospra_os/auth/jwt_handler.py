@@ -92,9 +92,14 @@ def _get_jwt_secret() -> str:
 JWT_SECRET_KEY = _get_jwt_secret()
 JWT_ALGORITHM = "HS256"
 
-# Token expiry times
-ACCESS_TOKEN_EXPIRE_MINUTES = 15  # Short-lived for security
-REFRESH_TOKEN_EXPIRE_DAYS = 7    # Longer-lived for convenience
+# Token expiry times — imported from jwt_auth (the single source of truth and
+# the live token-mint path) so the two modules can never silently diverge.
+# Previously this module hardcoded 15m/7d while jwt_auth used 24h/30d; whichever
+# minted a token decided its lifetime. Tune via env in jwt_auth.
+from ospra_os.auth.jwt_auth import (  # noqa: E402
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+)
 
 
 # ============================================================================

@@ -15,7 +15,7 @@ from celery import Task
 from sqlalchemy.orm import Session
 
 from ospra_os.database.connection import get_session_factory
-from ospra_os.database import User, Store
+from ospra_os.database import User, Store, StoreStatus
 
 # Multi-Tenant Support (GROK #14)
 from ospra_os.tenancy.context import TenantContext, tenant_scope
@@ -107,9 +107,14 @@ class UserTask(DatabaseTask):
         Returns:
             List of active User objects
         """
-        query = self.db.query(User).filter(
-            User.is_active == True  # noqa: E712
-        )
+        # NOTE: the User model has no ``is_active`` column — it lives on
+        # UserProductRecommendation ("still selling?"), not User (confirmed in
+        # user_models.py, and see the matching comment in auth/routes.py). The
+        # previous ``filter(User.is_active == True)`` raised at query time, so
+        # every Celery task calling this (email/learning/product tasks) would
+        # have crashed the moment a worker ran. Until a real is_active/banned
+        # flag is added to User, "active users" means all users.
+        query = self.db.query(User)
 
         if tier:
             query = query.filter(User.subscription_tier == tier)
@@ -132,14 +137,17 @@ class UserTask(DatabaseTask):
         )
 
         if active_only:
-            query = query.filter(Store.status == "connected")  # noqa: E712
+            # Store.status is SQLEnum(StoreStatus); "connected" is not a member
+            # (the enum is SETUP/ACTIVE/PAUSED/DISCONNECTED/ERROR), so the old
+            # string compare never matched a real row.
+            query = query.filter(Store.status == StoreStatus.ACTIVE)
 
         return query.all()
 
     def get_all_active_stores(self) -> List[Store]:
         """Get all active stores across all users"""
         return self.db.query(Store).filter(
-            Store.status == "connected"  # noqa: E712
+            Store.status == StoreStatus.ACTIVE
         ).all()
 
 

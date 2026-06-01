@@ -116,6 +116,44 @@ async def upgrade_user_tier(user_id: int, tier: str, db_session=None):
             session.close()
 
 
+def _enqueue_tier_change(user_id: int, tier: str, event_name: str, payload: Dict[str, Any]) -> bool:
+    """
+    Apply a subscription tier change via the HYBRID dispatcher
+    (``ospra_os.tasks.billing_tasks.dispatch_tier_change``): enqueue to a
+    Celery worker when one is reachable (retry + backoff + dead-letter), else
+    apply synchronously in-process so the customer is upgraded immediately.
+    On a genuine failure the event is parked in ``billing_dead_letter``.
+
+    This replaces the old ``background_tasks.add_task(upgrade_user_tier, ...)``
+    call, whose handler swallowed exceptions — a transient DB error there left
+    a paying customer on the wrong tier with no retry and no record.
+    """
+    try:
+        from ospra_os.tasks.billing_tasks import dispatch_tier_change
+
+        outcome = dispatch_tier_change(user_id, tier, event_name, payload)
+        logger.info(f"[BILLING] Tier change {outcome}: user={user_id} tier={tier} event={event_name}")
+        return outcome != "dead_letter"
+    except Exception as exc:
+        # Even importing the dispatcher failed (e.g. celery not installed at
+        # all). Park the event directly so it is never silently lost.
+        logger.error(f"[BILLING] dispatch_tier_change unavailable for user {user_id}: {exc}")
+        try:
+            from ospra_os.database.dead_letter_models import record_dead_letter
+
+            record_dead_letter(
+                event_name=event_name,
+                user_id=user_id,
+                tier=tier,
+                payload=payload,
+                last_error=f"dispatch unavailable: {exc}",
+                attempts=0,
+            )
+        except Exception as inner:
+            logger.error(f"[BILLING] Also failed to dead-letter user {user_id}: {inner}")
+        return False
+
+
 @router.post("/lemonsqueezy/subscription")
 async def lemonsqueezy_subscription(
     background_tasks: BackgroundTasks,
@@ -151,24 +189,24 @@ async def lemonsqueezy_subscription(
         if event_name == "subscription_created" and status == "active":
             # New subscription - upgrade user
             if user_id and tier:
-                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+                _enqueue_tier_change(int(user_id), tier, event_name, data)
                 logger.info(f"[SUCCESS] Scheduled tier upgrade for user {user_id} to {tier}")
             else:
                 logger.warning(f"[WARNING] Missing user_id or tier in custom_data")
-        
+
         elif event_name == "subscription_updated":
             if status == "active" and user_id and tier:
-                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+                _enqueue_tier_change(int(user_id), tier, event_name, data)
             elif status in ["cancelled", "expired", "past_due"]:
                 # Downgrade to free tier
                 if user_id:
-                    background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                    _enqueue_tier_change(int(user_id), "nest", event_name, data)
                     logger.info(f"[DOWNGRADE] User {user_id} subscription {status}")
-        
+
         elif event_name == "subscription_cancelled":
             # Downgrade to free tier
             if user_id:
-                background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                _enqueue_tier_change(int(user_id), "nest", event_name, data)
                 logger.info(f"[DOWNGRADE] User {user_id} subscription cancelled")
         
         return {
@@ -217,13 +255,13 @@ async def lemonsqueezy_order(
         # Handle successful order (one-time or first subscription payment)
         if event_name == "order_created" and status == "paid":
             if user_id and tier:
-                background_tasks.add_task(upgrade_user_tier, int(user_id), tier)
+                _enqueue_tier_change(int(user_id), tier, event_name, data)
                 logger.info(f"[SUCCESS] Order paid - upgrading user {user_id} to {tier}")
-        
+
         elif event_name == "order_refunded":
             # Refund - downgrade to free
             if user_id:
-                background_tasks.add_task(upgrade_user_tier, int(user_id), "nest")
+                _enqueue_tier_change(int(user_id), "nest", event_name, data)
                 logger.warning(f"[REFUND] Order refunded - downgrading user {user_id}")
         
         return {

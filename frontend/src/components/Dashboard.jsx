@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Package, Bot, Zap, Settings, LogOut, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock, ChevronRight, Activity, PanelLeftClose, PanelLeft, Store } from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock, ChevronRight, Activity, PanelLeftClose, PanelLeft, Store, Brain } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { api } from '../services/api';
@@ -43,9 +43,15 @@ function Sidebar({ currentPath }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
 
+  // NOTE: No separate "Winners" entry — Products IS winner-first discovery.
+  // Per CLAUDE.md standing rule + user directive: "Ospra by default should be a
+  // winners only product discovery based off all signals coded in. being on
+  // the products page is proof enough." Keep this sidebar in sync with
+  // Layout.jsx — if you add a route, add it in BOTH places.
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Dashboard' },
     { path: '/products', icon: Package, label: 'Products' },
+    { path: '/learning', icon: Brain, label: 'Learning' },
     { path: '/autopilot', icon: Bot, label: 'Auto-Pilot' },
     { path: '/actions', icon: Zap, label: 'Actions' },
     { path: '/settings/stores', icon: Store, label: 'Stores' },

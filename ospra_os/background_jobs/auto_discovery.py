@@ -156,7 +156,7 @@ class AutoDiscoveryJob:
         try:
             # Step 1: Get user and settings
             # user = self.db.query(User).filter(User.id == user_id).first()
-            user = self._get_user_mock(user_id)
+            user = self._get_user(user_id)
 
             if not user:
                 raise AutoDiscoveryError(f"User {user_id} not found")
@@ -173,7 +173,7 @@ class AutoDiscoveryJob:
             # settings = self.db.query(UserSettings).filter(
             #     UserSettings.user_id == user_id
             # ).first()
-            settings = self._get_user_settings_mock(user_id)
+            settings = self._get_user_settings(user_id)
 
             if not settings:
                 logger.warning(f"No settings found for user {user_id}, using defaults")
@@ -212,7 +212,7 @@ class AutoDiscoveryJob:
             #     Store.user_id == user_id,
             #     Store.status == 'active'
             # ).all()
-            stores = self._get_user_stores_mock(user_id)
+            stores = self._get_user_stores(user_id)
 
             if not stores:
                 logger.warning(f"No active stores for user {user_id}")
@@ -406,7 +406,7 @@ class AutoDiscoveryJob:
         try:
             # Get all active users with auto-discovery enabled
             # users = self.db.query(User).filter(User.is_active == True).all()
-            users = self._get_all_users_mock()
+            users = self._get_all_users()
 
             logger.info(f"Found {len(users)} active users")
 
@@ -811,28 +811,50 @@ class AutoDiscoveryJob:
             logger.error(f"Failed to get stats: {e}")
             return {"error": str(e)}
 
-    # Mock methods for testing (replace with actual database queries)
+    # ------------------------------------------------------------------
+    # Real DB-backed lookups (previously ``_get_*_mock`` stubs that ran
+    # discovery against fictional users — the scheduler is started in
+    # main.py's deferred startup, so in production it was burning API quota
+    # discovering products for ``user1@example.com``). These return dicts in
+    # the exact shape ``run_discovery_for_user`` already consumes, mapping the
+    # real ``UserSettings`` field names to the keys the flow expects.
+    # ------------------------------------------------------------------
 
-    def _get_user_mock(self, user_id: int) -> Dict[str, Any]:
-        """Mock user retrieval"""
+    def _get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Fetch a real user. Returns None if the user doesn't exist."""
+        from ospra_os.database import User
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
         return {
-            'id': user_id,
-            'email': f'user{user_id}@example.com',
-            'is_active': True
+            "id": user.id,
+            "email": user.email,
+            # User has no is_active column (see user_models.py); existing == active.
+            "is_active": True,
         }
 
-    def _get_user_settings_mock(self, user_id: int) -> Dict[str, Any]:
-        """Mock user settings retrieval"""
+    def _get_user_settings(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a user's discovery settings from the real ``UserSettings`` row,
+        mapped to the keys the discovery flow expects. Fields the model does
+        not track fall back to ``_get_default_settings``. Returns None when the
+        user has no settings row (caller then applies defaults).
+        """
+        from ospra_os.database import UserSettings
+        s = self.db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+        if not s:
+            return None
+        defaults = self._get_default_settings()
         return {
-            'user_id': user_id,
-            'auto_discovery_enabled': True,
-            'preferred_niches': ['smart_home', 'fitness'],
-            'exclude_niches': [],
-            'min_product_score': 7.0,
-            'max_products_per_niche': 10,
-            'discovery_interval_hours': 12,
-            'auto_deploy_enabled': False,
-            'auto_deploy_threshold': 8.5
+            "user_id": user_id,
+            "auto_discovery_enabled": bool(getattr(s, "auto_discover_products", True)),
+            "preferred_niches": getattr(s, "preferred_niches", None) or defaults["preferred_niches"],
+            "exclude_niches": defaults["exclude_niches"],
+            "min_product_score": getattr(s, "min_discovery_score", defaults["min_product_score"]),
+            "max_products_per_niche": defaults["max_products_per_niche"],
+            "discovery_interval_hours": defaults["discovery_interval_hours"],
+            "auto_deploy_enabled": bool(getattr(s, "auto_deploy_to_shopify", False)),
+            "auto_deploy_threshold": defaults["auto_deploy_threshold"],
         }
 
     def _get_default_settings(self) -> Dict[str, Any]:
@@ -848,24 +870,25 @@ class AutoDiscoveryJob:
             'auto_deploy_threshold': 8.5
         }
 
-    def _get_user_stores_mock(self, user_id: int) -> List[Dict[str, Any]]:
-        """Mock user stores retrieval"""
+    def _get_user_stores(self, user_id: int) -> List[Dict[str, Any]]:
+        """Fetch a user's real stores."""
+        from ospra_os.database import Store
+        stores = self.db.query(Store).filter(Store.user_id == user_id).all()
         return [
             {
-                'id': 1,
-                'user_id': user_id,
-                'platform': 'shopify',
-                'store_name': 'Test Store',
-                'status': 'active'
+                "id": st.id,
+                "user_id": user_id,
+                "platform": getattr(st.platform, "value", str(st.platform)),
+                "store_name": st.store_name,
+                "status": getattr(st.status, "value", str(st.status)),
             }
+            for st in stores
         ]
 
-    def _get_all_users_mock(self) -> List[Dict[str, Any]]:
-        """Mock all users retrieval"""
-        return [
-            {'id': 1, 'is_active': True},
-            {'id': 2, 'is_active': True}
-        ]
+    def _get_all_users(self) -> List[Dict[str, Any]]:
+        """Fetch all users (real DB). User has no is_active column."""
+        from ospra_os.database import User
+        return [{"id": u.id, "is_active": True} for u in self.db.query(User).all()]
 
 
 # Convenience function for easy initialization

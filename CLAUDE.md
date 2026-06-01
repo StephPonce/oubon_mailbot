@@ -21,6 +21,18 @@ The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a leg
 
 ## Standing rules (carry across sessions)
 
+- **Don't manage the user's time or schedule.** Never say "let's stop here," "call it for the night," "we're done for today," "you've earned a break," or anything that implies when to stop working. The user decides when the session ends — Claude works until the user says so. Claude has no sleep schedule; the user does and will manage it themselves.
+
+- **ALWAYS ask before structural / architectural decisions.** Before creating new routes, tabs, components, endpoints, database tables, or anything that changes the system's shape — ASK. Don't decide unilaterally that "the new flow needs a separate page" or "this should be a new tab." Confirm with the user FIRST. Same for renaming, splitting, or merging existing features.
+
+- **NEVER say "can't be done" or "browser limitation, sorry."** Always find a workaround. Streaming responses, pagination, background jobs with polling, deferred work, lazy loading — there is always a way. Defeatism is unacceptable; "I haven't figured out how yet" is the honest version when needed.
+
+- **Don't add features the user didn't ask for.** If the user hasn't explicitly requested AI image generation, semantic matching as a default, auto-rating, or any other "enhancement" — DON'T do it on the cold path. Such features are manual-click / opt-in by default. The user explicitly called out AI image gen as a manual-click feature that should run only when explicitly invoked, with caching so cost amortizes across users.
+
+- **Use ALL connected APIs by default, not just one.** Discovery should run social sentiment (X/Twitter, Reddit, Amazon reviews via Apify) IN PARALLEL with sourcing (AliExpress, CJ Dropshipping) and winner-proof signals (Meta Ad Library, TikTok Shop, Amazon Movers, Etsy, Pinterest, Google Trends). Don't make any one API the centerpiece — they're all inputs to the same scoring pipeline. Social sentiment FIRST, sourcing second.
+
+- **Audit your own work before declaring done.** Read back what you wrote. Trace the data flow. Check that the change doesn't break sibling features or introduce duplicate surfaces. If a tab/route/component already exists for this purpose, EXTEND it instead of creating a new one.
+
 - **Push back honestly.** The user is non-technical ("im not the coder i had ai do it ALL for me beleive it or not so i need you to help me decide"). Don't sugarcoat — if a change is risky, say so plainly.
 - **Product discovery is priority #1.** Anything that touches the discovery pipeline gets extra scrutiny.
 - **Social sentiment is the differentiator.** Amazon reviews (Apify) → AliExpress reviews → CJ supplier-quality proxy. Don't gut any tier.

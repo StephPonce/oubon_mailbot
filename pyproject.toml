@@ -28,6 +28,7 @@ dependencies = [
     "slack_sdk>=3.33.1",
     "email-validator>=2.2.0",
     "apscheduler>=3.10.4",
+    "celery>=5.3.0",  # task queue: ospra_os/celery_app.py + ospra_os/tasks/* (was undeclared)
     "aiohttp>=3.10.0",
     "pytrends>=4.9.2",
     "praw>=7.7.1",
@@ -68,6 +69,7 @@ dependencies = [
     # ``uv sync`` produce identical password-hashing behaviour. (Audit
     # fix #6 — dev/prod hashing divergence.)
     "bcrypt>=4.1.2",
+    "psycopg2-binary>=2.9.12",
 ]
 
 [project.optional-dependencies]

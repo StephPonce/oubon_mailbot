@@ -70,10 +70,24 @@ class TikTokClient:
         if not self.enabled:
             return None
 
+        # Scopes MUST match exactly what's enabled in the TikTok Developer
+        # Portal → Scopes tab. Requesting a scope here that isn't enabled
+        # in the portal triggers a "scope mismatch" rejection during app
+        # review (May 2026 — confirmed by review feedback).
+        #
+        # Currently enabled in portal:
+        #   - user.info.basic    (Login Kit)
+        #   - user.info.profile  (Login Kit)
+        #   - user.info.stats    (Login Kit)
+        #   - video.publish      (Content Posting API — Direct Post)
+        #   - video.upload       (Content Posting API — Upload as Draft)
+        #
+        # `video.list` was previously requested here but is NOT in the
+        # approved scope list — removed to fix the mismatch.
         params = {
             "client_key": self.client_key,
             "response_type": "code",
-            "scope": "user.info.basic,user.info.profile,user.info.stats,video.list,video.upload,video.publish",
+            "scope": "user.info.basic,user.info.profile,user.info.stats,video.publish,video.upload",
             "redirect_uri": self.redirect_uri,
         }
 

@@ -45,6 +45,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import urllib.parse
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -83,20 +84,21 @@ def _parse_iso_date(value: Any) -> Optional[datetime]:
 def _looks_like_shopify(url: str) -> bool:
     """Heuristic: does this destination URL look like a Shopify store?
     Used by the winner-heuristic — Shopify is the dominant dropshipper
-    platform. Both `*.myshopify.com` and `*/products/<handle>` URL
-    structures count."""
+    platform. We match on URL shape signals that Shopify storefronts
+    expose by convention. False positives are tolerable since downstream
+    code re-validates supplier match."""
     if not url:
         return False
     u = url.lower()
-    if "myshopify.com" in u:
+    if not any(u.startswith(s) for s in ("http://", "https://")):
+        return False
+    if "myshopify.com" in u or ".shopify.com" in u or "cdn.shopify.com" in u:
         return True
-    if "/products/" in u and any(
-        u.startswith(scheme) for scheme in ("http://", "https://")
-    ):
-        # Shopify product URLs are typically /products/<handle>. Many
-        # custom domains use Shopify under the hood. This is a
-        # heuristic — false positives are tolerable since downstream
-        # code re-validates supplier match.
+    # Storefront routes Shopify generates by default. /pages/ and
+    # /collections/ alongside /products/ catch dropshippers running
+    # landing pages and collection-funnel campaigns, not just direct
+    # PDP ads.
+    if any(p in u for p in ("/products/", "/pages/", "/collections/", "/cart", "/checkout")):
         return True
     return False
 
@@ -193,12 +195,31 @@ class MetaAdsLibraryApify:
         if not self.is_available():
             return {"available": False, "error": "apify token not configured"}
 
+        # The actor's input schema changed (verified May 2026 against the
+        # public Apify docs page). It no longer accepts a flat
+        # `searchTerms` + `country` shape — it expects an array of
+        # `{url: <meta-ad-library-search-url>}` entries instead. We
+        # construct the Ad Library search URL with the keyword embedded
+        # as the `q=` query param, then pass it in. This is also how
+        # the actor's marketplace example shows the call.
+        active_status = "active" if active_only else "all"
+        ad_library_url = (
+            "https://www.facebook.com/ads/library/"
+            f"?active_status={active_status}"
+            "&ad_type=all"
+            f"&country={country}"
+            f"&q={urllib.parse.quote(keyword)}"
+            "&search_type=keyword_unordered"
+            "&media_type=all"
+        )
+
         run_input = {
-            "searchTerms": [keyword],
-            "country": country,
-            "active": "active" if active_only else "all",
-            "maxResults": int(max_ads),
-            "scrapePageAds": False,  # only Ad Library search, not per-page deep dive
+            "urls": [{"url": ad_library_url}],
+            "count": int(max_ads),
+            "scrapePageAds.period": "",
+            "scrapePageAds.activeStatus": "all",
+            "scrapePageAds.sortBy": "impressions_desc",
+            "scrapePageAds.countryCode": "ALL",
         }
 
         try:
@@ -224,11 +245,18 @@ class MetaAdsLibraryApify:
             ad for ad in (self._normalise_ad(r) for r in results) if ad is not None
         ]
         if not ads:
+            sample_keys = (
+                sorted(results[0].keys())
+                if results and isinstance(results[0], dict)
+                else None
+            )
             return {
                 "available": False,
                 "error": "no ads parseable",
                 "keyword": keyword,
                 "country": country,
+                "results_count": len(results),
+                "sample_raw_keys": sample_keys,
             }
 
         advertisers = self._aggregate_advertisers(ads)
@@ -255,8 +283,13 @@ class MetaAdsLibraryApify:
         if not isinstance(raw, dict):
             return None
 
+        # The curious-coder/facebook-ads-library-scraper actor nests creative
+        # detail under `snapshot` — fall through to it when top-level is bare.
+        snapshot = raw.get("snapshot") if isinstance(raw.get("snapshot"), dict) else {}
+
         ad_id = (
             raw.get("ad_id")
+            or raw.get("ad_archive_id")
             or raw.get("adArchiveID")
             or raw.get("adId")
             or raw.get("id")
@@ -265,19 +298,29 @@ class MetaAdsLibraryApify:
             raw.get("page_id")
             or raw.get("pageId")
             or raw.get("page_id_str")
+            or snapshot.get("page_id")
         )
-        page_name = raw.get("page_name") or raw.get("pageName") or ""
+        page_name = (
+            raw.get("page_name")
+            or raw.get("pageName")
+            or snapshot.get("page_name")
+            or ""
+        )
         if not ad_id or not page_id:
             return None
 
-        # Creative body — sometimes a string, sometimes an array of strings
+        # Creative body — sometimes a string, sometimes a {"text": "..."} dict
+        # (curious-coder shape), sometimes an array of strings.
         body = (
             raw.get("ad_creative_body")
             or raw.get("ad_creative_bodies")
             or raw.get("body")
             or raw.get("text")
+            or snapshot.get("body")
             or ""
         )
+        if isinstance(body, dict):
+            body = body.get("text") or ""
         if isinstance(body, list):
             body = " ".join(str(b) for b in body if b)
 
@@ -285,6 +328,7 @@ class MetaAdsLibraryApify:
             raw.get("ad_creative_link_title")
             or raw.get("ad_creative_link_titles")
             or raw.get("title")
+            or snapshot.get("title")
         )
         if isinstance(title, list):
             title = title[0] if title else None
@@ -296,22 +340,30 @@ class MetaAdsLibraryApify:
             or raw.get("destination_url")
             or raw.get("destinationUrl")
             or raw.get("ad_creative_link_caption")
+            or snapshot.get("link_url")
             or None
         )
 
         # Snapshot URL = the Meta Ad Library page for this ad. Useful
         # for the UI to link to the actual creative.
-        snapshot_url = raw.get("ad_snapshot_url") or raw.get("snapshotUrl")
+        snapshot_url = (
+            raw.get("ad_snapshot_url")
+            or raw.get("snapshotUrl")
+            or raw.get("ad_library_url")
+            or raw.get("url")
+        )
 
         started = _parse_iso_date(
             raw.get("ad_delivery_start_time")
             or raw.get("startDate")
+            or raw.get("start_date_formatted")
             or raw.get("start_date")
             or raw.get("ad_creation_time")
         )
         stopped = _parse_iso_date(
             raw.get("ad_delivery_stop_time")
             or raw.get("endDate")
+            or raw.get("end_date_formatted")
             or raw.get("end_date")
         )
 
@@ -329,9 +381,28 @@ class MetaAdsLibraryApify:
             delta = end - started
             days_active = max(0, delta.days)
 
-        platforms = raw.get("publisher_platforms") or raw.get("publisherPlatforms") or []
+        platforms = (
+            raw.get("publisher_platforms")
+            or raw.get("publisherPlatforms")
+            or raw.get("publisher_platform")
+            or []
+        )
         if isinstance(platforms, str):
             platforms = [platforms]
+
+        # curious-coder dedupes near-identical creatives into a "collation"
+        # and reports the variant count as `collation_count` (or `ads_count`).
+        # Without this signal each row counts as one variant and almost
+        # nothing passes the proven-winner heuristic.
+        collation_count = (
+            raw.get("collation_count")
+            or raw.get("ads_count")
+            or 1
+        )
+        try:
+            collation_count = max(1, int(collation_count))
+        except (TypeError, ValueError):
+            collation_count = 1
 
         return {
             "ad_id": str(ad_id),
@@ -350,6 +421,7 @@ class MetaAdsLibraryApify:
             "is_active": is_active,
             "publisher_platforms": list(platforms) if platforms else [],
             "looks_shopify": _looks_like_shopify(str(landing_url or "")),
+            "collation_count": collation_count,
         }
 
     def _aggregate_advertisers(
@@ -367,11 +439,13 @@ class MetaAdsLibraryApify:
                 "page_url": ad.get("page_url"),
                 "ad_count": 0,
                 "creative_bodies": set(),
+                "collation_total": 0,
                 "max_days_active": 0,
                 "has_shopify_landing": False,
                 "landing_urls": [],
             })
             bucket["ad_count"] += 1
+            bucket["collation_total"] += int(ad.get("collation_count") or 1)
             if ad.get("creative_body"):
                 bucket["creative_bodies"].add(ad["creative_body"][:120])
             if ad.get("days_active") is not None:
@@ -385,12 +459,18 @@ class MetaAdsLibraryApify:
 
         out: list[dict[str, Any]] = []
         for b in buckets.values():
+            # variant_count = best of (distinct creative bodies, sum of
+            # actor-reported collation counts). Actors that already collapse
+            # variants into one row per collation report it via
+            # `collation_count`; older actors expose distinct bodies. Taking
+            # the max keeps both shapes working.
+            variant_count = max(len(b["creative_bodies"]), b["collation_total"])
             out.append({
                 "page_id": b["page_id"],
                 "page_name": b["page_name"],
                 "page_url": b["page_url"],
                 "ad_count": b["ad_count"],
-                "variant_count": len(b["creative_bodies"]),
+                "variant_count": variant_count,
                 "max_days_active": b["max_days_active"],
                 "has_shopify_landing": b["has_shopify_landing"],
                 "sample_landing_urls": b["landing_urls"][:3],

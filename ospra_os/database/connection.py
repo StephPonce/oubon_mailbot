@@ -54,13 +54,21 @@ def get_pool_args() -> dict:
     - 20 base + 30 overflow = 50 max connections
     - Handles 100+ concurrent users with proper async patterns
     """
+    # NOTE on sizing: pool_size + max_overflow must stay UNDER the database's
+    # max_connections. Neon/Render Postgres often caps well below 50, and with
+    # sync psycopg2 each web worker holds its own pool — so the effective total
+    # is (pool_size + max_overflow) x web-worker-count. Tune DB_POOL_SIZE /
+    # DB_POOL_OVERFLOW down (e.g. 10 / 10) if you see "too many connections".
     return {
         "pool_size": int(os.getenv("DB_POOL_SIZE", "20")),  # Configurable via env
         "max_overflow": int(os.getenv("DB_POOL_OVERFLOW", "30")),  # Configurable
         "pool_pre_ping": True,         # Verify connections before use
         "pool_recycle": 1800,          # Recycle connections after 30 min
         "pool_reset_on_return": "rollback",  # Always rollback on connection return
-        "pool_timeout": 30,            # Wait up to 30 seconds for a connection
+        # Fail fast instead of hanging: a request that can't get a connection
+        # in 10s should error rather than block for 30s and pile up (the old
+        # 30s value turned a brief pool contention spike into a cascade).
+        "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "10")),
     }
 
 

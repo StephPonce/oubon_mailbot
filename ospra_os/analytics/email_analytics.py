@@ -227,7 +227,7 @@ def get_analytics_summary(database_url: str) -> Dict[str, Any]:
         Dict with total_processed, total_replied, labels_applied
     """
     try:
-        tracker = AnalyticsTracker(database_url)
+        tracker = Analytics(database_url)
 
         # Get all-time stats
         metrics = tracker.session.query(EmailMetric).all()

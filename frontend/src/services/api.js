@@ -347,9 +347,14 @@ class OspraAPI {
     // we just send what the caller asks for and let the backend clamp + tag
     // tier_meta.clamped on the response. Sending more than the user's tier
     // allows is harmless — the backend trims and we surface the upgrade nudge.
-    const count = Math.min(params.count || params.limit || 10, 100);
-    const includeAiImages = params.includeAiImages !== false; // Enable AI images by default
-    const includeSentiment = params.includeSentiment !== false; // Enable sentiment by default
+    const count = Math.min(params.count || params.limit || 20, 100);
+    // AI image generation is MANUAL CLICK ONLY (per CLAUDE.md standing rule).
+    // Stability AI ~$0.06 per image; running it on every cold discovery
+    // call was burning budget AND making the call too slow for the browser.
+    // Default OFF; user clicks "Enhance" per product to invoke. Caller can
+    // still pass includeAiImages=true explicitly if needed (e.g. tests).
+    const includeAiImages = params.includeAiImages === true;
+    const includeSentiment = params.includeSentiment !== false; // sentiment ON — fast + cheap
     // Captions are LAZY-LOADED. Reason: caption generation hits Claude
     // ~10x in series under rate-limit, adding 6-12s to every cold load.
     // The dashboard doesn't render captions on the card until the user
@@ -1069,6 +1074,12 @@ Price: ${parseFloat(price).toFixed(2)}`;
     // Build payload matching backend SourceProduct schema.
     // CJ products use `all_images`; AliExpress uses a mix. We send both so
     // the backend can pick whichever is populated.
+    //
+    // Self-learning hookup: round-trip winner_provenance so the backend's
+    // /api/deploy/product can write a RecommendationOutcome row with full
+    // attribution. Without this, the feedback loop sees deploys from the
+    // Products page as "uncategorized" and can't credit the winner-source
+    // (Meta / TikTok Shop / Amazon Movers / Etsy) that surfaced the pick.
     const productPayload = {
       title: product.title || product.name,
       description: product.description || caption || product.title || product.name,
@@ -1078,6 +1089,19 @@ Price: ${parseFloat(price).toFixed(2)}`;
       images: product.all_images || (product.image_url ? [product.image_url] : []),
       all_images: product.all_images || null,
       source: product.source || 'aliexpress',
+      // Winner attribution (populated by backend's winner-first sourcing
+      // path in /api/discovery/quick) — flows back so /api/deploy/product
+      // can record per-source self-learning attribution. `source` stays as
+      // the routing key ('aliexpress' / 'cj_dropshipping'); winner_source
+      // and winner_provenance carry the "which winner surfaced this" info.
+      winner_source: product.winner_source || null,
+      winner_provenance: product.winner_provenance || null,
+      // Supplier identifiers we already have at discovery time — needed
+      // for the local Product row creation downstream.
+      product_id: product.product_id || product.cj_pid || null,
+      supplier_url: product.product_url || product.url || product.affiliate_url || null,
+      cost_price: product.cost_price || product.price || null,
+      suggested_price: product.suggested_price || product.retail_price || null,
     };
 
     return authService.post('/api/deploy/product', {

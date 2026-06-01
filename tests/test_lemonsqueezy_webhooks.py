@@ -52,23 +52,28 @@ def ls_secret(monkeypatch):
 @pytest.fixture
 def upgrade_capture(monkeypatch):
     """
-    Capture every ``upgrade_user_tier`` call instead of mutating the DB.
+    Capture every tier-change dispatch instead of enqueuing a real Celery task.
 
-    The route uses ``BackgroundTasks`` to dispatch the upgrade. With
-    Starlette's ``TestClient`` background tasks run synchronously after
-    the response is returned, so by the time ``client.post(...)`` returns
-    the captured list contains the upgrade arguments. We patch the
-    function on the route module (where it's looked up at call time).
+    The route now hands tier changes to the Celery task
+    ``ospra_os.tasks.billing_tasks.apply_subscription_change`` (via the
+    ``_enqueue_tier_change`` helper) so the DB write happens on a worker with
+    retry + dead-letter semantics, rather than the old in-request
+    ``BackgroundTasks(upgrade_user_tier)`` path. There is no broker/worker in
+    the test process, so we patch the task's ``.delay`` to capture the
+    ``(user_id, tier)`` it would have enqueued. The route converts user_id to
+    int before dispatch, so the captured value is already an int.
     """
     from ospra_os.api import webhook_routes
 
     captured: list[tuple[int, str]] = []
 
-    async def fake_upgrade(user_id: int, tier: str, db_session=None):
+    def fake_enqueue(user_id, tier, event_name=None, payload=None):
         captured.append((user_id, tier))
         return True
 
-    monkeypatch.setattr(webhook_routes, "upgrade_user_tier", fake_upgrade)
+    # Patch the route-level dispatch seam (not the Celery task) so these tests
+    # stay decoupled from the broker/worker and from the celery import.
+    monkeypatch.setattr(webhook_routes, "_enqueue_tier_change", fake_enqueue)
     return captured
 
 

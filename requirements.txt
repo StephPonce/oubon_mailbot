@@ -61,6 +61,12 @@ email-validator>=2.1.0
 # Redis (for caching/queues)
 redis>=5.0.1
 
+# Background task queue — imported by ospra_os/celery_app.py and ospra_os/tasks/*,
+# run as worker/beat/flower in docker-compose.yml. Was previously UNDECLARED, so
+# any environment installing from this file lacked Celery entirely and the task
+# system silently degraded. Broker/result backend is the Redis dependency above.
+celery>=5.3.0
+
 # Rate Limiting
 slowapi>=0.1.9
 

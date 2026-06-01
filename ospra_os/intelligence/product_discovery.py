@@ -28,7 +28,7 @@ import logging
 import os
 import re
 import time
-from typing import List, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
 
@@ -55,6 +55,47 @@ SUPPLIER_SOURCE_TIMEOUT = float(os.getenv("DISCOVERY_SUPPLIER_TIMEOUT", "12"))
 # products finish in the time of the slowest single call (~5s). 15s gives
 # headroom for cold-start latency on the first request.
 SENTIMENT_SOURCE_TIMEOUT = float(os.getenv("DISCOVERY_SENTIMENT_TIMEOUT", "15"))
+
+# Per-source trend-timeout overrides — Apify actors cold-start at 15-60s,
+# which the global TREND_SOURCE_TIMEOUT (default 10s) starves entirely.
+# The retired Winners-tab flow worked because /winners had its own 90s
+# middleware override; the new winner-first /quick flow needs the same
+# headroom AT THE PER-SOURCE LEVEL so fast sources (Google Trends) aren't
+# punished by giving slow sources their headroom globally.
+#
+# Empirically:
+#   - TikTok scraper (clockworks/free-tiktok-scraper): 30-60s cold
+#   - Meta Ad Library actor:                            20-45s cold
+#   - Amazon Movers / New Releases (Apify junglee):     15-30s cold
+#   - Pinterest / Etsy / TikTok Shop:                   ~15-25s cold
+#   - Google Trends (pytrends, in-process):             1-3s, never cold
+#
+# All env-overridable so we can re-tune from .env without a code change.
+TREND_SOURCE_TIMEOUT_OVERRIDES: Dict[str, float] = {
+    "tiktok_viral":              float(os.getenv("DISCOVERY_TIMEOUT_TIKTOK", "60")),
+    "meta_ads_library":          float(os.getenv("DISCOVERY_TIMEOUT_META", "45")),
+    "amazon_movers_rss":         float(os.getenv("DISCOVERY_TIMEOUT_AMAZON_MOVERS", "30")),
+    "amazon_new_releases_rss":   float(os.getenv("DISCOVERY_TIMEOUT_AMAZON_NEW_RELEASES", "30")),
+    "amazon_bsr":                float(os.getenv("DISCOVERY_TIMEOUT_AMAZON_BSR", "30")),
+    "etsy_trending":             float(os.getenv("DISCOVERY_TIMEOUT_ETSY", "25")),
+    "pinterest_trends":          float(os.getenv("DISCOVERY_TIMEOUT_PINTEREST", "20")),
+    "tiktok_shop":               float(os.getenv("DISCOVERY_TIMEOUT_TIKTOK_SHOP", "30")),
+}
+
+
+def _trend_timeout_for(label: str) -> float:
+    """Return the per-source trend timeout for a given task label.
+
+    Labels are emitted by `_get_trending_keywords` when it builds the
+    parallel task list (e.g. "tiktok_viral", "meta_ads_library",
+    "google_trends:smart"). google_trends:* hits the in-process pytrends
+    path which is fast — keep it on the tight global budget. Everything
+    else (Apify-backed) gets its per-source headroom from the override
+    table above; unknown labels fall back to the global cap.
+    """
+    if label.startswith("google_trends"):
+        return TREND_SOURCE_TIMEOUT
+    return TREND_SOURCE_TIMEOUT_OVERRIDES.get(label, TREND_SOURCE_TIMEOUT)
 
 
 def _with_timeout(coro, timeout: float):
@@ -334,6 +375,41 @@ def _compute_saturation(product: Dict) -> Dict:
         signals['twitter_chatter'] = round(sat, 3)
         weighted_sum += sat * 0.10
         weight_total += 0.10
+
+    # 6. Meta advertiser density — Task #9 Phase 2 direct measure.
+    # Until now, ali_order_volume was a proxy for "is this product crowded?"
+    # — high sales count was assumed to mean "lots of dropshippers selling
+    # it." But that's a noisy proxy: a product can have 50k orders from
+    # one super-seller and zero competition, or 200 orders spread across
+    # 30 dropshippers. The DIRECT measure is "how many distinct
+    # advertisers are running ads for this niche right now" — populated
+    # on the product by the scoring loop from
+    # engine._meta_winners_cache['advertisers'].
+    #
+    # Weight: 0.25 (same as the AE order proxy it complements). Over
+    # time we may zero out the AE proxy if this direct signal proves
+    # more predictive.
+    meta_advertiser_count = int(product.get('meta_niche_advertiser_count') or 0)
+    if meta_advertiser_count > 0:
+        # Translate advertiser count to saturation:
+        #   1-2   → 0.10 (blue ocean — almost no competition)
+        #   3-7   → 0.30 (validated, early — sweet spot for entry)
+        #   8-15  → 0.55 (established niche, multiple players)
+        #   16-30 → 0.75 (crowded, late entrant)
+        #   30+   → 0.90 (race to bottom)
+        if meta_advertiser_count >= 30:
+            sat = 0.90
+        elif meta_advertiser_count >= 16:
+            sat = 0.75
+        elif meta_advertiser_count >= 8:
+            sat = 0.55
+        elif meta_advertiser_count >= 3:
+            sat = 0.30
+        else:
+            sat = 0.10
+        signals['meta_advertiser_density'] = round(sat, 3)
+        weighted_sum += sat * 0.25
+        weight_total += 0.25
 
     if weight_total == 0:
         # No saturation data at all — return unknown / neutral.
@@ -911,10 +987,63 @@ class ProductDiscoveryEngine:
         logger.info(f"   ⏱️ Step 1 took {time.time() - step1_start:.2f}s")
 
         # =====================================================================
-        # STEP 2: SEARCH SUPPLIERS FOR TRENDING PRODUCTS (PARALLEL!)
+        # STEP 2a: WINNER-FIRST SOURCING (CLAUDE.md social-sentiment-first rule)
         # =====================================================================
+        # Read the winner caches that Step 1 already populated as side
+        # effects (Meta Ad Library, TikTok Shop, Amazon Movers, Etsy) and
+        # fan out to AE + CJ to source supplier matches PER WINNER. This
+        # replaces the old "throw the keywords at AE" flow that lost all
+        # the structured winner data.
+        #
+        # If no winners surfaced (small / unmapped niche), we fall through
+        # to the legacy keyword-based supplier search below as a safety net.
+        step2a_start = time.time()
+        logger.info("\n[WINNERS] STEP 2a: Winner-first sourcing (sentiment FIRST, sourcing per-winner)...")
+
+        winner_candidates = self._collect_winner_candidates(niche, max_per_source=5)
+        winner_products: List[Dict] = []
+        if winner_candidates:
+            # Per-winner AE/CJ budget — keep total parallel calls reasonable.
+            # 10 winners × 2 suppliers × 3 results = 60 candidates ideally.
+            winner_products = await self._source_winners_to_products(
+                winner_candidates,
+                niche=niche,
+                ae_per_winner=3,
+                cj_per_winner=3,
+            )
+            if winner_products:
+                data_sources_used.append('winner_first_sourcing')
+                logger.info(
+                    f"   ✓ Winner-first path sourced {len(winner_products)} products "
+                    f"in {time.time() - step2a_start:.2f}s"
+                )
+            else:
+                logger.warning(
+                    "   ⚠️ Winner candidates returned 0 AE/CJ matches — "
+                    "falling through to keyword-based search"
+                )
+        else:
+            logger.info(
+                "   ℹ️ No winner candidates surfaced — using keyword-based search "
+                "(legacy path)"
+            )
+
+        # =====================================================================
+        # STEP 2b: KEYWORD-BASED SUPPLIER SEARCH (fallback + supplement)
+        # =====================================================================
+        # Runs when winner-first produced fewer than max_products * 0.5
+        # results (so we always have at least a half-page to show). When
+        # winner-first nailed it, this is skipped entirely to save time.
+        winner_threshold = max(int(max_products * 0.5), 5)
+        skip_keyword_search = len(winner_products) >= winner_threshold
+        if skip_keyword_search:
+            logger.info(
+                f"   ⚡ Skipping keyword-based search — winner path already produced "
+                f"{len(winner_products)} products (threshold: {winner_threshold})"
+            )
+
         step2_start = time.time()
-        logger.info("\n[SUPPLIER] STEP 2: Searching suppliers IN PARALLEL...")
+        logger.info("\n[SUPPLIER] STEP 2b: Searching suppliers IN PARALLEL...")
 
         # Create all supplier fetch tasks to run concurrently
         supplier_tasks = []
@@ -941,65 +1070,122 @@ class ProductDiscoveryEngine:
         ali_per_kw   = max(10, min(40, max_products // 10)) # 10 → 40 per kw
         cj_count     = max(15, min(60, max_products // 5))  # 15 → 60
 
-        # AliExpress tasks - one per keyword (parallel keyword fetches)
-        if self.aliexpress_available:
-            for keyword in trending_keywords[:ali_keywords]:
-                supplier_tasks.append(self._fetch_aliexpress(keyword, count=ali_per_kw))
-                task_labels.append(f"aliexpress:{keyword[:20]}")
+        # Always start with whatever Step 2a's winner-first path produced.
+        # We split the flat winner_products list by source so the
+        # cross-reference step sees AE and CJ separately like it expects.
+        #
+        # `source` is now a routing key (always 'aliexpress' /
+        # 'cj_dropshipping') — winner attribution lives on
+        # `winner_source` + `winner_provenance` and doesn't affect
+        # routing decisions. See the comment in _source_winners_to_products
+        # for the bug this avoids.
+        #
+        # Dedup-by-product-id on BOTH sides — without this, when the keyword
+        # fallback below returns the same AE product that winner-first
+        # already sourced, the keyword version (no winner_provenance) gets
+        # appended alongside the tagged version. Then `_dedupe_by_title`
+        # later picks one based on oi_score, and the keyword version
+        # usually wins because the broader query produced richer signals —
+        # silently dropping our attribution.
+        aliexpress_products: List[Dict] = []
+        cj_products: List[Dict] = []
+        ae_seen_ids: set = set()
+        cj_seen_ids: set = set()
 
-        # CJ Dropshipping tasks
-        # Step B: CJ is rate-limited (1 req/sec). Previously we fired 3 tasks
-        # (1 category + 2 keyword) concurrently, which caused 429 cascades and
-        # burned our 12s per-source timeout. Now: ONE category-only task.
-        # If CJ's category search is empty, we'd rather know that cleanly than
-        # fall through to keyword spam that triggers rate limits.
-        if self.cj_available:
-            supplier_tasks.append(self._fetch_cj(keyword="", count=cj_count, niche=niche))
-            task_labels.append(f"cj:category:{niche}")
+        for p in winner_products:
+            src = str(p.get('source') or '')
+            if src == 'aliexpress':
+                pid = p.get('product_id')
+                if pid and pid not in ae_seen_ids:
+                    aliexpress_products.append(p)
+                    ae_seen_ids.add(pid)
+                elif not pid:
+                    # No product_id (rare) — keep it; dedup later via title.
+                    aliexpress_products.append(p)
+            elif src == 'cj_dropshipping':
+                pid = p.get('product_id')
+                if pid and pid not in cj_seen_ids:
+                    cj_products.append(p)
+                    cj_seen_ids.add(pid)
 
-        logger.info(
-            f"   📦 Supplier budget @ max_products={max_products}: "
-            f"AliExpress {ali_keywords}kw × {ali_per_kw} + CJ {cj_count} "
-            f"= {ali_keywords * ali_per_kw + cj_count} raw"
-        )
+        # Keyword-based supplier search runs ONLY when winner-first didn't
+        # produce enough to fill the page. Saves ~10s on hot niches where
+        # Meta/TikTok-Shop/etc. already nailed it.
+        if not skip_keyword_search:
+            # AliExpress tasks - one per keyword (parallel keyword fetches)
+            if self.aliexpress_available:
+                for keyword in trending_keywords[:ali_keywords]:
+                    supplier_tasks.append(self._fetch_aliexpress(keyword, count=ali_per_kw))
+                    task_labels.append(f"aliexpress:{keyword[:20]}")
 
-        # Execute ALL supplier fetches in parallel (each capped at SUPPLIER_SOURCE_TIMEOUT)
-        logger.info(
-            f"   🚀 Launching {len(supplier_tasks)} parallel supplier queries "
-            f"(per-source timeout: {SUPPLIER_SOURCE_TIMEOUT}s)..."
-        )
-        supplier_tasks_timed = [_with_timeout(t, SUPPLIER_SOURCE_TIMEOUT) for t in supplier_tasks]
-        results = await asyncio.gather(*supplier_tasks_timed, return_exceptions=True)
+            # CJ Dropshipping tasks
+            # Step B: CJ is rate-limited (1 req/sec). Previously we fired 3 tasks
+            # (1 category + 2 keyword) concurrently, which caused 429 cascades and
+            # burned our 12s per-source timeout. Now: ONE category-only task.
+            # If CJ's category search is empty, we'd rather know that cleanly than
+            # fall through to keyword spam that triggers rate limits.
+            if self.cj_available:
+                supplier_tasks.append(self._fetch_cj(keyword="", count=cj_count, niche=niche))
+                task_labels.append(f"cj:category:{niche}")
 
-        # Process results
-        aliexpress_products = []
-        cj_products = []
-        cj_seen_ids = set()
+            logger.info(
+                f"   📦 Supplier budget @ max_products={max_products}: "
+                f"AliExpress {ali_keywords}kw × {ali_per_kw} + CJ {cj_count} "
+                f"= {ali_keywords * ali_per_kw + cj_count} raw"
+            )
 
-        for i, result in enumerate(results):
-            label = task_labels[i] if i < len(task_labels) else f"task_{i}"
+            # Execute ALL supplier fetches in parallel (each capped at SUPPLIER_SOURCE_TIMEOUT)
+            logger.info(
+                f"   🚀 Launching {len(supplier_tasks)} parallel supplier queries "
+                f"(per-source timeout: {SUPPLIER_SOURCE_TIMEOUT}s)..."
+            )
+            supplier_tasks_timed = [_with_timeout(t, SUPPLIER_SOURCE_TIMEOUT) for t in supplier_tasks]
+            results = await asyncio.gather(*supplier_tasks_timed, return_exceptions=True)
 
-            if isinstance(result, asyncio.TimeoutError):
-                logger.warning(f"   ⏱️ {label} TIMED OUT after {SUPPLIER_SOURCE_TIMEOUT}s - skipped")
-                continue
-            if isinstance(result, Exception):
-                logger.warning(f"   ⚠️ {label} failed: {result}")
-                continue
+            for i, result in enumerate(results):
+                label = task_labels[i] if i < len(task_labels) else f"task_{i}"
 
-            if not result:
-                continue
+                if isinstance(result, asyncio.TimeoutError):
+                    logger.warning(f"   ⏱️ {label} TIMED OUT after {SUPPLIER_SOURCE_TIMEOUT}s - skipped")
+                    continue
+                if isinstance(result, Exception):
+                    logger.warning(f"   ⚠️ {label} failed: {result}")
+                    continue
 
-            if label.startswith("aliexpress"):
-                aliexpress_products.extend(result)
-                logger.debug(f"   ✓ {label}: {len(result)} products")
-            elif label.startswith("cj"):
-                # Dedupe CJ products
-                for p in result:
-                    pid = p.get('product_id')
-                    if pid and pid not in cj_seen_ids:
-                        cj_products.append(p)
-                        cj_seen_ids.add(pid)
-                logger.debug(f"   ✓ {label}: {len(result)} products")
+                if not result:
+                    continue
+
+                if label.startswith("aliexpress"):
+                    # Dedupe AE products against winner-path picks — without
+                    # this the keyword version of an already-tagged product
+                    # collides and downstream title-dedup may keep the
+                    # untagged copy, dropping winner_provenance attribution.
+                    added = 0
+                    skipped = 0
+                    for p in result:
+                        pid = p.get('product_id')
+                        if pid and pid in ae_seen_ids:
+                            skipped += 1
+                            continue
+                        aliexpress_products.append(p)
+                        if pid:
+                            ae_seen_ids.add(pid)
+                        added += 1
+                    if skipped:
+                        logger.debug(
+                            f"   ✓ {label}: +{added} new / {skipped} already had "
+                            "winner-first attribution"
+                        )
+                    else:
+                        logger.debug(f"   ✓ {label}: {added} products")
+                elif label.startswith("cj"):
+                    # Dedupe CJ products against winner-path picks too
+                    for p in result:
+                        pid = p.get('product_id')
+                        if pid and pid not in cj_seen_ids:
+                            cj_products.append(p)
+                            cj_seen_ids.add(pid)
+                    logger.debug(f"   ✓ {label}: {len(result)} products")
 
         if aliexpress_products:
             data_sources_used.append('aliexpress')
@@ -1008,7 +1194,10 @@ class ProductDiscoveryEngine:
 
         logger.info(f"   [CART] AliExpress: {len(aliexpress_products)} products")
         logger.info(f"   [PACKAGE] CJ Dropshipping: {len(cj_products)} products")
-        logger.info(f"   ⏱️ Step 2 (parallel) took {time.time() - step2_start:.2f}s")
+        if skip_keyword_search:
+            logger.info("   ⏱️ Step 2b skipped (winner path satisfied page)")
+        else:
+            logger.info(f"   ⏱️ Step 2b (parallel) took {time.time() - step2_start:.2f}s")
 
         # =====================================================================
         # STEP 3: CROSS-REFERENCE SUPPLIERS
@@ -1160,7 +1349,13 @@ class ProductDiscoveryEngine:
         step5_start = time.time()
         logger.info("\n[SCORE] STEP 5: Calculating OI scores...")
 
-        scored_products = self._calculate_scores(all_products)
+        # Task #24: pass the user-facing category niche down so per-product
+        # relevance can fall back to it. Otherwise each product carries the
+        # specific search keyword that found it ("LED strip lights RGB",
+        # "wifi smart plug") which doesn't match any RELEVANCE_KEYWORDS
+        # entry, so every product silently scores 70 via the generic
+        # word-overlap path.
+        scored_products = self._calculate_scores(all_products, category_niche=niche)
 
         # Per-source min_score (Task #31 — confirmed CJ killer May 11).
         # CJ-only products have no AE buyer signals (no AliExpress velocity,
@@ -1490,12 +1685,57 @@ class ProductDiscoveryEngine:
             f"surviving dedup: {cj_after_dedup}"
         )
 
-        final = url_valid[:max_products]
+        # Task #26: Source-quota split for the top-N slice.
+        # Previous behaviour was a naive `url_valid[:max_products]` — when
+        # AE products consistently outscored CJ products (which they do
+        # in most niches because AE has richer signals), the final result
+        # ended up 100% AliExpress. That kills Task #15 (sourcing UI shows
+        # AE + CJ side-by-side per product) — there are no CJ products to
+        # show.
+        #
+        # Fix: allocate a guaranteed CJ quota (default 30%) and fill the
+        # rest from AE. If either side has fewer candidates than its quota,
+        # the unused slots go back to the other pool so total count is
+        # preserved. Final list is re-sorted by oi_score so the highest-
+        # scoring picks appear first regardless of source.
+        def _is_cj_product(p):
+            return (
+                p.get('source') == 'cj_dropshipping'
+                or 'cj_dropshipping' in (p.get('available_on') or [])
+            )
+
+        ae_pool = [p for p in url_valid if not _is_cj_product(p)]
+        cj_pool = [p for p in url_valid if _is_cj_product(p)]
+
+        cj_quota_ratio = float(os.getenv("DISCOVERY_CJ_QUOTA_RATIO", "0.3"))
+        cj_quota = max(1, int(round(max_products * cj_quota_ratio)))
+        ae_quota = max(1, max_products - cj_quota)
+
+        ae_picked = ae_pool[:ae_quota]
+        cj_picked = cj_pool[:cj_quota]
+
+        # Backfill: top up the under-filled side from the other pool so
+        # the total still hits max_products.
+        ae_short = ae_quota - len(ae_picked)
+        cj_short = cj_quota - len(cj_picked)
+        if cj_short > 0:
+            ae_picked = ae_pool[:ae_quota + cj_short]
+        if ae_short > 0:
+            cj_picked = cj_pool[:cj_quota + ae_short]
+
+        combined = ae_picked + cj_picked
+        # Re-sort by oi_score so ranking still reflects quality. Final
+        # list will be a mix of AE and CJ in score order — Task #15
+        # sourcing UI then groups them per product for side-by-side
+        # comparison.
+        combined.sort(key=lambda p: (p.get('oi_score') or 0), reverse=True)
+        final = combined[:max_products]
 
         cj_in_final = _cj_count(final)
+        ae_in_final = len(final) - cj_in_final
         logger.info(
-            f"   [CJ FUNNEL] after max_products slice ({max_products}): "
-            f"{cj_in_final} CJ products in final response"
+            f"   [CJ FUNNEL] quota split: target {ae_quota}AE + {cj_quota}CJ → "
+            f"actual {ae_in_final}AE + {cj_in_final}CJ"
         )
 
         # Caption generation (Task #16). Generates a per-product Shopify
@@ -1670,21 +1910,41 @@ class ProductDiscoveryEngine:
             trend_tasks.append(self._fetch_tiktok_shop_trends(niche))
             trend_labels.append("tiktok_shop")
 
-        # Execute ALL trend queries in parallel (each capped at TREND_SOURCE_TIMEOUT)
+        # Execute ALL trend queries in parallel — each capped at its
+        # per-source timeout (see TREND_SOURCE_TIMEOUT_OVERRIDES). Fast
+        # sources (Google Trends) use the 10s global default; slow
+        # Apify actors (TikTok, Meta) get 45-60s.
         if trend_tasks:
+            per_source_timeouts = [_trend_timeout_for(lbl) for lbl in trend_labels]
+            timeout_summary = ", ".join(
+                f"{lbl}={t:g}s" for lbl, t in zip(trend_labels, per_source_timeouts)
+            )
             logger.info(
                 f"   🚀 Launching {len(trend_tasks)} parallel trend queries "
-                f"(per-source timeout: {TREND_SOURCE_TIMEOUT}s)..."
+                f"(per-source timeouts: {timeout_summary})..."
             )
-            trend_tasks_timed = [_with_timeout(t, TREND_SOURCE_TIMEOUT) for t in trend_tasks]
+            trend_tasks_timed = [
+                _with_timeout(t, to)
+                for t, to in zip(trend_tasks, per_source_timeouts)
+            ]
             trend_results = await asyncio.gather(*trend_tasks_timed, return_exceptions=True)
 
             # Process results
             for i, result in enumerate(trend_results):
                 label = trend_labels[i] if i < len(trend_labels) else f"trend_{i}"
+                # Pull the per-source timeout that ACTUALLY fired for this
+                # task, not the global default — without this the log lies
+                # ("TIMED OUT after 10.0s") when slow Apify sources get
+                # their 45-60s budget but still don't finish.
+                effective_timeout = (
+                    per_source_timeouts[i]
+                    if i < len(per_source_timeouts) else TREND_SOURCE_TIMEOUT
+                )
 
                 if isinstance(result, asyncio.TimeoutError):
-                    logger.warning(f"   ⏱️ {label} TIMED OUT after {TREND_SOURCE_TIMEOUT}s - skipped")
+                    logger.warning(
+                        f"   ⏱️ {label} TIMED OUT after {effective_timeout:g}s - skipped"
+                    )
                     continue
                 if isinstance(result, Exception):
                     logger.warning(f"   ⚠️ {label} failed: {result}")
@@ -1965,119 +2225,317 @@ class ProductDiscoveryEngine:
             logger.debug(f"Pinterest trends fetch failed: {e}")
             return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'pinterest_trends'}
 
+    # Task #4: sub-niche expansion for Meta Ad Library queries.
+    # Research from 6+ dropshipping product-discovery sources unanimously
+    # says: search SUB-NICHES and angle keywords, not broad category names.
+    # Querying Meta for "smart home" returns brands that USE the phrase in
+    # marketing copy (GlowRight, Houdini Holster) — not the actual product
+    # winners. Real winners run ads on specific sub-categories ("smart plug",
+    # "video doorbell") or angle/outcome keywords ("control with phone").
+    # This dict expands each top-level niche into 5-8 sub-queries that get
+    # run in parallel; results aggregate and dedupe by advertiser page_id.
+    # Falls back to [niche] if no expansion defined.
+    NICHE_SUBQUERIES: Dict[str, List[str]] = {
+        "smart_home": [
+            "smart plug", "video doorbell", "smart bulb", "motion sensor",
+            "smart lock", "smart camera", "smart switch", "robot vacuum",
+        ],
+        "kitchen": [
+            "kitchen gadget", "knife sharpener", "vegetable chopper",
+            "spice rack", "electric grinder", "silicone utensil",
+            "coffee maker", "air fryer accessory",
+        ],
+        "fitness": [
+            "resistance band", "foam roller", "massage gun",
+            "posture corrector", "yoga mat", "ab roller",
+            "compression sleeve", "jump rope",
+        ],
+        "beauty": [
+            "led face mask", "facial cleansing brush", "jade roller",
+            "hair straightener", "lash serum", "derma roller",
+            "scalp massager", "eyebrow tool",
+        ],
+        "pet": [
+            "self-cleaning brush", "pet water fountain", "interactive cat toy",
+            "no-pull harness", "dog dental chew", "pet hair remover",
+            "automatic feeder", "pet camera",
+        ],
+        "tech": [
+            "wireless charger", "magsafe accessory", "phone stand",
+            "carplay adapter", "usb-c hub", "portable monitor",
+            "wireless earbuds", "screen protector",
+        ],
+        "home_decor": [
+            "led wall light", "sunset projector", "smart led strip",
+            "wall art print", "ambient lamp", "decorative shelf",
+            "macrame hanging", "rug pad",
+        ],
+        "office": [
+            "standing desk", "monitor arm", "ergonomic chair",
+            "desk organizer", "cable management", "laptop stand",
+            "footrest", "wrist rest",
+        ],
+        "outdoor": [
+            "camping lantern", "portable grill", "hammock chair",
+            "solar light", "garden tool", "outdoor projector",
+            "patio heater", "cooler bag",
+        ],
+        "car": [
+            "magsafe car mount", "wireless carplay", "dash camera",
+            "car vacuum", "led headlight bulb", "tire inflator",
+            "car organizer", "obd2 scanner",
+        ],
+        "baby": [
+            "baby monitor", "white noise machine", "diaper organizer",
+            "teething toy", "baby carrier", "swaddle blanket",
+            "bottle warmer", "nursery night light",
+        ],
+    }
+
     async def _fetch_meta_ads_trends(self, niche: str) -> dict:
         """
-        Task #10: Meta Ad Library as a winner-proof source.
+        Task #10 + Task #4: Meta Ad Library as a winner-proof source,
+        with sub-niche expansion.
 
-        Pulls active ads matching the niche keyword and surfaces three
-        derived signals:
+        Pulls active ads matching multiple sub-niche queries (not just the
+        broad niche name) and surfaces three derived signals:
 
         1. `keywords` — common phrases from creative titles / bodies of
-           proven-winner advertisers. These get merged into the
-           trending-keywords pool so AE/CJ supplier searches pick them
-           up downstream.
-        2. `winners` — list of advertiser pages that pass the
-           14d-active × 3-variants × Shopify-landing heuristic. The
-           scoring pass can later inflate products that match by name.
-        3. `ad_count` — total active ads in the niche. Useful as a
-           saturation signal (lots of competition = harder market).
+           proven-winner advertisers across all sub-queries.
+        2. `winners` — list of unique advertiser pages (deduped by
+           page_id) that pass the 14d × 3-variants × Shopify heuristic
+           in ANY sub-query.
+        3. `ad_count` — total active ads across all sub-queries.
 
-        Returns the same dict shape as `_fetch_pinterest_trends` so the
-        merge loop in `_get_trending_keywords` treats it identically.
+        Why sub-niche expansion: querying Meta for "smart home" returns
+        brands that USE the phrase in marketing copy (GlowRight, Houdini
+        Holster) — not the actual product winners. Real smart-home
+        winners run ads on specific sub-niches ("smart plug",
+        "video doorbell"). Multi-query aggregation surfaces 5-10× more
+        relevant winners per niche.
 
-        Caveat: each Apify call costs $0.30-$1.00 per 1k ads. We cap at
-        50 ads per discovery cycle. If the niche has very low ad
-        density, we may return zero winners — that's a real signal
-        ("nobody's running ads = blue ocean"), not a failure.
+        Cost: each Apify call is ~$0.0008/ad. For smart_home with 8
+        sub-queries × 25 ads each = 200 ads × $0.0008 = ~$0.16/discovery.
+        Acceptable.
         """
         if not getattr(self, "meta_ads_scraper", None):
             return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'meta_ads'}
 
-        # The connector hits Ad Library full-text search — niche keys
-        # like "smart_home" become "smart home" before query.
-        query = niche.replace("_", " ").strip() or "trending"
+        # Expand the niche into sub-queries. Falls back to a single-element
+        # list containing the niche itself if no expansion is defined
+        # (preserves backward compatibility for niches not yet mapped).
+        broad_query = niche.replace("_", " ").strip() or "trending"
+        sub_queries = self.NICHE_SUBQUERIES.get(niche.lower()) or [broad_query]
+        # Always include the broad query as a fallback, deduped at the end.
+        if broad_query not in sub_queries:
+            sub_queries = list(sub_queries) + [broad_query]
 
-        try:
-            result = await self.meta_ads_scraper.search_active_ads(
-                keyword=query,
-                country="US",
-                max_ads=50,
-                active_only=True,
+        logger.info(
+            f"[meta-ads] expanding niche '{niche}' to "
+            f"{len(sub_queries)} sub-queries: {sub_queries}"
+        )
+
+        # Per-query cap. Lower than the old single-query cap of 50 to
+        # keep total Apify spend roughly equivalent across both modes.
+        per_query_cap = 25
+
+        # Run all sub-queries in parallel via asyncio.gather. Apify calls
+        # are I/O bound, so this parallelism is essentially free.
+        async def _one(q: str) -> dict:
+            try:
+                return await self.meta_ads_scraper.search_active_ads(
+                    keyword=q,
+                    country="US",
+                    max_ads=per_query_cap,
+                    active_only=True,
+                )
+            except Exception as e:
+                logger.debug(f"Meta Ad Library sub-query '{q}' failed: {e}")
+                return {'available': False, 'error': str(e), 'keyword': q}
+
+        results = await asyncio.gather(*[_one(q) for q in sub_queries])
+
+        # Aggregate across sub-query results. Dedup by page_id so the
+        # same advertiser appearing in multiple sub-queries only counts
+        # once. Track which sub-query first surfaced each advertiser so
+        # downstream code can see the discovery path.
+        all_winners_by_page: Dict[str, dict] = {}
+        all_advertisers_by_page: Dict[str, dict] = {}
+        total_ad_count = 0
+        per_query_stats: List[dict] = []
+
+        for q, r in zip(sub_queries, results):
+            if not isinstance(r, dict):
+                per_query_stats.append({'query': q, 'available': False, 'error': 'invalid_response'})
+                continue
+            if not r.get('available'):
+                per_query_stats.append({
+                    'query': q,
+                    'available': False,
+                    'error': r.get('error'),
+                })
+                continue
+
+            ad_count = int(r.get('ad_count', 0))
+            total_ad_count += ad_count
+
+            for w in r.get('winners') or []:
+                pid = str(w.get('page_id') or w.get('page_name') or '')
+                if pid and pid not in all_winners_by_page:
+                    w = dict(w)
+                    w['surfaced_by_query'] = q
+                    all_winners_by_page[pid] = w
+
+            for adv in r.get('advertisers') or []:
+                pid = str(adv.get('page_id') or adv.get('page_name') or '')
+                if pid and pid not in all_advertisers_by_page:
+                    adv = dict(adv)
+                    adv['surfaced_by_query'] = q
+                    all_advertisers_by_page[pid] = adv
+
+            per_query_stats.append({
+                'query': q,
+                'available': True,
+                'ad_count': ad_count,
+                'winners': len(r.get('winners') or []),
+            })
+
+        winners = list(all_winners_by_page.values())
+        advertisers = list(all_advertisers_by_page.values())
+
+        # Task #9: niche-relevance filter at Meta layer. Sub-query Meta
+        # search returns winners that match ANY single token in the
+        # sub-query (e.g. WYBOT matched "robot vacuum" because their
+        # pool-cleaning robots contain "robot"). Without this filter,
+        # Pat Kay (photography), Over 40 & Fabulous (beauty), WYBOT
+        # (pool robotics) all surface as smart_home winners.
+        #
+        # Heuristic: a winner is niche-relevant if at least 2 distinct
+        # niche-token strings appear as substrings in its page_name +
+        # sample_landing_urls. The 2-token requirement filters out
+        # single-keyword false positives — a truly on-niche brand will
+        # mention multiple category words across its name and URLs,
+        # whereas off-niche brands only happen to hit the one keyword
+        # that surfaced them.
+        # Build the niche keyword set from sub-queries, then ALSO add
+        # common 3-char prefix forms so URL slug abbreviations match.
+        # URL slugs frequently shorten: "wyze-cam-v3" not "wyze-camera-v3",
+        # "smart-vac" not "smart-vacuum". Without prefix expansion the
+        # filter rejects legitimately-on-niche brands like Wyze.
+        niche_keyword_set: set = set()
+        ABBREVIATIONS = {
+            'camera': ['cam'],
+            'vacuum': ['vac'],
+            'video':  ['vid'],
+            'doorbell': ['bell', 'door'],
+            'sensor': ['sens'],
+            'monitor': ['mon'],
+        }
+        for sq in sub_queries:
+            for tok in sq.lower().split():
+                if len(tok) >= 3:
+                    niche_keyword_set.add(tok)
+                    for abbr in ABBREVIATIONS.get(tok, []):
+                        niche_keyword_set.add(abbr)
+
+        def _is_niche_relevant(entry: dict) -> tuple[bool, set]:
+            """Return (kept, matched_tokens) for this winner/advertiser.
+
+            Substring match handles abbreviations like "cam" vs "camera"
+            and URL slugs like "wyze-cam-v3" where hyphens would split
+            tokens. Requires 2 distinct matches so single-keyword false
+            positives (e.g. WYBOT matching only "robot" because they sell
+            pool robots) get filtered.
+            """
+            content_parts = [str(entry.get('page_name') or '')]
+            for url in entry.get('sample_landing_urls') or []:
+                if isinstance(url, str):
+                    content_parts.append(url)
+            content = ' '.join(content_parts).lower()
+            matched = {tok for tok in niche_keyword_set if tok in content}
+            return (len(matched) >= 2, matched)
+
+        winners_pre_filter = len(winners)
+        advertisers_pre_filter = len(advertisers)
+        winners = [
+            {**w, 'niche_relevance_matched': sorted(matched)}
+            for w in winners
+            for kept, matched in [_is_niche_relevant(w)]
+            if kept
+        ]
+        advertisers = [
+            {**a, 'niche_relevance_matched': sorted(matched)}
+            for a in advertisers
+            for kept, matched in [_is_niche_relevant(a)]
+            if kept
+        ]
+        winners_dropped = winners_pre_filter - len(winners)
+        advertisers_dropped = advertisers_pre_filter - len(advertisers)
+        if winners_dropped or advertisers_dropped:
+            logger.info(
+                f"[meta-ads] niche-relevance filter dropped {winners_dropped} "
+                f"winners and {advertisers_dropped} advertisers as off-niche "
+                f"(requires 2+ niche keywords in page_name/URLs)"
             )
-        except Exception as e:
-            logger.debug(f"Meta Ad Library fetch failed: {e}")
-            return {'keywords': [], 'trend_direction': 'UNKNOWN', 'source': 'meta_ads'}
 
-        if not result.get("available"):
-            return {
-                'keywords': [],
-                'trend_direction': 'UNKNOWN',
-                'source': 'meta_ads',
-                'error': result.get("error"),
-            }
-
-        # Extract keyword candidates from the creative titles of the
-        # advertisers that pass the winner heuristic. Falls back to
-        # all advertisers if no clear winners (still better signal
-        # than nothing).
-        winners = result.get("winners") or []
-        seed_pool = winners or result.get("advertisers") or []
+        # Extract keyword candidates from winners (preferred) or all
+        # advertisers if no winners cleared the heuristic.
+        seed_pool = winners or advertisers[:10]
         keywords: list[str] = []
         for adv in seed_pool[:10]:
-            name = (adv.get("page_name") or "").strip()
+            name = (adv.get('page_name') or '').strip()
             if name:
-                # Page names are often "Brand X Co" — strip generic
-                # suffixes that don't help downstream search.
                 tokens = [
                     t for t in name.split()
                     if len(t) > 2 and t.lower() not in {
-                        "the", "and", "shop", "store", "co", "inc",
-                        "llc", "ltd",
+                        'the', 'and', 'shop', 'store', 'co', 'inc',
+                        'llc', 'ltd',
                     }
                 ]
                 if tokens:
-                    keywords.append(" ".join(tokens[:3]))
+                    keywords.append(' '.join(tokens[:3]))
 
-        # Pull standout phrases from creative bodies as a secondary
-        # keyword source. Most ad copy starts with a hook phrase that
-        # describes the product positioning ("Stop snoring tonight",
-        # "Pet hair gone in seconds", etc).
-        for ad in (result.get("ads_sample") or [])[:5]:
-            body = (ad.get("creative_body") or "").strip()
-            if body:
-                first = body.split(".")[0]  # first sentence
-                if 6 <= len(first) <= 60:
-                    keywords.append(first)
-
-        # Many advertisers = market is hot. Few = blue ocean. We map
-        # that to a direction the merge loop already understands.
-        ad_count = int(result.get("ad_count", 0))
-        if ad_count == 0:
-            direction = "UNKNOWN"
-        elif ad_count >= 25:
-            direction = "RISING"
-        elif ad_count >= 5:
-            direction = "STABLE"
+        # Direction from aggregate ad count.
+        if total_ad_count == 0:
+            direction = 'UNKNOWN'
+        elif total_ad_count >= 25:
+            direction = 'RISING'
+        elif total_ad_count >= 5:
+            direction = 'STABLE'
         else:
-            direction = "FALLING"
+            direction = 'FALLING'
 
-        # Stash the structured winner data on the engine so the scoring
-        # pass can read it later (Phase 2 — Task #15 will use this to
-        # inflate scores of products matching winning advertisers).
+        # Stash structured data on the engine for the scoring pass.
         self._meta_winners_cache = {
             'niche': niche,
+            'sub_queries_run': sub_queries,
+            'per_query_stats': per_query_stats,
             'winners': winners,
-            'advertisers': result.get("advertisers") or [],
-            'ad_count': ad_count,
+            'advertisers': advertisers,
+            'ad_count': total_ad_count,
             'fetched_at': datetime.now().isoformat(),
+            # Task #9: niche-filter transparency
+            'niche_filter': {
+                'keyword_set': sorted(niche_keyword_set),
+                'winners_dropped': winners_dropped,
+                'advertisers_dropped': advertisers_dropped,
+                'winners_kept': len(winners),
+            },
         }
+
+        logger.info(
+            f"[meta-ads] aggregated {len(winners)} unique winners, "
+            f"{len(advertisers)} unique advertisers, {total_ad_count} total ads "
+            f"across {len(sub_queries)} sub-queries"
+        )
 
         return {
             'keywords': keywords,
             'trend_direction': direction,
             'source': 'meta_ads',
-            'ad_count': ad_count,
+            'ad_count': total_ad_count,
             'winner_count': len(winners),
+            'sub_query_count': len(sub_queries),
         }
 
     async def _fetch_amazon_movers_rss(self, niche: str) -> dict:
@@ -3714,7 +4172,978 @@ class ProductDiscoveryEngine:
     # STEP 5: SCORING (FIXED - Extract real data, build score_breakdown)
     # =========================================================================
 
-    def _calculate_scores(self, products: List[Dict]) -> List[Dict]:
+    # =========================================================================
+    # CROSS-SOURCE MATCHING (Task #30)
+    # =========================================================================
+    # Meta Ad Library tells us *which products are paying for their ad spend
+    # right now* (the winner-heuristic: 14+ days active × 3+ creative variants
+    # × Shopify landing). That's the strongest market signal Ospra has.
+    #
+    # But the AE search returns products by keyword query — there's no
+    # automatic link between "Scentify is winning on Meta" and "this AE
+    # aromatherapy diffuser is the same product type." Without that link,
+    # the AE product gets ranked purely on AE-internal signals (velocity,
+    # rating, buzz) and the Meta winner data sits unused.
+    #
+    # This module bridges that gap. It builds a keyword index from the
+    # cached Meta winners' landing URLs (Shopify slug paths almost always
+    # contain product-type tokens — "aroma-diffuser", "portable-charger",
+    # "magnetic-wallet"). Then each AE product's title is tokenised and
+    # matched against the index. A match boosts the product's trend_score
+    # and sets trend_source = 'meta_winner_match'.
+    #
+    # This is the minimum-viable cross-source matcher. Future work
+    # (embedding similarity, supplier-side image matching) is in Task #14.
+    # =========================================================================
+
+    # Stopword set for keyword extraction — strip generic e-commerce noise
+    # so the matcher operates on product-type tokens. Expanded May 2026
+    # (Task #34) after the GlowRight matcher mistakenly hit car halo-ring
+    # AE products via overlap on {halo, lights}: "lights" is too generic
+    # to anchor a match. Added product-category generics, WH-question
+    # words from URL slugs ("why-halo-lux" → drop "why"), and pronouns.
+    _MATCH_STOPWORDS = frozenset({
+        # standard English stopwords
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+        'has', 'have', 'in', 'is', 'it', 'of', 'on', 'or', 'that', 'the',
+        'to', 'was', 'were', 'with', 'we', 'you', 'they', 'this', 'these',
+        'those', 'our', 'their', 'your', 'all', 'any', 'one', 'two',
+        # WH-words (common in marketing-page slugs like /why-product-x)
+        'why', 'how', 'what', 'when', 'where', 'who', 'which',
+        # e-commerce noise
+        'shop', 'store', 'official', 'best', 'new', 'buy', 'get', 'sale',
+        'free', 'shipping', 'usa', 'us', 'co', 'inc', 'llc', 'ltd',
+        # product modifiers (too generic to anchor a match)
+        'pro', 'plus', 'mini', 'max', 'set', 'pcs', 'pack', 'inch', 'cm',
+        'mm', 'kit', 'app', 'wifi', 'led', 'usb', 'rgb', 'smart',
+        'wireless', 'rechargeable', 'portable', 'compact', 'premium',
+        # product-category generics — these caused the GlowRight false
+        # positive. They appear in titles for many unrelated categories
+        # (car halo lights ≠ smart-home halo lights). Removing them
+        # forces the matcher to anchor on more specific product nouns.
+        'light', 'lights', 'lamp', 'lamps', 'device', 'gear', 'item',
+        'product', 'products', 'page', 'pages', 'home', 'collection',
+        # Task #2 (round 3): marketing/quality words that appear in
+        # Shopify URL slugs without contributing product-type info.
+        # Houdini Holster yielded [breakout, built, concealment, copy,
+        # holster, maximum] — "built/maximum/breakout/copy" come from
+        # slugs like /products/copy-of-foo, /pages/built-for-X, etc.
+        'copy', 'built', 'build', 'breakout', 'maximum', 'ultimate', 'ultra',
+        'mega', 'super', 'best', 'top', 'original', 'classic',
+        'signature', 'essential', 'elite', 'advanced', 'professional',
+        'standard', 'basic', 'deluxe', 'supreme', 'designed', 'crafted',
+        'made', 'perfect', 'amazing', 'great', 'special', 'unique',
+        'genuine', 'real', 'true', 'pure', 'fine', 'high', 'low',
+        # Caught in the Scentify/WYBOT/GlowRight slugs — marketing
+        # filler that surfaces as keywords but never matches AE titles
+        'bundle', 'full', 'different', 'dif', 'experience', 'introducing',
+        'meet', 'love', 'must', 'have', 'need', 'want',
+        # action / decision words (common in Shopify CTAs and pages)
+        'buy', 'order', 'learn', 'explore', 'discover', 'try',
+        'about', 'contact', 'support', 'help', 'guide', 'reviews',
+    })
+
+    def _extract_meta_winner_index(self) -> Dict[str, Dict[str, Any]]:
+        """Build a {page_id: {keywords, max_days, variants, page_name}} index
+        from the engine's cached Meta winners.
+
+        Pulls keywords from each advertiser's sample landing URL slugs —
+        Shopify product URLs (`/products/<slug>`, `/pages/<slug>`,
+        `/collections/<slug>`) almost always carry the product type in
+        the slug. Falls back to page_name tokens if no slug keywords
+        are extractable.
+
+        Returns an empty dict when no winner cache exists — caller treats
+        that as "no Meta signal" and skips the boost.
+        """
+        cache = getattr(self, '_meta_winners_cache', None) or {}
+        winners = cache.get('winners') or []
+        advertisers = cache.get('advertisers') or []
+
+        # Prefer explicit winners (passed the proven-winner heuristic).
+        # If none yet, fall back to the top advertisers by ad_count — still
+        # better signal than nothing, with the understanding that the
+        # match score below will be moderated by max_days_active / variants
+        # so weak advertisers don't get the same boost as winners.
+        seed = winners or advertisers[:5]
+
+        index: Dict[str, Dict[str, Any]] = {}
+        for adv in seed:
+            page_id = (
+                adv.get('page_id')
+                or adv.get('page_name')
+                or adv.get('pageId')
+                or ''
+            )
+            if not page_id:
+                continue
+
+            # Primary source: Shopify-style slugs in sample_landing_urls.
+            # These are the most product-specific keywords we have — a
+            # URL slug like "/products/aroma-diffuser-pro" reliably
+            # describes the product type, not the brand.
+            #
+            # Task #6: track keywords PER SLUG, not as a flat union.
+            # Multi-product brands (Wyze, Anker) ship multiple SKUs from
+            # different product slugs (/wyze-bulb, /wyze-cam-v3). Unioning
+            # the keywords makes the matcher require BOTH "bulb" AND "cam"
+            # in one AE title — impossible because no single AE clone is
+            # both a bulb AND a camera. Tracking per-slug lets the matcher
+            # check overlap against ONE slug at a time.
+            slug_keyword_groups: list[set] = []
+            slug_keywords_union: set = set()  # for legacy callers
+            for url in adv.get('sample_landing_urls') or []:
+                if not isinstance(url, str):
+                    continue
+                u = url.lower()
+                slug_tokens: set = set()
+                for marker in ('/products/', '/product/', '/pages/', '/collections/'):
+                    if marker in u:
+                        tail = u.split(marker, 1)[1]
+                        slug = tail.split('?', 1)[0].split('#', 1)[0].split('/', 1)[0]
+                        for tok in slug.replace('-', ' ').replace('_', ' ').split():
+                            tok = ''.join(c for c in tok if c.isalnum())
+                            if (
+                                len(tok) >= 3
+                                and tok not in self._MATCH_STOPWORDS
+                                and not tok.isdigit()
+                            ):
+                                slug_tokens.add(tok)
+                        break
+                if slug_tokens:
+                    slug_keyword_groups.append(slug_tokens)
+                    slug_keywords_union |= slug_tokens
+
+            # Task #34: don't seed brand names from page_name unless
+            # they also appear in a slug — gates brand contamination
+            # for matcher use. But we ALSO collect the page_name's
+            # distinctive token separately as a "brand fast-path" hint —
+            # if an AE title contains the brand name verbatim, that's
+            # a 1-token but highly specific match (Task #6 fast-path).
+            confirmed_page_tokens: set = set()
+            brand_tokens: set = set()
+            for tok in (adv.get('page_name') or '').lower().split():
+                tok = ''.join(c for c in tok if c.isalnum())
+                if (
+                    len(tok) >= 4
+                    and tok not in self._MATCH_STOPWORDS
+                    and not tok.isdigit()
+                ):
+                    if tok in slug_keywords_union:
+                        confirmed_page_tokens.add(tok)
+                    # Always collect for the brand fast-path, even if
+                    # the slug didn't confirm it.
+                    brand_tokens.add(tok)
+
+            if not slug_keywords_union and not brand_tokens:
+                continue
+
+            # The legacy `keywords` field stays the flat union for any
+            # callers that still iterate it (e.g. the keyword-extraction
+            # path in _fetch_meta_ads_trends).
+            keywords = slug_keywords_union | confirmed_page_tokens
+
+            index[str(page_id)] = {
+                'keywords': keywords,
+                'slug_keyword_groups': slug_keyword_groups,
+                'brand_tokens': brand_tokens,
+                'max_days': int(adv.get('max_days_active') or 0),
+                'variants': int(adv.get('variant_count') or 0),
+                'page_name': adv.get('page_name') or '',
+                'has_shopify': bool(adv.get('has_shopify_landing')),
+                'sample_url': (adv.get('sample_landing_urls') or [None])[0],
+            }
+
+        return index
+
+    def _collect_winner_candidates(
+        self,
+        niche: str,
+        max_per_source: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Winner-first restructure (per CLAUDE.md "social sentiment FIRST" rule).
+
+        Reads the four winner-proof caches that _get_trending_keywords already
+        populated as a side effect, and produces a normalized list of winner
+        candidates that discover_products() can fan out to AE+CJ for sourcing.
+
+        Each cache is a side-effect of an existing _fetch_* method:
+          - self._meta_winners_cache       <- _fetch_meta_ads_trends
+          - self._tiktok_shop_cache        <- _fetch_tiktok_shop_trends
+          - self._amazon_movers_cache      <- _fetch_amazon_movers_rss
+          - self._etsy_trending_cache      <- _fetch_etsy_trending
+
+        We never refetch — Step 1 already paid the I/O cost in parallel.
+        This is pure cache aggregation in-process.
+
+        Returns at most max_per_source winners per source, normalized to:
+            {
+                'source': 'meta_ads' | 'tiktok_shop' | 'amazon_movers' | 'etsy',
+                'name':   <human-readable winner name>,
+                'brand_tokens':       [str, ...],   # for AE brand-pass query
+                'slug_keyword_groups':[[str, ...], ...],  # for AE slug-pass query
+                'signal_strength':    float,         # 0-1, source-normalized
+                'metadata':           {<source-specific extras>},
+            }
+
+        Empty list = no winners surfaced; discover_products() falls back to
+        the legacy keyword-based search path.
+        """
+        candidates: List[Dict[str, Any]] = []
+
+        # ── 1. Meta Ad Library winners ──────────────────────────────────
+        # Use the existing index extractor — it's the same logic the old
+        # /winners route consumed, so behavior is identical between the
+        # retired endpoint and the new winner-first /quick flow.
+        try:
+            meta_index = self._extract_meta_winner_index()
+            # Prefer the strict-winners list, fall back to advertisers
+            # (mirrors the old /winners endpoint's soft-winners fallback).
+            meta_cache = getattr(self, '_meta_winners_cache', None) or {}
+            strict_winners = meta_cache.get('winners') or []
+            # Strength: strict-winner = 1.0 (passed the 14d × 3-variants ×
+            # Shopify-landing heuristic), advertiser-fallback = 0.6.
+            strict_page_ids = {
+                str(w.get('page_id') or w.get('page_name') or '')
+                for w in strict_winners
+            }
+            for page_id, entry in list(meta_index.items())[:max_per_source]:
+                slug_groups = entry.get('slug_keyword_groups') or []
+                brand_tokens = sorted(entry.get('brand_tokens') or set())
+                if not slug_groups and not brand_tokens:
+                    continue
+                candidates.append({
+                    'source': 'meta_ads',
+                    'name': entry.get('page_name') or page_id,
+                    'page_id': page_id,
+                    'brand_tokens': brand_tokens,
+                    'slug_keyword_groups': [sorted(g) for g in slug_groups],
+                    'signal_strength': 1.0 if page_id in strict_page_ids else 0.6,
+                    'metadata': {
+                        'max_days_active': entry.get('max_days', 0),
+                        'variant_count': entry.get('variants', 0),
+                        'has_shopify': entry.get('has_shopify', False),
+                        'sample_url': entry.get('sample_url'),
+                    },
+                })
+        except Exception as e:
+            logger.warning(f"[winners] meta candidate extraction failed: {e}")
+
+        # ── 2. TikTok Shop winners ──────────────────────────────────────
+        # Cache shape: {normalized_name: {units_sold_7d, views_7d, ...}}.
+        # Rank by units_sold_7d (first-party purchase signal). Names are
+        # already lowercased and whitespace-normalized — fine for AE search
+        # which is case-insensitive.
+        try:
+            ts_cache = getattr(self, '_tiktok_shop_cache', None) or {}
+            if ts_cache:
+                ranked = sorted(
+                    ts_cache.items(),
+                    key=lambda kv: int(kv[1].get('units_sold_7d') or 0),
+                    reverse=True,
+                )[:max_per_source]
+                # Normalize signal_strength by max units in this batch so
+                # we get a 0-1 range. Single-product batches collapse to 1.0.
+                max_units = max(
+                    (int(v.get('units_sold_7d') or 0) for _, v in ranked),
+                    default=1,
+                ) or 1
+                for name, data in ranked:
+                    units = int(data.get('units_sold_7d') or 0)
+                    if units <= 0:
+                        continue
+                    tokens = [
+                        t for t in name.split()
+                        if len(t) >= 3
+                        and t not in self._MATCH_STOPWORDS
+                        and t.isalpha()
+                    ]
+                    if not tokens:
+                        continue
+                    candidates.append({
+                        'source': 'tiktok_shop',
+                        'name': name,
+                        'brand_tokens': [],  # TikTok Shop products are mostly genericized
+                        'slug_keyword_groups': [tokens[:4]],
+                        'signal_strength': round(units / max_units, 3),
+                        'metadata': {
+                            'units_sold_7d': units,
+                            'views_7d': int(data.get('views_7d') or 0),
+                            'velocity_score': data.get('velocity_score', 0),
+                            'product_url': data.get('product_url'),
+                        },
+                    })
+        except Exception as e:
+            logger.warning(f"[winners] tiktok_shop candidate extraction failed: {e}")
+
+        # ── 3. Amazon Movers winners ────────────────────────────────────
+        # Cache shape: {items: [{title, asin, product_url, bestseller_rank, ...}]}.
+        # Lower bestseller_rank = higher signal (rank 1 is the top mover).
+        try:
+            mv_cache = getattr(self, '_amazon_movers_cache', None) or {}
+            items = mv_cache.get('items') or []
+            # Sort by rank ascending (1, 2, 3...). Items without rank go last.
+            ranked = sorted(
+                items,
+                key=lambda it: int(it.get('bestseller_rank') or 9999),
+            )[:max_per_source]
+            for idx, item in enumerate(ranked):
+                title = (item.get('title') or '').strip()
+                if not title:
+                    continue
+                tokens = [
+                    t.lower() for t in title.split()
+                    if len(t) >= 3
+                    and t.lower() not in self._MATCH_STOPWORDS
+                    and t.isalpha()
+                ]
+                if not tokens:
+                    continue
+                # Strength decays with position in the movers list.
+                strength = round(max(0.4, 1.0 - (idx * 0.15)), 3)
+                candidates.append({
+                    'source': 'amazon_movers',
+                    'name': title[:120],
+                    'brand_tokens': [],
+                    'slug_keyword_groups': [tokens[:4]],
+                    'signal_strength': strength,
+                    'metadata': {
+                        'asin': item.get('asin'),
+                        'product_url': item.get('product_url'),
+                        'bestseller_rank': item.get('bestseller_rank'),
+                        'rating': item.get('rating'),
+                        'reviews_count': item.get('reviews_count'),
+                    },
+                })
+        except Exception as e:
+            logger.warning(f"[winners] amazon_movers candidate extraction failed: {e}")
+
+        # ── 4. Etsy trending winners ────────────────────────────────────
+        # Cache shape: {items: [{title, url, category, ...}]}.
+        # Etsy doesn't expose rank-delta consistently — use list position
+        # as the relative-strength proxy (top items > tail items).
+        try:
+            etsy_cache = getattr(self, '_etsy_trending_cache', None) or {}
+            items = etsy_cache.get('items') or []
+            for idx, item in enumerate(items[:max_per_source]):
+                title = (item.get('title') or '').strip()
+                if not title:
+                    continue
+                tokens = [
+                    t.lower() for t in title.split()
+                    if len(t) >= 3
+                    and t.lower() not in self._MATCH_STOPWORDS
+                    and t.isalpha()
+                ]
+                if not tokens:
+                    continue
+                strength = round(max(0.3, 0.8 - (idx * 0.1)), 3)
+                candidates.append({
+                    'source': 'etsy',
+                    'name': title[:120],
+                    'brand_tokens': [],
+                    'slug_keyword_groups': [tokens[:4]],
+                    'signal_strength': strength,
+                    'metadata': {
+                        'product_url': item.get('url'),
+                        'category': item.get('category'),
+                    },
+                })
+        except Exception as e:
+            logger.warning(f"[winners] etsy candidate extraction failed: {e}")
+
+        if candidates:
+            by_source: Dict[str, int] = {}
+            for c in candidates:
+                by_source[c['source']] = by_source.get(c['source'], 0) + 1
+            logger.info(
+                f"[winners] collected {len(candidates)} candidates "
+                f"across {len(by_source)} sources: {by_source}"
+            )
+        else:
+            logger.info(
+                "[winners] no winner candidates surfaced — discover_products "
+                "will fall back to keyword-based AE/CJ search"
+            )
+
+        return candidates
+
+    async def _source_winners_to_products(
+        self,
+        winners: List[Dict[str, Any]],
+        niche: str,
+        ae_per_winner: int = 3,
+        cj_per_winner: int = 3,
+    ) -> List[Dict]:
+        """Fan out N winners to AE + CJ supplier searches IN PARALLEL.
+
+        For each winner, runs the same two-pass (brand → slug-keyword) AE
+        search the retired /winners route used, plus a CJ keyword search.
+        Returns a flat list of supplier products, each tagged with the
+        winner that surfaced it (so the self-learning loop sees better
+        attribution than "came from keyword").
+
+        Caller is discover_products() — this replaces the legacy Step 2
+        keyword-based supplier loop when winner candidates are available.
+        """
+        if not winners:
+            return []
+
+        import time as _time
+        sourcing_start = _time.time()
+
+        niche_context = niche.replace('_', ' ').strip() if niche else ''
+        # Cap how many supplier tasks fly in parallel. N winners × 2 suppliers
+        # = 2N tasks; with 10 winners that's 20 concurrent Apify/AE/CJ calls.
+        # The per-source timeout cap keeps the wall-clock bounded regardless.
+        max_winners = min(len(winners), 10)
+        winners = winners[:max_winners]
+
+        async def _source_one(winner: Dict[str, Any]) -> List[Dict]:
+            """AE (brand→slug fallback) + CJ for one winner, in parallel."""
+            local_products: List[Dict] = []
+            brand_tokens = winner.get('brand_tokens') or []
+            slug_groups = winner.get('slug_keyword_groups') or []
+
+            # Build candidate queries. Brand first (specific), slug second
+            # (catches generic alternatives when the brand isn't on AE).
+            candidate_queries: List[tuple[str, str]] = []  # (label, query)
+            if brand_tokens:
+                brand_q = (
+                    f"{niche_context} {brand_tokens[0]}".strip()
+                    if niche_context else brand_tokens[0]
+                )
+                candidate_queries.append(('brand', brand_q))
+            if slug_groups:
+                # First slug group — usually the primary product type.
+                # Strip brand tokens so we don't repeat the brand search.
+                first_slug = slug_groups[0]
+                non_brand = [t for t in first_slug if t not in brand_tokens]
+                if non_brand:
+                    slug_q = (
+                        f"{niche_context} {' '.join(non_brand[:3])}".strip()
+                        if niche_context else ' '.join(non_brand[:3])
+                    )
+                    candidate_queries.append(('slug', slug_q))
+
+            if not candidate_queries:
+                return []
+
+            # AE: try brand pass first, only fall through to slug if brand
+            # came back empty. CJ: single query against the slug (or brand
+            # if no slug) — CJ doesn't benefit from the brand-pass split.
+            ae_query = candidate_queries[0][1]
+            cj_query = candidate_queries[-1][1]  # prefer slug for CJ
+
+            ae_task = self._fetch_aliexpress(
+                ae_query,
+                count=max(ae_per_winner * 3, 10),
+            ) if (self.aliexpress_available and ae_per_winner > 0) else None
+
+            cj_task = self._fetch_cj(
+                keyword=cj_query,
+                count=max(cj_per_winner * 3, 10),
+                niche=niche,
+            ) if (self.cj_available and cj_per_winner > 0) else None
+
+            ae_results: List = []
+            cj_results: List = []
+            tasks = []
+            task_labels = []
+            if ae_task is not None:
+                tasks.append(_with_timeout(ae_task, SUPPLIER_SOURCE_TIMEOUT))
+                task_labels.append('ae')
+            if cj_task is not None:
+                tasks.append(_with_timeout(cj_task, SUPPLIER_SOURCE_TIMEOUT))
+                task_labels.append('cj')
+
+            if not tasks:
+                return []
+
+            try:
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+            except Exception as e:
+                logger.warning(
+                    f"[winners] sourcing failed for '{winner.get('name')}': {e}"
+                )
+                return []
+
+            for label, result in zip(task_labels, results):
+                if isinstance(result, (Exception, asyncio.TimeoutError)):
+                    continue
+                if not result:
+                    continue
+                if label == 'ae':
+                    ae_results = result[:ae_per_winner]
+                else:
+                    cj_results = result[:cj_per_winner]
+
+            # AE brand-pass fallback: if brand returned nothing AND we
+            # have a slug query queued, run it now.
+            if not ae_results and len(candidate_queries) > 1 and self.aliexpress_available:
+                slug_q = candidate_queries[1][1]
+                try:
+                    fallback = await asyncio.wait_for(
+                        self._fetch_aliexpress(slug_q, count=max(ae_per_winner * 3, 10)),
+                        timeout=SUPPLIER_SOURCE_TIMEOUT,
+                    )
+                    ae_results = (fallback or [])[:ae_per_winner]
+                except Exception:
+                    pass
+
+            # Tag each supplier product with the winner that surfaced it.
+            # This is what gives the self-learning loop better attribution
+            # than the old keyword-based path.
+            #
+            # IMPORTANT: do NOT overwrite p['source']. That field is a
+            # routing key used by ~6 downstream filters
+            # (`source == 'aliexpress'` / `'cj_dropshipping'`) — overwriting
+            # it caused winner-tagged products to silently fail price
+            # enrichment, hit the wrong score floor, and get culled at
+            # the quota-split step. Attribution lives on `winner_source`
+            # (the surfacing winner-source name) and `winner_provenance`
+            # (the rich metadata blob). The literal `source` stays as
+            # whatever _fetch_aliexpress / _fetch_cj set it to.
+            winner_meta = {
+                'source_winner': winner.get('source'),
+                'source_winner_name': winner.get('name'),
+                'source_winner_strength': winner.get('signal_strength'),
+            }
+            for p in ae_results:
+                p = dict(p)
+                p['winner_source'] = winner.get('source')
+                p['winner_provenance'] = winner_meta
+                local_products.append(p)
+            for p in cj_results:
+                p = dict(p)
+                p['winner_source'] = winner.get('source')
+                p['winner_provenance'] = winner_meta
+                local_products.append(p)
+
+            return local_products
+
+        # Fan out all winners in parallel — sourcing N winners is N×2
+        # independent supplier calls, which gather() runs concurrently.
+        logger.info(
+            f"[winners] sourcing {len(winners)} winners "
+            f"({len(winners) * 2} parallel supplier calls max)..."
+        )
+        per_winner_results = await asyncio.gather(
+            *[_source_one(w) for w in winners],
+            return_exceptions=True,
+        )
+
+        # Flatten + drop exceptions.
+        all_products: List[Dict] = []
+        for r in per_winner_results:
+            if isinstance(r, Exception):
+                logger.debug(f"[winners] one winner sourcing raised: {r}")
+                continue
+            if r:
+                all_products.extend(r)
+
+        logger.info(
+            f"[winners] sourced {len(all_products)} products from "
+            f"{len(winners)} winners in {_time.time() - sourcing_start:.2f}s"
+        )
+        return all_products
+
+    def _match_product_to_meta_winners(
+        self,
+        product_title: str,
+    ) -> tuple[int, Optional[Dict[str, Any]]]:
+        """Score one product's title against the cached Meta winner index.
+
+        Returns (best_match_score, best_winner_meta) — score is 0-100 and
+        winner_meta is None when no match cleared the threshold. The
+        scoring loop uses both: the score becomes the new trend_score
+        when it beats the current value, the winner_meta is stamped on
+        the product as `meta_winner_match` for UI/debug.
+
+        Threshold: at least 2 shared product-type tokens. Single-token
+        overlaps would match too aggressively (a "diffuser" hit on the
+        word "smart" alone would boost every AE smart-anything product).
+
+        Score formula:
+          base       = 50 + (shared_tokens * 15)   # 2 shared → 80, 3 → 95
+          age_bonus  = min(20, max_days_active / 2) # 14d → +7, 40d → +20
+          var_bonus  = min(15, variants * 2)        # 3 variants → +6, 8+ → +15
+          total      = min(100, base + age_bonus + var_bonus)
+
+        Cached on the instance so the index isn't rebuilt for every
+        product in the loop.
+        """
+        if not product_title:
+            return 0, None
+
+        # Lazy cache the winner index — built once per _calculate_scores call.
+        # We clear it at the start of every _calculate_scores so each fresh
+        # discovery run rebuilds against current cache.
+        index = getattr(self, '_winner_index_cached', None)
+        if index is None:
+            return 0, None
+        if not index:
+            return 0, None
+
+        # Tokenise the title
+        title_tokens: set = set()
+        for tok in product_title.lower().split():
+            tok = ''.join(c for c in tok if c.isalnum())
+            if (
+                len(tok) >= 3
+                and tok not in self._MATCH_STOPWORDS
+                and not tok.isdigit()
+            ):
+                title_tokens.add(tok)
+
+        if not title_tokens:
+            return 0, None
+
+        best_score = 0
+        best_winner: Optional[Dict[str, Any]] = None
+        for page_id, winner in index.items():
+            # Task #6: try matches in three tiers, strongest first.
+            # 1. Per-slug overlap (best signal — title actually
+            #    matches a specific product the winner sells)
+            # 2. Brand-name fast-path (title contains brand verbatim,
+            #    1-token match but high specificity)
+            # 3. Legacy union overlap fallback (kept for backward compat
+            #    with pre-#6 keyword sets that lack slug grouping)
+
+            best_match_type = None
+            best_match_tokens: set = set()
+
+            # Tier 1: per-slug overlap. ALWAYS require 2-token overlap
+            # — the per-slug grouping (vs the legacy union) is what
+            # makes this safe for multi-product brands like Wyze, NOT
+            # a loosened threshold. Wyze slugs are e.g. [bulb, wyze] /
+            # [cam, wyze]; a generic Tuya bulb only overlaps `bulb`
+            # (not a Wyze knockoff), but "Wyze Cam Knockoff Security
+            # Camera" overlaps {wyze, cam} from the second slug → match.
+            #
+            # The brand fast-path (tier 2 below) is the dedicated path
+            # for "title contains brand name only" — that's a 1-token
+            # but highly specific match, gated by length+specificity
+            # of the brand token itself.
+            for slug_keywords in winner.get('slug_keyword_groups') or []:
+                if not slug_keywords or len(slug_keywords) < 2:
+                    continue
+                slug_overlap = title_tokens & slug_keywords
+                if len(slug_overlap) >= 2:
+                    if len(slug_overlap) > len(best_match_tokens):
+                        best_match_tokens = slug_overlap
+                        best_match_type = 'slug'
+
+            # Tier 2: brand-name fast-path. If the AE title contains
+            # one of the winner's brand tokens (e.g. "wyze"), that's
+            # a single-token but highly specific signal — brand names
+            # are typically not generic dictionary words.
+            if not best_match_tokens:
+                brand_overlap = title_tokens & winner.get('brand_tokens', set())
+                if brand_overlap:
+                    best_match_tokens = brand_overlap
+                    best_match_type = 'brand'
+
+            # Tier 3: legacy union overlap (only if Tier 1+2 missed
+            # AND the winner has the legacy `keywords` set populated).
+            if not best_match_tokens:
+                union_overlap = title_tokens & winner.get('keywords', set())
+                if len(union_overlap) >= 2:
+                    best_match_tokens = union_overlap
+                    best_match_type = 'union'
+
+            if not best_match_tokens:
+                continue
+
+            # Score: base from match strength, bonuses from winner quality
+            base = 50 + len(best_match_tokens) * 15
+            age_bonus = min(20, winner['max_days'] // 2)
+            var_bonus = min(15, winner['variants'] * 2)
+            total = min(100, base + age_bonus + var_bonus)
+
+            if total > best_score:
+                best_score = total
+                best_winner = {
+                    'page_id': page_id,
+                    'page_name': winner['page_name'],
+                    'matched_keywords': sorted(best_match_tokens),
+                    'match_type': best_match_type,  # slug | brand | union
+                    'max_days_active': winner['max_days'],
+                    'variant_count': winner['variants'],
+                    'sample_url': winner.get('sample_url'),
+                    'match_score': total,
+                }
+
+        return best_score, best_winner
+
+    # =========================================================================
+    # SEMANTIC WINNER MATCHING (Task #3) — Haiku-based
+    # =========================================================================
+    # The keyword-overlap matcher (above) was the right MVP — fast, cheap,
+    # explainable — but it's whack-a-mole. Polysemous tokens like "halo"
+    # match car headlight rings; "lights" matches everything; brand names
+    # like "Wyze" require manual stopword tuning. The architectural fix is
+    # semantic matching: ask an LLM "is this AE product a credible
+    # alternative to this Meta winner?".
+    #
+    # Implementation: batched Haiku call PER WINNER (1 call scores all
+    # N AE candidates for that winner). ~200ms per call × 6 winners = ~1.2s
+    # added latency; ~$0.0001 per call. Caches per (winner_page_id,
+    # title_hash) so re-runs within the cache TTL are free.
+    #
+    # Falls back to (0, 'unavailable') when ANTHROPIC_API_KEY isn't set or
+    # the call fails — caller should detect this and use the keyword
+    # matcher as fallback.
+    # =========================================================================
+
+    _semantic_match_cache: Dict[str, tuple] = {}  # key -> (score, reason)
+
+    async def _semantic_match_winner_to_candidates(
+        self,
+        winner: Dict[str, Any],
+        ae_titles: List[str],
+    ) -> List[Tuple[int, str]]:
+        """Score each AE title's relevance to the winner via Claude Haiku.
+
+        Returns a list of (score 0-100, reason) tuples in the same order
+        as `ae_titles`. Empty input → empty output. Returns all-zero
+        scores with reason='unavailable' if the AI client isn't set up.
+        """
+        if not ae_titles:
+            return []
+
+        # Cache lookup for already-evaluated (winner, title) pairs
+        import hashlib as _hashlib
+        winner_key = str(winner.get('page_id') or winner.get('page_name') or '')
+
+        def _cache_key(title: str) -> str:
+            return f"{winner_key}::" + _hashlib.md5(title.encode()).hexdigest()[:16]
+
+        # Compute uncached entries
+        results: list[Optional[Tuple[int, str]]] = [None] * len(ae_titles)
+        uncached_indices: list[int] = []
+        uncached_titles: list[str] = []
+        for i, title in enumerate(ae_titles):
+            cached = self._semantic_match_cache.get(_cache_key(title))
+            if cached is not None:
+                results[i] = cached
+            else:
+                uncached_indices.append(i)
+                uncached_titles.append(title)
+
+        # If everything was cached, return early
+        if not uncached_titles:
+            return [r for r in results if r is not None]
+
+        # Build prompt and call Haiku
+        try:
+            page_name = winner.get('page_name') or '(unnamed)'
+            sample_url = (
+                winner.get('sample_landing_urls') or [None]
+            )[0] if isinstance(winner.get('sample_landing_urls'), list) else None
+            keywords_str = ', '.join(sorted(winner.get('extracted_keywords') or winner.get('keywords') or [])[:8])
+
+            numbered_candidates = '\n'.join(
+                f"{i+1}. {t[:200]}" for i, t in enumerate(uncached_titles)
+            )
+
+            system_prompt = (
+                "You evaluate AliExpress product candidates against a Meta Ad Library "
+                "winner brand to determine if the AE product is a credible alternative, "
+                "knockoff, or generic equivalent of what the winner sells. Reply with a "
+                "JSON array — one entry per candidate — and no other prose."
+            )
+
+            user_prompt = (
+                f"WINNER BRAND: {page_name}\n"
+                f"LANDING URL: {sample_url or '(none)'}\n"
+                f"PRODUCT KEYWORDS: {keywords_str or '(none)'}\n\n"
+                f"ALIEXPRESS CANDIDATES:\n{numbered_candidates}\n\n"
+                "For each candidate, score 0-100 how likely it is a credible alternative "
+                "or knockoff of the winner's product:\n"
+                "- 80-100: Clear alternative or knockoff (same product type and use case)\n"
+                "- 50-79: Same broad category but different positioning\n"
+                "- 0-49:  Different category or wrong product type\n\n"
+                "Reply with a JSON array exactly like this, no other text:\n"
+                '[{"i": 1, "s": 95, "r": "Direct Wyze cam clone"}, '
+                '{"i": 2, "s": 25, "r": "Off-category"}]'
+            )
+
+            from ospra_os.ml.ai_client import UnifiedAIClient
+            from ospra_os.ml.model_router import ModelTier
+            client = UnifiedAIClient()
+            ai_resp = await asyncio.to_thread(
+                client.generate,
+                prompt=user_prompt,
+                task_type='general',
+                system_prompt=system_prompt,
+                temperature=0.0,
+                max_tokens=1200,
+                force_tier=ModelTier.LOCAL_FREE,  # prefer cheap; falls back if unavailable
+            )
+
+            content = (ai_resp.content or '').strip()
+            # Strip code fences if present
+            if content.startswith('```'):
+                content = content.strip('`')
+                if content.startswith('json'):
+                    content = content[4:]
+                content = content.strip()
+
+            import json
+            parsed = json.loads(content)
+            if not isinstance(parsed, list):
+                raise ValueError(f"expected JSON array, got {type(parsed).__name__}")
+
+            # Map parsed results back to uncached indices
+            by_i = {int(e.get('i', 0)): e for e in parsed if isinstance(e, dict)}
+            for offset, orig_idx in enumerate(uncached_indices):
+                e = by_i.get(offset + 1)  # 1-indexed in prompt
+                if e:
+                    score = max(0, min(100, int(e.get('s', 0))))
+                    reason = str(e.get('r', ''))[:120]
+                else:
+                    score, reason = 0, 'no_response'
+                pair = (score, reason)
+                results[orig_idx] = pair
+                # Cache for next call
+                self._semantic_match_cache[_cache_key(uncached_titles[offset])] = pair
+
+        except Exception as exc:
+            logger.warning(f"[semantic-match] Haiku call failed: {exc}")
+            # Fill remaining unresolved with zeros so the caller knows
+            # to fall back to keyword matcher
+            for orig_idx in uncached_indices:
+                if results[orig_idx] is None:
+                    results[orig_idx] = (0, 'unavailable')
+
+        # Convert Optional list to concrete
+        return [r if r is not None else (0, 'error') for r in results]
+
+    # =========================================================================
+    # SELF-LEARNING PHASE 2 (Task #12) — load learned weights at scoring time
+    # =========================================================================
+    # The LearningProcessor + daily_feedback_loop write to NicheLearning and
+    # GlobalLearningWeights based on actual outcome data (predicted vs real
+    # success). Discovery had been ignoring those updates — engine hardcoded
+    # ranking weights, so learnings were effectively dropped on the floor.
+    # This adds a lightweight read-back: per discovery run, look up the
+    # learned multiplier for the niche and apply it in scoring.
+    #
+    # Cached for 10 min so we don't hit the DB per-product. Gracefully
+    # returns 0 (no adjustment) when no learning data exists yet — keeps
+    # behavior identical to pre-Phase-2 on cold installs.
+    # =========================================================================
+
+    _learned_adjustment_cache: Dict[str, Tuple[float, float]] = {}  # key -> (expires_at, adjustment)
+    _LEARNED_ADJUSTMENT_TTL_SECONDS = 600
+
+    # =========================================================================
+    # SELF-LEARNING PHASE 5C — per-signal weight multipliers
+    # =========================================================================
+    # NicheLearning gives us per-niche multiplier. GlobalLearningWeights
+    # has per-SIGNAL weights (e.g. "meta_winner_match" might learn it's a
+    # better predictor than "amazon_buzz" → its score contribution gets
+    # weighted higher in oi_score). This reads them and exposes a lookup.
+    # =========================================================================
+    _signal_weights_cache: Tuple[float, Dict[str, float]] = (0.0, {})  # (expires_at, weights)
+
+    def _get_learned_signal_weights(self) -> Dict[str, float]:
+        """Return a dict of {signal_name: weight_multiplier} from the most
+        recent GlobalLearningWeights row. Cached 10 min. Empty dict = no
+        learning data yet → caller uses default uniform weights (1.0 each).
+
+        Multiplier semantics: 1.0 = no change; 1.20 = boost signal 20%;
+        0.80 = suppress 20%. Bounded ±50% to prevent any single signal
+        from dominating after one bad data window.
+        """
+        import time as _time
+        expires_at, cached_weights = self._signal_weights_cache
+        if expires_at > _time.time():
+            return cached_weights
+
+        try:
+            from ospra_os.database import get_session
+            from ospra_os.database.performance_models import GlobalLearningWeights
+            with next(get_session()) as db:
+                row = (
+                    db.query(GlobalLearningWeights)
+                    .order_by(GlobalLearningWeights.updated_at.desc())
+                    .first()
+                )
+                if row and row.scoring_weights:
+                    raw = row.scoring_weights or {}
+                    # Sanitize: only keep numeric values, clip to [0.5, 1.5]
+                    weights = {}
+                    for k, v in raw.items():
+                        try:
+                            w = float(v)
+                            if w > 0:
+                                weights[str(k)] = max(0.5, min(1.5, w))
+                        except (TypeError, ValueError):
+                            continue
+                else:
+                    weights = {}
+        except Exception as exc:
+            logger.debug(f"[learning-read] signal weights fetch failed: {exc}")
+            weights = {}
+
+        self._signal_weights_cache = (
+            _time.time() + 600,  # 10 min TTL
+            weights,
+        )
+        return weights
+
+    def _apply_signal_weight(self, signal_name: str, contribution: float) -> float:
+        """Convenience: apply learned multiplier to a signal contribution.
+        Returns contribution unchanged if no learning data for this signal."""
+        weights = self._get_learned_signal_weights()
+        mult = weights.get(signal_name, 1.0)
+        return contribution * mult
+
+    def _get_learned_niche_adjustment(self, niche: Optional[str]) -> float:
+        """Return the learned score multiplier delta for `niche`, e.g.
+        +10 means apply a 1.10× multiplier; -5 means 0.95×. Returns 0.0
+        when no learning data exists for the niche yet.
+
+        Reads from NicheLearning (global row, user_id NULL) — personalized
+        per-user adjustments are a future enhancement.
+        """
+        if not niche:
+            return 0.0
+        import time as _time
+        cache_key = niche.lower()
+        cached = self._learned_adjustment_cache.get(cache_key)
+        if cached and cached[0] > _time.time():
+            return cached[1]
+
+        try:
+            from ospra_os.database import get_session
+            from ospra_os.database.performance_models import NicheLearning
+            with next(get_session()) as db:
+                row = (
+                    db.query(NicheLearning)
+                    .filter(NicheLearning.niche == niche.lower())
+                    .filter(NicheLearning.user_id.is_(None))  # global only for now
+                    .first()
+                )
+                adjustment = float(row.niche_score_adjustment) if row else 0.0
+        except Exception as exc:
+            logger.debug(f"[learning-read] failed to fetch niche adjustment for {niche}: {exc}")
+            adjustment = 0.0
+
+        self._learned_adjustment_cache[cache_key] = (
+            _time.time() + self._LEARNED_ADJUSTMENT_TTL_SECONDS,
+            adjustment,
+        )
+        return adjustment
+
+    def _calculate_scores(
+        self,
+        products: List[Dict],
+        *,
+        category_niche: Optional[str] = None,
+    ) -> List[Dict]:
         """
         Calculate OI Score with cross-reference bonus.
 
@@ -3725,17 +5154,59 @@ class ProductDiscoveryEngine:
         - Profit (15%): Margin percentage
         - Sourcing (20%): Cross-reference bonus, warehouse advantage
 
+        Args:
+          products: list of product dicts to score in-place.
+          category_niche: the user-facing niche (e.g. "smart_home") from
+            the discovery API call. Used as a fallback in
+            `_calculate_relevance` when a product's per-product `niche`
+            field (set to the specific search keyword that found it,
+            e.g. "LED strip lights RGB") doesn't have a RELEVANCE_KEYWORDS
+            entry. Without this, every product silently scores 70 via
+            the generic word-overlap path.
+
         IMPORTANT: This builds score_breakdown dict for AI analyzer compatibility
         """
+        # Task #30: build the Meta winner keyword index once per scoring pass.
+        # _match_product_to_meta_winners reads `_winner_index_cached` so each
+        # product in the loop does a cheap set-intersect rather than rebuilding
+        # the index N times. Cache is invalidated on every call.
+        self._winner_index_cached = self._extract_meta_winner_index()
+        if self._winner_index_cached:
+            logger.info(
+                f"[meta-match] indexed {len(self._winner_index_cached)} Meta "
+                f"winner(s) for cross-source matching"
+            )
+
+        # Task #9 Phase 2: direct saturation measure. Read the Meta
+        # advertiser count from the cache so _compute_saturation can use
+        # it without taking a self reference. Stamped on every product
+        # below so the (module-level) saturation function can read it
+        # via product.get(...). Falls back to 0 when Meta data wasn't
+        # collected — _compute_saturation then skips this signal.
+        meta_cache = getattr(self, "_meta_winners_cache", None) or {}
+        meta_niche_advertiser_count = len(meta_cache.get("advertisers") or [])
+        if meta_niche_advertiser_count > 0:
+            logger.info(
+                f"[meta-saturation] niche has {meta_niche_advertiser_count} "
+                f"active advertisers — feeding into saturation scoring"
+            )
         for product in products:
             data_sources = product.get('data_sources', {})
+
+            # Stamp the niche-level Meta advertiser count so the
+            # (module-level) _compute_saturation can read it.
+            # Task #9 Phase 2 — direct market-crowding measure.
+            if meta_niche_advertiser_count > 0:
+                product['meta_niche_advertiser_count'] = meta_niche_advertiser_count
 
             # ================================================================
             # RELEVANCE CHECK - Filter off-topic products
             # ================================================================
             niche = product.get('niche', '').lower()
             title = product.get('title', '').lower()
-            relevance_score = self._calculate_relevance(title, niche)
+            relevance_score = self._calculate_relevance(
+                title, niche, category_niche=category_niche,
+            )
             product['relevance_score'] = relevance_score
 
             # If product is clearly irrelevant, mark it early
@@ -3950,6 +5421,24 @@ class ProductDiscoveryEngine:
             elif twitter_buzz == 'medium':
                 trend_score = min(100, trend_score + 8)
                 has_trend_signal = True
+
+            # Task #30: Cross-source matching — Meta Ad Library winners.
+            # If this AE product looks like a product someone is paying real
+            # money to scale on Meta right now, that's a stronger signal
+            # than any AE-internal heuristic. We replace trend_score with
+            # the match score when it's higher than what we have so far,
+            # and stamp trend_source so downstream consumers know the
+            # signal came from cross-source matching (not Google / TikTok
+            # / AE velocity).
+            meta_match_score, meta_match_meta = self._match_product_to_meta_winners(
+                product.get('title', '')
+            )
+            if meta_match_score > 0:
+                if meta_match_score > trend_score:
+                    trend_score = meta_match_score
+                has_trend_signal = True
+                product['trend_source'] = 'meta_winner_match'
+                product['meta_winner_match'] = meta_match_meta
 
             # AliExpress velocity — Western-trend fallback. Mirror of the
             # AE-buyer sentiment fallback: when no Western trend signal
@@ -4283,8 +5772,25 @@ class ProductDiscoveryEngine:
             if cj_available or 'cj_dropshipping' in product.get('available_on', []):
                 sourcing_score += 10
 
-            # Supplier rating bonus (IMPROVED thresholds)
-            supplier_rating = product.get('rating', 0) or ali_data.get('rating', 0)
+            # Supplier rating bonus (IMPROVED thresholds).
+            # Task #23 (May 2026): also fall back to top-level
+            # aliexpress_rating which is set by the AE normalizer (line
+            # 2497ish) but wasn't being read here. That's why every
+            # product showed supplier_rating=50 in score_breakdown —
+            # both product.rating and ali_data.rating were 0 because the
+            # rating lives on `aliexpress_rating`. ae_signals.rating_stars
+            # is the same value from the data_sources path.
+            supplier_rating = (
+                product.get('rating', 0)
+                or ali_data.get('rating', 0)
+                or product.get('aliexpress_rating', 0)
+                or ae_signals.get('rating_stars', 0)
+                or 0
+            )
+            try:
+                supplier_rating = float(supplier_rating)
+            except (TypeError, ValueError):
+                supplier_rating = 0.0
             if supplier_rating >= 4.9:
                 sourcing_score += 12
             elif supplier_rating >= 4.7:
@@ -4302,10 +5808,25 @@ class ProductDiscoveryEngine:
             # BUILD score_breakdown FOR AI ANALYZER COMPATIBILITY
             # POST-FIX #15: twitter_sentiment / reddit_sentiment reflect real data
             # state - None when no real signal, actual score when we have one.
+            # Task #25 (May 2026): google_trends and tiktok_viral now ONLY carry
+            # values when the underlying source actually returned data. The old
+            # behaviour wrote a composite `trend_score` (which could be derived
+            # from AE velocity, Twitter buzz, etc.) into the google_trends slot
+            # AND defaulted to 55 when no signal was available. Both behaviours
+            # made it look like Google Trends or TikTok contributed to the score
+            # when they hadn't. The composite `trend_score` is still reported at
+            # the product level with `trend_source` indicating provenance — the
+            # breakdown should reflect raw per-source contribution, not the
+            # composite.
             # ================================================================
             product['score_breakdown'] = {
-                'google_trends': trend_score,
-                'tiktok_viral': min(100, tiktok_views // 10000) if tiktok_views > 0 else (trend_score if trend_score > 50 else 40),
+                'google_trends': (
+                    min(100, 15 + google_trend_score * 0.85)
+                    if google_trend_score > 0 else None
+                ),
+                'tiktok_viral': (
+                    min(100, tiktok_views // 10000) if tiktok_views > 0 else None
+                ),
                 'twitter_sentiment': sentiment_score if has_twitter_signal else None,
                 'aliexpress_orders': demand_score,
                 # Task #18: Real Amazon data (rating × reviews) when we have it
@@ -4313,7 +5834,15 @@ class ProductDiscoveryEngine:
                 'amazon_rating': amazon_rating_raw,
                 'amazon_reviews': amazon_review_count_raw if has_amazon_signal else None,
                 'reddit_sentiment': min(100, 40 + reddit_mentions * 3) if reddit_mentions > 0 else None,
-                'supplier_rating': min(100, int(supplier_rating * 20)) if supplier_rating > 0 else 50,
+                # Task #25/#23: surfacing this as None when no real signal so the
+                # caller can tell "no data" from "50/100 — confidently mediocre".
+                # The hardcoded 50 default went out the door silently — every
+                # product looked like it had a known-mediocre supplier when in
+                # fact we'd never measured them. Replacing real per-supplier
+                # scoring is Task #23 and lives in a follow-up commit.
+                'supplier_rating': (
+                    min(100, int(supplier_rating * 20)) if supplier_rating > 0 else None
+                ),
                 # Task #22: CJ supplier-quality proxy (fallback for CJ-only products)
                 'cj_supplier_proxy': cj_proxy_score,
                 # AE buyer-rating now exposed as a sourcing signal (not sentiment).
@@ -4325,6 +5854,13 @@ class ProductDiscoveryEngine:
                 ),
                 'aliexpress_rating': (
                     aliexpress_rating_raw if (aliexpress_found_real and aliexpress_buzz_raw > 0) else None
+                ),
+                # Task #30: cross-source signal. Score reflects how well this
+                # product matched a Meta winner (>=2 shared product-type tokens
+                # required; bonus for advertiser age + variant count). None
+                # when no match — caller distinguishes that from a 0 score.
+                'meta_winner_match': (
+                    meta_match_score if meta_match_score > 0 else None
                 ),
             }
             # Local derivations used by the validated-sources + coverage blocks
@@ -4361,6 +5897,11 @@ class ProductDiscoveryEngine:
                 sources_validated.append('google_trends')
             if tiktok_views > 0 or tiktok_data.get('available'):
                 sources_validated.append('tiktok')
+            # Task #30: Meta winner match counts as a validated cross-source
+            # signal — this product looks like something actively winning on
+            # Meta ads right now.
+            if meta_match_score > 0:
+                sources_validated.append('meta_winner_match')
 
             product['sources_validated'] = sources_validated
 
@@ -4485,12 +6026,27 @@ class ProductDiscoveryEngine:
             # product GOLDEN/EXCELLENT — you can't be "Strong buy" on 40%
             # of the data.
             # ================================================================
+            # Phase 5C: apply learned per-signal weight multipliers to
+            # the design weights. GlobalLearningWeights.scoring_weights is
+            # a dict like {"demand": 1.10, "trend": 0.95, ...}. Defaults
+            # to 1.0 (no change) when no learning data exists. This makes
+            # the engine LEARN that some signals predict outcomes better
+            # than others over time, instead of trusting hardcoded weights
+            # forever.
+            learned_signal_mults = self._get_learned_signal_weights()
+            design_weights = {
+                'demand': 0.25,
+                'trend': 0.25,
+                'sentiment': 0.15,
+                'profit': 0.15,
+                'sourcing': 0.20,
+            }
             component_values = {
-                'demand':    (0.25, demand_score    if has_demand_signal              else None),
-                'trend':     (0.25, trend_score     if has_trend_signal               else None),
-                'sentiment': (0.15, sentiment_score if sentiment_score is not None    else None),
-                'profit':    (0.15, profit_score),
-                'sourcing':  (0.20, product['sourcing_score']),
+                'demand':    (design_weights['demand']    * learned_signal_mults.get('demand', 1.0),    demand_score    if has_demand_signal              else None),
+                'trend':     (design_weights['trend']     * learned_signal_mults.get('trend', 1.0),     trend_score     if has_trend_signal               else None),
+                'sentiment': (design_weights['sentiment'] * learned_signal_mults.get('sentiment', 1.0), sentiment_score if sentiment_score is not None    else None),
+                'profit':    (design_weights['profit']    * learned_signal_mults.get('profit', 1.0),    profit_score),
+                'sourcing':  (design_weights['sourcing']  * learned_signal_mults.get('sourcing', 1.0),  product['sourcing_score']),
             }
 
             # Treat-missing-as-zero: missing components contribute 0 to the
@@ -4574,13 +6130,30 @@ class ProductDiscoveryEngine:
                 oi_score = min(oi_score, 45)
                 product['relevance_note'] = f'Off-topic: Low relevance ({relevance}%) to niche'
 
+            # Self-learning Phase 2: apply learned niche-level adjustment.
+            # NicheLearning rows are updated by daily_feedback_loop based on
+            # actual outcome data (predicted vs real success per niche). +10
+            # means this niche has historically outperformed predictions →
+            # boost. -10 means underperformed → suppress. Capped to ±25 so a
+            # single bad week doesn't tank a niche.
+            niche_adjustment = self._get_learned_niche_adjustment(category_niche)
+            if niche_adjustment != 0:
+                clipped_adj = max(-25.0, min(25.0, niche_adjustment))
+                multiplier = 1.0 + (clipped_adj / 100.0)
+                pre_adjustment = oi_score
+                oi_score = oi_score * multiplier
+                product['learned_niche_adjustment'] = round(clipped_adj, 2)
+                product['oi_score_pre_learning'] = round(pre_adjustment, 1)
+
             product['oi_score'] = round(oi_score, 1)
             product['final_score'] = product['oi_score']
             product['base_score'] = round(base_score, 1)
 
             # Discovery-stage confidence (kept for backward-compat; counts
             # number of validated source connectors that ran).
-            max_sources = 6  # aliexpress, cj, twitter, reddit, google_trends, tiktok
+            # Task #30: added meta_winner_match as a cross-source validation
+            # signal, so the denominator is now 7 (was 6).
+            max_sources = 7  # aliexpress, cj, twitter, reddit, google_trends, tiktok, meta_winner_match
             product['confidence'] = round((len(sources_validated) / max_sources) * 100, 0)
 
             # ================================================================
@@ -4716,7 +6289,13 @@ class ProductDiscoveryEngine:
         product["amazon_review_text"] = result_with_flag
         return result_with_flag
 
-    def _calculate_relevance(self, title: str, niche: str) -> float:
+    def _calculate_relevance(
+        self,
+        title: str,
+        niche: str,
+        *,
+        category_niche: Optional[str] = None,
+    ) -> float:
         """
         Calculate relevance score (0-100) for a product to its niche.
 
@@ -4724,24 +6303,47 @@ class ProductDiscoveryEngine:
         Products that match 'exclude' keywords are penalized.
         Products that match 'include' keywords are rewarded.
 
+        Resolution order for which RELEVANCE_KEYWORDS entry to use:
+          1. The per-product `niche` field (e.g. "smart_home", "kitchen")
+          2. If that doesn't have an entry, the `category_niche` fallback
+             (the user-facing niche from the discovery API call). Most
+             products carry the specific search keyword that found them
+             as their niche — that keyword almost never has a config
+             entry, so without the fallback every product hit the
+             generic 70 default. Task #24.
+          3. If neither has an entry, fall back to the generic
+             word-overlap path (returns 50 or 70).
+
         Returns:
             0-100 relevance score
         """
-        if not title or not niche:
+        if not title:
             return 50  # Neutral if we can't determine
+        if not niche and not category_niche:
+            return 50
 
         title_lower = title.lower()
-        niche_lower = niche.lower().replace('_', ' ')
 
-        # Get relevance keywords for this niche
-        relevance_config = self.RELEVANCE_KEYWORDS.get(niche_lower.replace(' ', '_'), {})
+        # Try the per-product niche first (specific match), then the
+        # category fallback. First entry to actually carry keywords wins.
+        relevance_config: dict = {}
+        for candidate in (niche, category_niche):
+            if not candidate:
+                continue
+            cand_norm = candidate.lower().replace(' ', '_')
+            cfg = self.RELEVANCE_KEYWORDS.get(cand_norm, {})
+            if cfg.get('include'):
+                relevance_config = cfg
+                break
+
         include_keywords = relevance_config.get('include', [])
         exclude_keywords = relevance_config.get('exclude', [])
 
-        # If no config for this niche, use generic matching
+        # If neither niche nor category_niche had a config, use generic matching
         if not include_keywords:
-            # Check if niche words appear in title
-            niche_words = set(niche_lower.split())
+            niche_words = set(
+                (niche or category_niche or '').lower().replace('_', ' ').split()
+            )
             title_words = set(title_lower.split())
             overlap = niche_words & title_words
             if overlap:
@@ -4755,7 +6357,7 @@ class ProductDiscoveryEngine:
         exclude_matches = sum(1 for kw in exclude_keywords if kw in title_lower)
 
         # Calculate score
-        # Base score of 30, +10 for each include match, -20 for each exclude match
+        # Base score of 30, +15 for each include match, -25 for each exclude match
         score = 30 + (include_matches * 15) - (exclude_matches * 25)
 
         # Clamp to 0-100

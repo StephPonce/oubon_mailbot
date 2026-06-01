@@ -52,28 +52,31 @@ from .base_apify import ApifyClient
 
 logger = logging.getLogger(__name__)
 
-# Default Apify actor. Configurable via env var so we can swap to a
-# better-maintained actor without code changes if this one falls behind.
-DEFAULT_ACTOR = "epctex/etsy-trending-scraper"
+# Default Apify actor. The original `epctex/etsy-trending-scraper` was
+# deprecated/removed — switched to `epctex/etsy-scraper` (the general
+# Etsy data extractor) which has a different input schema (startUrls
+# array + search + proxy, not category/sort) but does the same job.
+# Configurable via env var so we can swap actors without code changes.
+DEFAULT_ACTOR = "epctex/etsy-scraper"
 
-# Etsy doesn't use clean category slugs the way Amazon does — it uses
-# "category pages" with longer URLs. The Apify trending actors typically
-# accept a high-level category name like "home_living" or "jewelry". We
-# expose a tiny mapping so Ospra niches translate cleanly.
+# Etsy category URLs follow the pattern https://www.etsy.com/c/<slug>.
+# Slugs use hyphens and are slightly different from the more
+# programmer-friendly names the old connector mapped to. Verify by
+# visiting etsy.com/c/<category> in a browser.
 NICHE_TO_ETSY_CATEGORY: dict[str, str] = {
-    "smart_home": "home_living",
-    "home_decor": "home_living",
-    "kitchen":    "home_living",
-    "beauty":     "bath_beauty",
-    "skincare":   "bath_beauty",
-    "jewelry":    "jewelry",
-    "watches":    "jewelry",
-    "bags":       "bags_purses",
+    "smart_home": "home-and-living",
+    "home_decor": "home-and-living",
+    "kitchen":    "home-and-living/kitchen-and-dining",
+    "beauty":     "bath-and-beauty",
+    "skincare":   "bath-and-beauty",
+    "jewelry":    "jewelry-and-accessories/jewelry",
+    "watches":    "jewelry-and-accessories",
+    "bags":       "bags-and-purses",
     "fashion":    "clothing",
-    "toys":       "toys_games",
-    "baby":       "toys_games",
-    "pet":        "pet_supplies",
-    "office":     "paper_party_supplies",
+    "toys":       "toys-and-games",
+    "baby":       "toys-and-games/baby-and-toddler-toys",
+    "pet":        "pet-supplies",
+    "office":     "paper-and-party-supplies",
     "outdoor":    "weddings",
     # Niches Etsy doesn't really cover (tech, fitness, gaming) get None
     # — caller will skip this source for those niches.
@@ -167,11 +170,26 @@ class EtsyTrendingApify:
                 "error": "no_etsy_category_for_niche",
             }
 
+        # Build the Etsy category URL. The actor walks this page and
+        # returns its listings. Etsy lists category pages by descending
+        # popularity by default, so the first ~30 items effectively are
+        # the trending ones in that category.
+        etsy_url = f"https://www.etsy.com/c/{category}"
+
+        # epctex/etsy-scraper input schema (verified May 2026):
+        #   startUrls: array of {url} objects
+        #   maxItems: cap on results
+        #   proxy: required object (use Apify residential proxy)
+        # The actor doesn't accept `category`, `sort`, or `country`
+        # at the top level — those go into the URL itself.
         run_input = {
-            "category": category,
+            "startUrls": [{"url": etsy_url}],
             "maxItems": int(max_items),
-            "country": "US",
-            "sort": "trending",
+            "includeDescription": False,
+            "proxy": {
+                "useApifyProxy": True,
+                "apifyProxyGroups": ["RESIDENTIAL"],
+            },
         }
 
         try:

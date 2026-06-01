@@ -7,7 +7,7 @@ FastAPI endpoints for email automation metrics and dashboard statistics.
 from fastapi import APIRouter, Query
 from typing import List, Dict, Any
 from datetime import datetime, timedelta, timezone
-from app.analytics import Analytics, EmailMetric
+from ospra_os.analytics.email_analytics import Analytics, EmailMetric
 from ospra_os.core.settings import Settings
 
 router = APIRouter(prefix="/api", tags=["Email Analytics"])

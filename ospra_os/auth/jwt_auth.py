@@ -56,8 +56,14 @@ if not _jwt_secret:
 
 SECRET_KEY = _jwt_secret
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
-REFRESH_TOKEN_EXPIRE_DAYS = 30
+# Token lifetimes — SINGLE SOURCE OF TRUTH for the whole app. jwt_handler
+# imports these (rather than defining its own) so the two JWT modules can
+# never silently drift. They previously disagreed (jwt_auth 24h/30d vs
+# jwt_handler 15m/7d); jwt_auth is the live mint path, so we standardize here.
+# Override via env to tighten the access-token lifetime once the frontend's
+# refresh flow is confirmed to handle shorter sessions.
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24)))  # default 24h
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
 
 
 # ============================================================================

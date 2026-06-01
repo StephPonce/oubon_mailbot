@@ -35,6 +35,7 @@ from .webhook_utils import (
     detect_product_niche,
     detect_price_point,
     get_store_or_default,
+    upsert_product_performance_from_order,
     WebhookTopics,
 )
 from .webhook_registry import (
@@ -806,7 +807,22 @@ async def process_order_paid(data: Dict[str, Any], store_id: Optional[int]):
             )
             
             logger.info(f"    📊 Learning: {product_name} ({niche}) - ${item_revenue}")
-        
+
+        # ============================================================
+        # STEP 1b: REAL-TIME ProductPerformance UPSERT (Phase 5B)
+        # ============================================================
+        # AILearningEvent above is per-event. ProductPerformance is the
+        # daily aggregate that LearningProcessor reads to compute predicted
+        # vs actual. Without this real-time upsert there's a 0-6h delay
+        # before SalesSyncService catches up.
+        await upsert_product_performance_from_order(
+            order_id=order_id,
+            line_items=line_items,
+            store_id=store_id,
+            user_id=user_id,
+            is_refund=False,
+        )
+
         # ============================================================
         # STEP 2: TRIGGER AUTO-FULFILLMENT
         # ============================================================
@@ -876,26 +892,57 @@ async def process_order_cancelled(data: Dict[str, Any], store_id: Optional[int])
 async def process_refund_create(data: Dict[str, Any], store_id: Optional[int]):
     """Process refund - strong negative signal."""
     try:
-        order_id = data.get('order_id')
+        order_id = str(data.get('order_id') or '')
         reason = data.get('note', 'No reason provided')
-        
-        for item in data.get('refund_line_items', []):
-            line_item = item.get('line_item', {})
-            product_id = str(line_item.get('product_id', ''))
-            
+        refund_line_items = data.get('refund_line_items', [])
+
+        # Resolve user_id once
+        store_info = await get_store_or_default(store_id)
+        user_id = store_info.get("user_id", 1)
+
+        # Build a flattened line_items list shaped like process_order_paid
+        # (so the helper signature stays the same).
+        flat_lines = []
+        for item in refund_line_items:
+            li = item.get('line_item', {}) or {}
+            product_id = str(li.get('product_id', ''))
+            if not product_id:
+                continue
+            quantity = int(item.get('quantity') or 1)
+            # subtotal is the refund amount for THIS line item
+            refund_subtotal = float(item.get('subtotal') or 0)
+            # Per-unit price for the helper (treats this as "unit_price × quantity = total")
+            unit_price = (refund_subtotal / quantity) if quantity > 0 else refund_subtotal
+            flat_lines.append({
+                'product_id': product_id,
+                'name': li.get('name', ''),
+                'quantity': quantity,
+                'price': unit_price,
+            })
+
             await record_learning_event(
                 event_type="refund",
                 product_id=product_id,
                 details={
-                    "product_name": line_item.get('name', ''),
-                    "quantity": item.get('quantity', 1),
-                    "refund_amount": float(item.get('subtotal', 0)),
+                    "product_name": li.get('name', ''),
+                    "quantity": quantity,
+                    "refund_amount": refund_subtotal,
                     "reason": reason,
                     "source": "webhook_refunds_create",
                 },
                 store_id=store_id,
             )
-        
+
+        # Phase 5B: also update ProductPerformance with the refund amount
+        # so the daily aggregate reflects it in real time.
+        await upsert_product_performance_from_order(
+            order_id=order_id,
+            line_items=flat_lines,
+            store_id=store_id,
+            user_id=user_id,
+            is_refund=True,
+        )
+
         await create_notification(
             notification_type='alert',
             title='Refund Processed',
@@ -903,7 +950,7 @@ async def process_refund_create(data: Dict[str, Any], store_id: Optional[int]):
             severity='warning',
             store_id=store_id,
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to process refund: {e}")
 

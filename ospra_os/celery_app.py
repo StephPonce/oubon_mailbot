@@ -34,6 +34,7 @@ celery_app = Celery(
         "ospra_os.tasks.analytics_tasks",
         "ospra_os.tasks.learning_tasks",
         "ospra_os.tasks.feedback_tasks",  # G4: Complete Feedback Loop
+        "ospra_os.tasks.billing_tasks",  # LemonSqueezy tier changes (retry + dead-letter)
     ]
 )
 
