@@ -32,6 +32,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime
 from difflib import SequenceMatcher
 
+from ospra_os.intelligence.demand_authenticity import (
+    AUTHENTICITY_ENABLED,
+    compute_authenticity,
+    signals_from_product,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,6 +111,30 @@ def _with_timeout(coro, timeout: float):
     are skipped gracefully and we still return results from fast sources.
     """
     return asyncio.wait_for(coro, timeout=timeout)
+
+
+def _should_skip_keyword_search(winner_count: int, max_products: int, strict: bool) -> bool:
+    """
+    Decide whether STEP 2b (keyword-based supplier-CANDIDATE search) runs.
+
+    This is the lever for the "suppliers are sourcing, not discovery" model.
+
+    strict=True  (env DISCOVERY_WINNER_FIRST_STRICT=true): suppliers are
+        sourcing-only. STEP 2b never runs, so the ONLY candidates are the
+        trend/sentiment-validated winners from STEP 2a (and the AE/CJ products
+        those winners sourced). No standalone supplier products with zero
+        demand signal can enter — which is exactly what keeps the honest
+        scorer from being fed signal-less items. Trades quantity for quality;
+        pair with strong winner sources (Meta Ad Library, TikTok Shop, Amazon
+        Movers).
+    strict=False (default — unchanged behaviour): STEP 2b is skipped only when
+        winner-first already produced at least half a page, otherwise it
+        supplements so the user always sees a reasonable number of products.
+    """
+    if strict:
+        return True
+    threshold = max(int(max_products * 0.5), 5)
+    return winner_count >= threshold
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1035,8 +1065,16 @@ class ProductDiscoveryEngine:
         # results (so we always have at least a half-page to show). When
         # winner-first nailed it, this is skipped entirely to save time.
         winner_threshold = max(int(max_products * 0.5), 5)
-        skip_keyword_search = len(winner_products) >= winner_threshold
-        if skip_keyword_search:
+        _winner_first_strict = os.getenv("DISCOVERY_WINNER_FIRST_STRICT", "false").lower() == "true"
+        skip_keyword_search = _should_skip_keyword_search(
+            len(winner_products), max_products, _winner_first_strict
+        )
+        if skip_keyword_search and _winner_first_strict:
+            logger.info(
+                "   [WINNER-FIRST STRICT] suppliers are sourcing-only — skipping keyword "
+                f"candidate search (winner path produced {len(winner_products)} products)"
+            )
+        elif skip_keyword_search:
             logger.info(
                 f"   ⚡ Skipping keyword-based search — winner path already produced "
                 f"{len(winner_products)} products (threshold: {winner_threshold})"
@@ -3024,7 +3062,7 @@ class ProductDiscoveryEngine:
                 # silently drops CJ from the result mix.
                 client_available = bool(getattr(self, 'cj_available', False))
                 token_present = bool(
-                    os.getenv('CJ_API_TOKEN') or os.getenv('OUBONSHOP_CJ_API_TOKEN')
+                    os.getenv('CJ_ACCESS_TOKEN') or os.getenv('OUBONSHOP_CJ_ACCESS_TOKEN')
                 )
                 category_mapped = bool(niche and getattr(self, 'cj_client', None)
                                        and niche in getattr(self.cj_client, 'CATEGORY_MAP', {}))
@@ -6124,6 +6162,43 @@ class ProductDiscoveryEngine:
             product['saturation_confidence'] = sat_conf
             product['saturation_signals'] = saturation_result.get('signals', {})
             product['saturation_note'] = saturation_result.get('note')
+
+            # ──────────────────────────────────────────────────────────────
+            # DEMAND AUTHENTICITY — paid/promoted vs organic divergence check
+            # ──────────────────────────────────────────────────────────────
+            # Gated A/B toggle (DISCOVERY_AUTHENTICITY_ENABLED). Demote-only
+            # (multiplier <= 1.0). Catches products with heavy promoted signal
+            # (Meta ad winners, TikTok hype) but no corroborating organic
+            # demand (Google Trends intent, Amazon reviews). See
+            # ospra_os/intelligence/demand_authenticity.py docstring.
+            if AUTHENTICITY_ENABLED:
+                org, promo, n_org = signals_from_product(product)
+                auth = compute_authenticity(
+                    organic_strength=org,
+                    promoted_strength=promo,
+                    n_organic_sources=n_org,
+                )
+                oi_score = oi_score * auth.multiplier
+                product['authenticity_score'] = auth.score
+                product['authenticity_label'] = auth.label
+                product['authenticity_divergence'] = auth.divergence_flag
+                product['authenticity_reasons'] = auth.reasons
+
+            # ──────────────────────────────────────────────────────────────
+            # WINNER-STRENGTH BOOST
+            # ──────────────────────────────────────────────────────────────
+            # Compensates for missing sentiment signal on winner-sourced
+            # products (especially CJ-only, which lack Amazon-reviews /
+            # Twitter / AE-velocity signals that AE products accumulate).
+            # The winner provenance IS the signal — a product matched to a
+            # strict Meta winner (strength=1.0) deserves a real boost; a
+            # loose match (0.6) gets a smaller one. Range 1.00 → 1.20×.
+            wp = product.get('winner_provenance') or {}
+            winner_strength = float(wp.get('source_winner_strength') or 0)
+            if winner_strength > 0:
+                winner_boost = 1.0 + 0.20 * winner_strength
+                oi_score = oi_score * winner_boost
+                product['winner_strength_boost'] = round(winner_boost, 3)
 
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:

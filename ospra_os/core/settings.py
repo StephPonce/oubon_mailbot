@@ -424,7 +424,11 @@ class Settings(BaseSettings):
 
     @property
     def CJ_DROPSHIPPING_ENABLED(self) -> bool:
-        return bool(os.getenv("CJ_API_EMAIL") and os.getenv("CJ_API_KEY"))
+        # Match what the CJ client actually authenticates with
+        # (ospra_os/integrations/cj_dropshipping/client.py reads CJ_ACCESS_TOKEN).
+        # The old check looked for CJ_API_EMAIL + CJ_API_KEY, which the client
+        # never uses — so this reported CJ "disabled" even with a valid token.
+        return bool(os.getenv("CJ_ACCESS_TOKEN") or os.getenv("OUBONSHOP_CJ_ACCESS_TOKEN"))
 
     @property
     def AMAZON_REVIEWS_ENABLED(self) -> bool:

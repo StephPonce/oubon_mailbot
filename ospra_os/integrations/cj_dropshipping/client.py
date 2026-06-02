@@ -374,89 +374,55 @@ class CJDropshippingClient:
         all_products = []
         seen_pids = set()
 
-        # 1. Check if we have a direct keyword mapping
+        def _add(products: List[Dict]) -> None:
+            # Normalized CJ products expose `product_id` (prefix "cj_") and `cj_pid`.
+            for p in products:
+                pid = p.get('product_id') or p.get('cj_pid') or p.get('title') or ''
+                if pid and pid not in seen_pids:
+                    seen_pids.add(pid)
+                    all_products.append(p)
+
+        # ── KEYWORD-FIRST ────────────────────────────────────────────────
+        # CJ's /product/getCategory has been returning an EMPTY category list
+        # (verified via scripts/diagnose_cj.py: category 1489 → 0 products,
+        # keyword "smart plug" → 10). Leading with category therefore wasted
+        # the reliable request slot and often returned nothing. Keyword search
+        # (productNameEn) is the working path, so we lead with it and use the
+        # SPECIFIC mapped phrases (e.g. "smart plug", "wifi plug") rather than
+        # splitting into broad single words like "smart" (which match junk).
         mapping = self.KEYWORD_MAP.get(query_lower)
-
-        if mapping:
-            logger.info(f"[INFO] CJ smart search: '{query}' -> mapped keywords + category")
-
-            # Search by category first (most reliable)
-            if mapping.get('category'):
-                cat_products = await self.search_products(
-                    keyword="",
-                    category_id=mapping['category'],
-                    page_size=page_size
-                )
-                for p in cat_products:
-                    # Normalized CJ products expose `product_id` (prefix "cj_") and `cj_pid`.
-                    # The old keys `source_id`/`name` never exist, so every product
-                    # deduped to '' and 10 results collapsed to 1 unique product.
-                    pid = p.get('product_id') or p.get('cj_pid') or p.get('title') or ''
-                    if pid not in seen_pids:
-                        seen_pids.add(pid)
-                        all_products.append(p)
-
-            # Then try first mapped keyword only (to avoid rate limiting)
-            for kw in mapping.get('keywords', [])[:1]:
-                if len(all_products) >= page_size:
-                    break
-                kw_products = await self.search_products(
-                    keyword=kw,
-                    page_size=min(10, page_size - len(all_products))
-                )
-                for p in kw_products:
-                    # Normalized CJ products expose `product_id` (prefix "cj_") and `cj_pid`.
-                    # The old keys `source_id`/`name` never exist, so every product
-                    # deduped to '' and 10 results collapsed to 1 unique product.
-                    pid = p.get('product_id') or p.get('cj_pid') or p.get('title') or ''
-                    if pid not in seen_pids:
-                        seen_pids.add(pid)
-                        all_products.append(p)
-
+        if mapping and mapping.get('keywords'):
+            keywords = list(mapping['keywords'])
         else:
-            # 2. No mapping - try to infer category from query words
-            for word in query_lower.split():
-                # Task #36: check dynamic + hard-coded map for the niche keyword
-                resolved_cat = self._get_category_id(word)
-                if resolved_cat:
-                    logger.info(
-                        f"[INFO] CJ: Found category '{word}' -> {resolved_cat}"
-                    )
-                    cat_products = await self.search_products(
-                        keyword="",
-                        category_id=resolved_cat,
-                        page_size=page_size
-                    )
-                    for p in cat_products:
-                        # Normalized CJ products expose `product_id` (prefix "cj_") and `cj_pid`.
-                        # The old keys `source_id`/`name` never exist, so every product
-                        # deduped to '' and 10 results collapsed to 1 unique product.
-                        pid = p.get('product_id') or p.get('cj_pid') or p.get('title') or ''
-                        if pid not in seen_pids:
-                            seen_pids.add(pid)
-                            all_products.append(p)
-                    break
+            # Full phrase first (most specific), then longer single words.
+            keywords = [query_lower] + [w for w in query_lower.split() if len(w) > 3]
 
-            # 3. Try first significant word as keyword (limit to 1 to avoid rate limits)
-            if len(all_products) < page_size:
-                words = [w for w in query_lower.split() if len(w) > 3]  # Longer words only
-                for word in words[:1]:  # Only try 1 word to avoid rate limits
-                    if len(all_products) >= page_size:
+        # De-dupe preserving order; cap at 3 keyword calls to respect rate limits.
+        _seen_kw: set = set()
+        keywords = [k for k in keywords if k and not (k in _seen_kw or _seen_kw.add(k))][:3]
+
+        logger.info(f"[INFO] CJ smart search: '{query}' -> keyword-first {keywords}")
+        for kw in keywords:
+            if len(all_products) >= page_size:
+                break
+            remaining = page_size - len(all_products)
+            _add(await self.search_products(keyword=kw, page_size=min(20, remaining)))
+
+        # ── CATEGORY as best-effort SUPPLEMENT ──────────────────────────
+        # Usually empty today, but kept so a future CATEGORY_MAP refresh
+        # transparently adds coverage without another code change.
+        if len(all_products) < page_size:
+            cat_id = mapping.get('category') if mapping else None
+            if not cat_id:
+                for word in query_lower.split():
+                    cat_id = self._get_category_id(word)
+                    if cat_id:
                         break
-                    kw_products = await self.search_products(
-                        keyword=word,
-                        page_size=min(10, page_size - len(all_products))
-                    )
-                    for p in kw_products:
-                        # Normalized CJ products expose `product_id` (prefix "cj_") and `cj_pid`.
-                        # The old keys `source_id`/`name` never exist, so every product
-                        # deduped to '' and 10 results collapsed to 1 unique product.
-                        pid = p.get('product_id') or p.get('cj_pid') or p.get('title') or ''
-                        if pid not in seen_pids:
-                            seen_pids.add(pid)
-                            all_products.append(p)
+            if cat_id:
+                remaining = page_size - len(all_products)
+                _add(await self.search_products(keyword="", category_id=cat_id, page_size=remaining))
 
-        logger.info(f"[SUCCESS] CJ smart search '{query}': {len(all_products)} unique products")
+        logger.info(f"[SUCCESS] CJ smart search '{query}': {len(all_products)} unique products (keyword-first)")
         return all_products[:page_size]
     
     async def get_product_details(self, pid: str) -> Optional[Dict]:
