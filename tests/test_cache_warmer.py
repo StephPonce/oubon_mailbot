@@ -92,3 +92,45 @@ async def test_warm_all_iterates_all_niches(monkeypatch):
     res = await cache_warmer.warm_all(fake_discovery, niches=["a", "b", "c"])
     assert set(res.keys()) == {"a", "b", "c"}
     assert all(v == 1 for v in res.values())
+
+
+# ── Freshness rotation ──────────────────────────────────────────────────────
+
+def _prods(*ids):
+    return [{"product_id": i, "title": f"Product {i}", "oi_score": 50} for i in ids]
+
+
+def test_apply_freshness_marks_new_and_repeats():
+    prev = _prods("a", "b")
+    new = _prods("a", "c")
+    out = cache_warmer.apply_freshness(new, prev)
+    by_id = {p["product_id"]: p for p in out}
+    assert by_id["a"]["is_new_discovery"] is False
+    assert by_id["a"]["repeat_count"] == 1
+    assert by_id["c"]["is_new_discovery"] is True
+    assert by_id["c"]["repeat_count"] == 0
+    assert all(p.get("first_seen_at") for p in out)
+
+
+def test_apply_freshness_carries_first_seen_forward():
+    prev = cache_warmer.apply_freshness(_prods("a"), None)
+    first_seen = prev[0]["first_seen_at"]
+    out = cache_warmer.apply_freshness(_prods("a"), prev)
+    assert out[0]["first_seen_at"] == first_seen
+    assert out[0]["repeat_count"] == 1
+
+
+def test_apply_freshness_rotates_new_below_top_slots():
+    # Top keep_top slots untouched; below them, NEW items surface before repeats.
+    prev = _prods("a", "b", "c", "d", "e")
+    new = _prods("a", "b", "c", "d", "x")  # x is new, ranked last by discovery
+    out = cache_warmer.apply_freshness(new, prev, keep_top=3)
+    assert [p["product_id"] for p in out[:3]] == ["a", "b", "c"]  # winners stay
+    assert out[3]["product_id"] == "x"  # new item promoted above repeat 'd'
+
+
+def test_apply_freshness_never_touches_scores():
+    prev = _prods("a", "b")
+    new = _prods("a", "c")
+    out = cache_warmer.apply_freshness(new, prev)
+    assert all(p["oi_score"] == 50 for p in out)

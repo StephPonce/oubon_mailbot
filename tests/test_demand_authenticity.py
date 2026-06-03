@@ -49,12 +49,14 @@ def test_single_source_organic():
     assert 0.9 <= r.multiplier <= 1.0
 
 
-def test_unproven_is_only_slightly_demoted_not_flagged():
-    # Weak everything → unproven, NOT manufactured (no divergence flag).
+def test_unproven_is_neutral_not_demoted():
+    # Weak everything → unproven, NOT manufactured — and NEUTRAL (1.0).
+    # The base score already penalizes missing signals; this layer must not
+    # double-count uncertainty (that compressed all thin products into the 30s).
     r = compute_authenticity(organic_strength=0.1, promoted_strength=0.15, n_organic_sources=0)
     assert r.divergence_flag is False
     assert r.label == "unproven"
-    assert 0.8 <= r.multiplier <= 0.92
+    assert r.multiplier == 1.0
 
 
 def test_multiplier_never_inflates():

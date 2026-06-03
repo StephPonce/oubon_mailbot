@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,62 @@ DEFAULT_WARM_INTERVAL_HOURS = int(os.getenv("DISCOVERY_WARM_INTERVAL_HOURS", "6"
 # How many products to fetch per warm run (a generous pool the read path
 # paginates / per-user-filters down from).
 WARM_FETCH_COUNT = int(os.getenv("DISCOVERY_WARM_COUNT", "50"))
+# Freshness rotation: keep the top N score-ranked slots untouched (real winners
+# stay visible), then surface NEW discoveries ahead of repeats below them.
+FRESHNESS_KEEP_TOP = int(os.getenv("DISCOVERY_FRESHNESS_KEEP_TOP", "3"))
+
+
+def _identity(p: Dict[str, Any]) -> str:
+    """Stable identity for batch-over-batch comparison."""
+    return str(
+        p.get("product_id")
+        or p.get("id")
+        or (p.get("title") or "").strip().lower()[:80]
+    )
+
+
+def apply_freshness(
+    new_batch: List[Dict[str, Any]],
+    previous_batch: Optional[List[Dict[str, Any]]],
+    keep_top: int = FRESHNESS_KEEP_TOP,
+) -> List[Dict[str, Any]]:
+    """
+    Compare this warm's batch against the previous one and:
+
+      1. Stamp every product with ``is_new_discovery`` (not in last batch),
+         ``repeat_count`` (consecutive batches seen) and ``first_seen_at``
+         (carried forward), so the UI can badge "NEW" and the user can see
+         what changed since yesterday instead of an identical-looking page.
+      2. Rotate ORDERING (scores are NOT touched — honest scoring stays
+         honest): the top ``keep_top`` score-ranked slots stay as-is (a real
+         winner is still a winner today), and below them NEW discoveries are
+         surfaced ahead of repeats.
+
+    Without this, deterministic discovery makes every refresh look identical
+    even when it found something new buried at rank 14.
+    """
+    now_iso = datetime.now(timezone.utc).isoformat()
+    prev_by_id = {_identity(p): p for p in (previous_batch or [])}
+
+    for p in new_batch:
+        prev = prev_by_id.get(_identity(p))
+        if prev is not None:
+            p["is_new_discovery"] = False
+            p["repeat_count"] = int(prev.get("repeat_count") or 0) + 1
+            p["first_seen_at"] = prev.get("first_seen_at") or now_iso
+        else:
+            p["is_new_discovery"] = True
+            p["repeat_count"] = 0
+            p["first_seen_at"] = now_iso
+
+    if len(new_batch) <= keep_top:
+        return new_batch
+
+    head = new_batch[:keep_top]
+    tail = new_batch[keep_top:]
+    tail_new = [p for p in tail if p.get("is_new_discovery")]
+    tail_rep = [p for p in tail if not p.get("is_new_discovery")]
+    return head + tail_new + tail_rep
 
 
 def parse_niches(raw: Optional[str]) -> List[str]:
@@ -92,6 +149,17 @@ async def warm_one(
         return 0
 
     cache = get_product_cache()
+
+    # Freshness pass: compare against the previous cached batch so each warm
+    # rotates genuinely NEW finds toward the top and stamps is_new_discovery /
+    # repeat_count / first_seen_at for the UI. Scores are not modified.
+    try:
+        prev_entry = cache.get(niche, tiers[0])
+        previous = list(prev_entry.products) if prev_entry and getattr(prev_entry, "products", None) else None
+    except Exception:
+        previous = None
+    products = apply_freshness(products, previous)
+
     for tier in tiers:
         try:
             cache.set(

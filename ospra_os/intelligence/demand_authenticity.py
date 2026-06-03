@@ -147,8 +147,9 @@ def compute_authenticity(
         )
     elif organic >= 0.5:
         divergence = False
-        # Real demand present. Demote-only model caps the factor at 1.0.
-        multiplier = 0.85 + 0.15 * score
+        # Real demand present — NO haircut. Products with good evidence must
+        # not be shaved; only affirmative adverse signals demote.
+        multiplier = 1.0
         if n_organic_sources >= 2:
             label = "corroborated"
             reasons.append(
@@ -164,10 +165,15 @@ def compute_authenticity(
                 f"but watch for added hype."
             )
     else:
-        # Weak everything → unproven (NOT fake). Slight demote only; the honest
-        # scorer already handles missing signals, so we don't double-punish hard.
+        # Weak everything → unproven (NOT fake) → NEUTRAL multiplier.
+        # CALIBRATION (anti-double-counting): the honest base score ALREADY
+        # penalizes missing signals (absent components contribute zero weight),
+        # and the saturation layer separately haircuts unknowns. Adding a third
+        # uncertainty haircut here compressed every thin-evidence product into
+        # the 30s. Absence of data is penalized ONCE, at the base; this layer
+        # only demotes on AFFIRMATIVE adverse signal (manufactured / hype).
         divergence = False
-        multiplier = 0.85 + 0.15 * score
+        multiplier = 1.0
         label = "unproven"
         reasons.append(
             f"Weak signals (organic {organic:.2f}, promoted {promoted:.2f}) — "
