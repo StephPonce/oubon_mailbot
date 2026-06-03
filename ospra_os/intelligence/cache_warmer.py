@@ -80,7 +80,9 @@ async def warm_one(
 
     tiers = tiers or _all_cache_tiers()
     try:
-        products = await discovery_func(niche=niche, count=count)
+        # ProductDiscoveryEngine.discover_products names this `max_products`,
+        # not `count` — passing `count=` raises TypeError and the warm fails.
+        products = await discovery_func(niche=niche, max_products=count)
     except Exception as exc:
         logger.warning("cache_warmer: discovery failed for niche=%s: %s", niche, exc)
         return 0

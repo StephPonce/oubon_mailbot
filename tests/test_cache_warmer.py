@@ -38,7 +38,7 @@ async def test_warm_one_runs_discovery_once_and_caches_all_tiers(monkeypatch):
 
     calls = {"n": 0}
 
-    async def fake_discovery(niche, count):
+    async def fake_discovery(niche, max_products):
         calls["n"] += 1
         return [{"id": i} for i in range(5)]
 
@@ -58,7 +58,7 @@ async def test_warm_one_runs_discovery_once_and_caches_all_tiers(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_warm_one_never_raises_on_discovery_failure():
-    async def boom(niche, count):
+    async def boom(niche, max_products):
         raise RuntimeError("apify down")
 
     assert await cache_warmer.warm_one("smart_home", boom) == 0
@@ -72,7 +72,7 @@ async def test_warm_one_empty_products_caches_nothing(monkeypatch):
         lambda: fake_cache,
     )
 
-    async def empty(niche, count):
+    async def empty(niche, max_products):
         return []
 
     assert await cache_warmer.warm_one("smart_home", empty) == 0
@@ -86,7 +86,7 @@ async def test_warm_all_iterates_all_niches(monkeypatch):
         lambda: _FakeCache(),
     )
 
-    async def fake_discovery(niche, count):
+    async def fake_discovery(niche, max_products):
         return [{"id": 1}]
 
     res = await cache_warmer.warm_all(fake_discovery, niches=["a", "b", "c"])
