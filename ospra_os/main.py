@@ -1601,6 +1601,18 @@ async def _run_startup_deferred():
     except Exception as e:
         logger.warning(f"Auto-deploy scheduler failed to start: {e}")
 
+    # Start Discovery Cache Warmer — keeps the (niche, tier) discovery cache hot
+    # in the background so the dashboard reads instantly instead of triggering a
+    # ~80s live discovery on the request path (which Safari times out at ~60s).
+    # Reuses the SAME engine singleton the discovery route uses (get_engine()).
+    try:
+        from ospra_os.intelligence.unified_discovery_routes import get_engine
+        from ospra_os.intelligence.cache_warmer import start_cache_warmer
+        start_cache_warmer(get_engine().discover_products)
+        logger.info("Discovery cache warmer started (background pre-warm)")
+    except Exception as e:
+        logger.warning(f"Discovery cache warmer failed to start: {e}")
+
     # Start Learning Summary background jobs
     try:
         from ospra_os.learning.summary_jobs import setup_summary_jobs
