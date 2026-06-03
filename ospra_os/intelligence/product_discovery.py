@@ -4590,6 +4590,50 @@ class ProductDiscoveryEngine:
         except Exception as e:
             logger.warning(f"[winners] etsy candidate extraction failed: {e}")
 
+        # ── 5. Amazon New Releases winners ──────────────────────────────
+        # Cache shape: {items: [{title, asin, product_url, bestseller_rank, ...}]}.
+        # Same shape as _amazon_movers_cache. New Releases = products
+        # launched in last 30d — by definition early-stage / un-saturated,
+        # so signal_strength stays high across the head of the list.
+        try:
+            nr_cache = getattr(self, '_amazon_new_releases_cache', None) or {}
+            items = nr_cache.get('items') or []
+            ranked = sorted(
+                items,
+                key=lambda it: int(it.get('bestseller_rank') or 9999),
+            )[:max_per_source]
+            for idx, item in enumerate(ranked):
+                title = (item.get('title') or '').strip()
+                if not title:
+                    continue
+                tokens = [
+                    t.lower() for t in title.split()
+                    if len(t) >= 3
+                    and t.lower() not in self._MATCH_STOPWORDS
+                    and t.isalpha()
+                ]
+                if not tokens:
+                    continue
+                # Decay slower than movers (new releases stay high-signal
+                # deeper into the list since each is genuinely new).
+                strength = round(max(0.5, 1.0 - (idx * 0.10)), 3)
+                candidates.append({
+                    'source': 'amazon_new_releases',
+                    'name': title[:120],
+                    'brand_tokens': [],
+                    'slug_keyword_groups': [tokens[:4]],
+                    'signal_strength': strength,
+                    'metadata': {
+                        'asin': item.get('asin'),
+                        'product_url': item.get('product_url'),
+                        'bestseller_rank': item.get('bestseller_rank'),
+                        'rating': item.get('rating'),
+                        'reviews_count': item.get('reviews_count'),
+                    },
+                })
+        except Exception as e:
+            logger.warning(f"[winners] amazon_new_releases candidate extraction failed: {e}")
+
         if candidates:
             by_source: Dict[str, int] = {}
             for c in candidates:

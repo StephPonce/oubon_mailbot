@@ -2872,12 +2872,23 @@ export function ProductDiscovery() {
       // Structured error from backend (503 with diagnostics) — surface it to the user.
       if (response && response.__error) {
         console.error('[ProductDiscovery] Discovery error:', response);
+        // Coerce any object-shaped error fields to strings up front. The
+        // backend can send these as objects like {code, message}; rendering an
+        // object as a React child crashes the whole page ("Objects are not
+        // valid as a React child"). Normalizing here makes every downstream
+        // render safe regardless of the backend's error shape.
+        const asText = (v) =>
+          v == null
+            ? v
+            : typeof v === 'string'
+              ? v
+              : (v.message || v.detail || v.error || JSON.stringify(v));
         setDiscoveryError({
           status: response.status,
-          error: response.error,
-          discovery_error: response.discovery_error,
+          error: asText(response.error),
+          discovery_error: asText(response.discovery_error),
           diagnostics: response.diagnostics,
-          hint: response.hint,
+          hint: asText(response.hint),
         });
         setProducts([]);
         return;
@@ -3380,7 +3391,13 @@ export function ProductDiscovery() {
             <>
               <h3 className="text-xl font-semibold text-white mb-2">Discovery unavailable</h3>
               <p className="text-red-300 mb-4 max-w-lg mx-auto">
-                {discoveryError.error || 'No real products could be fetched.'}
+                {/* Coerce to string — the backend error field can be an object
+                    like {code, message}; rendering that object directly crashes
+                    React ("Objects are not valid as a React child"). */}
+                {(typeof discoveryError.error === 'string'
+                  ? discoveryError.error
+                  : discoveryError.error?.message || discoveryError.error?.detail)
+                  || 'No real products could be fetched.'}
               </p>
 
               {discoveryError.diagnostics && (
@@ -3409,7 +3426,10 @@ export function ProductDiscovery() {
 
                   {discoveryError.discovery_error && (
                     <div className="text-xs text-red-200 mt-2 font-mono break-all">
-                      Engine error: {discoveryError.discovery_error}
+                      Engine error: {typeof discoveryError.discovery_error === 'string'
+                        ? discoveryError.discovery_error
+                        : (discoveryError.discovery_error?.message
+                          || JSON.stringify(discoveryError.discovery_error))}
                     </div>
                   )}
                 </div>
