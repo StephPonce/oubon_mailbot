@@ -6184,9 +6184,16 @@ class ProductDiscoveryEngine:
             # the truly crowded ones.
             #
             # Confidence-aware: if we don't have enough saturation data
-            # (confidence < 0.3) we apply a neutral 0.85× multiplier
-            # rather than the unknown=0.5 → 0.71× hit. Otherwise products
-            # with sparse data get unfairly punished.
+            # (confidence < 0.3) we apply a NEUTRAL 1.0× multiplier — no
+            # haircut for unknown saturation. Haircuts only fire on
+            # MEASURED saturation.
+            #
+            # CALIBRATION (anti-double-counting, matches the authenticity
+            # layer fix): the base score already penalizes missing signals
+            # ONCE (absent components contribute zero weight). The previous
+            # 0.85× low-confidence path was a second uncertainty haircut on
+            # the same evidence gap, compressing thin-data products
+            # unfairly. Absence of data is penalized at the base, not here.
             saturation_result = _compute_saturation(product)
             sat_score = saturation_result['score']
             sat_conf = saturation_result['confidence']
@@ -6194,9 +6201,9 @@ class ProductDiscoveryEngine:
             if sat_conf >= 0.3:
                 saturation_multiplier = (1.0 - sat_score) ** 0.5
             else:
-                # Low-confidence path — slight haircut but don't penalize
-                # heavily for missing data.
-                saturation_multiplier = 0.85
+                # Low-confidence path — NEUTRAL. Only measured saturation
+                # earns a haircut.
+                saturation_multiplier = 1.0
 
             oi_score = oi_score * saturation_multiplier
 
