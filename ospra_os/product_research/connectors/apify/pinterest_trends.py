@@ -33,9 +33,10 @@ from .base_apify import ApifyClient
 logger = logging.getLogger(__name__)
 
 
-# Default actor — swap with PINTEREST_APIFY_ACTOR env var if you prefer
-# a different scraper (e.g. epctex/pinterest-scraper, apify/pinterest-search-scraper)
-DEFAULT_ACTOR_ID = "epctex/pinterest-search-scraper"
+# Default actor. ``epctex/pinterest-search-scraper`` was removed from the
+# Apify store (returns 404); ``epctex/pinterest-scraper`` is the alive
+# successor from the same author. Override via ``PINTEREST_APIFY_ACTOR``.
+DEFAULT_ACTOR_ID = "epctex/pinterest-scraper"
 
 # Pinterest's repin counts span many orders of magnitude. We log-compress
 # at 50,000 repins (≈ "very popular pin" ceiling for a single query) so

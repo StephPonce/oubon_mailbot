@@ -62,12 +62,16 @@ class ApifyClient:
     - clockworks/tiktok-scraper (TikTok videos & hashtags)
     """
     
-    # Popular Apify actors for e-commerce
+    # Popular Apify actors for e-commerce.
+    #
+    # Actor IDs are env-overridable so we can swap a dead actor without a
+    # redeploy. `apify/amazon-crawler` was removed from the Apify store
+    # (returns 404) — `epctex/amazon-scraper` is the alive replacement.
     ACTORS = {
-        'amazon_bestsellers': 'junglee/amazon-bestsellers',
-        'amazon_search': 'apify/amazon-crawler', 
-        'tiktok_scraper': 'clockworks/tiktok-scraper',
-        'tiktok_hashtag': 'clockworks/tiktok-hashtag-scraper',
+        'amazon_bestsellers': os.getenv('APIFY_AMAZON_BESTSELLERS_ACTOR', 'junglee/amazon-bestsellers'),
+        'amazon_search': os.getenv('APIFY_AMAZON_SEARCH_ACTOR', 'epctex/amazon-scraper'),
+        'tiktok_scraper': os.getenv('APIFY_TIKTOK_SCRAPER_ACTOR', 'clockworks/tiktok-scraper'),
+        'tiktok_hashtag': os.getenv('APIFY_TIKTOK_HASHTAG_ACTOR', 'clockworks/tiktok-hashtag-scraper'),
     }
     
     def __init__(self, api_token: Optional[str] = None):

@@ -32,11 +32,14 @@ from .base_apify import ApifyClient
 logger = logging.getLogger(__name__)
 
 
-# Apify actor for AliExpress reviews. The exact actor ID depends on
-# what's available in the user's Apify account; ``epctex/aliexpress-reviews-scraper``
-# is the most common public option. Override with the env var
-# ``APIFY_ALIEXPRESS_REVIEWS_ACTOR`` if a different actor is preferred.
-DEFAULT_ACTOR = "epctex/aliexpress-reviews-scraper"
+# Apify actor for AliExpress reviews. ``epctex/aliexpress-reviews-scraper``
+# was removed from the Apify store (returns 404). ``epctex/aliexpress-scraper``
+# is the alive successor from the same author and returns product data with
+# embedded reviews. Override via ``APIFY_ALIEXPRESS_REVIEWS_ACTOR`` if a
+# different actor is preferred. The normalizer below tolerates a range of
+# field names, so a schema drift from this swap degrades to an empty review
+# list rather than an error.
+DEFAULT_ACTOR = "epctex/aliexpress-scraper"
 
 
 class AliExpressReviewsApify:
