@@ -32,14 +32,17 @@ from .base_apify import ApifyClient
 logger = logging.getLogger(__name__)
 
 
-# Apify actor for AliExpress reviews. ``epctex/aliexpress-reviews-scraper``
-# was removed from the Apify store (returns 404). ``epctex/aliexpress-scraper``
-# is the alive successor from the same author and returns product data with
-# embedded reviews. Override via ``APIFY_ALIEXPRESS_REVIEWS_ACTOR`` if a
-# different actor is preferred. The normalizer below tolerates a range of
-# field names, so a schema drift from this swap degrades to an empty review
-# list rather than an error.
-DEFAULT_ACTOR = "epctex/aliexpress-scraper"
+# Apify actor for AliExpress reviews. The previous default
+# (``epctex/aliexpress-reviews-scraper``) was removed from the Apify store
+# (404), and the only alive alternative we vetted
+# (``epctex/aliexpress-scraper``) requires a FLAT_PRICE_PER_MONTH rental
+# ($30/mo). Ospra's stance is no rental defaults, so this connector is
+# disabled by default and must be opted in via
+# ``APIFY_ALIEXPRESS_REVIEWS_ACTOR``. When unset, ``is_available()`` returns
+# False and ``fetch_reviews()`` returns ``{"available": False}`` cleanly —
+# the discovery flow already treats AliExpress reviews as a best-effort
+# enrichment so the rest of the pipeline is unaffected.
+DEFAULT_ACTOR = ""
 
 
 class AliExpressReviewsApify:
@@ -59,7 +62,9 @@ class AliExpressReviewsApify:
         )
 
     def is_available(self) -> bool:
-        return self.client.is_available()
+        # Require BOTH an Apify token AND a configured actor — the default
+        # actor is empty so that we don't silently spend on a rental.
+        return bool(self.actor_id) and self.client.is_available()
 
     async def fetch_reviews(
         self,

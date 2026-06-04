@@ -33,10 +33,14 @@ from .base_apify import ApifyClient
 logger = logging.getLogger(__name__)
 
 
-# Default actor. ``epctex/pinterest-search-scraper`` was removed from the
-# Apify store (returns 404); ``epctex/pinterest-scraper`` is the alive
-# successor from the same author. Override via ``PINTEREST_APIFY_ACTOR``.
-DEFAULT_ACTOR_ID = "epctex/pinterest-scraper"
+# Default Pinterest actor. The previous default
+# (``epctex/pinterest-search-scraper``) was removed from the Apify store
+# (404) and the alive successor (``epctex/pinterest-scraper``) requires a
+# FLAT_PRICE_PER_MONTH rental ($35/mo). To match the no-rental-defaults
+# stance, this connector is disabled by default and must be opted in via
+# ``PINTEREST_APIFY_ACTOR``. When unset, the trend-fetch path falls
+# through cleanly (UNKNOWN, +0 keywords) without burning credits.
+DEFAULT_ACTOR_ID = ""
 
 # Pinterest's repin counts span many orders of magnitude. We log-compress
 # at 50,000 repins (≈ "very popular pin" ceiling for a single query) so
@@ -104,7 +108,9 @@ class PinterestTrendsApify:
         return "pinterest_trends"
 
     def is_available(self) -> bool:
-        return self._available
+        # Both the Apify client AND a configured actor are required — the
+        # default actor is empty so we don't auto-spend on a rental.
+        return self._available and bool(self.actor_id)
 
     def _cache_key(self, keyword: str, geo: str) -> str:
         return f"pinterest:{keyword.lower()}:{geo}"

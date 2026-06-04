@@ -19,8 +19,13 @@ import pytest
 
 @pytest.fixture
 def configured_connector():
-    """Pinterest connector with a fake Apify token."""
-    with patch.dict(os.environ, {"APIFY_API_TOKEN": "fake-token-12345"}):
+    """Pinterest connector with a fake Apify token AND an explicit actor."""
+    # The connector's default actor was unset (2026-06-03) so it doesn't
+    # auto-spend on a rental. Tests that need an "available" connector pass
+    # an actor explicitly — production code is expected to do the same via
+    # the PINTEREST_APIFY_ACTOR env var.
+    env = {"APIFY_API_TOKEN": "fake-token-12345", "PINTEREST_APIFY_ACTOR": "test/fake-actor"}
+    with patch.dict(os.environ, env):
         from ospra_os.product_research.connectors.apify.pinterest_trends import (
             PinterestTrendsApify,
         )

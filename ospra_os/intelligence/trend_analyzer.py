@@ -23,7 +23,12 @@ try:
 except ImportError as e:
     logger.warning(f"Apify Google Trends not available: {e}")
 
-# Legacy pytrends (DEPRECATED - archived April 2025, constant 429 errors)
+# Legacy pytrends (archived April 2025) — wired here as the FREE fallback
+# when the Apify Google Trends actor is unavailable / quota-exhausted /
+# rate-limited. The "expect 429 errors" tag in earlier comments was the
+# original author's resignation; with proxies + retries (configured at
+# init time, below) it works often enough to lift trend_score off "Est."
+# on a meaningful chunk of products.
 try:
     from pytrends.request import TrendReq
     HAS_PYTRENDS = True
@@ -31,6 +36,42 @@ try:
 except ImportError:
     HAS_PYTRENDS = False
     logger.info("pytrends not installed (not needed - using Apify)")
+
+
+_URLLIB3_PYTRENDS_PATCHED = False
+
+
+def _patch_urllib3_for_pytrends() -> None:
+    """
+    Compat shim: pytrends 4.9.x calls ``Retry(method_whitelist=...)`` but
+    urllib3 v2 renamed that kwarg to ``allowed_methods`` and removed the
+    old one. Without this patch every pytrends call raises
+    ``TypeError: Retry.__init__() got an unexpected keyword argument
+    'method_whitelist'`` before a single HTTP request fires.
+
+    Pinning urllib3<2 was rejected: it cascades into half the project's
+    other HTTP dependencies. Instead we wrap ``Retry.__init__`` and
+    aliases ``method_whitelist`` → ``allowed_methods`` on the way in.
+    Idempotent, called once at TrendAnalyzer init.
+    """
+    global _URLLIB3_PYTRENDS_PATCHED
+    if _URLLIB3_PYTRENDS_PATCHED:
+        return
+    try:
+        from urllib3.util.retry import Retry
+    except Exception:
+        return
+
+    original_init = Retry.__init__
+
+    def patched_init(self, *args, **kwargs):
+        if "method_whitelist" in kwargs and "allowed_methods" not in kwargs:
+            kwargs["allowed_methods"] = kwargs.pop("method_whitelist")
+        return original_init(self, *args, **kwargs)
+
+    Retry.__init__ = patched_init
+    _URLLIB3_PYTRENDS_PATCHED = True
+    logger.info("[TRENDS] urllib3.Retry patched for pytrends 4.x compatibility")
 
 # Claude AI for product analysis
 try:
@@ -62,11 +103,35 @@ class TrendAnalyzer:
                 logger.warning(f"[WARNING] Apify Google Trends init failed: {e}")
                 self.apify_trends = None
 
-        # Legacy pytrends fallback (DEPRECATED - constant 429 errors)
-        if not self.apify_trends and HAS_PYTRENDS:
+        # pytrends fallback — initialize WHENEVER it is importable, not just
+        # when Apify is missing. The old gate skipped pytrends whenever an
+        # Apify client was constructed even if every Apify call returned 0
+        # results (paid actor, rate limit, downtime), which is why every
+        # Google-Trends row went to UNKNOWN in production. Apify is still
+        # preferred (tried first in ``_get_google_trends``); pytrends is
+        # here so the fallback path is actually wired.
+        #
+        # Free-tier rate-limit mitigation:
+        #   PYTRENDS_PROXIES — comma-separated list of "https://host:port"
+        #     proxies. pytrends rotates through them on retry, dodging the
+        #     anonymous-IP 429 wall.
+        #   PYTRENDS_RETRIES (default 2) — automatic retry count.
+        #   PYTRENDS_BACKOFF (default 0.5) — exponential backoff factor.
+        if HAS_PYTRENDS:
             try:
-                self.pytrends = TrendReq(hl='en-US', tz=360)
-                logger.warning("[WARNING] Using pytrends fallback (DEPRECATED - expect 429 errors)")
+                _patch_urllib3_for_pytrends()
+                _proxies_raw = os.getenv("PYTRENDS_PROXIES", "").strip()
+                proxies = [p.strip() for p in _proxies_raw.split(",") if p.strip()]
+                retries = int(os.getenv("PYTRENDS_RETRIES", "2"))
+                backoff = float(os.getenv("PYTRENDS_BACKOFF", "0.5"))
+                kwargs = dict(hl="en-US", tz=360, retries=retries, backoff_factor=backoff)
+                if proxies:
+                    kwargs["proxies"] = proxies
+                self.pytrends = TrendReq(**kwargs)
+                logger.info(
+                    "[TRENDS] pytrends fallback ready "
+                    f"(proxies={len(proxies)}, retries={retries}, backoff={backoff})"
+                )
             except Exception as e:
                 logger.warning(f"[WARNING] pytrends init failed: {e}")
                 self.pytrends = None

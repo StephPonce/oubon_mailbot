@@ -840,20 +840,39 @@ class ProductDiscoveryEngine:
         else:
             self.sources_status['x_twitter'] = '[ERROR] No XAI_API_KEY'
         
-        # Reddit — DEPRECATED per architecture pivot (May 2026).
-        # Reddit is a LAGGING indicator — by the time a niche dropship product
-        # generates Reddit threads, it's already past the early-winner window
-        # we're trying to surface. Replaced by Meta Ad Library + TikTok Shop
-        # bestsellers as LEADING indicators of currently-winning products.
+        # Reddit — RE-ENABLED 2026-06-03. The May-2026 deprecation was
+        # premature: the dashboard was reporting "Est." on every product
+        # because no FREE sentiment source was firing reliably. Reddit's
+        # public JSON API is genuinely free (no auth, no rentals, no Apify
+        # actor cost) and the connector below already produces honest
+        # sentiment evidence — turning it back on is the fastest way to put
+        # a real (not estimated) sentiment number on more products.
         #
-        # Code remains in place (RedditConnector, _enrich_with_reddit_sentiment,
-        # reddit_evidence schema) so we can revive it cheaply if the product
-        # case changes. But the connector is hard-disabled here so no Reddit
-        # fan-out happens at discovery time, no env vars are required, and
-        # the UI won't render a stale "Reddit: Not yet checked" panel.
+        # If a future architectural review wants Reddit back off, set
+        # ``DISCOVERY_DISABLE_REDDIT=1``. The qualitative case for the May
+        # pivot (Reddit is a LAGGING indicator) still holds for early-winner
+        # surfacing — but Meta Ad Library + TikTok Shop are mostly paid
+        # right now, so Reddit is the only free-and-running sentiment
+        # source until those come back on rentals.
         self.reddit = None
         self.reddit_available = False
-        self.sources_status['reddit'] = '[DEPRECATED] Removed per winner-first pivot'
+        if os.getenv("DISCOVERY_DISABLE_REDDIT", "").strip() in {"1", "true", "yes"}:
+            self.sources_status['reddit'] = '[DISABLED] DISCOVERY_DISABLE_REDDIT set'
+        else:
+            try:
+                from ospra_os.product_research.connectors.social.reddit import RedditConnector
+                self.reddit = RedditConnector(
+                    client_id=os.getenv("REDDIT_CLIENT_ID"),
+                    client_secret=os.getenv("REDDIT_SECRET"),
+                )
+                self.reddit_available = self.reddit.is_available()
+                if self.reddit_available:
+                    self.sources_status['reddit'] = '[SUCCESS] Connected (public JSON API)'
+                    logger.info("[SUCCESS] Reddit connector loaded (public JSON API)")
+                else:
+                    self.sources_status['reddit'] = '[ERROR] Init failed'
+            except Exception as e:
+                self.sources_status['reddit'] = f'[ERROR] {e}'
 
         # Amazon reviews (via Apify) - primary social signal (Task #18)
         # Amazon aggregate rating × review count is the strongest purchase-intent

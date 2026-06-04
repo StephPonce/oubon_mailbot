@@ -47,11 +47,15 @@ class ApifyGoogleTrends:
     """
     Google Trends via Apify - 99.7% success rate, no 429 errors!
 
-    Uses: syntellect_ai/google-trends-scraper
-    Cost: ~$0.00007 per result
+    Default actor: ``apify/google-trends-scraper`` (PAY_PER_EVENT — no
+    monthly rental). The previous default ``syntellect_ai/google-trends-scraper``
+    is FLAT_PRICE_PER_MONTH (rental required), which is why the live
+    discovery silently returned ``Got 0 trend results`` — the call
+    succeeded but the actor refused to run on an unrented account.
+    Override via ``APIFY_GOOGLE_TRENDS_ACTOR``.
     """
 
-    ACTOR_ID = "syntellect_ai/google-trends-scraper"
+    ACTOR_ID = os.getenv("APIFY_GOOGLE_TRENDS_ACTOR", "apify/google-trends-scraper")
 
     # Timeframe mapping (pytrends format -> Apify format)
     TIMEFRAME_MAP = {

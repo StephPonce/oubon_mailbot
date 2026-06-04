@@ -64,12 +64,19 @@ class ApifyClient:
     
     # Popular Apify actors for e-commerce.
     #
-    # Actor IDs are env-overridable so we can swap a dead actor without a
-    # redeploy. `apify/amazon-crawler` was removed from the Apify store
-    # (returns 404) — `epctex/amazon-scraper` is the alive replacement.
+    # Actor IDs are env-overridable. ``amazon_search`` has NO default because
+    # every public free Amazon keyword-search actor we vetted requires a
+    # FLAT_PRICE_PER_MONTH rental (epctex/amazon-scraper = $40/mo,
+    # apify/amazon-crawler = 404 / removed). To keep Ospra free of rental
+    # surprises the default is empty — when unset, ``search_amazon`` returns
+    # an empty list and the Amazon-reviews matcher reports ``empty_pool``
+    # honestly instead of secretly tripping a rental.
+    #
+    # To re-enable Amazon search, set ``APIFY_AMAZON_SEARCH_ACTOR`` to a
+    # PAY_PER_EVENT actor you have access to (e.g. a rented epctex actor).
     ACTORS = {
         'amazon_bestsellers': os.getenv('APIFY_AMAZON_BESTSELLERS_ACTOR', 'junglee/amazon-bestsellers'),
-        'amazon_search': os.getenv('APIFY_AMAZON_SEARCH_ACTOR', 'epctex/amazon-scraper'),
+        'amazon_search': os.getenv('APIFY_AMAZON_SEARCH_ACTOR', ''),
         'tiktok_scraper': os.getenv('APIFY_TIKTOK_SCRAPER_ACTOR', 'clockworks/tiktok-scraper'),
         'tiktok_hashtag': os.getenv('APIFY_TIKTOK_HASHTAG_ACTOR', 'clockworks/tiktok-hashtag-scraper'),
     }
@@ -373,10 +380,21 @@ class ApifyClient:
         """
         Search Amazon products by keyword
         """
+        actor = self.ACTORS.get('amazon_search') or ''
+        if not actor:
+            # No actor configured — see ACTORS comment. Fail closed so the
+            # caller (amazon_reviews matcher) reports ``empty_pool`` cleanly
+            # instead of silently spending money on a rental fallback.
+            print(
+                "[SEARCH] Amazon search disabled: APIFY_AMAZON_SEARCH_ACTOR is "
+                "unset (matcher will report empty_pool)."
+            )
+            return []
+
         print(f"[SEARCH] Searching Amazon for: {keyword}")
-        
+
         results = await self.run_actor(
-            actor_id=self.ACTORS['amazon_search'],
+            actor_id=actor,
             run_input={
                 "searchTerms": [keyword],
                 "maxItems": max_items,
