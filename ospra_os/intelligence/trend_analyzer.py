@@ -292,14 +292,23 @@ Format your response as JSON:
         if not keywords:
             return {'available': False, 'reason': 'no keywords'}
 
-        # TRY APIFY FIRST (99.7% success rate, no 429 errors)
-        if self.apify_trends:
+        # APIFY: demoted to a last-resort fallback that ONLY runs when
+        # pytrends isn't configured at all. The `apify/google-trends-scraper`
+        # actor takes ~12 min/run (verified 2026-06-04: a SUCCEEDED run took
+        # 739s) — far longer than any inline request timeout — so it must
+        # never sit on the discovery request path. pytrends (below) is the
+        # primary inline source; Apify is kept only for degraded mode and
+        # should be moved to a background pre-warm + cache if reinstated.
+        if self.apify_trends and not self.pytrends:
             try:
-                logger.info(f"[TRENDS] Fetching Google Trends via Apify: {keywords}")
+                logger.info(f"[TRENDS] Fetching Google Trends via Apify (fallback): {keywords}")
 
                 results = await self.apify_trends.get_interest(
                     search_terms=keywords,
                     geo='US',
+                    # `today 12-m` is REJECTED by this actor (allowed values:
+                    # today 1-m / 3-m / 5-y / all). 3-m returns ~93 daily
+                    # points; the recent-window metric adapts to the length.
                     timeframe='today 3-m'
                 )
 
@@ -355,14 +364,21 @@ Format your response as JSON:
                 logger.warning(f"[WARNING] Apify Google Trends failed: {e}")
                 # Fall through to pytrends fallback
 
-        # FALLBACK: Legacy pytrends (DEPRECATED - expect 429 errors)
+        # PRIMARY inline source: pytrends (in-process, seconds, works with the
+        # urllib3 patch + PYTRENDS_PROXIES wired at init). Chosen over the
+        # Apify actor because the actor is ~12 min/run — incompatible with a
+        # ~50s discovery request. Verified live 2026-06-04: returns 53 weekly
+        # points for `today 12-m` with distinct cross-product series.
         if self.pytrends:
-            logger.warning("[WARNING] Falling back to pytrends (DEPRECATED - expect 429 errors)")
+            logger.info(f"[TRENDS] Fetching Google Trends via pytrends: {keywords}")
             try:
-                # Build payload (last 90 days)
+                # 12-month timeframe gives us weekly data points (~52),
+                # which is exactly what the recent-vs-baseline metric
+                # needs: ``today 3-m`` returned daily points where "last
+                # 4 weeks" wouldn't span enough data to be meaningful.
                 self.pytrends.build_payload(
                     keywords,
-                    timeframe='today 3-m',  # Last 3 months
+                    timeframe='today 12-m',
                     geo='US'
                 )
 
@@ -375,14 +391,28 @@ Format your response as JSON:
                 if interest_over_time.empty:
                     return {'available': False, 'reason': 'no data'}
 
-                # Calculate trends
+                # Convert peak-normalized series → comparable cross-product
+                # metric (see ApifyGoogleTrends._parse_apify_result for the
+                # same math + rationale). pytrends scales each term to its
+                # own peak=100, so latest values were always saturating
+                # near 100 and every product looked equally "trending."
                 latest_values = {}
+                peak_values = {}
                 momentum = {}
 
                 for keyword in keywords:
                     if keyword in interest_over_time.columns:
                         values = interest_over_time[keyword].values
-                        latest_values[keyword] = int(values[-1]) if len(values) > 0 else 0
+                        peak_values[keyword] = int(values[-1]) if len(values) > 0 else 0
+
+                        if len(values) > 0:
+                            recent_window = max(1, min(4, len(values) // 4)) if len(values) >= 8 else max(1, len(values) // 2)
+                            recent_mean = float(values[-recent_window:].mean())
+                            overall_mean = float(values.mean()) if values.mean() > 0 else 1.0
+                            ratio = recent_mean / overall_mean
+                            latest_values[keyword] = max(0, min(100, int(round(ratio * 50))))
+                        else:
+                            latest_values[keyword] = 0
 
                         # Calculate momentum (% change over period)
                         if len(values) >= 2:
@@ -405,16 +435,79 @@ Format your response as JSON:
                     'source': 'pytrends',  # Flag that we used pytrends
                     'keywords': keywords,
                     'interest_scores': latest_values,
+                    'peak_normalized_interest': peak_values,
                     'momentum': momentum,
                     'trend_direction': trend_direction,
                     'primary_momentum': momentum.get(primary_keyword, 0)
                 }
 
             except Exception as e:
-                logger.error(f"[ERROR] pytrends error (expected - use Apify instead): {e}")
+                logger.error(f"[ERROR] pytrends error: {e}")
                 return {'available': False, 'reason': str(e)}
 
         return {'available': False, 'reason': 'no trends connector - set APIFY_API_TOKEN'}
+
+    async def get_trend_interest(self, terms: List[str]) -> Dict[str, Dict]:
+        """Batch-fetch trend interest for EXPLICIT search phrases.
+
+        Unlike ``_get_google_trends`` this does NOT run keyword extraction —
+        it queries the phrases verbatim, batched ≤5 per pytrends call, and
+        returns ``{term_lower: {interest, direction, momentum, available}}``.
+
+        Used to wire trend into per-product scores at winner granularity:
+        the discovery layer calls this with the winner phrases, then stamps
+        each sourced product's ``data_sources['google_trends']`` from its
+        winner. ``interest`` is the same comparable recent-vs-baseline metric
+        as the rest of the trend path (50 = at baseline, 100 = ~2× baseline).
+        """
+        out: Dict[str, Dict] = {}
+        if not self.pytrends or not terms:
+            return out
+
+        # Clean + de-dupe (order-preserving, case-insensitive).
+        seen: set = set()
+        uniq: List[str] = []
+        for t in terms:
+            t = (t or '').strip()
+            if t and t.lower() not in seen:
+                seen.add(t.lower())
+                uniq.append(t)
+
+        for i in range(0, len(uniq), 5):
+            batch = uniq[i:i + 5]
+            try:
+                self.pytrends.build_payload(batch, timeframe='today 12-m', geo='US')
+                await asyncio.sleep(2)  # gentle pacing to avoid 429s
+                iot = self.pytrends.interest_over_time()
+                if iot.empty:
+                    continue
+                for term in batch:
+                    if term not in iot.columns:
+                        continue
+                    values = iot[term].values
+                    if len(values) == 0:
+                        continue
+                    recent_window = max(1, min(4, len(values) // 4)) if len(values) >= 8 else max(1, len(values) // 2)
+                    recent_mean = float(values[-recent_window:].mean())
+                    overall_mean = float(values.mean()) if values.mean() > 0 else 1.0
+                    interest = max(0, min(100, int(round((recent_mean / overall_mean) * 50))))
+                    if len(values) >= 3:
+                        start_avg = values[:len(values) // 3].mean()
+                        end_avg = values[-len(values) // 3:].mean()
+                        momentum = round(((end_avg - start_avg) / start_avg) * 100, 1) if start_avg > 0 else 0.0
+                    else:
+                        momentum = 0.0
+                    direction = 'rising' if momentum > 10 else 'falling' if momentum < -10 else 'stable'
+                    out[term.lower()] = {
+                        'interest': interest,
+                        'direction': direction,
+                        'momentum': momentum,
+                        'available': True,
+                    }
+            except Exception as e:
+                logger.warning(f"[TRENDS] batch interest failed for {batch}: {e}")
+
+        return out
 
     async def _get_instagram_data(self, product_name: str) -> Dict:
         """
@@ -507,37 +600,67 @@ Format your response as JSON:
         }
 
     def _extract_keywords(self, product_name: str, niche: str) -> List[str]:
+        """Build clean, Trends-friendly search phrases from a product name.
+
+        Google Trends needs real multi-word product phrases ("wireless
+        carplay adapter", "smart video doorbell"), NOT single generic
+        tokens. The old version shredded every input into one product-type
+        word + one category word + the underscore niche (e.g. ['smart',
+        'plug', 'smart_home']) — Trends returns near-zero / ambiguous data
+        for bare words like "smart" or the non-word "smart_home", which is
+        why the live pipeline saw empty trend series. We now keep the actual
+        phrase, and add a generic two-word "{type} {category}" companion
+        (never a bare single word) as a broader sibling series.
+
+        Handles both caller shapes: clean niche seeds ("wifi smart plug")
+        are used verbatim; long product titles are trimmed to their first
+        few informative words.
         """
-        Extract search keywords from product name and niche
-        """
-        keywords = []
+        import re
 
-        # Add niche
-        if niche:
-            keywords.append(niche.lower())
+        def _clean(text: str) -> str:
+            t = (text or "").lower().replace("_", " ").replace("-", " ")
+            t = re.sub(r"[^a-z0-9 ]+", " ", t)
+            return re.sub(r"\s+", " ", t).strip()
 
-        # Extract key terms from product name
-        name_lower = product_name.lower()
+        keywords: List[str] = []
+        name = _clean(product_name)
 
-        # Common product type keywords
-        product_types = ['smart', 'wifi', 'wireless', 'bluetooth', 'led', 'portable',
-                        'mini', 'pro', 'ultra', 'rechargeable', 'solar', 'robot']
+        if name:
+            words = name.split()
+            if len(words) <= 4:
+                # Already a clean, search-friendly phrase — use verbatim.
+                phrase = " ".join(words)
+            else:
+                # Long title → keep the first 3 informative words.
+                stop = {"the", "a", "an", "for", "with", "fit", "to", "of",
+                        "and", "pack", "set", "new", "case"}
+                informative = [w for w in words if w not in stop and len(w) > 2]
+                phrase = " ".join(informative[:3]) or " ".join(words[:3])
+            if phrase:
+                keywords.append(phrase)
 
-        for ptype in product_types:
-            if ptype in name_lower:
-                keywords.append(ptype)
-                break
+        # Generic two-word companion phrase ("{type} {category}") when both
+        # are present — gives Trends a broader sibling series. Never a bare
+        # single word, and never the underscore niche.
+        product_types = ['smart', 'wifi', 'wireless', 'bluetooth', 'led',
+                         'portable', 'mini', 'rechargeable', 'solar', 'robot']
+        categories = ['light', 'camera', 'speaker', 'vacuum', 'thermostat',
+                      'plug', 'bulb', 'strip', 'sensor', 'lock', 'doorbell',
+                      'monitor', 'tracker', 'adapter']
+        ptype = next((p for p in product_types if p in name), '')
+        cat = next((c for c in categories if c in name), '')
+        if ptype and cat:
+            keywords.append(f"{ptype} {cat}")
 
-        # Extract main product category
-        categories = ['light', 'camera', 'speaker', 'vacuum', 'thermostat', 'plug',
-                     'bulb', 'strip', 'sensor', 'lock', 'doorbell', 'monitor']
-
-        for category in categories:
-            if category in name_lower:
-                keywords.append(category)
-                break
-
-        return list(set(keywords))[:5]  # Return unique, max 5
+        # De-dupe (order-preserving), max 5.
+        seen: set = set()
+        out: List[str] = []
+        for k in keywords:
+            if k and k not in seen:
+                seen.add(k)
+                out.append(k)
+        return out[:5]
 
     def _extract_hashtags(self, product_name: str) -> List[str]:
         """

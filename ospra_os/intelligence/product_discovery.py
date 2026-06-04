@@ -1406,6 +1406,53 @@ class ProductDiscoveryEngine:
         step5_start = time.time()
         logger.info("\n[SCORE] STEP 5: Calculating OI scores...")
 
+        # ── Wire per-winner Google Trends into per-product scores (2026-06-04) ──
+        # The trend fetch was otherwise niche-level and never reached the
+        # per-product scorer — data_sources['google_trends'] had no writer, so
+        # google_trends was always null in every score_breakdown. Here we fetch
+        # pytrends interest for each WINNER's phrase (batched ≤5/call) and stamp
+        # it on every product that winner sourced, giving the scorer a real,
+        # cross-product-comparable trend signal at winner granularity. Wrapped
+        # so a trend hiccup can never break discovery.
+        if self.trend_analyzer and getattr(self, 'trends_available', False) and all_products:
+            try:
+                phrase_by_winner: Dict[str, str] = {}
+                for p in all_products:
+                    wname = ((p.get('winner_provenance') or {}).get('source_winner_name') or '').strip()
+                    if wname and wname not in phrase_by_winner:
+                        phrases = self.trend_analyzer._extract_keywords(wname, niche)
+                        if phrases:
+                            phrase_by_winner[wname] = phrases[0]
+                if phrase_by_winner:
+                    trend_map = await self.trend_analyzer.get_trend_interest(
+                        list(dict.fromkeys(phrase_by_winner.values()))
+                    )
+                    attached = 0
+                    for p in all_products:
+                        wname = ((p.get('winner_provenance') or {}).get('source_winner_name') or '').strip()
+                        phrase = phrase_by_winner.get(wname)
+                        td = trend_map.get((phrase or '').lower()) if phrase else None
+                        if td and td.get('available') and td.get('interest', 0) > 0:
+                            ds = p.setdefault('data_sources', {})
+                            ds['google_trends'] = {
+                                'interest': td['interest'],
+                                'direction': td['direction'],
+                                'momentum': td.get('momentum', 0),
+                                'available': True,
+                                'source': 'pytrends',
+                                'matched_phrase': phrase,
+                            }
+                            p['google_trend_score'] = td['interest']
+                            p['trend_direction'] = td['direction']
+                            attached += 1
+                    logger.info(
+                        f"   [trend-wire] attached per-winner Google Trends to "
+                        f"{attached}/{len(all_products)} products "
+                        f"({len(trend_map)} winner phrases resolved)"
+                    )
+            except Exception as e:
+                logger.warning(f"   [trend-wire] per-winner trend attach failed: {e}")
+
         # Task #24: pass the user-facing category niche down so per-product
         # relevance can fall back to it. Otherwise each product carries the
         # specific search keyword that found it ("LED strip lights RGB",
@@ -1444,6 +1491,44 @@ class ProductDiscoveryEngine:
         def _passes_filter(p):
             threshold = cj_min_score if _is_cj_only(p) else min_score
             return (p.get('oi_score', 0) or 0) >= threshold
+
+        # ── winner_source pre-clamp instrumentation (2026-06-04) ──────────
+        # Surface, BEFORE the min_score filter and the route's tier clamp,
+        # how each winner source fares: how many of its sourced products
+        # were scored and how many clear the floor. Answers "do meta_ads
+        # winners survive scoring into the ranked output, or get scored
+        # out?" — and for a dropped meta_ads winner, prints the breakdown so
+        # we can see which component kills it.
+        try:
+            from collections import Counter as _Counter
+            _ws_total: _Counter = _Counter()
+            _ws_pass: _Counter = _Counter()
+            for _p in scored_products:
+                _ws = _p.get('winner_source') or 'keyword'
+                _ws_total[_ws] += 1
+                if _passes_filter(_p):
+                    _ws_pass[_ws] += 1
+            logger.info(
+                "   [winner_source] pre-clamp scored set (passing min_score / total): "
+                + ", ".join(f"{s}={_ws_pass[s]}/{_ws_total[s]}" for s in sorted(_ws_total))
+            )
+            _meta_dropped = [
+                _p for _p in scored_products
+                if _p.get('winner_source') == 'meta_ads' and not _passes_filter(_p)
+            ]
+            if _meta_dropped:
+                _w = min(_meta_dropped, key=lambda p: p.get('oi_score', 0) or 0)
+                logger.info(
+                    "   [winner_source] dropped meta_ads winner "
+                    f"{(_w.get('title') or _w.get('name') or '?')[:60]!r}: "
+                    f"oi_score={_w.get('oi_score')} final_score={_w.get('final_score')} "
+                    f"floor={min_score} | demand={_w.get('demand_score')} "
+                    f"profit={_w.get('profit_score')} sourcing={_w.get('sourcing_score')} "
+                    f"saturation={_w.get('saturation_score')} authenticity={_w.get('authenticity_score')} "
+                    f"breakdown={_w.get('score_breakdown')}"
+                )
+        except Exception as _e:
+            logger.warning(f"   [winner_source] instrumentation failed: {_e}")
 
         filtered = [p for p in scored_products if _passes_filter(p)]
         ranked = sorted(filtered, key=lambda x: x.get('oi_score', 0), reverse=True)

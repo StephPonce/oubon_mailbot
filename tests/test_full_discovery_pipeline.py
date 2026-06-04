@@ -77,7 +77,7 @@ async def test_google_trends():
 
 async def test_xai_twitter():
     """Test xAI Twitter discovery"""
-    print_header("XAI TWITTER DISCOVERY (Grok-2)")
+    print_header("XAI TWITTER DISCOVERY (Agent Tools API / grok-4.3)")
     
     try:
         from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
@@ -88,7 +88,7 @@ async def test_xai_twitter():
             print_result("xAI Connection", False, "XAI_API_KEY not set")
             return False
         
-        print_result("xAI Connection", True, "Connected to Grok-2")
+        print_result("xAI Connection", True, f"Connected ({discovery.model})")
         
         # Check niches and hashtags
         niches = discovery.get_all_niches()

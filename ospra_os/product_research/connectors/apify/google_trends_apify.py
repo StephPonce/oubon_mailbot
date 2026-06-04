@@ -24,11 +24,28 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TrendData:
-    """Google Trends data for a search term"""
+    """Google Trends data for a search term.
+
+    ``current_interest`` was originally the last data-point on the
+    pytrends/Apify interest-over-time series. Google normalizes each
+    series to the term's own peak=100, so that raw value is NOT
+    comparable across products — two unrelated keywords could both
+    return 100 even though one has 100× more absolute search volume
+    than the other. As of 2026-06-03 ``current_interest`` is now the
+    RELATIVE-INTEREST METRIC: mean of the last 4 weeks divided by the
+    full-period mean, scaled to 0-100 (50 = at-baseline, 100 = double
+    its own average → genuinely spiking). This makes the field
+    comparable across products downstream, which is what every
+    consumer of it (opportunity_scorer.google_trend_score,
+    demand_authenticity, the score_breakdown) already assumed.
+
+    ``peak_normalized_interest`` preserves the raw last-point value
+    if anyone still wants it (currently unused downstream).
+    """
     search_term: str
-    current_interest: int  # 0-100
-    max_interest: int      # 0-100
-    avg_interest: float    # 0-100
+    current_interest: int  # 0-100, COMPARABLE recent-vs-baseline metric
+    max_interest: int      # 0-100, raw peak in the period
+    avg_interest: float    # 0-100, raw mean over the period
     velocity: float        # % change (positive = trending up)
     trend_score: float     # 0-100 (our calculated score)
     related_queries: List[Dict]  # Rising & top queries
@@ -41,6 +58,10 @@ class TrendData:
 
     # AI predictions (if enabled)
     prediction: Optional[Dict] = None
+    # Preserved raw last-point value (peak-normalized to this term's
+    # own series). NOT comparable across products — kept only for
+    # debugging / future use.
+    peak_normalized_interest: int = 0
 
 
 class ApifyGoogleTrends:
@@ -206,17 +227,56 @@ class ApifyGoogleTrends:
         """Parse Apify result into TrendData."""
         try:
             search_term = item.get('searchTerm', '')
-            interest_over_time = item.get('interestOverTime', [])
+
+            # Actor schema drift (verified 2026-06-04): newer runs return the
+            # series under `interestOverTime_timelineData` with a NESTED
+            # `value: [N]`; older runs used `interestOverTime` with a flat
+            # `value: N`. Parse both — the old flat path silently produced 0
+            # points against the new schema, which is one reason trend series
+            # came back empty.
+            interest_over_time = (
+                item.get('interestOverTime_timelineData')
+                or item.get('interestOverTime')
+                or []
+            )
 
             # Calculate statistics from interest over time
-            values = [entry.get('value', 0) for entry in interest_over_time if entry.get('value') is not None]
+            values = []
+            for entry in interest_over_time:
+                if not isinstance(entry, dict):
+                    continue
+                v = entry.get('value')
+                if isinstance(v, list):  # new schema: value is [N]
+                    v = v[0] if v else None
+                if v is None:
+                    continue
+                try:
+                    values.append(int(v))
+                except (TypeError, ValueError):
+                    continue
 
             if values:
-                current_interest = values[-1] if values else 0
-                max_interest = max(values) if values else 0
-                avg_interest = sum(values) / len(values) if values else 0
+                peak_normalized_interest = values[-1]
+                max_interest = max(values)
+                avg_interest = sum(values) / len(values)
 
-                # Calculate velocity (% change from first half to second half)
+                # ─── Comparable recent-vs-baseline metric ───────────────
+                # Trailing mean of the recent window divided by the full-
+                # period mean, scaled to [0, 100] with 50 as neutral:
+                #   1.0× baseline → 50 (flat)
+                #   1.5× baseline → 75 (rising)
+                #   2.0×+ baseline → 100 (spike, clamped)
+                #   0.5× baseline → 25 (declining)
+                # On a 12-month / weekly series, the recent window is the
+                # last 4 weeks. On shorter series we adapt to ~1/4 of the
+                # available data so very-short queries still produce a
+                # meaningful ratio.
+                recent_window = max(1, min(4, len(values) // 4)) if len(values) >= 8 else max(1, len(values) // 2)
+                recent_mean = sum(values[-recent_window:]) / recent_window
+                overall_mean = avg_interest if avg_interest > 0 else 1
+                current_interest = max(0, min(100, int(round((recent_mean / overall_mean) * 50))))
+
+                # Velocity (% change from first half to second half).
                 if len(values) >= 4:
                     first_half = sum(values[:len(values)//2]) / (len(values)//2)
                     second_half = sum(values[len(values)//2:]) / (len(values) - len(values)//2)
@@ -224,48 +284,56 @@ class ApifyGoogleTrends:
                 else:
                     velocity = 0
 
-                # Calculate trend score (0-100)
-                # Higher score = trending up + high interest
-                trend_score = min(100, (current_interest / max(avg_interest, 1)) * 50)
+                # Connector-level trend_score (separate from the discovery
+                # scorer's product-level trend_score). Same recent/baseline
+                # math, with velocity nudge so a fast-mover scores higher.
+                trend_score = current_interest
                 if velocity > 20:
                     trend_score = min(100, trend_score * 1.3)
                 elif velocity < -20:
                     trend_score = trend_score * 0.7
             else:
+                peak_normalized_interest = 0
                 current_interest = 0
                 max_interest = 0
                 avg_interest = 0
                 velocity = 0
                 trend_score = 0
 
-            # Parse related queries
-            related_queries = item.get('relatedQueries', {})
+            # Parse related queries. Schema drift: newer runs flatten these to
+            # `relatedQueries_rising` / `relatedQueries_top` (vs the old nested
+            # `relatedQueries.rising`). Accept both.
+            related_queries = item.get('relatedQueries', {}) or {}
+            rq_rising = related_queries.get('rising') or item.get('relatedQueries_rising') or []
+            rq_top = related_queries.get('top') or item.get('relatedQueries_top') or []
             related_queries_list = []
-            for q in related_queries.get('rising', []):
+            for q in rq_rising:
                 related_queries_list.append({
                     'query': q.get('query', ''),
                     'value': q.get('value', ''),
                     'type': 'rising'
                 })
-            for q in related_queries.get('top', []):
+            for q in rq_top:
                 related_queries_list.append({
                     'query': q.get('query', ''),
                     'value': q.get('value', 0),
                     'type': 'top'
                 })
 
-            # Parse related topics
-            related_topics = item.get('relatedTopics', {})
+            # Parse related topics (same flattening drift).
+            related_topics = item.get('relatedTopics', {}) or {}
+            rt_rising = related_topics.get('rising') or item.get('relatedTopics_rising') or []
+            rt_top = related_topics.get('top') or item.get('relatedTopics_top') or []
             related_topics_list = []
-            for t in related_topics.get('rising', []):
+            for t in rt_rising:
                 related_topics_list.append({
-                    'topic': t.get('topic', ''),
+                    'topic': t.get('topic', '') or t.get('query', ''),
                     'value': t.get('value', ''),
                     'type': 'rising'
                 })
-            for t in related_topics.get('top', []):
+            for t in rt_top:
                 related_topics_list.append({
-                    'topic': t.get('topic', ''),
+                    'topic': t.get('topic', '') or t.get('query', ''),
                     'value': t.get('value', 0),
                     'type': 'top'
                 })
@@ -290,7 +358,8 @@ class ApifyGoogleTrends:
                 geo=geo,
                 timeframe=timeframe,
                 fetched_at=datetime.now(timezone.utc).isoformat(),
-                prediction=prediction
+                prediction=prediction,
+                peak_normalized_interest=int(peak_normalized_interest),
             )
 
         except Exception as e:

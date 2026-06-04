@@ -31,7 +31,6 @@ import os
 import json
 import asyncio
 from typing import List, Dict, Optional, Any
-from datetime import datetime
 from dataclasses import dataclass
 
 try:
@@ -580,13 +579,21 @@ class XAITwitterDiscovery:
             print("[WARNING]  XAI_API_KEY not configured")
             return
             
-        # xAI uses OpenAI-compatible API
+        # xAI uses OpenAI-compatible API. The Agent Tools API lives on the
+        # /v1/responses endpoint (client.responses.create), which the openai
+        # SDK ≥1.66 exposes against this base_url.
         self.client = AsyncOpenAI(
             api_key=self.api_key,
             base_url="https://api.x.ai/v1"
         )
+        # Model backing the Agent Tools API. Overridable via XAI_MODEL;
+        # defaults to grok-4.3 — the model xAI's x_search docs demonstrate,
+        # verified live with real X citations on this account. grok-3/grok-2
+        # are NOT valid: they predate server-side tools / are decommissioned
+        # and cannot run x_search on /v1/responses.
+        self.model = os.getenv("XAI_MODEL", "grok-4.3")
         self._available = True
-        print("[SUCCESS] xAI Twitter Discovery initialized (100+ hashtags, 15+ niches)")
+        print(f"[SUCCESS] xAI Twitter Discovery initialized ({self.model}, 100+ hashtags, 15+ niches)")
     
     def is_available(self) -> bool:
         """Check if xAI API is configured and available."""
@@ -606,7 +613,87 @@ class XAITwitterDiscovery:
         for tags in self.PRODUCT_HASHTAGS.values():
             all_tags.extend(tags)
         return list(set(all_tags))
-    
+
+    # ================================================================
+    # xAI Agent Tools API (server-side x_search / web_search)
+    # ================================================================
+    # xAI retired the Live Search API (the ``search_parameters`` /
+    # ``extra_body`` path on chat.completions) on 2026-01-12. Live X
+    # grounding now runs through the Agent Tools API on /v1/responses:
+    # you declare server-side tools (``x_search``, ``web_search``) and
+    # xAI orchestrates the search loop on its own infra — Grok decides
+    # when to search, runs it server-side, and grounds its answer on
+    # real posts. The returned source URLs come back as citations.
+
+    async def _agent_search(
+        self,
+        system: str,
+        user: str,
+        *,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        max_output_tokens: int = 2000,
+        temperature: float = 0.3,
+    ) -> "tuple[str, List[str]]":
+        """Run a Grok request through xAI's Agent Tools API.
+
+        Returns ``(text, citations)``. ``citations`` is a deduped list of
+        the real source URLs Grok pulled via the server-side tools.
+
+        Raises on API error — callers already wrap their calls in
+        try/except and return method-appropriate empty defaults, so the
+        error semantics are unchanged from the old chat.completions path.
+        """
+        if tools is None:
+            tools = [{"type": "x_search"}]
+        response = await self.client.responses.create(
+            model=self.model,
+            instructions=system,
+            input=user,
+            tools=tools,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+        )
+        return self._extract_text(response), self._extract_citations(response)
+
+    @staticmethod
+    def _extract_text(response: Any) -> str:
+        """Pull the final text answer out of a Responses API object."""
+        # The openai SDK exposes an aggregated convenience property.
+        text = getattr(response, "output_text", None)
+        if text:
+            return text
+        # Fallback: concatenate text parts across output items.
+        parts: List[str] = []
+        for item in (getattr(response, "output", None) or []):
+            for c in (getattr(item, "content", None) or []):
+                t = getattr(c, "text", None)
+                if t:
+                    parts.append(t)
+        return "".join(parts)
+
+    @staticmethod
+    def _extract_citations(response: Any) -> List[str]:
+        """Collect real source URLs from a Responses API object.
+
+        Reads both a possible top-level ``citations`` list (mirrors the
+        retired Live Search shape, which xAI still populates) and the
+        ``url_citation`` annotations that ride on the message content
+        parts in the Responses API. Deduped, order-preserving.
+        """
+        urls: List[str] = []
+        top = getattr(response, "citations", None)
+        if top:
+            urls.extend(str(c) for c in top if c)
+        for item in (getattr(response, "output", None) or []):
+            for c in (getattr(item, "content", None) or []):
+                for ann in (getattr(c, "annotations", None) or []):
+                    url = getattr(ann, "url", None)
+                    if url is None and isinstance(ann, dict):
+                        url = ann.get("url")
+                    if url:
+                        urls.append(str(url))
+        return list(dict.fromkeys(urls))
+
     async def discover_viral_products(
         self,
         niche: str = "smart_home",
@@ -707,23 +794,23 @@ RESPOND IN THIS EXACT JSON FORMAT:
 IMPORTANT: Only include products that are ACTUALLY trending on Twitter right now. Be specific with product names and brands."""
 
         try:
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are Grok, an AI with real-time access to Twitter/X data. You can see current tweets, engagement metrics, and trending topics. Provide accurate, real-time data about what's trending on Twitter. Be specific about product names and brands - avoid generic descriptions."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
+            content, _citations = await self._agent_search(
+                system=(
+                    "You are Grok with live X (Twitter) search enabled via the "
+                    "Agent Tools API. Use x_search to find products people are "
+                    "actually tweeting about right now, with their real "
+                    "engagement, and use web_search to resolve the purchase "
+                    "links (Amazon, AliExpress, Shopify stores). Ground every "
+                    "product on real posts. Be specific about product names and "
+                    "brands — avoid generic descriptions. Never invent products, "
+                    "tweets, or engagement numbers."
+                ),
+                user=prompt,
+                tools=[{"type": "x_search"}, {"type": "web_search"}],
                 temperature=0.3,
-                max_tokens=3000
+                max_output_tokens=3000,
             )
-            
-            content = response.choices[0].message.content
+
             products = self._parse_products_response(content, niche)
             
             print(f"   [SUCCESS] Found {len(products)} viral products on Twitter")
@@ -806,12 +893,12 @@ IMPORTANT: Only include products that are ACTUALLY trending on Twitter right now
         Get Twitter sentiment for a specific product — using xAI's
         live X search for real tweet citations.
 
-        Phase F upgrade (2026-04-25): switched from chat-mode (Grok
-        paraphrasing what it knows) to live-search mode via xAI's
-        ``search_parameters``. The model now actually queries X in
-        real time and the response includes a ``citations`` field
-        with real tweet URLs. We surface those URLs alongside the
-        paraphrased samples so users can click through and verify.
+        Phase F (2026-04-25) first moved this off chat-mode to xAI's
+        Live Search (``search_parameters``). xAI retired Live Search on
+        2026-01-12, so this now runs on the Agent Tools API: the
+        server-side ``x_search`` tool queries X in real time and returns
+        real source URLs as citations. We surface those URLs alongside
+        the paraphrased samples so users can click through and verify.
 
         Honesty rules from the original prompt remain — if the model
         can't find real tweets, ``found_real_tweets=false`` and
@@ -916,59 +1003,30 @@ IF NO TWEETS AT EITHER LEVEL, RETURN:
 }}"""
 
         try:
-            # xAI live search: ``search_parameters`` is xAI-specific and
-            # passed via the OpenAI SDK's ``extra_body``. The model is
-            # grounded on real X posts rather than paraphrasing memory,
-            # and the response includes a ``citations`` field with real
-            # tweet URLs. ``mode="auto"`` lets the model decide whether
-            # the query needs search; for product sentiment it always
-            # will. ``sources=[{"type":"x"}]`` restricts search to X.
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are Grok with live X (Twitter) search enabled. "
-                            "When you find real tweets, paraphrase them faithfully and ALSO "
-                            "include the tweet URLs from your search results in the "
-                            "``citations`` array of your JSON response. "
-                            "Be rigorously honest: if live search returns no real tweets "
-                            "about the specific product or category, set "
-                            "found_real_tweets=false and return null/zero values with an "
-                            "empty citations array. Fabricating tweets or citations is a "
-                            "serious error. Generic, unbranded, or unknown products "
-                            "frequently have no tweet data — that's the correct honest "
-                            "answer, not a failure."
-                        )
-                    },
-                    {"role": "user", "content": prompt}
-                ],
+            # xAI Agent Tools API: the server-side ``x_search`` tool runs the
+            # search loop on xAI's infra and grounds Grok on real X posts
+            # rather than paraphrased memory. ``_agent_search`` returns the
+            # real source URLs Grok pulled (top-level citations + Responses
+            # API url_citation annotations, deduped) — we surface those as
+            # clickable tweet sources downstream.
+            content, real_citations = await self._agent_search(
+                system=(
+                    "You are Grok with live X (Twitter) search enabled via the "
+                    "Agent Tools API. When you find real tweets, paraphrase them "
+                    "faithfully; the x_search tool supplies the real source URLs "
+                    "as citations, so you do not need to fabricate any. "
+                    "Be rigorously honest: if live search returns no real tweets "
+                    "about the specific product or category, set "
+                    "found_real_tweets=false and return null/zero values. "
+                    "Fabricating tweets or citations is a serious error. Generic, "
+                    "unbranded, or unknown products frequently have no tweet "
+                    "data — that's the correct honest answer, not a failure."
+                ),
+                user=prompt,
+                tools=[{"type": "x_search"}],
                 temperature=0.2,
-                max_tokens=1500,
-                extra_body={
-                    "search_parameters": {
-                        "mode": "auto",
-                        "sources": [{"type": "x"}],
-                        "max_search_results": 15,
-                        "return_citations": True,
-                    }
-                },
+                max_output_tokens=1500,
             )
-
-            content = response.choices[0].message.content
-
-            # xAI returns real tweet URLs in ``response.citations`` when
-            # live search was used. Surface them on the parsed result so
-            # downstream code (and the UI) can show clickable sources
-            # rather than only paraphrased text.
-            real_citations: list[str] = []
-            try:
-                citations_attr = getattr(response, "citations", None)
-                if citations_attr:
-                    real_citations = [str(c) for c in citations_attr if c]
-            except Exception:
-                real_citations = []
 
             import re
             json_match = re.search(r'\{[\s\S]*\}', content)
@@ -1050,22 +1108,23 @@ RESPOND IN JSON:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {"role": "system", "content": "You are Grok with real-time Twitter trend access."},
-                    {"role": "user", "content": prompt}
-                ],
+            content, _ = await self._agent_search(
+                system=(
+                    "You are Grok with live X (Twitter) trend access via the "
+                    "Agent Tools API. Use x_search to ground trending hashtags "
+                    "in real, current posts rather than memory."
+                ),
+                user=prompt,
                 temperature=0.3,
-                max_tokens=1500
+                max_output_tokens=1500,
             )
-            
+
             import re
-            json_match = re.search(r'\{[\s\S]*\}', response.choices[0].message.content)
+            json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group()).get("hashtags", [])
             return []
-            
+
         except Exception as e:
             print(f"   [ERROR] Trending hashtags failed: {e}")
             return []
@@ -1105,22 +1164,23 @@ RESPOND IN JSON:
 }"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {"role": "system", "content": "You are Grok, analyzing e-commerce trends on Twitter."},
-                    {"role": "user", "content": prompt}
-                ],
+            content, _ = await self._agent_search(
+                system=(
+                    "You are Grok analyzing emerging e-commerce niches on X via "
+                    "the Agent Tools API. Use x_search to ground emerging trends "
+                    "in real, current posts."
+                ),
+                user=prompt,
                 temperature=0.4,
-                max_tokens=2000
+                max_output_tokens=2000,
             )
-            
+
             import re
-            json_match = re.search(r'\{[\s\S]*\}', response.choices[0].message.content)
+            json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group())
-            return {"raw_response": response.choices[0].message.content}
-            
+            return {"raw_response": content}
+
         except Exception as e:
             return {"error": str(e)}
     
@@ -1162,22 +1222,23 @@ RESPOND IN JSON:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {"role": "system", "content": "You are Grok with access to Twitter user timelines."},
-                    {"role": "user", "content": prompt}
-                ],
+            content, _ = await self._agent_search(
+                system=(
+                    "You are Grok with access to X (Twitter) user timelines via "
+                    "the Agent Tools API. Use x_search to find real, recent posts "
+                    "from the named influencers and the products they mention."
+                ),
+                user=prompt,
                 temperature=0.3,
-                max_tokens=2000
+                max_output_tokens=2000,
             )
-            
+
             import re
-            json_match = re.search(r'\{[\s\S]*\}', response.choices[0].message.content)
+            json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group()).get("influencer_picks", [])
             return []
-            
+
         except Exception as e:
             print(f"   [ERROR] Influencer monitoring failed: {e}")
             return []
@@ -1217,22 +1278,25 @@ RESPOND IN JSON:
 }}"""
 
         try:
-            response = await self.client.chat.completions.create(
-                model="grok-3",
-                messages=[
-                    {"role": "system", "content": "You are Grok analyzing product comparisons on Twitter."},
-                    {"role": "user", "content": prompt}
-                ],
+            content, _ = await self._agent_search(
+                system=(
+                    "You are Grok analyzing product comparisons on X via the "
+                    "Agent Tools API. Use x_search to ground the comparison in "
+                    "real posts, and web_search to corroborate competitor "
+                    "details where the tweets reference external reviews."
+                ),
+                user=prompt,
+                tools=[{"type": "x_search"}, {"type": "web_search"}],
                 temperature=0.3,
-                max_tokens=1500
+                max_output_tokens=1500,
             )
-            
+
             import re
-            json_match = re.search(r'\{[\s\S]*\}', response.choices[0].message.content)
+            json_match = re.search(r'\{[\s\S]*\}', content)
             if json_match:
                 return json.loads(json_match.group())
-            return {"raw_response": response.choices[0].message.content}
-            
+            return {"raw_response": content}
+
         except Exception as e:
             return {"error": str(e)}
     
