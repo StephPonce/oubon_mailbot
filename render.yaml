@@ -69,7 +69,17 @@ services:
         sync: false
       - key: APIFY_API_TOKEN
         sync: false
-      
+
+      # Reddit signal source (set values in Render Dashboard > Environment).
+      # Without these, prod discovery loses the Reddit sentiment source that
+      # local has.
+      - key: REDDIT_CLIENT_ID
+        sync: false
+      - key: REDDIT_CLIENT_SECRET
+        sync: false
+      - key: REDDIT_USER_AGENT
+        sync: false
+
       # Email (Resend)
       - key: RESEND_API_KEY
         sync: false

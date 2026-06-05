@@ -23,7 +23,7 @@ resend>=0.7.0
 
 # AI APIs
 anthropic>=0.18.0
-openai>=1.10.0
+openai>=1.66.0  # >=1.66 required for the Responses API (xai_twitter Agent Tools)
 google-generativeai>=0.3.2
 
 # Google APIs (Gmail, etc)
