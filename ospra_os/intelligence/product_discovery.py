@@ -58,9 +58,13 @@ SUPPLIER_SOURCE_TIMEOUT = float(os.getenv("DISCOVERY_SUPPLIER_TIMEOUT", "12"))
 # SENTIMENT_SOURCE_TIMEOUT was 6s when Grok calls ran sequentially and only
 # 1-2 of 10 products would complete before the budget ran out. Post-Fix #15
 # Grok calls inside the enrichment are parallelized (asyncio.gather), so 20
-# products finish in the time of the slowest single call (~5s). 15s gives
-# headroom for cold-start latency on the first request.
-SENTIMENT_SOURCE_TIMEOUT = float(os.getenv("DISCOVERY_SENTIMENT_TIMEOUT", "15"))
+# products finish in the time of the slowest single call. Raised 15s → 30s
+# (2026-06): the xAI Agent Tools migration moved sentiment to grok-4.3's
+# server-side ``x_search``, which runs a multi-step search loop on xAI's
+# infra and genuinely takes 20-30s — at 15s it timed out and reported no
+# sentiment even when the call would have succeeded. Override via
+# DISCOVERY_SENTIMENT_TIMEOUT.
+SENTIMENT_SOURCE_TIMEOUT = float(os.getenv("DISCOVERY_SENTIMENT_TIMEOUT", "30"))
 
 # Per-source trend-timeout overrides — Apify actors cold-start at 15-60s,
 # which the global TREND_SOURCE_TIMEOUT (default 10s) starves entirely.
