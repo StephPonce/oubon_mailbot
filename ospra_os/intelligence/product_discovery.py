@@ -2476,9 +2476,19 @@ class ProductDiscoveryEngine:
         if broad_query not in sub_queries:
             sub_queries = list(sub_queries) + [broad_query]
 
+        # Cap the fan-out. Each sub-query is a separate Apify actor run, so
+        # the old 8-9 sub-query expansion fired 8-9 facebook-ads actors in
+        # parallel per discovery — the single biggest Apify-credit sink and a
+        # memory-burst that 402'd on smaller plans. NICHE_SUBQUERIES is
+        # ordered most-relevant-first, so the top few keep the strongest
+        # winner coverage at a fraction of the cost. Override via
+        # META_ADS_MAX_SUBQUERIES.
+        max_sub_queries = max(1, int(os.getenv("META_ADS_MAX_SUBQUERIES", "3")))
+        sub_queries = sub_queries[:max_sub_queries]
+
         logger.info(
             f"[meta-ads] expanding niche '{niche}' to "
-            f"{len(sub_queries)} sub-queries: {sub_queries}"
+            f"{len(sub_queries)} sub-queries (cap={max_sub_queries}): {sub_queries}"
         )
 
         # Per-query cap. Lower than the old single-query cap of 50 to
