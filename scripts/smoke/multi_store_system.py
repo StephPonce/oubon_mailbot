@@ -10,6 +10,8 @@ NOTE: This is a standalone integration test script designed to be run directly w
       Pytest is configured to skip this file.
 """
 
+import os
+
 import pytest
 import requests
 import json
@@ -76,8 +78,8 @@ def test_add_shopify_store():
         "store_url": "rxxj7d-1i.myshopify.com",
         "platform": "shopify",
         "credentials": {
-            "shop_url": "rxxj7d-1i.myshopify.com",
-            "access_token": "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",
+            "shop_url": os.getenv("SHOPIFY_STORE", "yourstore.myshopify.com"),
+            "access_token": os.getenv("SHOPIFY_API_TOKEN", "shpat_REPLACE_ME"),
             "api_version": "2025-01"
         },
         "niche": "smart_home",

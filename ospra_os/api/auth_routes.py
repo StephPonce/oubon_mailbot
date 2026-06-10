@@ -40,7 +40,9 @@ from ospra_os.auth.jwt_auth import (
     get_user_by_id,
     verify_password,
     hash_password,
+    blacklist_jti,
 )
+from ospra_os.security.rate_limiting import check_sensitive_rate_limit
 from ospra_os.database import User
 
 # Try to import email service, but don't fail if it doesn't exist
@@ -77,6 +79,11 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    """Optional body for logout — pass the refresh token so it can be revoked too."""
+    refresh_token: Optional[str] = None
+
+
 # ============================================================================
 # REGISTRATION
 # ============================================================================
@@ -85,6 +92,7 @@ class RefreshTokenRequest(BaseModel):
 async def register(
     user_data: UserCreate,
     background_tasks: BackgroundTasks,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     """
@@ -94,6 +102,9 @@ async def register(
     New users start at the Nest (free) tier.
     Sends a welcome email in the background.
     """
+    # SECURITY: brute-force / mass-signup limiter (3/hr per IP)
+    check_sensitive_rate_limit("register", request)
+
     # Check if email already exists
     existing_user = get_user_by_email(db, user_data.email)
     if existing_user:
@@ -148,6 +159,9 @@ async def login(
 
     Returns access and refresh tokens upon successful authentication.
     """
+    # SECURITY: credential brute-force limiter (5/min per IP)
+    check_sensitive_rate_limit("login", request)
+
     user = authenticate_user(db, credentials.email, credentials.password)
 
     if not user:
@@ -229,7 +243,11 @@ async def refresh_token(request: RefreshTokenRequest, db: Session = Depends(get_
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-    
+
+    # SECURITY: refresh-token rotation — the old refresh token is revoked the
+    # moment it's used, so a stolen/replayed refresh token dies on first reuse.
+    blacklist_jti(payload.get("jti", ""))
+
     # Generate new tokens
     return generate_tokens(user)
 
@@ -263,26 +281,39 @@ async def get_me(user: User = Depends(get_current_user)):
 @router.post("/logout")
 async def logout(
     request: Request,
+    body: Optional[LogoutRequest] = None,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Logout endpoint.
-
-    Note: JWT tokens are stateless, so actual token invalidation
-    happens client-side by removing the stored tokens.
-
-    This endpoint exists for:
-    1. Consistency in API design
-    2. Future token blacklist implementation
-    3. Logging logout events
+    Logout endpoint — REVOKES the access token server-side (and the refresh
+    token too, if the client sends it in the body). Previously this was a
+    no-op and stolen tokens stayed valid until natural expiry.
     """
+    # Revoke the access token used for this request.
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        try:
+            payload = decode_token(auth_header[7:])
+            blacklist_jti(payload.get("jti", ""))
+        except HTTPException:
+            pass  # already invalid/revoked — nothing to do
+
+    # Revoke the refresh token if the client provided it.
+    if body and body.refresh_token:
+        try:
+            payload = decode_token(body.refresh_token)
+            if payload.get("type") == "refresh" and str(payload.get("sub")) == str(user.id):
+                blacklist_jti(payload.get("jti", ""))
+        except HTTPException:
+            pass
+
     # SECURITY AUDIT: Log logout
     log_security_event(
         event_type=SecurityEventType.LOGOUT,
         user_id=user.id,
         user_email=user.email,
-        message="User logged out",
+        message="User logged out (tokens revoked)",
         request=request,
         db=db,
     )
@@ -290,7 +321,7 @@ async def logout(
     return {
         "success": True,
         "message": "Logged out successfully",
-        "note": "Please remove stored tokens on client"
+        "note": "Tokens revoked server-side; remove stored tokens on client"
     }
 
 

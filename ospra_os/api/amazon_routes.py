@@ -42,6 +42,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/amazon", tags=["Amazon FBA"])
 
 
+def _get_owned_account(service: AmazonService, account_id: int, current_user: User):
+    """SECURITY: load an Amazon account ONLY if it belongs to the caller.
+
+    Raises 404 (not 403) for both missing and foreign accounts so the
+    endpoint never acts as an account-ID existence oracle.
+    """
+    account = service.get_account(account_id)
+    if not account or account.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found"
+        )
+    return account
+
+
+def _get_owned_listing(db: Session, listing_id: int, current_user: User):
+    """SECURITY: load a listing ONLY if its parent account belongs to the caller."""
+    from ospra_os.database.amazon_models import AmazonListing, AmazonAccount
+
+    listing = (
+        db.query(AmazonListing)
+        .join(AmazonAccount, AmazonListing.account_id == AmazonAccount.id)
+        .filter(AmazonListing.id == listing_id, AmazonAccount.user_id == current_user.id)
+        .first()
+    )
+    if not listing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Listing not found"
+        )
+    return listing
+
+
 # ============================================================================
 # PYDANTIC MODELS
 # ============================================================================
@@ -199,22 +232,17 @@ async def connect_account(
 @router.get("/accounts/{account_id}")
 async def get_account(
     account_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get Amazon account details with statistics.
 
-    Returns account info plus stats on listings, orders, revenue, etc.
+    SECURITY: caller must own the account.
     """
     try:
         service = AmazonService(db)
-
-        account = service.get_account(account_id)
-        if not account:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Account not found"
-            )
+        account = _get_owned_account(service, account_id, current_user)
 
         stats = service.get_account_statistics(account_id)
 
@@ -247,15 +275,17 @@ async def get_account(
 @router.delete("/accounts/{account_id}")
 async def disconnect_account(
     account_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Disconnect Amazon account.
 
-    Marks account as disconnected but preserves historical data.
+    SECURITY: caller must own the account.
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, account_id, current_user)
         success = service.disconnect_account(account_id)
 
         if not success:
@@ -288,10 +318,13 @@ async def research_products(
     account_id: int = Query(..., description="Amazon account ID"),
     keywords: str = Query(..., description="Search keywords"),
     max_results: int = Query(default=20, ge=1, le=50, description="Max results"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Search Amazon catalog for product research.
+
+    SECURITY: caller must own the account.
 
     Returns products with:
     - Basic info (ASIN, title, brand, image)
@@ -304,6 +337,7 @@ async def research_products(
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, account_id, current_user)
         results = service.research_products(
             account_id=account_id,
             keywords=keywords,
@@ -328,6 +362,7 @@ async def research_products(
 @router.post("/research/analyze")
 async def analyze_product(
     request: AnalyzeProductRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -344,6 +379,7 @@ async def analyze_product(
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, request.account_id, current_user)
         analysis = service.analyze_product_profitability(
             account_id=request.account_id,
             asin=request.asin,
@@ -372,17 +408,18 @@ async def get_listings(
     account_id: int = Query(..., description="Amazon account ID"),
     status_filter: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get Amazon listings.
 
-    Returns all listings for an account, optionally filtered by status.
+    SECURITY: caller must own the account.
     """
     try:
         from ospra_os.database.amazon_models import AmazonListing
-        from sqlalchemy import and_
 
+        _get_owned_account(AmazonService(db), account_id, current_user)
         query = db.query(AmazonListing).filter(
             AmazonListing.account_id == account_id
         )
@@ -424,6 +461,7 @@ async def get_listings(
 @router.post("/listings")
 async def create_listing(
     request: CreateListingRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -439,6 +477,7 @@ async def create_listing(
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, request.account_id, current_user)
 
         listing = service.create_listing(
             account_id=request.account_id,
@@ -480,17 +519,18 @@ async def create_listing(
 @router.put("/listings/{listing_id}/publish")
 async def publish_listing(
     listing_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Publish listing to Amazon.
 
-    Submits listing to Amazon SP-API.
-    Changes status from 'draft' to 'active' on success.
+    SECURITY: caller must own the listing's account.
 
     Note: Amazon may take several minutes to process listing.
     """
     try:
+        _get_owned_listing(db, listing_id, current_user)
         service = AmazonService(db)
         success = service.publish_listing(listing_id)
 
@@ -516,15 +556,17 @@ async def publish_listing(
 @router.post("/listings/sync")
 async def sync_listings(
     account_id: int = Query(..., description="Amazon account ID"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Sync all listings from Amazon.
 
-    Fetches current listing data from Amazon and updates database.
+    SECURITY: caller must own the account.
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, account_id, current_user)
         count = service.sync_listings(account_id)
 
         return {
@@ -549,17 +591,19 @@ async def sync_listings(
 async def get_orders(
     account_id: int = Query(..., description="Amazon account ID"),
     limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Get Amazon orders.
 
-    Returns recent orders for an account.
+    SECURITY: caller must own the account.
     """
     try:
         from ospra_os.database.amazon_models import AmazonOrder
         from sqlalchemy import desc
 
+        _get_owned_account(AmazonService(db), account_id, current_user)
         orders = db.query(AmazonOrder).filter(
             AmazonOrder.account_id == account_id
         ).order_by(desc(AmazonOrder.purchase_date)).limit(limit).all()
@@ -595,16 +639,17 @@ async def get_orders(
 @router.post("/orders/sync")
 async def sync_orders(
     request: SyncOrdersRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Sync orders from Amazon.
 
-    Fetches new orders and updates database.
-    Default: last 7 days. Can specify custom date range.
+    SECURITY: caller must own the account.
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, request.account_id, current_user)
         count = service.sync_orders(
             account_id=request.account_id,
             created_after=request.created_after,
@@ -632,18 +677,17 @@ async def sync_orders(
 @router.post("/inventory/sync")
 async def sync_inventory(
     account_id: int = Query(..., description="Amazon account ID"),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Sync FBA inventory from Amazon.
 
-    Updates inventory quantities for all SKUs:
-    - Available quantity
-    - Reserved quantity (in orders)
-    - Inbound quantity (in shipments)
+    SECURITY: caller must own the account.
     """
     try:
         service = AmazonService(db)
+        _get_owned_account(service, account_id, current_user)
         count = service.sync_inventory(account_id)
 
         return {

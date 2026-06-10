@@ -1061,8 +1061,23 @@ For API support, contact support@ospra.io
     """,
     version="2.0.0",
     openapi_tags=tags_metadata,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # SECURITY: interactive API docs are disabled in production — they expose
+    # the full route surface to anyone. Re-enable temporarily by setting
+    # EXPOSE_API_DOCS=true in the environment (e.g. on a staging service).
+    docs_url="/docs" if (
+        os.getenv("EXPOSE_API_DOCS", "").lower() == "true"
+        or not (
+            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+            or os.getenv("RENDER", "") == "true"
+        )
+    ) else None,
+    redoc_url="/redoc" if (
+        os.getenv("EXPOSE_API_DOCS", "").lower() == "true"
+        or not (
+            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+            or os.getenv("RENDER", "") == "true"
+        )
+    ) else None,
     contact={
         "name": "Ospra Support",
         "email": "support@ospra.io",

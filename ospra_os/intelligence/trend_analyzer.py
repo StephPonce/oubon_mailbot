@@ -82,13 +82,120 @@ except ImportError:
     logger.warning("anthropic package not installed. AI analysis will be unavailable.")
 
 
+TREND_CACHE_TTL_HOURS = int(os.getenv("TREND_CACHE_TTL_HOURS", "24"))
+
+
 class TrendAnalyzer:
     """
     Multi-platform trend analysis
     - Google Trends (search momentum)
     - Instagram (hashtag popularity)
     - TikTok (video views)
+
+    Read order for Google Trends (task #47):
+      1. cached_google_trends table — warmed every 12h by the Render cron
+         (``python -m ospra_os.tasks.trend_warm``). Microseconds, no 429s.
+      2. pytrends inline — best-effort fallback for cache misses only.
+    Cache misses are recorded so the next warm run fetches exactly the
+    terms discovery actually asked for.
     """
+
+    # ------------------------------------------------------------------
+    # Trend cache (task #47)
+    # ------------------------------------------------------------------
+
+    def _read_trend_cache(self, terms: List[str]) -> Dict[str, Dict]:
+        """Return {term_lower: result} for fresh cache rows. Never raises."""
+        out: Dict[str, Dict] = {}
+        if not terms:
+            return out
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.database.trend_cache_models import CachedGoogleTrend
+
+            cutoff = datetime.utcnow() - timedelta(hours=TREND_CACHE_TTL_HOURS)
+            lowered = [t.lower() for t in terms if t]
+            session = SessionLocal()
+            try:
+                rows = (
+                    session.query(CachedGoogleTrend)
+                    .filter(CachedGoogleTrend.term.in_(lowered))
+                    .all()
+                )
+                now = datetime.utcnow()
+                for row in rows:
+                    # Bump demand signal on every read (hit or stale).
+                    row.last_requested_at = now
+                    if row.fetched_at is not None and row.fetched_at >= cutoff and row.interest is not None:
+                        out[row.term] = {
+                            'interest': int(row.interest),
+                            'direction': row.direction or 'stable',
+                            'momentum': float(row.momentum or 0.0),
+                            'available': True,
+                            'source': f"cache:{row.source or 'warm'}",
+                            'related_queries': row.related_queries,
+                        }
+                session.commit()
+            finally:
+                session.close()
+        except Exception as e:
+            logger.debug(f"[TRENDS] cache read skipped: {e}")
+        return out
+
+    def _record_trend_misses(self, terms: List[str]) -> None:
+        """Record cache misses so the warm cron picks them up. Never raises."""
+        if not terms:
+            return
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.database.trend_cache_models import CachedGoogleTrend
+
+            session = SessionLocal()
+            try:
+                now = datetime.utcnow()
+                for term in {t.lower() for t in terms if t}:
+                    row = session.query(CachedGoogleTrend).filter_by(term=term).first()
+                    if row is None:
+                        session.add(CachedGoogleTrend(
+                            term=term, miss_count=1, last_requested_at=now,
+                        ))
+                    else:
+                        row.miss_count = (row.miss_count or 0) + 1
+                        row.last_requested_at = now
+                session.commit()
+            finally:
+                session.close()
+        except Exception as e:
+            logger.debug(f"[TRENDS] miss recording skipped: {e}")
+
+    def _write_through_trend_cache(self, results: Dict[str, Dict], source: str) -> None:
+        """Persist inline pytrends successes so the next request is a hit."""
+        if not results:
+            return
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.database.trend_cache_models import CachedGoogleTrend
+
+            session = SessionLocal()
+            try:
+                now = datetime.utcnow()
+                for term, data in results.items():
+                    if not data.get('available'):
+                        continue
+                    row = session.query(CachedGoogleTrend).filter_by(term=term.lower()).first()
+                    if row is None:
+                        row = CachedGoogleTrend(term=term.lower())
+                        session.add(row)
+                    row.interest = int(data.get('interest', 0))
+                    row.direction = data.get('direction', 'stable')
+                    row.momentum = float(data.get('momentum', 0.0))
+                    row.source = source
+                    row.fetched_at = now
+                session.commit()
+            finally:
+                session.close()
+        except Exception as e:
+            logger.debug(f"[TRENDS] write-through skipped: {e}")
 
     def __init__(self):
         # Google Trends - Apify FIRST (99.7% success rate, no 429 errors)
@@ -292,6 +399,34 @@ Format your response as JSON:
         if not keywords:
             return {'available': False, 'reason': 'no keywords'}
 
+        # CACHE FIRST (task #47): warmed by the trend pre-warm cron. A hit on
+        # the primary keyword serves the whole call with zero network I/O.
+        cached = self._read_trend_cache(keywords)
+        primary_lower = keywords[0].lower()
+        if primary_lower in cached:
+            interest_scores = {kw: cached[kw.lower()]['interest']
+                               for kw in keywords if kw.lower() in cached}
+            momentum = {kw: cached[kw.lower()]['momentum']
+                        for kw in keywords if kw.lower() in cached}
+            primary_momentum = cached[primary_lower]['momentum']
+            trend_direction = 'RISING' if primary_momentum > 10 else \
+                              'FALLING' if primary_momentum < -10 else 'STABLE'
+            related = {kw: cached[kw.lower()].get('related_queries')
+                       for kw in keywords
+                       if kw.lower() in cached and cached[kw.lower()].get('related_queries')}
+            return {
+                'available': True,
+                'source': cached[primary_lower].get('source', 'cache'),
+                'keywords': keywords,
+                'interest_scores': interest_scores,
+                'momentum': momentum,
+                'trend_direction': trend_direction,
+                'primary_momentum': primary_momentum,
+                'related_queries': related,
+            }
+        # Record misses so the warm cron picks these phrases up next cycle.
+        self._record_trend_misses([k for k in keywords if k.lower() not in cached])
+
         # APIFY: demoted to a last-resort fallback that ONLY runs when
         # pytrends isn't configured at all. The `apify/google-trends-scraper`
         # actor takes ~12 min/run (verified 2026-06-04: a SUCCEEDED run took
@@ -461,7 +596,7 @@ Format your response as JSON:
         as the rest of the trend path (50 = at baseline, 100 = ~2× baseline).
         """
         out: Dict[str, Dict] = {}
-        if not self.pytrends or not terms:
+        if not terms:
             return out
 
         # Clean + de-dupe (order-preserving, case-insensitive).
@@ -473,6 +608,22 @@ Format your response as JSON:
                 seen.add(t.lower())
                 uniq.append(t)
 
+        # CACHE FIRST (task #47): the pre-warm cron fills cached_google_trends
+        # every 12h; reading it is microseconds and removes pytrends 429s from
+        # the prod hot path. Only cache MISSES fall through to inline pytrends.
+        cached = self._read_trend_cache(uniq)
+        out.update(cached)
+        uniq = [t for t in uniq if t.lower() not in cached]
+        if not uniq:
+            return out
+
+        # Record misses so the next warm run fetches what discovery wanted.
+        self._record_trend_misses(uniq)
+
+        if not self.pytrends:
+            return out
+
+        inline: Dict[str, Dict] = {}
         for i in range(0, len(uniq), 5):
             batch = uniq[i:i + 5]
             try:
@@ -498,7 +649,7 @@ Format your response as JSON:
                     else:
                         momentum = 0.0
                     direction = 'rising' if momentum > 10 else 'falling' if momentum < -10 else 'stable'
-                    out[term.lower()] = {
+                    inline[term.lower()] = {
                         'interest': interest,
                         'direction': direction,
                         'momentum': momentum,
@@ -507,6 +658,9 @@ Format your response as JSON:
             except Exception as e:
                 logger.warning(f"[TRENDS] batch interest failed for {batch}: {e}")
 
+        # Write-through: inline successes become cache hits for the next call.
+        self._write_through_trend_cache(inline, source='pytrends')
+        out.update(inline)
         return out
 
     async def _get_instagram_data(self, product_name: str) -> Dict:

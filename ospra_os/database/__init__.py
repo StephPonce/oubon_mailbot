@@ -135,6 +135,9 @@ from .performance_models import (
     PerformanceOutcome,
 )
 
+# Cached Google Trends (task #47 — trend pre-warm store)
+from .trend_cache_models import CachedGoogleTrend
+
 # Security Audit Models
 try:
     from ospra_os.security.security_audit import SecurityAuditLog
@@ -228,6 +231,7 @@ __all__ = [
     # Core Models
     "AIUsage",
     "RankingHistory",
+    "CachedGoogleTrend",
     "Niche",
     "NicheSnapshot",
 

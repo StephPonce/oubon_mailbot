@@ -2483,7 +2483,10 @@ class ProductDiscoveryEngine:
         # ordered most-relevant-first, so the top few keep the strongest
         # winner coverage at a fraction of the cost. Override via
         # META_ADS_MAX_SUBQUERIES.
-        max_sub_queries = max(1, int(os.getenv("META_ADS_MAX_SUBQUERIES", "3")))
+        # Default 5 (was 3): the 3-cap visibly cost branded-winner coverage in
+        # prod probes (obscure keyword products instead of TP-Link/Wyze-class).
+        # 9→5 still captures ~most of the credit saving; quality > marginal cut.
+        max_sub_queries = max(1, int(os.getenv("META_ADS_MAX_SUBQUERIES", "5")))
         sub_queries = sub_queries[:max_sub_queries]
 
         logger.info(

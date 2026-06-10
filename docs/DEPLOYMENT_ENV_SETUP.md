@@ -111,8 +111,8 @@ WOOCOMMERCE_CONSUMER_SECRET=cs_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # ============================================================================
 
 # Shopify
-SHOPIFY_STORE=rxxj7d-1i.myshopify.com
-SHOPIFY_API_TOKEN=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
+SHOPIFY_STORE=yourstore.myshopify.com
+SHOPIFY_API_TOKEN=shpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  # NEVER commit a real token
 
 # Amazon Seller Central (SP-API)
 AMAZON_REFRESH_TOKEN=Atzr|IwEBIKnmBpFqoVl...

@@ -26,6 +26,28 @@ from ospra_os.database import User, SubscriptionTier, UserSettings
 router = APIRouter(prefix="/api/user", tags=["User"])
 
 
+def _is_production() -> bool:
+    """Match the production detection used by jwt_auth: any prod platform marker."""
+    return (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+        or os.getenv("RENDER", "") == "true"
+        or bool(os.getenv("RAILWAY_ENVIRONMENT"))
+        or bool(os.getenv("VERCEL"))
+    )
+
+
+def _direct_tier_change_allowed() -> bool:
+    """SECURITY: direct (no-payment) tier changes are dev/test only.
+
+    In production every tier change must come from the LemonSqueezy webhook
+    (payment-verified). Explicit opt-in via ALLOW_DIRECT_TIER_CHANGE=true is
+    available for staging smoke tests, never set it on prod.
+    """
+    if os.getenv("ALLOW_DIRECT_TIER_CHANGE", "").lower() == "true":
+        return True
+    return not _is_production()
+
+
 # ============================================================================
 # REQUEST MODELS
 # ============================================================================
@@ -132,9 +154,15 @@ async def set_tier(
     """
     Set user subscription tier.
     
-    This is for development/testing. In production, tier changes
-    would go through the payment system (LemonSqueezy webhooks).
+    This is for development/testing ONLY. In production, tier changes
+    go through the payment system (LemonSqueezy webhooks) and this
+    endpoint is disabled.
     """
+    if not _direct_tier_change_allowed():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Direct tier changes are disabled in production. Use the billing checkout.",
+        )
     # Validate tier
     tier_map = {
         "nest": SubscriptionTier.NEST,
@@ -231,9 +259,10 @@ async def upgrade_subscription(
 ):
     """
     Initiate subscription upgrade.
-    
-    In production, this would redirect to LemonSqueezy checkout.
-    For now, it directly updates the tier (for testing).
+
+    Production: creates a LemonSqueezy checkout session and returns its URL —
+    the tier is ONLY granted by the payment webhook after checkout completes.
+    Dev/test (or ALLOW_DIRECT_TIER_CHANGE=true): updates the tier directly.
     """
     tier_map = {
         "nest": SubscriptionTier.NEST,
@@ -241,31 +270,52 @@ async def upgrade_subscription(
         "soar": SubscriptionTier.SOAR,
         "stratosphere": SubscriptionTier.STRATOSPHERE,
     }
-    
+
     tier_lower = request.tier.lower()
     if tier_lower not in tier_map:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid tier: {request.tier}"
         )
-    
-    # In production, this would create a LemonSqueezy checkout session
-    # For now, directly update the tier
-    
+
     new_tier = tier_map[tier_lower]
-    user.subscription_tier = new_tier
-    user.subscription_started = datetime.now(timezone.utc)
-    user.updated_at = datetime.now(timezone.utc)
-    
-    db.commit()
-    db.refresh(user)
-    
-    tier_value = user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier)
-    
+
+    # Downgrades to the free tier never need payment.
+    if new_tier == SubscriptionTier.NEST or _direct_tier_change_allowed():
+        user.subscription_tier = new_tier
+        user.subscription_started = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(user)
+        tier_value = (
+            user.subscription_tier.value
+            if hasattr(user.subscription_tier, "value")
+            else str(user.subscription_tier)
+        )
+        return {"success": True, "message": f"Upgraded to {tier_value}"}
+
+    # Production paid path: hand back a payment-verified checkout URL.
+    try:
+        from ospra_os.payments.lemonsqueezy import LemonSqueezyClient
+        client = LemonSqueezyClient()
+        checkout_url, error = await client.create_checkout(
+            tier=new_tier,
+            user_email=user.email,
+            user_id=str(user.id),
+        )
+    except Exception as e:
+        checkout_url, error = None, str(e)
+
+    if not checkout_url:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Billing is not available right now: {error}. No tier change was made.",
+        )
+
     return {
         "success": True,
-        "message": f"Upgraded to {tier_value}",
-        # In production: "checkout_url": "https://lemonsqueezy.com/checkout/..."
+        "message": f"Complete checkout to activate {tier_lower}",
+        "checkout_url": checkout_url,
     }
 
 

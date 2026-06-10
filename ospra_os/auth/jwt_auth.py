@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 import hashlib
 import os
+import uuid
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -62,8 +63,59 @@ ALGORITHM = "HS256"
 # jwt_handler 15m/7d); jwt_auth is the live mint path, so we standardize here.
 # Override via env to tighten the access-token lifetime once the frontend's
 # refresh flow is confirmed to handle shorter sessions.
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", str(60 * 24)))  # default 24h
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))  # default 1h
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
+
+
+# ============================================================================
+# TOKEN BLACKLIST (revocation)
+# ============================================================================
+# Shared with jwt_handler: the persistent blacklist lives in
+# ospra_os.security.production_security. Imported lazily + cached so a
+# missing optional dependency can never break auth module import.
+_blacklist = None
+_blacklist_loaded = False
+
+
+def _get_blacklist():
+    global _blacklist, _blacklist_loaded
+    if not _blacklist_loaded:
+        _blacklist_loaded = True
+        try:
+            from ospra_os.security.production_security import get_token_blacklist
+            _blacklist = get_token_blacklist()
+        except Exception:
+            # In-memory fallback — still gives same-process revocation.
+            _blacklist = None
+    return _blacklist
+
+
+_fallback_blacklist: set = set()
+
+
+def blacklist_jti(jti: str) -> None:
+    """Revoke a token by its jti (logout / refresh rotation)."""
+    if not jti:
+        return
+    bl = _get_blacklist()
+    if bl is not None:
+        bl.add(jti)
+    else:
+        _fallback_blacklist.add(jti)
+
+
+def is_jti_blacklisted(jti: str) -> bool:
+    if not jti:
+        # Legacy tokens minted before jti existed can't be revoked —
+        # they age out at their (now 1h) expiry.
+        return False
+    bl = _get_blacklist()
+    if bl is not None:
+        try:
+            return bl.is_blacklisted(jti)
+        except Exception:
+            return jti in _fallback_blacklist
+    return jti in _fallback_blacklist
 
 
 # ============================================================================
@@ -216,6 +268,7 @@ def create_access_token(user: User) -> str:
         "tier": user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
+        "jti": uuid.uuid4().hex,  # unique ID so the token can be revoked
         "type": "access"
     }
     
@@ -238,6 +291,7 @@ def create_refresh_token(user: User) -> str:
         "sub": str(user.id),
         "exp": expire,
         "iat": datetime.now(timezone.utc),
+        "jti": uuid.uuid4().hex,  # unique ID so the token can be revoked
         "type": "refresh"
     }
     
@@ -259,13 +313,23 @@ def decode_token(token: str) -> dict:
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
     except JWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # SECURITY: revoked tokens (logout / refresh rotation) are rejected here,
+    # on the LIVE decode path — previously only the unused jwt_handler checked.
+    if is_jti_blacklisted(payload.get("jti", "")):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return payload
 
 
 # ============================================================================

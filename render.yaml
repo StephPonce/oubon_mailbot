@@ -107,6 +107,37 @@ services:
         sync: false
 
   # ---------------------------------------------------------------------------
+  # TREND PRE-WARM CRON (task #47)
+  # Runs the slow (~12 min) Apify Google-Trends actor off the request path
+  # every 12h and upserts cached_google_trends, which the API reads inline.
+  # Needs only DATABASE_URL + APIFY_API_TOKEN — no Redis, no worker.
+  # ---------------------------------------------------------------------------
+  - type: cron
+    name: ospra-trend-warm
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: .
+    schedule: "0 */12 * * *"
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: python -m ospra_os.tasks.trend_warm
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+      - key: APIFY_API_TOKEN
+        sync: false
+      - key: TREND_WARM_NICHES
+        value: "smart_home,tech"
+      - key: TREND_WARM_MAX_TERMS
+        value: "25"
+
+  # ---------------------------------------------------------------------------
   # FRONTEND STATIC SITE
   # ---------------------------------------------------------------------------
   - type: web
