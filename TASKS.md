@@ -52,6 +52,8 @@ Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent
   - Step 4: bump `requires-python = ">=3.12"` in `pyproject.toml` so the `DeprecationWarning` becomes a CI enforcement mechanism, not just a lint preference.
   - Blocking trigger: Python 3.12+ upgrade. Non-blocking under the current 3.10 dev/prod runtime.
 
+- [x] **#48 — Live validation of trend pre-warm** (2026-06 session, DONE to the deployable boundary). Ran the REAL Apify google-trends actor (run OMw4YuFZcLZPfpZCF, SUCCEEDED, 5 terms in / 3 items out), fed results through the real `_parse_apify_result` → `trend_warm.upsert_result` → `cached_google_trends`, then verified the read path serves `cache:apify` hits for all 3 terms with zero network I/O. Partial actor coverage (2 terms missing) is handled by design: they stay pending and re-warm next cron cycle. Targeted test sweep after all changes: ~633 pass; only pre-existing failures (TierSystem deprecation ×5, script-style ×2, velocity/priority ×2) — none from this session's changes. REMAINING (needs deploy): push to GitHub → Render Blueprint picks up the `ospra-trend-warm` cron → set APIFY_API_TOKEN on the cron service → run one manual cron trigger → prod probe should show google_trends populated from cache.
+
 ## Blocked
 
 _(none)_
