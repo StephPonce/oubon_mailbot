@@ -497,15 +497,12 @@ class OspraAPI {
    * Uses: GET /api/dashboard/v2/products
    */
   async getProductRecommendations(limit = 10) {
-    try {
-      // /api/dashboard/v2/products requires auth — was 401-ing because the
-      // bare fetch sent no Bearer token. Same root cause as discoverProducts.
-      const data = await authService.get('/api/dashboard/v2/products', { per_page: limit });
-      return data.products || data.data || data || [];
-    } catch (error) {
-      console.error('getProductRecommendations error:', error);
-      return [];
-    }
+    // /api/dashboard/v2/products requires auth — was 401-ing because the
+    // bare fetch sent no Bearer token. Same root cause as discoverProducts.
+    // Errors propagate (task #51b): swallowing them as [] made outages look
+    // like "no products". Background callers that want silence add .catch().
+    const data = await authService.get('/api/dashboard/v2/products', { per_page: limit });
+    return data.products || data.data || data || [];
   }
   
   /**
@@ -515,15 +512,13 @@ class OspraAPI {
   async getTrendingProducts(niche = null) {
     try {
       // Try research endpoint first
-      const url = niche 
-        ? `${API_BASE_URL}/research/trending?limit=10`
-        : `${API_BASE_URL}/research/trending?limit=10`;
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE_URL}/research/trending?limit=10`);
       const data = await response.json();
       return data.products || data.trends || data.data || data || [];
     } catch (error) {
-      console.error('getTrendingProducts error:', error);
-      // Fallback to quick discovery
+      console.error('getTrendingProducts error, falling back to discovery:', error);
+      // Fallback to quick discovery; if that also fails, the error propagates
+      // to the caller (task #51b) instead of masquerading as an empty list.
       return this.discoverProducts({ niche: niche || 'trending', count: 10 });
     }
   }
@@ -548,7 +543,7 @@ class OspraAPI {
       return data.products || data.data || data || [];
     } catch (error) {
       console.error('searchProducts error:', error);
-      return [];
+      throw error; // surface to the caller (task #51b)
     }
   }
   
@@ -567,7 +562,7 @@ class OspraAPI {
       return data.products || data.data || data || [];
     } catch (error) {
       console.error('getDatabaseProducts error:', error);
-      return [];
+      throw error; // surface to the caller (task #51b)
     }
   }
   
@@ -576,13 +571,8 @@ class OspraAPI {
    * Uses: GET /research/sources
    */
   async getDataSources() {
-    try {
-      const response = await fetch(`${API_BASE_URL}/research/sources`);
-      return response.json();
-    } catch (error) {
-      console.error('getDataSources error:', error);
-      return { sources: [] };
-    }
+    const response = await fetch(`${API_BASE_URL}/research/sources`);
+    return response.json();
   }
   
   // ===========================================================================

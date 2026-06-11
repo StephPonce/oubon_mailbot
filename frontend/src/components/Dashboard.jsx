@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Home, Package, Bot, Zap, Settings, LogOut, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock, ChevronRight, Activity, PanelLeftClose, PanelLeft, Store, Brain } from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, TrendingUp, TrendingDown, ShoppingCart, DollarSign, Clock, ChevronRight, Activity, PanelLeftClose, PanelLeft, RefreshCw, Store, Brain } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { api } from '../services/api';
@@ -183,6 +183,10 @@ export function Dashboard() {
   });
   const [autopilotStatus, setAutopilotStatus] = useState(null);
   const [recentActions, setRecentActions] = useState([]);
+  // null = fine, 'partial' = some panels failed, 'full' = nothing loaded.
+  // Task #51b: failures used to be silently painted as "Inactive"/"No
+  // pending actions", which reads as healthy when the API is actually down.
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -190,24 +194,34 @@ export function Dashboard() {
 
   const loadDashboardData = async () => {
     setLoading(true);
-    try {
-      const [statusRes, actionsRes, actionStatsRes] = await Promise.all([
-        api.getAutopilotStatus().catch(() => ({ is_active: false })),
-        api.getPendingActions({ limit: 5 }).catch(() => []),
-        api.getActionStats().catch(() => ({ total_proposed: 0 })),
-      ]);
+    setLoadError(null);
+    const [statusRes, actionsRes, actionStatsRes] = await Promise.allSettled([
+      api.getAutopilotStatus(),
+      api.getPendingActions({ limit: 5 }),
+      api.getActionStats(),
+    ]);
 
-      setAutopilotStatus(statusRes);
-      setRecentActions(Array.isArray(actionsRes) ? actionsRes : []);
+    const failures = [statusRes, actionsRes, actionStatsRes].filter(
+      (r) => r.status === 'rejected'
+    ).length;
+    if (failures > 0) {
+      console.error('Dashboard load failures:', failures);
+      setLoadError(failures === 3 ? 'full' : 'partial');
+    }
+
+    if (statusRes.status === 'fulfilled') setAutopilotStatus(statusRes.value);
+    if (actionsRes.status === 'fulfilled') {
+      setRecentActions(Array.isArray(actionsRes.value) ? actionsRes.value : []);
+    }
+    if (actionStatsRes.status === 'fulfilled' || actionsRes.status === 'fulfilled') {
+      const actionStats = actionStatsRes.status === 'fulfilled' ? actionStatsRes.value : {};
+      const actions = actionsRes.status === 'fulfilled' ? actionsRes.value : null;
       setStats(prev => ({
         ...prev,
-        pendingActions: actionStatsRes.pending || actionsRes?.length || 0,
+        pendingActions: actionStats.pending || actions?.length || 0,
       }));
-    } catch (error) {
-      console.error('Failed to load dashboard:', error);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   };
 
   return (
@@ -222,6 +236,22 @@ export function Dashboard() {
 
       {/* Main Content - Floating Card */}
       <main className={`${collapsed ? 'ml-[84px]' : 'ml-[252px]'} min-h-[calc(100vh-24px)] backdrop-blur-xl bg-black/40 border border-white/10 rounded-2xl p-6 transition-all duration-300`}>
+        {loadError && (
+          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-between gap-4">
+            <p className="text-amber-200 text-sm">
+              {loadError === 'full'
+                ? "Couldn't reach the server — the data below may be stale."
+                : 'Some dashboard data failed to load.'}
+            </p>
+            <button
+              onClick={loadDashboardData}
+              disabled={loading}
+              className="shrink-0 flex items-center gap-2 px-4 py-1.5 rounded-lg bg-white/10 border border-white/10 text-white text-sm hover:bg-white/20 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Retry
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard title="Products" value={stats.products || '-'} icon={Package} color="purple" />
           <StatCard title="Orders Today" value={stats.orders || '-'} icon={ShoppingCart} color="cyan" />
