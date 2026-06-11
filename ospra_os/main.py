@@ -897,6 +897,16 @@ except Exception as e:
     user_router = None
     _HAS_USER_ROUTES = False
 
+# Public no-auth routes (task #52 — live scoreboard marketing page)
+try:
+    from ospra_os.api.public_routes import router as public_router  # type: ignore
+    _HAS_PUBLIC_ROUTES = True
+    logger.info("Public routes loaded successfully (scoreboard)")
+except Exception as e:
+    logger.warning(f"Public routes not loaded: {e}")
+    public_router = None
+    _HAS_PUBLIC_ROUTES = False
+
 # Import GmailClient for the OAuth callback
 try:
     from app.gmail_client import GmailClient
@@ -1972,6 +1982,8 @@ if _HAS_WEBHOOKS and webhook_router:
     app.include_router(webhook_router)  # exposes /api/webhooks/* (LemonSqueezy + Shopify + CJ)
 if _HAS_USER_ROUTES and user_router:
     app.include_router(user_router)  # exposes /api/users/*
+if _HAS_PUBLIC_ROUTES and public_router:
+    app.include_router(public_router)  # exposes /api/public/* (no auth — scoreboard)
 
 # keep a root-level callback because your Google OAuth client JSON often points here
 @app.get("/oauth2callback", include_in_schema=False)

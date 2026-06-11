@@ -41,6 +41,7 @@ EXEMPT_PREFIXES: Set[str] = {
     "/static/",
     "/assets/",
     "/_next/",
+    "/api/public/",  # no-auth marketing endpoints (scoreboard, task #52)
 }
 
 

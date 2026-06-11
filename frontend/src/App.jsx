@@ -41,6 +41,8 @@ const Stores = lazy(() => import('./components/Stores'));
 // landing that polls until the payment webhook grants the tier.
 const Upgrade = lazy(() => import('./components/Upgrade'));
 const BillingSuccess = lazy(() => import('./components/BillingSuccess'));
+// Public live scoreboard (task #52) — marketing page, NO auth required.
+const Scoreboard = lazy(() => import('./components/Scoreboard'));
 
 // Suspense fallback used by every lazy route. Centered spinner with the
 // glassmorphism look the rest of the app uses, so the lazy hand-off
@@ -98,6 +100,9 @@ function AppRoutes() {
           } 
         />
         
+        {/* Public live scoreboard — intentionally outside ProtectedRoute */}
+        <Route path="/scoreboard" element={<Scoreboard />} />
+
         {/* Protected routes */}
         <Route 
           path="/dashboard" 
