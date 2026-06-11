@@ -89,6 +89,8 @@ services:
         value: "https://ospra.io"
       
       # LemonSqueezy Payment
+      - key: LEMONSQUEEZY_API_KEY
+        sync: false
       - key: LEMONSQUEEZY_STORE_ID
         sync: false
       - key: LEMONSQUEEZY_WEBHOOK_SECRET

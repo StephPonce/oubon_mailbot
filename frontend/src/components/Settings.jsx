@@ -518,7 +518,15 @@ export function Settings() {
     setUpgrading(tier);
     try {
       const response = await api.upgradeTier(tier);
+      if (response.checkout_url) {
+        // Production paid path: tier is granted by the payment webhook after
+        // checkout, so hand the user off to LemonSqueezy. Don't reset the
+        // spinner — we're leaving the page.
+        window.location.assign(response.checkout_url);
+        return;
+      }
       if (response.success) {
+        // Dev/free path: tier changed directly.
         window.location.reload();
       }
     } catch (error) {

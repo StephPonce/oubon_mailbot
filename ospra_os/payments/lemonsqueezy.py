@@ -155,10 +155,29 @@ LEMONSQUEEZY_API_KEY = os.getenv("LEMONSQUEEZY_API_KEY")
 LEMONSQUEEZY_STORE_ID = os.getenv("LEMONSQUEEZY_STORE_ID")
 LEMONSQUEEZY_WEBHOOK_SECRET = os.getenv("LEMONSQUEEZY_WEBHOOK_SECRET")
 
-# Product variant IDs (set these after creating products in LemonSqueezy)
-LS_VARIANT_FLIGHT = os.getenv("LS_VARIANT_FLIGHT")  # $29/mo
-LS_VARIANT_SOAR = os.getenv("LS_VARIANT_SOAR")      # $79/mo
-LS_VARIANT_STRATOSPHERE = os.getenv("LS_VARIANT_STRATOSPHERE")  # $199/mo
+def _env_first(*names: str) -> Optional[str]:
+    """First non-empty env var among `names` (canonical name first, legacy alias after)."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
+
+
+# Product variant IDs (set these after creating products in LemonSqueezy).
+# Canonical names match render.yaml (LEMONSQUEEZY_{TIER}_{INTERVAL}_VARIANT,
+# also read by api/subscription_routes.py); LS_VARIANT_* kept as legacy alias.
+LS_VARIANT_FLIGHT = _env_first("LEMONSQUEEZY_FLIGHT_MONTHLY_VARIANT", "LS_VARIANT_FLIGHT")  # $29/mo
+LS_VARIANT_SOAR = _env_first("LEMONSQUEEZY_SOAR_MONTHLY_VARIANT", "LS_VARIANT_SOAR")  # $79/mo
+LS_VARIANT_STRATOSPHERE = _env_first("LEMONSQUEEZY_STRATOSPHERE_MONTHLY_VARIANT", "LS_VARIANT_STRATOSPHERE")  # $199/mo
+
+# Yearly variants (annual always saves 2 months — see memory/pricing.md)
+LS_VARIANT_FLIGHT_YEARLY = _env_first("LEMONSQUEEZY_FLIGHT_YEARLY_VARIANT", "LS_VARIANT_FLIGHT_YEARLY")  # $290/yr
+LS_VARIANT_SOAR_YEARLY = _env_first("LEMONSQUEEZY_SOAR_YEARLY_VARIANT", "LS_VARIANT_SOAR_YEARLY")  # $790/yr
+LS_VARIANT_STRATOSPHERE_YEARLY = _env_first("LEMONSQUEEZY_STRATOSPHERE_YEARLY_VARIANT", "LS_VARIANT_STRATOSPHERE_YEARLY")  # $1,990/yr
+
+# Frontend base URL for checkout redirects (Render sets APP_URL=https://ospra.io)
+APP_URL = os.getenv("APP_URL", "https://ospra.io").rstrip("/")
 
 # LemonSqueezy Checkout URLs (direct links)
 LS_CHECKOUT_FLIGHT = os.getenv("LS_CHECKOUT_FLIGHT", "https://ospra.lemonsqueezy.com/buy/7f817d94-cf31-4ab6-9ff4-54de583f7920")
@@ -170,14 +189,19 @@ API_BASE = "https://api.lemonsqueezy.com/v1"
 
 # ==================== VARIANT MAPPING ====================
 
-# Map variant IDs to tiers
+# Map variant IDs to tiers (monthly and yearly variants grant the same tier;
+# the webhook only cares which tier a variant belongs to)
 VARIANT_TO_TIER = {}
-if LS_VARIANT_FLIGHT:
-    VARIANT_TO_TIER[LS_VARIANT_FLIGHT] = SubscriptionTier.FLIGHT
-if LS_VARIANT_SOAR:
-    VARIANT_TO_TIER[LS_VARIANT_SOAR] = SubscriptionTier.SOAR
-if LS_VARIANT_STRATOSPHERE:
-    VARIANT_TO_TIER[LS_VARIANT_STRATOSPHERE] = SubscriptionTier.STRATOSPHERE
+for _variant, _tier in (
+    (LS_VARIANT_FLIGHT, SubscriptionTier.FLIGHT),
+    (LS_VARIANT_SOAR, SubscriptionTier.SOAR),
+    (LS_VARIANT_STRATOSPHERE, SubscriptionTier.STRATOSPHERE),
+    (LS_VARIANT_FLIGHT_YEARLY, SubscriptionTier.FLIGHT),
+    (LS_VARIANT_SOAR_YEARLY, SubscriptionTier.SOAR),
+    (LS_VARIANT_STRATOSPHERE_YEARLY, SubscriptionTier.STRATOSPHERE),
+):
+    if _variant:
+        VARIANT_TO_TIER[_variant] = _tier
 
 
 # ==================== HELPER FUNCTIONS ====================
@@ -187,14 +211,21 @@ def get_tier_from_variant(variant_id: str) -> SubscriptionTier:
     return VARIANT_TO_TIER.get(variant_id, SubscriptionTier.NEST)
 
 
-def get_variant_for_tier(tier: SubscriptionTier) -> Optional[str]:
-    """Get LemonSqueezy variant ID for a tier"""
+def get_variant_for_tier(tier: SubscriptionTier, interval: str = "monthly") -> Optional[str]:
+    """Get LemonSqueezy variant ID for a tier + billing interval"""
     variant_map = {
-        SubscriptionTier.FLIGHT: LS_VARIANT_FLIGHT,
-        SubscriptionTier.SOAR: LS_VARIANT_SOAR,
-        SubscriptionTier.STRATOSPHERE: LS_VARIANT_STRATOSPHERE,
+        "monthly": {
+            SubscriptionTier.FLIGHT: LS_VARIANT_FLIGHT,
+            SubscriptionTier.SOAR: LS_VARIANT_SOAR,
+            SubscriptionTier.STRATOSPHERE: LS_VARIANT_STRATOSPHERE,
+        },
+        "yearly": {
+            SubscriptionTier.FLIGHT: LS_VARIANT_FLIGHT_YEARLY,
+            SubscriptionTier.SOAR: LS_VARIANT_SOAR_YEARLY,
+            SubscriptionTier.STRATOSPHERE: LS_VARIANT_STRATOSPHERE_YEARLY,
+        },
     }
-    return variant_map.get(tier)
+    return variant_map.get(interval, {}).get(tier)
 
 
 def get_checkout_url_for_tier(tier: SubscriptionTier) -> Optional[str]:
@@ -261,25 +292,30 @@ class LemonSqueezyClient:
         tier: SubscriptionTier,
         user_email: str,
         user_id: str,
-        success_url: str = "https://app.ospra.io/billing/success",
-        cancel_url: str = "https://app.ospra.io/billing"
+        success_url: Optional[str] = None,
+        cancel_url: Optional[str] = None,
+        interval: str = "monthly",
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Create a checkout session for a subscription tier
-        
+
         Args:
             tier: The subscription tier to purchase
             user_email: Customer email
             user_id: Your internal user ID
-            success_url: Redirect URL on success
-            cancel_url: Redirect URL on cancel
-        
+            success_url: Redirect URL on success (default: APP_URL/billing/success)
+            cancel_url: Redirect URL on cancel (default: APP_URL/upgrade)
+            interval: "monthly" or "yearly"
+
         Returns:
             Tuple of (checkout_url, error)
         """
-        variant_id = get_variant_for_tier(tier)
+        success_url = success_url or f"{APP_URL}/billing/success"
+        cancel_url = cancel_url or f"{APP_URL}/upgrade"
+
+        variant_id = get_variant_for_tier(tier, interval)
         if not variant_id:
-            return None, f"No variant configured for tier: {tier}"
+            return None, f"No {interval} variant configured for tier: {tier}"
         
         if not LEMONSQUEEZY_STORE_ID:
             return None, "LEMONSQUEEZY_STORE_ID not configured"

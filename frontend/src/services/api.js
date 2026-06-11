@@ -1227,8 +1227,8 @@ Price: ${parseFloat(price).toFixed(2)}`;
     return response.json();
   }
   
-  async upgradeTier(tier) {
-    return authService.post('/api/user/upgrade', { tier });
+  async upgradeTier(tier, interval = 'monthly') {
+    return authService.post('/api/user/upgrade', { tier, interval });
   }
 
   async getTierInfo() {

@@ -35,6 +35,11 @@ const AutopilotControl = lazy(() => import('./components/AutopilotControl'));
 const ActionQueue = lazy(() => import('./components/ActionQueue'));
 const Settings = lazy(() => import('./components/Settings'));
 const Stores = lazy(() => import('./components/Stores'));
+// Billing flow (task #50): /upgrade is where useRequireTier bounces users who
+// hit a gated feature; /billing/success is the LemonSqueezy post-checkout
+// landing that polls until the payment webhook grants the tier.
+const Upgrade = lazy(() => import('./components/Upgrade'));
+const BillingSuccess = lazy(() => import('./components/BillingSuccess'));
 
 // Suspense fallback used by every lazy route. Centered spinner with the
 // glassmorphism look the rest of the app uses, so the lazy hand-off
@@ -146,6 +151,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <Stores />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/upgrade"
+          element={
+            <ProtectedRoute>
+              <Upgrade />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing/success"
+          element={
+            <ProtectedRoute>
+              <BillingSuccess />
             </ProtectedRoute>
           }
         />

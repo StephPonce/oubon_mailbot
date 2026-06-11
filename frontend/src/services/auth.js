@@ -439,6 +439,30 @@ class AuthService {
   }
 
   /**
+   * Re-fetch the current user from the server (/api/auth/me).
+   *
+   * Returns the server-side subscription tier, which can be NEWER than the
+   * tier baked into the JWT (e.g. right after a payment webhook grants a
+   * tier). Callers that need the UI to pick up a tier change must follow up
+   * with refreshAccessToken() so the new JWT carries the new tier claim.
+   *
+   * @returns {Promise<{user: Object, tier: string}|null>} null on failure
+   */
+  async refreshUser() {
+    try {
+      const response = await this.fetch('/api/auth/me');
+      const data = await response.json();
+      if (!data?.user) return null;
+      storeUser(data.user);
+      this._notify();
+      return { user: data.user, tier: data.subscription?.tier || data.user.subscription_tier };
+    } catch (error) {
+      console.debug('refreshUser failed:', error.message);
+      return null;
+    }
+  }
+
+  /**
    * Check if user is authenticated.
    */
   isAuthenticated() {

@@ -85,6 +85,10 @@ class SubscriptionUpgrade(BaseModel):
         ...,
         description="Target subscription tier"
     )
+    interval: Literal["monthly", "yearly"] = Field(
+        "monthly",
+        description="Billing interval (yearly saves 2 months)"
+    )
 
 
 # ============================================================================
@@ -302,6 +306,7 @@ async def upgrade_subscription(
             tier=new_tier,
             user_email=user.email,
             user_id=str(user.id),
+            interval=request.interval,
         )
     except Exception as e:
         checkout_url, error = None, str(e)
