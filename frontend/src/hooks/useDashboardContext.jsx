@@ -224,7 +224,7 @@ export function DashboardProvider({ children }) {
 
     try {
       switch (section) {
-        case 'products':
+        case 'products': {
           const [trending, recommended] = await Promise.all([
             api.getTrendingProducts().catch(() => ({ products: [] })),
             api.getProductRecommendations(20).catch(() => []),
@@ -238,8 +238,9 @@ export function DashboardProvider({ children }) {
             },
           }));
           break;
+        }
 
-        case 'actions':
+        case 'actions': {
           const [actions, stats] = await Promise.all([
             api.getPendingActions({ limit: 50 }).catch(() => []),
             api.getActionStats().catch(() => null),
@@ -250,8 +251,9 @@ export function DashboardProvider({ children }) {
             actionStats: stats,
           }));
           break;
+        }
 
-        case 'autopilot':
+        case 'autopilot': {
           const [status, config] = await Promise.all([
             api.getAutopilotStatus().catch(() => null),
             api.getAutopilotConfig().catch(() => null),
@@ -262,12 +264,13 @@ export function DashboardProvider({ children }) {
             autopilotConfig: config,
           }));
           break;
+        }
 
         case 'metrics':
           // TODO: Fetch store metrics when connected
           break;
 
-        case 'alerts':
+        case 'alerts': {
           const alertsRes = await api.getOiAlerts?.().catch(() => ({ alerts: [] }));
           setState(prev => ({
             ...prev,
@@ -275,6 +278,7 @@ export function DashboardProvider({ children }) {
             unreadAlertCount: alertsRes?.unread_count ?? 0,
           }));
           break;
+        }
       }
     } catch (error) {
       console.error(`Failed to refresh ${section}:`, error);
