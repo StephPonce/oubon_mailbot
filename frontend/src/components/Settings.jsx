@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
+import { useToast } from '../hooks/useToast';
 import { api } from '../services/api';
 import { FloatingOiChat } from './FloatingOiChat';
 
@@ -450,6 +451,7 @@ export function Settings() {
   const { user, logout } = useAuth();
   const { collapsed } = useSidebar();
   const navigate = useNavigate();
+  const toast = useToast();
   
   const [profile, setProfile] = useState({ email: '' });
   const [notifications, setNotifications] = useState({
@@ -531,7 +533,7 @@ export function Settings() {
       }
     } catch (error) {
       console.error('Failed to upgrade:', error);
-      alert('Failed to upgrade. Please try again.');
+      toast.error('Failed to upgrade. Please try again.');
     } finally {
       setUpgrading(null);
     }

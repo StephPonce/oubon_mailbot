@@ -15,6 +15,7 @@ import { Loader2 } from 'lucide-react';
 import { AuthProvider } from './hooks/useAuth';
 import { SidebarProvider } from './hooks/useSidebar';
 import { DashboardProvider } from './hooks/useDashboardContext';
+import { ToastProvider } from './hooks/useToast';
 import { LoginForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm, ProtectedRoute, PublicOnlyRoute } from './components/auth';
 import Dashboard from './components/Dashboard';
 // Task #35 — lazy-load the heavy route components. ProductDiscovery alone is
@@ -197,9 +198,11 @@ function App() {
   return (
     <AuthProvider>
       <SidebarProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <ToastProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </ToastProvider>
       </SidebarProvider>
     </AuthProvider>
   );

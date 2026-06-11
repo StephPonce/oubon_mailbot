@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
+import { useToast } from '../hooks/useToast';
 import { api, API_BASE_URL } from '../services/api';
 import { capture, EVENTS } from '../services/analytics';
 import { PageLayout } from './Layout';
@@ -1375,6 +1376,7 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
 // COMPONENT: Product Detail Panel - Auto-analysis, image toggle
 // ============================================================================
 function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnhance }) {
+  const toast = useToast();
   const [caption, setCaption] = useState('');
   const [deploying, setDeploying] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1546,11 +1548,11 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
           // console.log('Image was already enhanced (cached - FREE)');
         }
       } else {
-        alert('Image enhancement failed. ' + (data.error || 'Check if STABILITY_API_KEY is configured.'));
+        toast.error('Image enhancement failed. ' + (data.error || 'Check if STABILITY_API_KEY is configured.'));
       }
     } catch (error) {
       console.error('Image enhancement failed:', error);
-      alert('Image enhancement failed: ' + (error.message || 'Unknown error'));
+      toast.error('Image enhancement failed: ' + (error.message || 'Unknown error'));
     } finally {
       setGeneratingImage(false);
     }
@@ -1559,7 +1561,7 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
   // Enhance ALL product images in batch
   const enhanceAllImages = async () => {
     if (!product.all_images || product.all_images.length === 0) {
-      alert('No images available to enhance');
+      toast.info('No images available to enhance');
       return;
     }
 
@@ -1593,13 +1595,13 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
           });
         }
 
-        alert(`Enhanced ${result.successful} of ${result.total} images (~$${(result.successful * 0.06).toFixed(2)} cost)`);
+        toast.success(`Enhanced ${result.successful} of ${result.total} images (~$${(result.successful * 0.06).toFixed(2)} cost)`);
       } else {
-        alert('All image enhancements failed. ' + (result.results[0]?.error || 'Unknown error'));
+        toast.error('All image enhancements failed. ' + (result.results[0]?.error || 'Unknown error'));
       }
     } catch (error) {
       console.error('Batch enhancement failed:', error);
-      alert('Batch enhancement failed: ' + (error.message || 'Unknown error'));
+      toast.error('Batch enhancement failed: ' + (error.message || 'Unknown error'));
     } finally {
       setGeneratingImage(false);
     }
@@ -1827,16 +1829,16 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
 
   const handleDeploy = async () => {
     if (product.is_mock) {
-      alert('Cannot deploy demo products. Connect APIs for real products.');
+      toast.info('Cannot deploy demo products. Connect APIs for real products.');
       return;
     }
     setDeploying(true);
     try {
       await onDeploy(product, caption);
-      alert(`${product.title} deployed to Shopify!`);
+      toast.success(`${product.title} deployed to Shopify!`);
       onClose();
     } catch (error) {
-      alert('Deploy failed: ' + (error.message || 'Unknown error'));
+      toast.error('Deploy failed: ' + (error.message || 'Unknown error'));
     } finally {
       setDeploying(false);
     }
@@ -2568,6 +2570,7 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
 // MAIN COMPONENT: Product Discovery
 // ============================================================================
 export function ProductDiscovery() {
+  const toast = useToast();
   const { user, hasTier } = useAuth();
   const { 
     setVisibleProducts, 
@@ -3023,7 +3026,7 @@ export function ProductDiscovery() {
       }
     } catch (error) {
       console.error('Image enhancement failed:', error);
-      alert('Enhancement failed: ' + (error.message || 'Unknown error'));
+      toast.error('Enhancement failed: ' + (error.message || 'Unknown error'));
     } finally {
       setGeneratingImages(false);
     }
