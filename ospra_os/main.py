@@ -1027,6 +1027,17 @@ async def app_lifespan(app: "FastAPI"):  # type: ignore[name-defined]
             logger.error(f"Shutdown error bubbled to lifespan: {e}")
 
 
+# SECURITY: interactive API docs (and the openapi.json schema that powers them)
+# are disabled in production — they expose the full route surface to anyone.
+# Re-enable temporarily by setting EXPOSE_API_DOCS=true (e.g. on staging).
+_EXPOSE_DOCS = (
+    os.getenv("EXPOSE_API_DOCS", "").lower() == "true"
+    or not (
+        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
+        or os.getenv("RENDER", "") == "true"
+    )
+)
+
 app = FastAPI(
     title="Ospra OS API",
     description="""
@@ -1061,23 +1072,9 @@ For API support, contact support@ospra.io
     """,
     version="2.0.0",
     openapi_tags=tags_metadata,
-    # SECURITY: interactive API docs are disabled in production — they expose
-    # the full route surface to anyone. Re-enable temporarily by setting
-    # EXPOSE_API_DOCS=true in the environment (e.g. on a staging service).
-    docs_url="/docs" if (
-        os.getenv("EXPOSE_API_DOCS", "").lower() == "true"
-        or not (
-            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
-            or os.getenv("RENDER", "") == "true"
-        )
-    ) else None,
-    redoc_url="/redoc" if (
-        os.getenv("EXPOSE_API_DOCS", "").lower() == "true"
-        or not (
-            os.getenv("ENVIRONMENT", "").lower() in ("production", "prod")
-            or os.getenv("RENDER", "") == "true"
-        )
-    ) else None,
+    docs_url="/docs" if _EXPOSE_DOCS else None,
+    redoc_url="/redoc" if _EXPOSE_DOCS else None,
+    openapi_url="/openapi.json" if _EXPOSE_DOCS else None,
     contact={
         "name": "Ospra Support",
         "email": "support@ospra.io",
