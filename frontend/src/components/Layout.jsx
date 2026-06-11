@@ -5,14 +5,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Package, Bot, Zap, Settings, LogOut, Activity, PanelLeftClose, PanelLeft, Store, Brain } from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, Activity, Menu, PanelLeftClose, PanelLeft, Store, Brain } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { FloatingOiChat } from './FloatingOiChat';
 
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, toggle, mobileOpen, setMobileOpen, toggleMobile } = useSidebar();
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
@@ -56,7 +56,22 @@ export function Sidebar() {
   };
 
   return (
-    <aside className={`${collapsed ? 'w-[72px]' : 'w-[240px]'} h-[calc(100vh-24px)] fixed left-3 top-3 backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl flex flex-col z-40 transition-all duration-300`}>
+    <>
+      {/* Mobile hamburger — sidebar is off-canvas below md (task #51f) */}
+      <button
+        onClick={toggleMobile}
+        className="md:hidden fixed top-5 left-5 z-50 p-2 rounded-xl bg-black/60 border border-white/10 backdrop-blur-xl text-white"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/60 z-40"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+    <aside className={`w-[240px] ${collapsed ? 'md:w-[72px]' : 'md:w-[240px]'} h-[calc(100vh-24px)] fixed left-3 top-3 backdrop-blur-xl bg-black/60 border border-white/10 rounded-2xl flex flex-col z-40 max-md:z-50 transition-all duration-300 ${mobileOpen ? 'translate-x-0' : 'max-md:-translate-x-[110%]'}`}>
       {/* Header */}
       <div className="p-4">
         <div className="flex items-center gap-3">
@@ -72,8 +87,8 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 space-y-1">
+      {/* Navigation — clicking any link also closes the mobile menu */}
+      <nav className="flex-1 px-2 space-y-1" onClick={() => setMobileOpen(false)}>
         {navItems.map(item => (
           <Link
             key={item.path}
@@ -90,10 +105,10 @@ export function Sidebar() {
           </Link>
         ))}
         
-        {/* Collapse Button */}
+        {/* Collapse Button — collapse only matters at md+ */}
         <button
-          onClick={toggle}
-          className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-white/40 hover:bg-white/5 hover:text-white w-full ${collapsed ? 'justify-center' : ''}`}
+          onClick={(e) => { e.stopPropagation(); toggle(); }}
+          className={`max-md:hidden flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-white/40 hover:bg-white/5 hover:text-white w-full ${collapsed ? 'justify-center' : ''}`}
           title={collapsed ? 'Expand' : 'Collapse'}
         >
           {collapsed ? <PanelLeft className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
@@ -143,6 +158,7 @@ export function Sidebar() {
         )}
       </div>
     </aside>
+    </>
   );
 }
 
@@ -160,7 +176,7 @@ export function PageLayout({ children, title, subtitle }) {
       <Sidebar />
 
       {/* Main Content - Floating Card */}
-      <main className={`${collapsed ? 'ml-[84px]' : 'ml-[252px]'} min-h-[calc(100vh-24px)] backdrop-blur-xl bg-black/40 border border-white/10 rounded-2xl p-6 transition-all duration-300`}>
+      <main className={`max-md:ml-0 max-md:mt-14 ${collapsed ? 'md:ml-[84px]' : 'md:ml-[252px]'} min-h-[calc(100vh-24px)] backdrop-blur-xl bg-black/40 border border-white/10 rounded-2xl p-6 transition-all duration-300`}>
         {(title || subtitle) && (
           <div className="mb-8">
             {title && <h1 className="text-3xl font-bold text-white mb-2">{title}</h1>}

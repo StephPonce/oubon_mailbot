@@ -13,14 +13,21 @@ export function SidebarProvider({ children }) {
     return saved === 'true';
   });
 
+  // Below md: the sidebar is off-canvas and this controls it (task #51f).
+  // Not persisted — a mobile menu should always start closed.
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', collapsed);
   }, [collapsed]);
 
   const toggle = () => setCollapsed(prev => !prev);
+  const toggleMobile = () => setMobileOpen(prev => !prev);
 
   return (
-    <SidebarContext.Provider value={{ collapsed, setCollapsed, toggle }}>
+    <SidebarContext.Provider
+      value={{ collapsed, setCollapsed, toggle, mobileOpen, setMobileOpen, toggleMobile }}
+    >
       {children}
     </SidebarContext.Provider>
   );
