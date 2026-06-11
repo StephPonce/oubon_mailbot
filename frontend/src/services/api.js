@@ -1225,6 +1225,14 @@ Price: ${parseFloat(price).toFixed(2)}`;
     return authService.get('/api/user/tier');
   }
 
+  /**
+   * All products the user has deployed to Shopify.
+   * Returns { total, deployments }. Used by the onboarding checklist.
+   */
+  async getDeployments() {
+    return authService.get('/api/dashboard/v2/deployments');
+  }
+
   // ===========================================================================
   // DATA & PRIVACY (GDPR self-serve)
   // ===========================================================================

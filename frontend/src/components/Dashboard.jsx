@@ -10,6 +10,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { api } from '../services/api';
 import { FloatingOiChat } from './FloatingOiChat';
+import { OnboardingChecklist } from './OnboardingChecklist';
 
 function StatCard({ title, value, change, icon: Icon, color = 'purple' }) {
   const colorClasses = {
@@ -252,6 +253,8 @@ export function Dashboard() {
             </button>
           </div>
         )}
+        <OnboardingChecklist />
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatCard title="Products" value={stats.products || '-'} icon={Package} color="purple" />
           <StatCard title="Orders Today" value={stats.orders || '-'} icon={ShoppingCart} color="cyan" />
