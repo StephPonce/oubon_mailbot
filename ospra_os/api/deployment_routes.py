@@ -384,6 +384,24 @@ async def _record_product_deploy_outcome(
         if cost_price > 0 else 0
     )
 
+    # Carry the discovery grade/score onto the persisted Product so the public
+    # scoreboard (#54) and the learning loop can read graded outcomes. Before
+    # this, deploy dropped the grade entirely — every deployed product landed
+    # with grade=NULL, so the scoreboard's `grade IS NOT NULL` filter always
+    # returned 0 rows. oi_score is 0-100; discovery_score is the 0-10 scale.
+    _grade = source_product.get("grade")
+    _oi = source_product.get("oi_score") or source_product.get("score")
+    _discovery_score = source_product.get("discovery_score")
+    if _discovery_score is None and _oi is not None:
+        try:
+            _discovery_score = round(float(_oi) / 10.0, 1)
+        except (TypeError, ValueError):
+            _discovery_score = None
+    # niche tag lets the scoreboard report the niche without storing tenant data
+    _ai_tags = source_product.get("ai_tags")
+    if not _ai_tags and niche:
+        _ai_tags = [niche]
+
     with next(get_session()) as db:
         # Resolve a store to attach the Product to. Use the user's first
         # store if no explicit store_id was passed through deploy options.
@@ -418,8 +436,13 @@ async def _record_product_deploy_outcome(
                 f"Winner source: {provenance.get('source_winner', 'unknown')} / "
                 f"{provenance.get('source_winner_name', 'n/a')}"
             )[:2000],
-            status=ProductStatus.DISCOVERED,
+            grade=(str(_grade)[:3] if _grade else None),
+            discovery_score=_discovery_score,
+            ai_tags=_ai_tags,
+            # This row is created at deploy time, so it IS deployed.
+            status=ProductStatus.DEPLOYED,
             discovered_at=_dt.utcnow(),
+            deployed_at=_dt.utcnow(),
         )
         db.add(product)
         db.flush()
