@@ -380,6 +380,16 @@ def init_database(database_url: str = None):
                 schema_check = verify_database_schema(engine)
                 if schema_check['all_present']:
                     print("[DB INIT] ✓ Schema ready via Alembic")
+                    # Same backfill as the all-present branch: Alembic only
+                    # creates tables its migrations define, so any model-only
+                    # table (cached_google_trends, ai_learning_events, ...)
+                    # still needs the idempotent create_all to exist.
+                    try:
+                        Base.metadata.create_all(bind=engine)
+                    except Exception as backfill_error:
+                        logger.warning(
+                            f"[DB INIT] post-Alembic table backfill failed (non-fatal): {backfill_error}"
+                        )
                     return engine
         
         # Fall back to create_all() (SQLite or Alembic failed/unavailable)
