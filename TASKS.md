@@ -3,6 +3,8 @@
 Live task tracker. Claude reads this at the start of every session.
 Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent 10–15 completed tasks here; archive older ones to `docs/archive/TASKS_*.md` when this file gets long.
 
+**Conventions:** every task numbered (#N); never mark done without runtime evidence; link commits. **A frontend feature isn't "done" until it's reachable by clicking from the dashboard or landing page — runtime evidence must include the navigation path, not just the route existing** (added after #51's pages shipped with no nav entry point; redirect-only routes like /billing/success are exempt).
+
 ---
 
 ## In progress
@@ -69,6 +71,24 @@ Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent
 ## Blocked
 
 _(none)_
+
+## #54 — Discovery candidate quality + signal integrity (2026-06-12, IN PROGRESS)
+
+The moat. Top priority. Commits: fb1f41f, 8924951, 388d13c, 7c62f3b (+ nav commit).
+
+**Before (prod probe /api/discovery/quick/smart_home, 2026-06-12):** niche-irrelevant products in the pool (plush slippers, holiday flags, neck pillow); google_trends 0 cache hits (3/10 live pytrends, identical interest:100 on the 3 meta winners — same matched_phrase "aosu life"); sentiment 7/10 (the meta winners lacked it); `/api/public/scoreboard` → **503**.
+
+**Done this session:**
+- **(e+addendum-3) Scoreboard 503 → 200, root-caused twice.** (i) The endpoint swallowed a query exception into a blanket 503; now each query is guarded, degrades to 200 with a non-sensitive `meta.degraded_stages` marker, and logs exc_info (fb1f41f). The marker revealed `first_sales` (the `ai_learning_events` query) as the failure. (ii) Root cause of the missing table: **`init_database` early-returned after verifying only the 4 CRITICAL_TABLES** (users/stores/products/user_settings), so it never ran create_all — meaning **every table added to a model after prod was first provisioned was never created** (`ai_learning_events`, **`cached_google_trends` from #47**, `product_performance`, …). Fixed to always run idempotent `create_all` (8924951); verified a 4-critical-table DB backfills 53 tables incl. those two, existing data untouched. **This likely also explains the #47/#48 trend-cache 0-hits — the table may not have existed on the API service.** (iii) `total_graded:0` was structural: **deploy never persisted `grade`** — `_record_product_deploy_outcome` left grade=NULL/status=DISCOVERED, so the scoreboard's `grade IS NOT NULL` filter always returned 0. Now deploy persists grade/discovery_score/ai_tags/deployed_at/status=DEPLOYED (7c62f3b, 2 tests).
+- **(a) Niche relevance gate** (388d13c, 15 tests). New `_passes_niche_gate`/`_apply_niche_gate` at discovery STEP 3b (after pool assembly, before enrichment → also saves API spend). A candidate must share vocabulary with the requested niche (RELEVANCE_KEYWORDS includes ∪ NICHE_SUBQUERIES ∪ NICHE_KEYWORDS, minus generic stopwords incl. home/smart/google) or match via category, and must not hit an exclude term; rejections logged. Pins the exact probe cases: slippers/flags/neck-pillow rejected, smart plug/doorbell/robot-vacuum/branded-via-category pass. Safety valve keeps the pool unfiltered if the gate would empty it. Toggle: `DISCOVERY_RELEVANCE_GATE=false`.
+- **(b) Winner→supplier drift** — covered by the gate: an off-type supplier match (slipper sourced for a smart_home winner) is removed at STEP 3b regardless of how it matched. Deeper `_calculate_match_score` category-requirement is a further hardening opportunity (not done).
+- **(addendum 1+2) Discoverability** — Scoreboard + Upgrade added to all 3 in-app Sidebar nav copies; "Compare all plans" button in Settings → /upgrade; Scoreboard link added to marketing-site (desktop+mobile nav+footer) → app.ospra.io/scoreboard.
+
+**Remaining (needs Render cron re-trigger + ONE budgeted probe):**
+- Re-trigger `ospra-trend-warm` once more (this session's earlier probe seeded misses; the table now exists on the API after the DB fix deploys) → then ONE `force_refresh` discovery probe to validate: (c) sentiment populated on most, (d) google_trends `source: cache:apify` + interest varying per (distinct) term — fix the *50/cap-at-2× interest saturation in trend_analyzer ONLY IF distinct terms still all read 100 (don't loosen scoring otherwise), (a) ≥7/10 niche-relevant, and ≥2-3 BUY-range grades earned. Record after/before here.
+- Scoreboard "real data": empty until Oubon deploys a graded product post-fix (grade now persists). Owner can deploy one from the Products page to populate it.
+
+**Convention added (see below): a frontend feature isn't done until it's reachable by clicking from the dashboard or landing page.**
 
 ## Recently completed
 
