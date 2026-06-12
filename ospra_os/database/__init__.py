@@ -89,6 +89,7 @@ from .email_models import (
     EmailTemplate,
     EmailLabel,
     EmailFollowup,
+    get_followup_session,  # was in __all__ but never imported — broke email_processor
 )
 
 # Testing Models

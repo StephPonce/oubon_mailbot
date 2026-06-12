@@ -115,7 +115,7 @@ class SmartReplySystem:
 
         # Handle specific categories with special logic
         if label == "Tracking" or label == "Order Help":
-            return self._handle_order_tracking(subject, body, customer_name, templates, metadata)
+            return self._handle_order_tracking(subject, body, customer_name, from_email, templates, metadata)
 
         elif label == "Return/Refund":
             return self._handle_refund_request(subject, body, customer_name, from_email, templates, metadata)
@@ -142,11 +142,34 @@ class SmartReplySystem:
             # Use template during quiet hours or if AI unavailable
             return self._use_template(rule, templates, customer_name, metadata)
 
+    @staticmethod
+    def _sender_owns_order(order_data: Dict[str, Any], sender_email: str) -> bool:
+        """True only when the order's customer email matches the sender.
+
+        SECURITY: order IDs are guessable (#1001, #1002, ...). Without this
+        check anyone could email "order #1234 arrived broken, will ship it
+        back" and trigger a refund on — and learn the total of — a stranger's
+        order. Orders with no email on file fail closed (manual review).
+        """
+        sender = (sender_email or "").strip().lower()
+        if not sender:
+            return False
+        candidates = []
+        customer = order_data.get("customer")
+        if isinstance(customer, dict):
+            candidates.append(customer.get("email"))
+        candidates.append(order_data.get("email"))
+        candidates.append(order_data.get("contact_email"))
+        return any(
+            isinstance(c, str) and c.strip().lower() == sender for c in candidates
+        )
+
     def _handle_order_tracking(
         self,
         subject: str,
         body: str,
         customer_name: str,
+        customer_email: str,
         templates: Dict[str, Any],
         metadata: Dict[str, Any],
     ) -> Dict[str, Any]:
@@ -157,6 +180,11 @@ class SmartReplySystem:
         if order_id and self.shopify:
             # Lookup order in Shopify
             order_data = self.shopify.lookup_order(order_id)
+
+            # SECURITY: never reveal another customer's order details.
+            if order_data and not self._sender_owns_order(order_data, customer_email):
+                metadata["ownership_check_failed"] = True
+                order_data = None
 
             if order_data:
                 metadata["used_shopify"] = True
@@ -193,6 +221,12 @@ class SmartReplySystem:
 
         if order_id and self.shopify:
             order_data = self.shopify.lookup_order(order_id)
+
+            # SECURITY: refunds may only be discussed/processed with the
+            # order's own customer — never act on someone else's order.
+            if order_data and not self._sender_owns_order(order_data, customer_email):
+                metadata["ownership_check_failed"] = True
+                order_data = None
 
             if order_data:
                 metadata["used_shopify"] = True
