@@ -1285,6 +1285,22 @@ class ProductDiscoveryEngine:
         logger.info(f"   -> {len(all_products)} unique products after cross-reference")
         logger.info(f"   ⏱️ Step 3 took {time.time() - step3_start:.2f}s")
 
+        # =====================================================================
+        # STEP 3b: NICHE RELEVANCE GATE (#54)
+        # =====================================================================
+        # Drop candidates that don't belong in the requested niche BEFORE we
+        # spend sentiment/trend API calls on them. Catches both meta-ads
+        # winners and supplier matches whose product type drifted off-niche
+        # (e.g. plush slippers / holiday flags attaching to a smart_home
+        # winner via loose keyword overlap).
+        _pre_gate = len(all_products)
+        all_products = self._apply_niche_gate(all_products, niche)
+        if len(all_products) != _pre_gate:
+            logger.info(
+                f"   -> {len(all_products)} products after relevance gate "
+                f"(removed {_pre_gate - len(all_products)})"
+            )
+
         if len(all_products) == 0:
             allow_demo = os.getenv("ALLOW_DEMO_FALLBACK", "0").lower() in ("1", "true", "yes")
             if allow_demo:
@@ -6609,6 +6625,116 @@ class ProductDiscoveryEngine:
 
         # Clamp to 0-100
         return max(0, min(100, score))
+
+    # =========================================================================
+    # NICHE RELEVANCE GATE (Task #54)
+    # =========================================================================
+    # Words too generic to signal niche membership — present in many niches'
+    # vocabularies, so matching on them alone lets off-topic products through.
+    _GATE_STOPWORDS = frozenset({
+        "the", "a", "an", "set", "with", "for", "and", "of", "to", "kit",
+        "pack", "pcs", "pc", "new", "mini", "pro", "max", "plus", "smart",
+        "wireless", "electric", "portable", "usb", "led",
+        # location/descriptor words that appear in multi-word vocab entries
+        # ("google home", "home decor") but are far too generic to signal
+        # niche membership on their own.
+        "home", "google", "fast", "thick", "large", "small",
+    })
+
+    def _niche_vocabulary(self, niche: str):
+        """(include_tokens, exclude_tokens) for a niche, built once and cached.
+
+        include tokens are the union of RELEVANCE_KEYWORDS['include'],
+        NICHE_SUBQUERIES, and NICHE_KEYWORDS for the niche — the same
+        vocabularies discovery already searches against — minus generic
+        stopwords. exclude tokens come from RELEVANCE_KEYWORDS['exclude'].
+        """
+        norm = (niche or "").lower().replace(" ", "_")
+        cache = getattr(self, "_niche_vocab_cache", None)
+        if cache is None:
+            cache = {}
+            self._niche_vocab_cache = cache
+        if norm in cache:
+            return cache[norm]
+
+        include = set()
+        rel = self.RELEVANCE_KEYWORDS.get(norm, {})
+        for kw in rel.get("include", []):
+            include.update(kw.lower().split())
+        for kw in self.NICHE_SUBQUERIES.get(norm, []):
+            include.update(kw.lower().split())
+        for kw in self.NICHE_KEYWORDS.get(norm, []):
+            include.update(kw.lower().split())
+        include -= self._GATE_STOPWORDS
+
+        exclude = set()
+        for kw in rel.get("exclude", []):
+            exclude.update(kw.lower().split())
+
+        result = (include, exclude)
+        cache[norm] = result
+        return result
+
+    def _passes_niche_gate(self, product: Dict, requested_niche: str):
+        """Decide whether a candidate belongs in the requested niche.
+
+        Returns (passed: bool, reason: str). A candidate passes when its
+        title (or category) shares meaningful vocabulary with the niche and
+        doesn't hit an exclude term. Unknown niches (no vocabulary) are not
+        gated. Toggle with DISCOVERY_RELEVANCE_GATE=false.
+        """
+        if os.getenv("DISCOVERY_RELEVANCE_GATE", "true").lower() != "true":
+            return True, "gate_disabled"
+
+        include_tokens, exclude_tokens = self._niche_vocabulary(requested_niche)
+        if not include_tokens:
+            return True, "no_vocab"  # unknown niche — don't gate blindly
+
+        title = (product.get("title") or product.get("product_name") or "").lower()
+        title_tokens = set(re.findall(r"[a-z0-9]+", title))
+
+        # 1. Hard exclude (e.g. "pillow"/"blanket" in smart_home)
+        if title_tokens & exclude_tokens:
+            return False, "exclude_match"
+        # 2. Title shares niche vocabulary
+        if title_tokens & include_tokens:
+            return True, "vocab_match"
+        # 3. Category shares niche vocabulary (titles are noisy; category helps)
+        cat = (product.get("category_name") or product.get("category") or "").lower()
+        if set(re.findall(r"[a-z0-9]+", cat)) & include_tokens:
+            return True, "category_match"
+        return False, "no_overlap"
+
+    def _apply_niche_gate(self, products: List[Dict], requested_niche: str) -> List[Dict]:
+        """Filter a candidate pool to niche-relevant products, logging rejects.
+
+        Safety valve: if the gate would remove EVERY candidate (likely an
+        incomplete vocabulary for this niche, not 100% junk), it keeps the
+        pool unfiltered and logs loudly — an empty discovery result is worse
+        than a slightly-noisy one, and product discovery is priority #1.
+        """
+        kept, rejected = [], []
+        for p in products:
+            passed, reason = self._passes_niche_gate(p, requested_niche)
+            (kept if passed else rejected).append((p, reason))
+
+        if rejected:
+            logger.info(
+                f"   [RELEVANCE GATE] dropped {len(rejected)}/{len(products)} "
+                f"off-niche candidates for '{requested_niche}'"
+            )
+            for p, reason in rejected[:15]:
+                logger.info(f"      ✗ {(p.get('title') or p.get('product_name') or '?')[:60]} ({reason})")
+
+        if not kept and products:
+            logger.warning(
+                f"   [RELEVANCE GATE] would have removed ALL {len(products)} candidates "
+                f"for '{requested_niche}' — keeping pool unfiltered (vocabulary may need "
+                f"expansion for this niche)"
+            )
+            return products
+
+        return [p for p, _ in kept]
 
     # =========================================================================
     # DEMO DATA FOR DEVELOPMENT
