@@ -8,7 +8,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Home, Package, Bot, Zap, Settings as SettingsIcon, LogOut,
   User, CreditCard, Bell, Check, Activity, Loader2, Menu, PanelLeftClose, PanelLeft,
-  Shield, Download, Trash2, AlertTriangle
+  Shield, Download, Trash2, AlertTriangle, Trophy, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
@@ -28,6 +28,8 @@ function Sidebar({ currentPath }) {
     { path: '/products', icon: Package, label: 'Products' },
     { path: '/autopilot', icon: Bot, label: 'Auto-Pilot' },
     { path: '/actions', icon: Zap, label: 'Actions' },
+    { path: '/scoreboard', icon: Trophy, label: 'Scoreboard' },
+    { path: '/upgrade', icon: Sparkles, label: 'Upgrade' },
   ];
 
   const tierColors = {
@@ -607,7 +609,15 @@ export function Settings() {
               </div>
               
               <div className="pt-4 border-t border-white/10">
-                <h3 className="text-white font-medium mb-3">Upgrade Your Plan</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-medium">Upgrade Your Plan</h3>
+                  <button
+                    onClick={() => navigate('/upgrade')}
+                    className="flex items-center gap-1.5 text-sm text-purple-400 hover:text-purple-300 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4" /> Compare all plans
+                  </button>
+                </div>
                 <div className="space-y-3">
                   {['flight', 'soar', 'stratosphere'].map((tier) => {
                     const isCurrentTier = user?.tier === tier;

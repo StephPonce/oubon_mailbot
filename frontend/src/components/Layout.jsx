@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Home, Package, Bot, Zap, Settings, LogOut, Activity, Menu, PanelLeftClose, PanelLeft, Store, Brain } from 'lucide-react';
+import { Home, Package, Bot, Zap, Settings, LogOut, Activity, Menu, PanelLeftClose, PanelLeft, Store, Brain, Trophy, Sparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useSidebar } from '../hooks/useSidebar';
 import { FloatingOiChat } from './FloatingOiChat';
@@ -30,6 +30,8 @@ export function Sidebar() {
     { path: '/autopilot', icon: Bot, label: 'Auto-Pilot' },
     { path: '/actions', icon: Zap, label: 'Actions' },
     { path: '/settings/stores', icon: Store, label: 'Stores' },
+    { path: '/scoreboard', icon: Trophy, label: 'Scoreboard' },
+    { path: '/upgrade', icon: Sparkles, label: 'Upgrade' },
   ];
 
   const tierColors = {
