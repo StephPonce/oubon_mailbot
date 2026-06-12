@@ -63,33 +63,53 @@ def _niche_from_tags(tags) -> Optional[str]:
 
 
 def _build_scoreboard() -> dict:
-    """Query graded picks + outcomes for the dogfood tenant."""
+    """Query graded picks + outcomes for the dogfood tenant.
+
+    Each query is guarded independently so prod schema drift (a missing
+    column or un-migrated table) degrades the page instead of 503-ing it.
+    `degraded_stages` names which query failed — those names are not
+    sensitive (no table names / SQL) so they're safe in the public body,
+    while the full exception is logged server-side with exc_info.
+    """
     from ospra_os.auth.jwt_auth import get_db
     from ospra_os.database.product_models import Product
     from ospra_os.database.performance_models import AILearningEvent
     from ospra_os.database.store_models import Store
 
     user_id = _scoreboard_user_id()
+    degraded_stages = []
+    products = []
+    first_sales = []
     db = next(get_db())
     try:
-        products = (
-            db.query(Product)
-            .join(Store, Product.store_id == Store.id)
-            .filter(Store.user_id == user_id, Product.grade.isnot(None))
-            .order_by(Product.created_at.desc())
-            .limit(200)
-            .all()
-        )
+        try:
+            products = (
+                db.query(Product)
+                .join(Store, Product.store_id == Store.id)
+                .filter(Store.user_id == user_id, Product.grade.isnot(None))
+                .order_by(Product.created_at.desc())
+                .limit(200)
+                .all()
+            )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Scoreboard graded_products query failed: {e}", exc_info=True)
+            degraded_stages.append("graded_products")
 
         # first-sale events carry days_to_first_sale in their details JSON
-        first_sales = (
-            db.query(AILearningEvent)
-            .filter(
-                AILearningEvent.user_id == user_id,
-                AILearningEvent.event_type == "first_sale",
+        try:
+            first_sales = (
+                db.query(AILearningEvent)
+                .filter(
+                    AILearningEvent.user_id == user_id,
+                    AILearningEvent.event_type == "first_sale",
+                )
+                .all()
             )
-            .all()
-        )
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Scoreboard first_sales query failed: {e}", exc_info=True)
+            degraded_stages.append("first_sales")
     finally:
         db.close()
 
@@ -110,36 +130,43 @@ def _build_scoreboard() -> dict:
     sale_days = []
 
     for p in products:
-        grade = (p.grade or "").strip()
-        units = p.total_sales or 0
-        deployed = p.deployed_at is not None
-        days_to_first_sale = days_to_sale_by_product.get(str(p.id))
-        if days_to_first_sale is not None:
-            sale_days.append(days_to_first_sale)
+        try:
+            grade = (getattr(p, "grade", None) or "").strip()
+            units = getattr(p, "total_sales", 0) or 0
+            deployed = getattr(p, "deployed_at", None) is not None
+            days_to_first_sale = days_to_sale_by_product.get(str(p.id))
+            if days_to_first_sale is not None:
+                sale_days.append(days_to_first_sale)
 
-        if grade in BUY_GRADES and deployed:
-            buy_deployed += 1
-            if units > 0:
-                buy_with_sales += 1
-        if grade in AVOID_GRADES:
-            avoid_total += 1
-            if units > 0:
-                avoid_with_sales += 1
+            if grade in BUY_GRADES and deployed:
+                buy_deployed += 1
+                if units > 0:
+                    buy_with_sales += 1
+            if grade in AVOID_GRADES:
+                avoid_total += 1
+                if units > 0:
+                    avoid_with_sales += 1
 
-        picks.append({
-            # Anonymized: title + niche only; no source/store/supplier data.
-            "title": (p.ai_title or p.product_name or "Unnamed product")[:120],
-            "niche": _niche_from_tags(p.ai_tags) or "general",
-            "grade": grade,
-            "score": round(p.discovery_score, 1) if p.discovery_score else None,
-            "graded_at": p.created_at.isoformat() if p.created_at else None,
-            "deployed": deployed,
-            "units_sold": units if deployed else None,
-            "revenue_direction": (
-                "up" if (p.total_revenue or 0) > 0 else "flat"
-            ) if deployed else None,
-            "days_to_first_sale": days_to_first_sale,
-        })
+            score = getattr(p, "discovery_score", None)
+            created = getattr(p, "created_at", None)
+            picks.append({
+                # Anonymized: title + niche only; no source/store/supplier data.
+                "title": (getattr(p, "ai_title", None) or getattr(p, "product_name", None)
+                          or "Unnamed product")[:120],
+                "niche": _niche_from_tags(getattr(p, "ai_tags", None)) or "general",
+                "grade": grade,
+                "score": round(score, 1) if score else None,
+                "graded_at": created.isoformat() if created else None,
+                "deployed": deployed,
+                "units_sold": units if deployed else None,
+                "revenue_direction": (
+                    "up" if (getattr(p, "total_revenue", 0) or 0) > 0 else "flat"
+                ) if deployed else None,
+                "days_to_first_sale": days_to_first_sale,
+            })
+        except Exception as e:
+            logger.warning(f"Scoreboard skipped a malformed product row: {e}")
+            continue
 
     sale_days.sort()
     median_days = sale_days[len(sale_days) // 2] if sale_days else None
@@ -162,6 +189,7 @@ def _build_scoreboard() -> dict:
             "source": "Live Oubon Shop store data — our own storefront running Ospra",
             "note": "Small sample sizes are shown as-is; we don't extrapolate.",
             "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "degraded_stages": degraded_stages,
         },
     }
 
@@ -185,6 +213,9 @@ async def get_public_scoreboard(request: Request):
             return _cache["payload"]
         raise HTTPException(status_code=503, detail="Scoreboard temporarily unavailable.")
 
+    # Full-hour cache only for clean builds; a degraded payload caches briefly
+    # so the page recovers quickly once the underlying schema issue is fixed.
+    degraded = bool(payload.get("meta", {}).get("degraded_stages"))
     _cache["payload"] = payload
-    _cache["expires_at"] = now + CACHE_TTL_SECONDS
+    _cache["expires_at"] = now + (60 if degraded else CACHE_TTL_SECONDS)
     return payload
