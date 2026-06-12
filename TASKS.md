@@ -87,6 +87,7 @@ The moat. Top priority. Commits: fb1f41f, 8924951, 388d13c, 7c62f3b (+ nav commi
 **Remaining (needs Render cron re-trigger + ONE budgeted probe):**
 - Re-trigger `ospra-trend-warm` once more (this session's earlier probe seeded misses; the table now exists on the API after the DB fix deploys) → then ONE `force_refresh` discovery probe to validate: (c) sentiment populated on most, (d) google_trends `source: cache:apify` + interest varying per (distinct) term — fix the *50/cap-at-2× interest saturation in trend_analyzer ONLY IF distinct terms still all read 100 (don't loosen scoring otherwise), (a) ≥7/10 niche-relevant, and ≥2-3 BUY-range grades earned. Record after/before here.
 - Scoreboard "real data": empty until Oubon deploys a graded product post-fix (grade now persists). Owner can deploy one from the Products page to populate it.
+- Scoreboard `first_sales` still degrades in prod after the DB-backfill deploy (endpoint stays 200; only days-to-first-sale is affected, win-rate/picks are independent). The DB fix creates MISSING tables but `create_all` never ALTERs an existing one — so `ai_learning_events` most likely exists in prod with an older/drifted schema (e.g. pre-`event_type`). Non-fatal; needs prod DB inspection (check `ai_learning_events` columns; if drifted, drop+recreate or Alembic-migrate it). The full exc_info is in the API logs (`Scoreboard first_sales query failed: ...`).
 
 **Convention added (see below): a frontend feature isn't done until it's reachable by clicking from the dashboard or landing page.**
 
