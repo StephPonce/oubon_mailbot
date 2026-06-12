@@ -353,8 +353,23 @@ def init_database(database_url: str = None):
         schema_check = verify_database_schema(engine)
         if schema_check['all_present']:
             print(f"[DB INIT] ✓ All {len(CRITICAL_TABLES)} critical tables present - schema OK")
+            # CRITICAL: verify_database_schema only checks the 4 CRITICAL_TABLES.
+            # Returning here without create_all meant ANY table added to a model
+            # AFTER prod was first provisioned (ai_learning_events,
+            # cached_google_trends, product_performance, ...) would NEVER be
+            # created in production — silently breaking the features that need
+            # them. create_all is idempotent: it only CREATES missing tables,
+            # never ALTERs or DROPs existing ones, so this is safe on every boot
+            # and backfills newly-added tables on the next deploy.
+            try:
+                Base.metadata.create_all(bind=engine)
+                print("[DB INIT] ✓ Backfilled any missing non-critical tables")
+            except Exception as backfill_error:
+                logger.warning(
+                    f"[DB INIT] non-critical table backfill failed (non-fatal): {backfill_error}"
+                )
             return engine
-        
+
         # Schema missing or incomplete - need to create
         print(f"[DB INIT] Missing tables: {schema_check['missing_tables']}")
         
