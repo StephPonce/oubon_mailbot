@@ -591,7 +591,20 @@ class ProductDiscoveryEngine:
                         "automation", "iot", "zigbee", "bluetooth", "remote", "control", "dimmer",
                         "motion", "detector", "thermostat", "camera", "doorbell", "lock", "alexa", "google home"],
             "exclude": ["furniture", "sofa", "chair", "table", "bed", "mattress", "curtain", "carpet",
-                        "painting", "vase", "cushion", "pillow", "blanket", "living room set"]
+                        "painting", "vase", "cushion", "pillow", "blanket", "living room set",
+                        # Word-collision excludes (2026-06-13 smart_home probe): these
+                        # off-niche items slipped through on a single generic include
+                        # token — "plug" (sink plug), "light" (camping lantern),
+                        # "bluetooth"/"camera" (wearables). Their distinctive category
+                        # words are excluded so the gate drops them while genuine smart
+                        # plugs / bulbs / wifi cameras (no exclude token) still pass.
+                        # Plumbing:
+                        "basin", "sink", "faucet", "drain",
+                        # Camping / non-smart lighting:
+                        "lantern", "kerosene", "tent", "camping",
+                        # Wearables (smartwatches, smart glasses, earbuds are not smart_home):
+                        "watch", "earphones", "earbuds", "eyewear", "glasses", "sunglasses",
+                        "pedometer", "wristband"]
         },
         "kitchen": {
             "include": ["kitchen", "cooking", "food", "utensil", "knife", "pot", "pan", "cook", "chef",

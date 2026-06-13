@@ -48,6 +48,34 @@ class TestSmartHomeGate:
         passed, reason = gate(engine, title)
         assert passed is True, f"{title!r} should pass (got {reason})"
 
+    @pytest.mark.parametrize("title", [
+        # Live /api/discovery/quick/smart_home probe (2026-06-13): each of these
+        # slipped through the gate on a single generic include token — "plug"
+        # (sink plug), "light" (camping lantern), "bluetooth"/"camera" (wearables).
+        # The exclude-vocabulary tightening must reject them at the gate.
+        "Basin Waste   40mm Adjustable Height For Bathroom, Universal Sink Plug - Black",
+        "Vintage Outdoor Camping Lantern, Portable Kerosene Lamp Style Light, LED Tent Light",
+        "8MP Camera Smart Eyewear, AI Translation Bluetooth Glasses, Recording Sunglasses",
+        "2-in-1 Smart Watch & Bluetooth Earphones, MP3 Player, Heart Rate Sleep Monitor",
+    ])
+    def test_word_collision_offniche_rejected(self, engine, title):
+        passed, reason = gate(engine, title)
+        assert passed is False, f"{title!r} should be rejected (got {reason})"
+        assert reason == "exclude_match"
+
+    def test_collision_tokens_still_pass_genuine_products(self, engine):
+        # The collision tokens (plug/light/camera) MUST remain valid for real
+        # smart_home products — the fix excludes the off-niche *category* words,
+        # not the include tokens themselves.
+        for title in [
+            "WiFi Smart Plug with Energy Monitoring",
+            "Smart Bulb Dimmable WiFi LED Light",
+            "Smart Video Doorbell Camera 1080p",
+            "LED Light Strip RGB WiFi",
+        ]:
+            passed, reason = gate(engine, title)
+            assert passed is True, f"{title!r} should still pass (got {reason})"
+
     def test_neck_pillow_hits_exclude(self, engine):
         # "pillow" is an explicit exclude term for smart_home
         passed, reason = gate(engine, "Memory Foam Neck Pillow")
