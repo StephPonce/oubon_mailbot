@@ -3112,12 +3112,14 @@ class ProductDiscoveryEngine:
                     "discovered_at": datetime.now().isoformat()
                 }
                 products.append(product)
-                
+
         except Exception as e:
             logger.error(f"AliExpress fetch error: {e}")
-        
-        return products
-    
+
+        # Intake relevance (#55): reject results that don't match the keyword
+        # that found them (AE sometimes returns promoted/loosely-related items).
+        return self._filter_supplier_results(products, query=keyword)
+
     async def _fetch_cj(self, keyword: str, count: int, niche: str = None) -> List[Dict]:
         """Fetch from CJ Dropshipping using smart search with keyword mappings.
 
@@ -3213,8 +3215,11 @@ class ProductDiscoveryEngine:
         except Exception as e:
             logger.error(f"[ERROR] CJ fetch error: {e}", exc_info=True)
 
-        return products
-    
+        # Intake relevance (#55): CJ is a category-only search (no keyword),
+        # so filter by niche relevance to drop products the broad category
+        # pulled in that don't belong (e.g. basin waste under a "home" tree).
+        return self._filter_supplier_results(products, query=keyword or "", niche=niche or "")
+
     # =========================================================================
     # STEP 3: CROSS-REFERENCE SUPPLIERS
     # =========================================================================
@@ -6735,6 +6740,72 @@ class ProductDiscoveryEngine:
             return products
 
         return [p for p, _ in kept]
+
+    # =========================================================================
+    # SUPPLIER INTAKE RELEVANCE (Task #55)
+    # =========================================================================
+    # The candidate pool was full of off-niche junk (awnings, basin waste,
+    # camping lanterns for smart_home) because the trend-keyword expansion
+    # (Amazon Movers / Google rising-related / etc.) leaks off-niche terms
+    # into the supplier search, and results were accepted with NO check that
+    # they matched the query or niche. These intake filters make the pool
+    # majority-relevant BEFORE the STEP-3b gate, so the gate trims edge cases
+    # instead of doing demolition.
+
+    def _title_overlaps_query(self, title: str, query: str) -> bool:
+        """True if a supplier result title shares a meaningful token with the
+        search keyword that found it. Rejects e.g. a "basin waste" result
+        returned for the query "wifi smart plug". When the query has no
+        meaningful tokens (e.g. a category-only CJ search), returns True —
+        there's nothing to match against, so niche relevance is used instead.
+        """
+        q_tokens = {
+            t for t in re.findall(r"[a-z0-9]+", (query or "").lower())
+            if len(t) > 2 and t not in self._GATE_STOPWORDS
+        }
+        if not q_tokens:
+            return True
+        t_tokens = set(re.findall(r"[a-z0-9]+", (title or "").lower()))
+        return bool(q_tokens & t_tokens)
+
+    def _filter_supplier_results(
+        self, products: List[Dict], *, query: str = "", niche: str = "",
+    ) -> List[Dict]:
+        """Reject off-niche/off-query supplier results at intake.
+
+        Keyword searches (query set) require query-term overlap; category
+        searches (no query) fall back to the niche relevance gate. Toggle with
+        DISCOVERY_INTAKE_FILTER=false. Never empties a non-empty batch to zero
+        on the niche-only path (defers to the STEP-3b safety valve), but the
+        query-overlap path CAN drop everything — a keyword that returns 100%
+        unrelated results SHOULD contribute nothing.
+        """
+        if os.getenv("DISCOVERY_INTAKE_FILTER", "true").lower() != "true":
+            return products
+        if not products:
+            return products
+
+        has_query = bool({
+            t for t in re.findall(r"[a-z0-9]+", (query or "").lower())
+            if len(t) > 2 and t not in self._GATE_STOPWORDS
+        })
+
+        kept, dropped = [], 0
+        for p in products:
+            title = p.get("title") or p.get("product_name") or ""
+            if has_query:
+                ok = self._title_overlaps_query(title, query)
+            else:
+                ok, _ = self._passes_niche_gate(p, niche)
+            if ok:
+                kept.append(p)
+            else:
+                dropped += 1
+
+        if dropped:
+            tag = f"query='{query[:24]}'" if has_query else f"niche='{niche}'"
+            logger.info(f"   [INTAKE FILTER] dropped {dropped}/{len(products)} off-target results ({tag})")
+        return kept
 
     # =========================================================================
     # DEMO DATA FOR DEVELOPMENT
