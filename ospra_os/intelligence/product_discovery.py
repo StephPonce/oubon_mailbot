@@ -6659,6 +6659,25 @@ class ProductDiscoveryEngine:
         "home", "google", "fast", "thick", "large", "small",
     })
 
+    # Generic, collision-prone niche-vocabulary tokens (#55). These words DO
+    # belong to a niche's include set, but they appear on so many unrelated
+    # products that a SINGLE one of them is not enough to claim niche
+    # membership — e.g. "Universal Sink Plug" shares only "plug" with
+    # smart_home, "Camping Lantern ... LED Tent Light" shares only "light".
+    # A title matching ONLY one of these (and nothing stronger) must earn a
+    # second signal (another matched token or a category match) to pass the
+    # gate. Niche-specific tokens (thermostat/doorbell/vacuum/zigbee/…) are
+    # NOT here, so a single strong token still passes on its own.
+    # Kept deliberately narrow: only tokens that genuinely ride on unrelated
+    # products. wifi/bulb/switch/sensor/remote/strip are NOT here — they are
+    # specific enough that a single one (e.g. "Smart Bulb", "Smart Switch")
+    # should still pass.
+    _WEAK_NICHE_TOKENS = frozenset({
+        "plug", "light", "lights", "lamp", "camera", "bluetooth", "speaker",
+        "charger", "cable", "adapter", "holder", "mount", "screen", "display",
+        "band",
+    })
+
     def _niche_vocabulary(self, niche: str):
         """(include_tokens, exclude_tokens) for a niche, built once and cached.
 
@@ -6714,14 +6733,27 @@ class ProductDiscoveryEngine:
         # 1. Hard exclude (e.g. "pillow"/"blanket" in smart_home)
         if title_tokens & exclude_tokens:
             return False, "exclude_match"
-        # 2. Title shares niche vocabulary
-        if title_tokens & include_tokens:
+        # 2. Title shares niche vocabulary. A niche-specific (strong) token,
+        #    or two-plus matched tokens, is enough. A SINGLE generic/
+        #    collision-prone token (plug/light/camera/…) is NOT — it must
+        #    earn a category match below ("Universal Sink Plug" shares only
+        #    "plug" with smart_home and should not pass on that alone).
+        matched = title_tokens & include_tokens
+        strong = matched - self._WEAK_NICHE_TOKENS
+        if strong or len(matched) >= 2:
             return True, "vocab_match"
         # 3. Category shares niche vocabulary (titles are noisy; category helps)
         cat = (product.get("category_name") or product.get("category") or "").lower()
         if set(re.findall(r"[a-z0-9]+", cat)) & include_tokens:
             return True, "category_match"
-        return False, "no_overlap"
+        # 4. A lone generic token is enough IF the category corroborates that
+        #    same token (substring catches singular/plural, e.g. title "Smart
+        #    Plug" + category "Smart Plugs"). "Sink Plug" in "Bathroom
+        #    Fittings" finds no corroboration and stays rejected.
+        if matched and any(tok in cat for tok in matched):
+            return True, "category_corroborated"
+        # Nothing, or only a lone generic token with no supporting category.
+        return False, "weak_or_no_overlap"
 
     def _apply_niche_gate(self, products: List[Dict], requested_niche: str) -> List[Dict]:
         """Filter a candidate pool to niche-relevant products, logging rejects.

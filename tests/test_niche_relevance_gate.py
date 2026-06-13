@@ -76,6 +76,48 @@ class TestSmartHomeGate:
             passed, reason = gate(engine, title)
             assert passed is True, f"{title!r} should still pass (got {reason})"
 
+    def test_single_generic_token_is_not_enough(self, engine):
+        # #55 general matcher: a lone collision-prone token ("plug") with no
+        # supporting category must NOT pass — this is the "Universal Sink Plug
+        # for smart_home" class, the same word-collision that fooled the old
+        # single-token gate, fixed for ALL niches without a per-niche list.
+        passed, reason = gate(engine, "Universal Sink Plug Black")
+        assert passed is False, f"lone-generic-token product should drop (got {reason})"
+
+    def test_lone_generic_token_passes_when_category_corroborates(self, engine):
+        # The same lone "plug" token DOES pass when the category backs it up;
+        # substring corroboration handles singular/plural ("plug" vs "Plugs").
+        passed, reason = gate(engine, "Smart Plug", category="Smart Plugs")
+        assert passed is True
+        assert reason == "category_corroborated"
+
+    def test_sink_plug_stays_dropped_with_offniche_category(self, engine):
+        # Corroboration must not be a backdoor: an off-niche category gives the
+        # lone "plug" token nothing to lean on.
+        passed, reason = gate(
+            engine, "Universal Sink Plug 40mm", category="Bathroom Fittings"
+        )
+        assert passed is False
+
+    @pytest.mark.parametrize("title", [
+        # Canonical single-strong-token products must still pass — the weak set
+        # is deliberately narrow so these are NOT collateral damage.
+        "Smart Bulb",
+        "Smart Switch",
+        "PIR Sensor",
+        "Smart Thermostat",
+        "Zigbee Hub",
+        "Smart Door Lock",
+    ])
+    def test_single_strong_token_still_passes(self, engine, title):
+        passed, reason = gate(engine, title)
+        assert passed is True, f"{title!r} should pass on its strong token (got {reason})"
+
+    def test_two_generic_tokens_pass(self, engine):
+        # Two generic tokens together are meaningful even if each alone is weak.
+        passed, reason = gate(engine, "WiFi Smart Plug Energy Monitor")
+        assert passed is True
+
     def test_neck_pillow_hits_exclude(self, engine):
         # "pillow" is an explicit exclude term for smart_home
         passed, reason = gate(engine, "Memory Foam Neck Pillow")
