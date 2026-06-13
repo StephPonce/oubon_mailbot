@@ -179,7 +179,13 @@ async def warm_via_apify(terms: List[str]) -> List[str]:
     from ospra_os.product_research.connectors.apify.google_trends_apify import ApifyGoogleTrends
 
     client = ApifyGoogleTrends()
-    results = await client.get_interest(search_terms=terms, geo="US", timeframe="today 3-m")
+    # The cron runs off the request path and exists precisely to absorb this
+    # actor's ~12-minute runtime. The 120s request-path default would abandon
+    # every run at ~2 min (credits still spent) and fall back to pytrends —
+    # which is exactly what was happening in prod. Give it 20 minutes.
+    results = await client.get_interest(
+        search_terms=terms, geo="US", timeframe="today 3-m", timeout_secs=1200
+    )
 
     warmed: List[str] = []
     for td in results or []:

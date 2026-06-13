@@ -304,7 +304,13 @@ class ApifyClient:
                     if elapsed % 30 == 0:
                         print(f"   Still running... ({elapsed}s)")
                 
-                print(f"[ALARM] Timeout after {timeout_secs}s waiting for {actor_id}")
+                # Log the run ID so an abandoned-but-still-charging run is
+                # traceable in the Apify console (results may finish later).
+                print(
+                    f"[ALARM] Timeout after {timeout_secs}s waiting for {actor_id} "
+                    f"(run_id={run_id}, last status={status} — run continues "
+                    f"server-side; check the Apify console for its results)"
+                )
                 return []
                 
         except Exception as e:

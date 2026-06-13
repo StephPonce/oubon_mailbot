@@ -129,7 +129,8 @@ class ApifyGoogleTrends:
         search_terms: List[str],
         geo: str = "US",
         timeframe: str = "today 3-m",
-        enable_prediction: bool = True
+        enable_prediction: bool = True,
+        timeout_secs: int = 120,
     ) -> List[TrendData]:
         """
         Get Google Trends interest data for search terms.
@@ -139,6 +140,11 @@ class ApifyGoogleTrends:
             geo: Country code (US, GB, DE, etc.) or "" for worldwide
             timeframe: Time range (see TIMEFRAME_MAP)
             enable_prediction: Include AI trend predictions
+            timeout_secs: Max seconds to wait per Apify batch. Default 120 is
+                right for request-path use (we fall back to cache/pytrends fast),
+                but the actor itself takes ~12 min — off-request callers (the
+                trend-warm cron) should pass a much larger value so the run
+                actually completes instead of being abandoned mid-flight.
 
         Returns:
             List of TrendData objects with interest data
@@ -148,7 +154,9 @@ class ApifyGoogleTrends:
         # Process in batches of 5 (Apify limit)
         for i in range(0, len(search_terms), 5):
             batch = search_terms[i:i+5]
-            batch_results = await self._fetch_trends_batch(batch, geo, timeframe, enable_prediction)
+            batch_results = await self._fetch_trends_batch(
+                batch, geo, timeframe, enable_prediction, timeout_secs=timeout_secs
+            )
             results.extend(batch_results)
 
             # Small delay between batches
@@ -162,7 +170,8 @@ class ApifyGoogleTrends:
         search_terms: List[str],
         geo: str,
         timeframe: str,
-        enable_prediction: bool
+        enable_prediction: bool,
+        timeout_secs: int = 120,
     ) -> List[TrendData]:
         """Fetch trends for a batch of up to 5 terms."""
         results = []
@@ -200,7 +209,7 @@ class ApifyGoogleTrends:
                         "apifyProxyGroups": ["RESIDENTIAL"]
                     }
                 },
-                timeout_secs=120,
+                timeout_secs=timeout_secs,
                 memory_mbytes=256  # Low memory = cheaper
             )
 

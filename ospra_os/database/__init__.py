@@ -107,10 +107,13 @@ try:
         AmazonOrder,
         FBAShipment,
     )
-except ImportError:
-    # Amazon models import depends on ospra_os.security.credential_encryption
-    # being importable at package init time; fall back to None if the package
-    # isn't wired up yet in this environment.
+except Exception:
+    # Broadened from ImportError: these optional imports can also raise at
+    # import time when settings validation fails (e.g. a lean cron process
+    # that doesn't set JWT_SECRET_KEY). The DB package must import regardless
+    # so background jobs like the trend-warm cron don't need the full web
+    # service's env. Amazon models also depend on credential_encryption being
+    # wired up. Fall back to None either way.
     AmazonAccount = None
     AmazonListing = None
     AmazonOrder = None
@@ -142,13 +145,17 @@ from .trend_cache_models import CachedGoogleTrend
 # Security Audit Models
 try:
     from ospra_os.security.security_audit import SecurityAuditLog
-except ImportError:
-    SecurityAuditLog = None  # Optional - created if security_audit module exists
+except Exception:
+    # Broadened from ImportError: importing security_audit pulls in settings
+    # whose validation raises (not ImportError) when JWT_SECRET_KEY is unset,
+    # which crashed the trend-warm cron. Optional model — None is fine.
+    SecurityAuditLog = None
 
 # Tenant Audit Models
 try:
     from ospra_os.tenancy.audit import TenantAuditLog
-except ImportError:
+except Exception:
+    # Broadened from ImportError for the same reason as SecurityAuditLog above.
     TenantAuditLog = None  # Optional - created if tenancy module exists
 
 # Backwards compatibility - these functions are now available from connection.py
