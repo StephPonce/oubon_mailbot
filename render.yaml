@@ -140,6 +140,66 @@ services:
         value: "25"
 
   # ---------------------------------------------------------------------------
+  # CATALOG WARM CRON (#56)
+  # Runs the REAL discovery engine across niches and upserts graded products
+  # into discovered_catalog (the persistent, cross-process store the API reads
+  # via /api/discovery/catalog). This is what populates the dashboard with
+  # DOZENS of graded products + days-of-proof instead of one on-demand result.
+  # Runs at 01:00 / 13:00 UTC — an hour after trend-warm so Trends are fresh.
+  # Needs discovery's full credential set (sentiment + suppliers + apify).
+  # ---------------------------------------------------------------------------
+  - type: cron
+    name: ospra-catalog-warm
+    runtime: python
+    plan: starter
+    region: oregon
+    rootDir: .
+    schedule: "0 1,13 * * *"
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: python -m ospra_os.tasks.catalog_warm
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ospra-db
+          property: connectionString
+      # Niches to build the catalog for (start modest to bound cron cost/runtime).
+      - key: DISCOVERY_CATALOG_NICHES
+        value: "smart_home,tech,kitchen,fitness,beauty"
+      - key: DISCOVERY_CATALOG_COUNT
+        value: "20"
+      # AI grading + sentiment
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      # Suppliers
+      - key: CJ_ACCESS_TOKEN
+        sync: false
+      - key: ALIEXPRESS_APP_KEY
+        sync: false
+      - key: ALIEXPRESS_APP_SECRET
+        sync: false
+      - key: ALIEXPRESS_ACCESS_TOKEN
+        sync: false
+      # Trends / social signals
+      - key: APIFY_API_TOKEN
+        sync: false
+      - key: REDDIT_CLIENT_ID
+        sync: false
+      - key: REDDIT_CLIENT_SECRET
+        sync: false
+      - key: REDDIT_USER_AGENT
+        sync: false
+
+  # ---------------------------------------------------------------------------
   # FRONTEND STATIC SITE
   # ---------------------------------------------------------------------------
   - type: web

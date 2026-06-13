@@ -141,6 +141,7 @@ from .performance_models import (
 
 # Cached Google Trends (task #47 — trend pre-warm store)
 from .trend_cache_models import CachedGoogleTrend
+from .discovered_catalog import DiscoveredProduct
 
 # Security Audit Models
 try:
@@ -240,6 +241,7 @@ __all__ = [
     "AIUsage",
     "RankingHistory",
     "CachedGoogleTrend",
+    "DiscoveredProduct",
     "Niche",
     "NicheSnapshot",
 

@@ -901,6 +901,79 @@ async def list_niches():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/catalog")
+async def get_catalog(
+    niche: Optional[str] = Query(None, description="Filter by niche"),
+    min_score: float = Query(0, ge=0, le=100, description="Minimum score 0-100"),
+    phase: Optional[str] = Query(None, description="Lifecycle phase (discovery/early_spike/growth/maturity)"),
+    max_saturation: Optional[float] = Query(None, description="Max saturation 0-100 (lower = less competition)"),
+    sort: str = Query("score", description="score | freshness | proof"),
+    limit: int = Query(60, ge=1, le=200),
+):
+    """Persistent discovered-product catalog (#56).
+
+    Read path for the durable store the `catalog_warm` cron populates across
+    niches. Unlike `/quick` (one niche, on-demand, in-memory), this serves the
+    accumulated catalog with `days_of_proof` so the dashboard can show dozens of
+    graded products with a track record. No auth: non-sensitive product data
+    (same as `/niches`).
+    """
+    try:
+        from ospra_os.database.connection import SessionLocal
+        from ospra_os.database.discovered_catalog import DiscoveredProduct
+    except Exception as e:
+        return {"success": False, "error": f"catalog unavailable: {e}", "products": [], "count": 0}
+
+    session = SessionLocal()
+    try:
+        q = session.query(DiscoveredProduct)
+        if niche:
+            q = q.filter(DiscoveredProduct.niche == niche)
+        if phase:
+            q = q.filter(DiscoveredProduct.velocity_phase == phase)
+        if min_score:
+            q = q.filter(DiscoveredProduct.score >= min_score)
+        if max_saturation is not None:
+            q = q.filter(DiscoveredProduct.saturation_score <= max_saturation)
+
+        if sort == "freshness":
+            q = q.order_by(DiscoveredProduct.first_seen_at.desc())
+        elif sort == "proof":
+            q = q.order_by(DiscoveredProduct.times_seen.desc(), DiscoveredProduct.first_seen_at.asc())
+        else:
+            q = q.order_by(DiscoveredProduct.score.desc())
+
+        rows = q.limit(limit).all()
+        products = []
+        for r in rows:
+            payload = dict(r.payload or {})
+            payload.update({
+                "catalog_grade": r.grade,
+                "catalog_score": r.score,
+                "saturation_score": r.saturation_score,
+                "opportunity_score": r.opportunity_score,
+                "velocity_phase": r.velocity_phase,
+                "days_of_proof": r.days_of_proof,
+                "times_seen": r.times_seen,
+                "first_seen_at": r.first_seen_at.isoformat() if r.first_seen_at else None,
+                "niche": r.niche,
+            })
+            products.append(payload)
+
+        total = session.query(DiscoveredProduct).count()
+        return {
+            "success": True,
+            "count": len(products),
+            "total_in_catalog": total,
+            "products": products,
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] catalog read failed: {e}")
+        return {"success": False, "error": str(e), "products": [], "count": 0}
+    finally:
+        session.close()
+
+
 @router.get("/sources")
 async def get_sources_status():
     """Get status of all 10 data sources including AI image generation."""

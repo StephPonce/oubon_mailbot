@@ -72,6 +72,25 @@ Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent
 
 _(none)_
 
+## #56 — Persistent catalog + scheduled discovery (2026-06-13, IN PROGRESS — "why is nothing wired")
+
+**Root-cause chain for "the dashboard is empty / nothing accumulates" (all verified live):**
+1. **`app.ospra.io` has NO DNS record** — the app is served at **`ospra.io`** (ospra.io/dashboard + /scoreboard → 200). The `app.` subdomain the owner was visiting doesn't resolve. OWNER ACTION: add the `app` CNAME at the registrar + Render custom domain, or just use ospra.io.
+2. **The product cache (`ProductDiscoveryCache`) is in-memory only** — wiped on restart, not shareable with a background process. (Comment: "replace with Redis for persistence".)
+3. **No Celery worker/beat in prod** — `render.yaml` had only the API + trend-warm cron, so every `beat_schedule` job (incl. `daily-product-discovery`) NEVER RAN.
+4. **`discover_products_for_user` is a stub** — `# TODO: Integrate with actual discovery engine`, returns `[]`. Scheduled discovery was never implemented.
+5. **No persistent table for full graded products** — `product_search_cache` stores only AliExpress IDs; nothing holds a multi-source graded catalog → can't accumulate "dozens" or "days of proof".
+6. saturation_score + velocity lifecycle phase are COMPUTED but never surfaced to API output/UI.
+7. Live source health (`/sources-health`): amazon_new_releases ✅, tiktok_shop ✅, cj ✅(dyn categories not loaded); meta_ads ⏱ timeout, amazon_movers ❌ parse, etsy ❌ no_data; aliexpress ⚠ not_configured (needs owner keys).
+
+**Shipped this session (fixes 2+4+5 — the persistent spine, commit below):**
+- New `discovered_catalog` table (`database/discovered_catalog.py`, `DiscoveredProduct`, registered in `database/__init__`): full product `payload` JSON + grade/score/saturation/opportunity/velocity_phase/sentiment, and **proof-age** (`first_seen_at` anchor never resets; `last_seen_at`/`times_seen` bump on re-surface → `days_of_proof`).
+- New standalone cron `ospra_os/tasks/catalog_warm.py` (`python -m ospra_os.tasks.catalog_warm`, trend-warm pattern, self-bootstraps table): runs the REAL `discover_products(niche)` across niches and upserts graded results. Env: `DISCOVERY_CATALOG_NICHES`, `DISCOVERY_CATALOG_COUNT`.
+- New read endpoint `GET /api/discovery/catalog` (filters: niche/min_score/phase/max_saturation/sort, returns `days_of_proof`+opportunity). No auth (non-sensitive, like `/niches`).
+- Render cron `ospra-catalog-warm` added to render.yaml (01:00/13:00 UTC, after trend-warm; discovery's full credential set). 6 tests green (`tests/test_catalog_warm.py`); persistence/dedupe/proof-accrual/opportunity-normalization verified on sqlite.
+
+**Remaining for #56:** (a) wire the dashboard/ProductDiscovery UI to read `/api/discovery/catalog` and render the "Just Caught / Growing / Proven" categories + competition (saturation) + days-of-proof badges (surfacing fix #6). (b) plumb `velocity_phase` into the discovery output so the catalog stores it (currently usually None — engine computes phases but doesn't attach to `/quick` product dicts). (c) OWNER: set the cron's secret env vars in Render + the `app.ospra.io` DNS. (d) fix the 3 broken sources (meta_ads timeout, amazon_movers parse, etsy) + AliExpress creds.
+
 ## #55 — Upstream sourcing relevance (2026-06-12, IN PROGRESS — top moat priority)
 
 The gate (#54a) filters, but can't manufacture good candidates: the AE/CJ supplier search returns awnings, basin waste, and camping lanterns for smart_home. **Root cause traced:** `_get_trending_keywords` merges base niche keywords with Amazon Movers / Amazon New-Releases / Google "rising related" / TikTok / Etsy terms — for a broad Amazon category mapping those leak off-niche terms (basin waste = home-improvement, awning = patio) into the keyword pool; then STEP 2b accepts whatever AE/CJ return with **no query-term or niche check at intake** (`_fetch_aliexpress` appended every result; `_fetch_cj` is a category-only search). So the STEP-3b gate had to do demolition.
