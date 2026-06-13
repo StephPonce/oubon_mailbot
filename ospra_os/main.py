@@ -1244,8 +1244,24 @@ app.mount("/static/images", StaticFiles(directory=str(images_dir)), name="images
 # ---------------------------------------------------------------
 @app.get("/health")
 def health_check_immediate():
-    """Immediate health check that responds before full initialization."""
-    return {"status": "ok", "service": "Ospra Intelligence Platform", "version": "2026-01-11"}
+    """Immediate health check that responds before full initialization.
+
+    Exposes the deployed git commit so "what code is prod actually running"
+    is one curl away. Render injects RENDER_GIT_COMMIT; we also accept an
+    explicit GIT_COMMIT override. This exists because a "green" deploy was
+    silently serving stale pre-gate code (#54) with no way to verify it.
+    """
+    commit = (
+        os.getenv("RENDER_GIT_COMMIT")
+        or os.getenv("GIT_COMMIT")
+        or "unknown"
+    )
+    return {
+        "status": "ok",
+        "service": "Ospra Intelligence Platform",
+        "version": "2026-01-11",
+        "commit": commit[:12],
+    }
 
 @app.get("/health/celery")
 def celery_health():
