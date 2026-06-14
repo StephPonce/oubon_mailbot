@@ -13,6 +13,8 @@ import {
   Activity, ArrowRight, BadgeCheck, Clock, RefreshCw, ShieldCheck, TrendingUp,
 } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
+import { PageLayout } from './Layout';
 
 const GRADE_STYLES = {
   'A+': 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30',
@@ -53,6 +55,10 @@ export default function Scoreboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  // #9: when an authenticated user opens the scoreboard from the in-app
+  // sidebar, keep the sidebar (wrap in PageLayout). Public visitors (no auth)
+  // get the standalone marketing page.
+  const { user } = useAuth();
 
   const load = async () => {
     setLoading(true);
@@ -76,13 +82,7 @@ export default function Scoreboard() {
   const picks = data?.picks || [];
   const winRate = stats?.buy_win_rate != null ? `${Math.round(stats.buy_win_rate * 100)}%` : '—';
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
-      </div>
-
+  const body = (
       <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-10">
@@ -234,6 +234,17 @@ export default function Scoreboard() {
           </>
         )}
       </div>
+  );
+
+  // Authenticated → keep the in-app sidebar. Public visitor → standalone page.
+  if (user) return <PageLayout>{body}</PageLayout>;
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
+      </div>
+      {body}
     </div>
   );
 }

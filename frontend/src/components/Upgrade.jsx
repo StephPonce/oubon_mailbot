@@ -21,6 +21,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check, Loader2, Lock, Sparkles } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../services/api';
+import { PageLayout } from './Layout';
 
 const TIER_ORDER = ['nest', 'flight', 'soar', 'stratosphere'];
 
@@ -193,12 +194,7 @@ export default function Upgrade() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-cyan-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10" />
-      </div>
-
+    <PageLayout>
       <div className="relative max-w-6xl mx-auto">
         <Link
           to="/dashboard"
@@ -265,6 +261,6 @@ export default function Upgrade() {
           payment is confirmed. Annual plans always save exactly 2 months.
         </p>
       </div>
-    </div>
+    </PageLayout>
   );
 }

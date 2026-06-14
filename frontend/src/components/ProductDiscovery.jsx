@@ -229,6 +229,14 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     amazon_buzz: typeof p.amazon_buzz === 'number' ? p.amazon_buzz : null,
     amazon_rating: typeof p.amazon_rating === 'number' ? p.amazon_rating : null,
     amazon_review_count: typeof p.amazon_review_count === 'number' ? p.amazon_review_count : null,
+    // #56: opportunity/competition + lifecycle + proof-age signals consumed by
+    // OpportunityBadges. Without these in the whitelist the badges never render
+    // even though the backend sends saturation_score on every product.
+    saturation_score: p.saturation_score ?? null,
+    opportunity_score: p.opportunity_score ?? null,
+    velocity_phase: p.velocity_phase || p.lifecycle_phase || null,
+    days_of_proof: p.days_of_proof ?? null,
+    times_seen: p.times_seen ?? null,
     raw_data: p,
   };
 }
