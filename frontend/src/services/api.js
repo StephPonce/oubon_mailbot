@@ -463,7 +463,39 @@ class OspraAPI {
     _inflightDiscovery.set(url, promise);
     return promise;
   }
-  
+
+  /**
+   * Get the persistent discovered-product catalog (#56).
+   * GET /api/discovery/catalog — the durable store the catalog_warm cron
+   * populates across niches. Returns dozens of graded products with
+   * days_of_proof + opportunity, unlike on-demand /quick. No auth required.
+   *
+   * @param {object} params - { niche, minScore, phase, maxSaturation, sort, limit }
+   * @returns {Promise<array>} products array (empty if catalog not yet warmed)
+   */
+  async getCatalog(params = {}) {
+    const qs = new URLSearchParams();
+    if (params.niche) qs.set('niche', params.niche);
+    if (params.minScore != null) qs.set('min_score', params.minScore);
+    if (params.phase) qs.set('phase', params.phase);
+    if (params.maxSaturation != null) qs.set('max_saturation', params.maxSaturation);
+    if (params.sort) qs.set('sort', params.sort);
+    qs.set('limit', params.limit || 60);
+    const url = `${API_BASE_URL}/api/discovery/catalog?${qs.toString()}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn('[API] getCatalog HTTP', response.status);
+        return [];
+      }
+      const data = await response.json();
+      return Array.isArray(data?.products) ? data.products : [];
+    } catch (error) {
+      console.error('[API] getCatalog error:', error);
+      return [];
+    }
+  }
+
   /**
    * Enhance products with AI-generated images
    * POST /api/discovery/enhance-images

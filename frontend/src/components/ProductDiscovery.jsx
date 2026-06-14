@@ -321,6 +321,66 @@ function SupplierBadges({ product }) {
 }
 
 // ============================================================================
+// COMPONENT: OpportunityBadges (#56) — competition, lifecycle phase, proof-age
+// ============================================================================
+// Renders ONLY when the backing fields exist, so on-demand /quick results and
+// persistent catalog results both degrade gracefully (older cached cards just
+// show nothing extra). This is what surfaces "caught early / low competition /
+// N days of proof" — the trust + non-saturation signals.
+const _PHASE_BADGE = {
+  discovery:   { label: '🔥 Just Caught', cls: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+  early_spike: { label: '🔥 Just Caught', cls: 'bg-pink-500/20 text-pink-300 border-pink-500/30' },
+  growth:      { label: '📈 Growing',     cls: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
+  maturity:    { label: '✅ Proven',      cls: 'bg-green-500/20 text-green-300 border-green-500/30' },
+  decline:     { label: '↓ Fading',       cls: 'bg-white/10 text-white/50 border-white/10' },
+};
+
+function OpportunityBadges({ product }) {
+  const badges = [];
+
+  const phase = product.velocity_phase;
+  if (phase && _PHASE_BADGE[phase]) {
+    const p = _PHASE_BADGE[phase];
+    badges.push(
+      <span key="phase" title="How early we caught this product in its lifecycle"
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${p.cls}`}>{p.label}</span>
+    );
+  }
+
+  // Competition from opportunity_score, falling back to saturation_score
+  // (which may be 0-1 or 0-100). Higher opportunity = lower competition.
+  let opp = product.opportunity_score;
+  if (opp == null && product.saturation_score != null) {
+    const s = product.saturation_score;
+    opp = 100 - (s <= 1 ? s * 100 : s);
+  }
+  if (opp != null) {
+    const comp = opp >= 65
+      ? { label: 'Low competition', cls: 'bg-green-500/20 text-green-300 border-green-500/30' }
+      : opp >= 40
+        ? { label: 'Medium competition', cls: 'bg-amber-500/20 text-amber-300 border-amber-500/30' }
+        : { label: 'High competition', cls: 'bg-red-500/20 text-red-300 border-red-500/30' };
+    badges.push(
+      <span key="comp" title={`Opportunity ${Math.round(opp)}/100 — higher means less saturated`}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${comp.cls}`}>{comp.label}</span>
+    );
+  }
+
+  const d = product.days_of_proof;
+  if (d != null) {
+    const label = d <= 0 ? 'Caught today' : `Caught ${d}d ago`;
+    const seen = product.times_seen > 1 ? ` · seen ${product.times_seen}×` : '';
+    badges.push(
+      <span key="proof" title="Days since we first detected this product — its track record"
+            className="px-2 py-0.5 rounded-full text-[10px] font-medium border bg-white/10 text-white/60 border-white/10">{label}{seen}</span>
+    );
+  }
+
+  if (badges.length === 0) return null;
+  return <div className="flex flex-wrap items-center gap-1.5 mt-2">{badges}</div>;
+}
+
+// ============================================================================
 // COMPONENT: Product Card - CLICKABLE, Oi Score + supplier badges
 // ============================================================================
 // Task #35: ProductCard is rendered up to 20-50× per discovery result.
@@ -450,6 +510,9 @@ const ProductCard = React.memo(function ProductCard({ product, onClick }) {
             </span>
           )}
         </div>
+
+        {/* #56: competition / early-caught / days-of-proof badges */}
+        <OpportunityBadges product={product} />
       </div>
     </div>
   );
@@ -2862,6 +2925,37 @@ export function ProductDiscovery() {
 
     try {
       console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
+
+      // #56: prefer the PERSISTENT CATALOG — dozens of graded products with
+      // proof-age + competition, populated by the catalog_warm cron. When the
+      // catalog is empty (cron not yet run) we fall through to on-demand
+      // discovery, so the page behaves exactly as before until it's warmed.
+      try {
+        const catalog = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        if (Array.isArray(catalog) && catalog.length > 0) {
+          const normalized = catalog.map(p => ({
+            ...normalizeProduct(p, p.niche || niche),
+            // Re-attach catalog-only signals so OpportunityBadges can render
+            // them (normalizeProduct may not carry these through).
+            velocity_phase: p.velocity_phase,
+            saturation_score: p.saturation_score,
+            opportunity_score: p.opportunity_score,
+            days_of_proof: p.days_of_proof,
+            times_seen: p.times_seen,
+          }));
+          console.log(`[ProductDiscovery] Catalog hit: ${normalized.length} products for ${niche}`);
+          setProducts(normalized);
+          setDiscoveryError(null);
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({ products: normalized, savedAt: Date.now() }));
+          } catch (_) { /* localStorage full/unavailable — non-fatal */ }
+          setLoading(false);
+          return;
+        }
+        console.log(`[ProductDiscovery] Catalog empty for ${niche} — falling back to on-demand discovery`);
+      } catch (e) {
+        console.warn('[ProductDiscovery] catalog fetch failed, using on-demand discovery', e);
+      }
 
       // Fetch products (same niche for all filter types).
       // Initial load fetches 20 to stay under Safari's ~60s fetch timeout.
