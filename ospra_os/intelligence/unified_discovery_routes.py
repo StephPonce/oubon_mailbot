@@ -220,6 +220,10 @@ async def enhance_products_with_images(products: List[Dict], max_images: int = 5
     logger.info(f" Enhancing top {len(products_to_enhance)} product images via Stability...")
 
     enhanced_count = 0
+    # #2: persist successful enhancements to the SYSTEM-WIDE DB cache (keyed by
+    # the same product id the detail panel reads with) so they survive deploys
+    # and amortize across users — the disk cache below is ephemeral on Render.
+    enhanced_for_db = []  # list of (product_id, enhanced_url, original_url)
     for product in products_to_enhance:
         original_url = product.get('image_url') or product.get('main_image')
         if not original_url:
@@ -241,6 +245,9 @@ async def enhance_products_with_images(products: List[Dict], max_images: int = 5
                 # 'cached' when disk-cache hit (cost $0), 'stability' for a fresh API call.
                 product['image_source'] = 'cached' if result.get('cached') else 'stability'
                 enhanced_count += 1
+                pid = product.get('id') or product.get('product_id')
+                if pid:
+                    enhanced_for_db.append((str(pid), enhanced, product.get('original_image_url', original_url)))
                 logger.info(f"   [SUCCESS] {product['image_source']} image for: {product.get('title', '')[:40]}...")
             else:
                 product['ai_image_url'] = None
@@ -259,7 +266,24 @@ async def enhance_products_with_images(products: List[Dict], max_images: int = 5
     for product in sorted_products[max_images:]:
         product['ai_image_url'] = None
         product['image_source'] = 'not_in_top_n'
-    
+
+    # #2: write through to the system-wide DB cache so a later session (any
+    # user, any instance, post-deploy) reuses these instead of re-spending
+    # Stability budget. Best-effort — never breaks the response.
+    if enhanced_for_db:
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.api.image_generation_routes import update_product_enhanced_images
+            db = SessionLocal()
+            try:
+                for pid, enhanced_url, original_url in enhanced_for_db:
+                    update_product_enhanced_images(db, pid, [enhanced_url], [original_url])
+            finally:
+                db.close()
+            logger.info(f"   [CACHE] Persisted {len(enhanced_for_db)} enhanced images to system-wide DB")
+        except Exception as e:
+            logger.warning(f"   [CACHE] system-wide enhanced-image persist skipped: {e}")
+
     logger.info(f" Image generation complete: {enhanced_count}/{len(products_to_enhance)} successful")
     return products
 
