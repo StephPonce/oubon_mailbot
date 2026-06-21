@@ -1477,6 +1477,25 @@ function ProductDetailPanel({ product, onClose, onDeploy, onUpdateProduct, onEnh
     generateAIAnalysis(); // Auto-generate analysis when panel opens
   }, [product.id]);
 
+  // #3: CJ discovery (product/list) returns only the MAIN image, so CJ cards
+  // arrive with 1 image. Lazily fetch the full productImageSet from the detail
+  // endpoint when the panel opens, then merge into the product so the gallery
+  // shows every angle. Kept off the cold discovery path on purpose.
+  useEffect(() => {
+    const pid = product.raw_data?.cj_pid || product.cj_pid;
+    const isCj = product.source === 'cj_dropshipping' || !!pid;
+    const haveFew = (product.all_images?.length || 0) <= 1;
+    if (!isCj || !haveFew || !pid || !onUpdateProduct) return;
+    let cancelled = false;
+    (async () => {
+      const imgs = await api.getProductImages(pid);
+      if (!cancelled && imgs.length > 1) {
+        onUpdateProduct({ ...product, all_images: imgs, image_count: imgs.length });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [product.id]);
+
   // Task #38 — async handler for the "Generate Marketing Angles" button.
   // We only show the button when the product is saturated, so by the
   // time this runs we already know the backend will accept it (no need

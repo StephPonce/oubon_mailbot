@@ -497,6 +497,26 @@ class OspraAPI {
   }
 
   /**
+   * Fetch the FULL source image set for a CJ product on demand (#3).
+   * CJ discovery returns only the main image; the rest live on the detail
+   * endpoint. Called lazily when a product detail panel opens. No auth.
+   * @param {string} pid - CJ product id (cj_pid)
+   * @returns {Promise<string[]>} all image URLs (empty on failure)
+   */
+  async getProductImages(pid) {
+    if (!pid) return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/discovery/product-images?pid=${encodeURIComponent(pid)}`);
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data?.all_images) ? data.all_images : [];
+    } catch (error) {
+      console.error('[API] getProductImages error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Enhance products with AI-generated images
    * POST /api/discovery/enhance-images
    * 

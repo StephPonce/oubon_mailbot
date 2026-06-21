@@ -974,6 +974,41 @@ async def get_catalog(
         session.close()
 
 
+_cj_image_cache: Dict[str, List[str]] = {}
+
+
+@router.get("/product-images")
+async def get_product_images(pid: str = Query(..., description="CJ product id (cj_pid)")):
+    """Fetch the FULL image set for a CJ product on demand (#3).
+
+    CJ's product/list (used in discovery) returns only the MAIN image, so
+    discovered CJ products carry image_count=1. The complete productImageSet
+    is only on the product/query detail endpoint. This is called lazily when a
+    product's detail panel opens — keeping the cold discovery path cheap while
+    still giving the gallery every angle. Results are cached per pid in-process.
+    """
+    if not pid:
+        return {"success": False, "error": "missing pid", "all_images": [], "image_count": 0}
+    if pid in _cj_image_cache:
+        imgs = _cj_image_cache[pid]
+        return {"success": True, "all_images": imgs, "image_count": len(imgs), "cached": True}
+    try:
+        from ospra_os.integrations.cj_dropshipping.client import get_cj_client
+        client = get_cj_client()
+        if not client or not client.is_available():
+            return {"success": False, "error": "CJ not configured", "all_images": [], "image_count": 0}
+        detail = await client.get_product_details(pid)
+        if not detail:
+            return {"success": False, "error": "product not found", "all_images": [], "image_count": 0}
+        imgs = [u for u in (detail.get("all_images") or []) if u]
+        if imgs:
+            _cj_image_cache[pid] = imgs
+        return {"success": True, "all_images": imgs, "image_count": len(imgs)}
+    except Exception as e:
+        logger.error(f"[ERROR] product-images failed for pid={pid!r}: {e}")
+        return {"success": False, "error": str(e), "all_images": [], "image_count": 0}
+
+
 @router.get("/sources")
 async def get_sources_status():
     """Get status of all 10 data sources including AI image generation."""
