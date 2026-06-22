@@ -53,8 +53,103 @@ def _bootstrap_table() -> None:
     from ospra_os.database.base import Base
     from ospra_os.database.connection import engine
     from ospra_os.database.discovered_catalog import DiscoveredProduct
+    from ospra_os.database.product_timeseries import ProductTimeseries
 
-    Base.metadata.create_all(bind=engine, tables=[DiscoveredProduct.__table__])
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[DiscoveredProduct.__table__, ProductTimeseries.__table__],
+    )
+
+
+def _int_or_none(v):
+    try:
+        return int(v) if v is not None and v != "" else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _float_or_none(v):
+    try:
+        return float(v) if v is not None and v != "" else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _extract_timeseries_signals(product: dict) -> dict:
+    """Pull the raw daily signals (the moat columns) off the product dict.
+
+    Every signal is None when absent — never a fabricated zero — so the
+    confidence gate can mark thin days as low-confidence, not bad products.
+    """
+    ds = product.get("data_sources") or {}
+    ae = ds.get("aliexpress") or {}
+    tiktok_shop = ds.get("tiktok_shop") or {}
+
+    meta_adv = _int_or_none(product.get("meta_niche_advertiser_count"))
+    ae_orders = _int_or_none(
+        product.get("sales_count") or ae.get("orders") or product.get("lastest_volume")
+    )
+    gt = product.get("google_trend_score")
+    if gt is None:
+        gt = (ds.get("google_trends") or {}).get("interest")
+    google_trends = _float_or_none(gt)
+    tt_units = _int_or_none(
+        product.get("tiktok_units_sold") or tiktok_shop.get("units_sold_7d")
+    )
+    tt_velocity = _float_or_none(
+        product.get("tiktok_velocity") or tiktok_shop.get("velocity")
+    )
+
+    signals = {
+        "meta_advertiser_count": meta_adv,
+        "aliexpress_orders": ae_orders,
+        "google_trends_interest": google_trends,
+        "tiktok_units_sold": tt_units,
+        "tiktok_velocity": tt_velocity,
+    }
+    signals["signal_count"] = sum(1 for v in signals.values() if v is not None)
+    return signals
+
+
+def snapshot_timeseries(session, product: dict, niche: str) -> str:
+    """Upsert today's per-product time-series row. Returns 'inserted' or 'updated'.
+
+    One row per (product_key, snapshot_date): a same-day re-run UPDATEs, a new
+    day INSERTs — building the trajectory history that powers velocity grading.
+    """
+    from ospra_os.database.product_timeseries import ProductTimeseries
+
+    key = _product_key(product)
+    today = datetime.utcnow().date()
+    cat = _extract(product, niche)  # reuse grade/score/saturation extraction
+    sig = _extract_timeseries_signals(product)
+
+    fields = {
+        "niche": niche,
+        "title": cat["title"],
+        "grade": cat["grade"],
+        "score": cat["score"],
+        "saturation_score": cat["saturation_score"],
+        "opportunity_score": cat["opportunity_score"],
+        "velocity_phase": cat["velocity_phase"],
+        "sentiment_score": cat["sentiment_score"],
+        **sig,
+    }
+
+    row = (
+        session.query(ProductTimeseries)
+        .filter_by(product_key=key, snapshot_date=today)
+        .first()
+    )
+    if row is None:
+        session.add(ProductTimeseries(
+            product_key=key, snapshot_date=today,
+            created_at=datetime.utcnow(), **fields,
+        ))
+        return "inserted"
+    for k, v in fields.items():
+        setattr(row, k, v)
+    return "updated"
 
 
 def _product_key(product: dict) -> str:
@@ -127,11 +222,15 @@ async def warm_niche(niche: str) -> dict:
     new = seen = 0
     session = _session()
     try:
+        snapshots = 0
         for p in products or []:
             try:
                 result = upsert_product(session, p, niche)
                 new += result == "new"
                 seen += result == "seen"
+                # #56 Phase 1 (the moat): also write today's time-series row.
+                snapshot_timeseries(session, p, niche)
+                snapshots += 1
             except Exception as e:
                 logger.warning(f"[{niche}] skip one product: {e}")
                 session.rollback()
@@ -139,8 +238,14 @@ async def warm_niche(niche: str) -> dict:
     finally:
         session.close()
 
-    logger.info(f"[{niche}] discovered={len(products or [])} new={new} refreshed={seen}")
-    return {"niche": niche, "discovered": len(products or []), "new": new, "seen": seen}
+    logger.info(
+        f"[{niche}] discovered={len(products or [])} new={new} refreshed={seen} "
+        f"snapshots={snapshots}"
+    )
+    return {
+        "niche": niche, "discovered": len(products or []),
+        "new": new, "seen": seen, "snapshots": snapshots,
+    }
 
 
 async def run() -> dict:
@@ -153,11 +258,15 @@ async def run() -> dict:
     total_new = sum(r.get("new", 0) for r in results)
     total_seen = sum(r.get("seen", 0) for r in results)
     total_disc = sum(r.get("discovered", 0) for r in results)
+    total_snap = sum(r.get("snapshots", 0) for r in results)
     logger.info(
         f"Catalog warm complete: {total_disc} discovered across {len(niches)} niches "
-        f"({total_new} new, {total_seen} refreshed)."
+        f"({total_new} new, {total_seen} refreshed, {total_snap} daily snapshots)."
     )
-    return {"niches": len(niches), "discovered": total_disc, "new": total_new, "seen": total_seen, "by_niche": results}
+    return {
+        "niches": len(niches), "discovered": total_disc, "new": total_new,
+        "seen": total_seen, "snapshots": total_snap, "by_niche": results,
+    }
 
 
 def main() -> None:

@@ -12,13 +12,16 @@ from sqlalchemy.orm import sessionmaker
 
 from ospra_os.database.base import Base
 from ospra_os.database.discovered_catalog import DiscoveredProduct
+from ospra_os.database.product_timeseries import ProductTimeseries
 from ospra_os.tasks import catalog_warm as cw
 
 
 @pytest.fixture()
 def session():
     eng = create_engine("sqlite://")
-    Base.metadata.create_all(eng, tables=[DiscoveredProduct.__table__])
+    Base.metadata.create_all(
+        eng, tables=[DiscoveredProduct.__table__, ProductTimeseries.__table__]
+    )
     yield sessionmaker(bind=eng)()
 
 
@@ -84,3 +87,59 @@ def test_score_filter_excludes_avoid_grade(session):
 def test_product_key_stable_and_title_sensitive():
     assert cw._product_key(PLUG) == cw._product_key(dict(PLUG))
     assert cw._product_key(PLUG) != cw._product_key(SINK)
+
+
+# ---------------------------------------------------------------------------
+# product_timeseries — the moat (#56 Phase 1)
+# ---------------------------------------------------------------------------
+
+FULL_SIGNAL = {
+    "title": "Smart Doorbell Camera", "image_url": "http://img/9.jpg",
+    "source": "cj_dropshipping", "tier": "GOOD", "final_score": 70.0,
+    "saturation_score": 0.30, "sentiment_score": 64, "velocity_phase": "growth",
+    "meta_niche_advertiser_count": 8,
+    "sales_count": 1200,
+    "google_trend_score": 55,
+    "data_sources": {"tiktok_shop": {"units_sold_7d": 340, "velocity": 22.5}},
+}
+
+
+def test_snapshot_extracts_named_signals(session):
+    assert cw.snapshot_timeseries(session, FULL_SIGNAL, "smart_home") == "inserted"
+    session.commit()
+    row = session.query(ProductTimeseries).one()
+    assert row.meta_advertiser_count == 8
+    assert row.aliexpress_orders == 1200
+    assert row.google_trends_interest == 55.0
+    assert row.tiktok_units_sold == 340
+    assert row.tiktok_velocity == 22.5
+    assert row.signal_count == 5            # all 5 raw signals fresh
+    assert row.grade == "GOOD" and row.velocity_phase == "growth"
+
+
+def test_snapshot_missing_signals_are_null_not_zero(session):
+    # PLUG has none of the raw signals → they must be NULL (confidence gate),
+    # never fabricated zeros.
+    cw.snapshot_timeseries(session, PLUG, "smart_home")
+    session.commit()
+    row = session.query(ProductTimeseries).one()
+    assert row.meta_advertiser_count is None
+    assert row.aliexpress_orders is None
+    assert row.google_trends_interest is None
+    assert row.signal_count == 0           # thin day → low confidence, not bad product
+
+
+def test_snapshot_one_row_per_product_per_day(session):
+    # Same product, same day, run twice → UPDATE not duplicate.
+    assert cw.snapshot_timeseries(session, FULL_SIGNAL, "smart_home") == "inserted"
+    session.commit()
+    assert cw.snapshot_timeseries(session, FULL_SIGNAL, "smart_home") == "updated"
+    session.commit()
+    assert session.query(ProductTimeseries).count() == 1
+
+
+def test_snapshot_distinct_products_distinct_rows(session):
+    cw.snapshot_timeseries(session, FULL_SIGNAL, "smart_home")
+    cw.snapshot_timeseries(session, PLUG, "smart_home")
+    session.commit()
+    assert session.query(ProductTimeseries).count() == 2
