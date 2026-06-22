@@ -7,6 +7,32 @@ Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent
 
 ---
 
+## #57 — Discovery architecture overhaul (2026-06-22, IN PROGRESS — audit-first, phased)
+
+Goal: move discovery from fragile live per-request multi-source scraping to batch-ingest + scheduled-enrichment + DB-read, graded anti-saturation-first to surface EARLY, uncrowded products. Owner-directed, phased, reversible.
+
+**Phase 0 audit — DONE.** 5 parallel read-only explorers (routes / scorers / sentiment / DB+jobs / cross-cutting) + independent verification of every delete-critical claim. Headline: this is a *layering* problem — multiple overlapping impls of each concept (2 scorers, 4 saturation calcs, 3 velocity impls, 2 snapshot tables, 2 discovery routers), most half-wired. The healthy spine already exists: `catalog_warm` cron → `discovered_catalog` → `/api/discovery/catalog`. Verification corrected several over-confident agent claims: `ranking_engine` IS live (main.py + rankings_routes + daily_ranking_job) and reads the dead ORM tables; `product_history.py` is a 2nd `product_snapshots` impl wired into main.py (raw sqlite → ephemeral/broken on Render); `grade_reasoning.py` has a 3rd saturation calc; `twitter.py`/`meta.py` are import-coupled to `/research/*` (NOT zero-blast).
+
+**Owner-approved retire list (zero-blast; tables HELD pending ranking decision):** opportunity_scorer.py, saturation_scorer.py, /research/* legacy router (keep /research/sources), dead /api/discovery aliases (products/live-products/multi-niche), stub Celery tasks, empty twitter.py/meta.py, move /test-* /cache/* /sources-health behind admin auth. Do NOT drop dead tables (product_intelligence, ProductSnapshot) yet.
+
+**Shipped this session:**
+- **#6 honest X/Grok sentiment** (commit 8c918a4): paraphrase (no citations) → 0 confidence; live-cited weighted by real engagement. Variance guard PASS, 19 tests green. (Aligned with Phase 1 demote-X goal.)
+- **OAuth env-var fix** (d456ab9): AliExpress + affiliate redirect URIs no longer hardcode the dead oubon-mailbot host (would've broken the callback the moment AE keys are added). Now env-driven, default to the API host; added to render.yaml. Gates Phase 2.
+- **Retire orphaned scorers** (0b59acc): deleted opportunity_scorer.py + saturation_scorer.py (zero live callers) + obsolete TestOpportunityScorerWiring. App boots; 54 tests green.
+- **Phase 1 moat clock STARTED** (5f25cc5): new `product_timeseries` table (1 row/product/day; meta_advertiser_count, aliexpress_orders, google_trends_interest, tiktok_units_sold, tiktok_velocity + grade-of-day; NULLs not fabricated zeros; signal_count confidence gate). `catalog_warm` writes a daily snapshot per product. 10 catalog tests green.
+
+**Decision resolved — ranking subsystem:** frontend calls ZERO `/api/rankings` paths (verified). Per owner rule → retire wholesale (ranking_engine + rankings_routes + daily_ranking_job), which frees the dead tables. NUANCE found: `/api/rankings/*` is registered TWICE — rankings_routes (→ranking_engine→dead ORM tables, wins by order) AND a duplicate block in main.py:4441-4772 (→ProductHistoryDB raw sqlite, shadowed). Both unused by frontend. Retire is queued as its own carefully-verified commit (≈400 lines across main.py two surfaces + 3 files) — NOT yet executed.
+
+**Remaining (queued, in order):**
+1. Ranking retire (the dual-surface surgery above) → then drop the freed dead tables (product_intelligence, ProductSnapshot, product_saturation, product_velocity) via migration.
+2. Rest of retire batch: /research/* (+ repoint frontend fallback + remove twitter.py/meta.py), dead /api/discovery aliases, stub Celery tasks, admin-gate /test-* /cache/* /sources-health.
+3. Phase 1 cont.: velocity-based saturation as a first-class grade term (advertiser-density + weekly slope; reward 5–15 advertisers + rising demand); TikTok-Shop sales-velocity as primary TikTok input; consolidate to ONE velocity + ONE saturation impl. Variance-test, don't loosen.
+4. /api/discovery/quick → read discovered_catalog first (DB-read), live only as fallback.
+5. Phase 2: AliExpress catalog ingest (blocked on owner AE keys); lifecycle-stage classifier (Emergence/Growth/Maturity/Decline/Pump-fad via trend_trajectory.py); confidence gate.
+6. Phase 3: per-source enrichment crons (read/write product_timeseries); outcome scoreboard.
+7. Cross-cutting: tier/drop paid actors (keep Meta Ad Library; pytrends + free Amazon RSS); mock all external services in CI so builds stop going red on live-API hiccups.
+8. **Fast-follow after Phase 1 (owner ask): scope a real Shopify store-count source** (replace the fabricated/empty saturation "user count" with real competitor-store signal).
+
 ## In progress
 
 - [x] **#40 — Security: scrub leaked Shopify token + gitleaks pre-commit** (2026-06 session, DONE). A real `shpat_…` Admin token was committed in `docs/DEPLOYMENT_ENV_SETUP.md:115` and `scripts/smoke/multi_store_system.py:80`. Both replaced (docs → placeholder, smoke script → `os.getenv`). Added `gitleaks` hook to `.pre-commit-config.yaml` so secrets can't be committed again. ⚠ OWNER ACTION: rotate the token in Shopify admin — it lives in git history on GitHub.
