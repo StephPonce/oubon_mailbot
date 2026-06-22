@@ -335,53 +335,7 @@ async def test_get_interest_falls_back_to_description_match(configured_connector
     assert results[0].total_repins == 500
 
 
-# ---------------------------------------------------------------------------
-# OpportunityScorer integration (the 0.15 weight)
-# ---------------------------------------------------------------------------
-
-class TestOpportunityScorerWiring:
-    def test_pinterest_in_trend_source_weights(self):
-        from ospra_os.intelligence.opportunity_scorer import OpportunityScorer
-        assert "pinterest" in OpportunityScorer.TREND_SOURCE_WEIGHTS
-        assert OpportunityScorer.TREND_SOURCE_WEIGHTS["pinterest"] == 0.15
-
-    def test_demand_signal_enum_includes_pinterest(self):
-        from ospra_os.intelligence.opportunity_scorer import DemandSignal
-        assert DemandSignal.PINTEREST_TREND.value == "pinterest_trend"
-        assert DemandSignal.PINTEREST_SAVES.value == "pinterest_saves"
-
-    def test_demand_metrics_has_pinterest_fields(self):
-        from ospra_os.intelligence.opportunity_scorer import DemandMetrics
-        m = DemandMetrics()
-        # New fields exist with defaults of 0
-        assert m.pinterest_trend_score == 0.0
-        assert m.pinterest_velocity == 0.0
-        assert m.pinterest_saves == 0
-        assert m.pinterest_repins == 0
-
-    def test_pinterest_velocity_contributes_to_velocity_score(self):
-        from ospra_os.intelligence.opportunity_scorer import (
-            DemandMetrics,
-            OpportunityScorer,
-        )
-        scorer = OpportunityScorer()
-        # Only Pinterest signal present (other sources absent)
-        m = DemandMetrics()
-        m.pinterest_trend_score = 80.0
-        m.pinterest_velocity = 20.0  # +20% growth
-        score = scorer._calc_velocity_score(m)
-        # With only Pinterest signal: pin_velocity = 50 + 20 = 70
-        # weighted average with single weight returns that value
-        assert score == 70.0
-
-    def test_pinterest_volume_contributes_to_volume_score(self):
-        from ospra_os.intelligence.opportunity_scorer import (
-            DemandMetrics,
-            OpportunityScorer,
-        )
-        scorer = OpportunityScorer()
-        m = DemandMetrics()
-        m.pinterest_trend_score = 75.0
-        score = scorer._calc_volume_score(m)
-        # Single source → returns that source's score directly
-        assert score == 75.0
+# NOTE: TestOpportunityScorerWiring removed alongside the retirement of the
+# orphaned opportunity_scorer.py (Phase 0 audit — zero live callers). The
+# Pinterest signal lives on in the live inline scorer (_calculate_scores);
+# its wiring is covered there, not in the dead scorer.
