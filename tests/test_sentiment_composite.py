@@ -25,6 +25,7 @@ from ospra_os.intelligence.sentiment_composite import (
     score_from_twitter_polarity,
     tiktok_weight,
     twitter_weight,
+    twitter_weight_v2,
 )
 
 
@@ -58,6 +59,35 @@ def test_reddit_weight_one_post_low():
 def test_twitter_weight_volume_ladder():
     assert twitter_weight(0) == 0
     assert 0 < twitter_weight(1) < twitter_weight(50) < twitter_weight(1000) <= 1.0
+
+
+def test_twitter_weight_v2_paraphrase_contributes_zero():
+    # #6 Option A: Grok paraphrase (no real citations) is NOT proof — it must
+    # contribute ZERO confidence regardless of claimed tweet count / engagement.
+    assert twitter_weight_v2(50, 9999, has_citations=False) == 0.0
+    assert twitter_weight_v2(0, 0, has_citations=False) == 0.0
+    assert twitter_weight_v2(1000, 100000, has_citations=False) == 0.0
+
+
+def test_twitter_weight_v2_citations_weighted_by_real_engagement():
+    # With real citations, weight is driven by real engagement (log-scaled
+    # likes+RT+replies) blended with volume. A handful of low-engagement posts
+    # barely registers; a high-engagement cluster carries real weight.
+    low = twitter_weight_v2(3, 0, has_citations=True)
+    mid = twitter_weight_v2(50, 1000, has_citations=True)
+    high = twitter_weight_v2(200, 10000, has_citations=True)
+    assert low < 0.15, "citations but ~0 engagement should be near-zero"
+    assert 0.4 < mid < 0.8, "1k engagement = moderate weight"
+    assert high > 0.85, "10k+ engagement = strong weight"
+    assert low < mid < high <= 1.0
+
+
+def test_twitter_weight_v2_engagement_dominates_volume():
+    # Engagement is the real proof; raw volume only supports it. High volume but
+    # zero engagement must stay below modest volume WITH real engagement.
+    volume_no_engagement = twitter_weight_v2(1000, 0, has_citations=True)
+    modest_with_engagement = twitter_weight_v2(20, 5000, has_citations=True)
+    assert modest_with_engagement > volume_no_engagement
 
 
 def test_tiktok_weight_combines_comments_and_views():

@@ -86,6 +86,30 @@ def twitter_weight(tweet_count: int) -> float:
     return min(1.0, math.log10(1 + tweet_count) / 3.0)
 
 
+def twitter_weight_v2(tweet_count: int, total_engagement: int = 0,
+                      has_citations: bool = False) -> float:
+    """Honest Twitter/X confidence (#6, Option A).
+
+    Grok output WITHOUT real citations is paraphrase/recollection from training
+    data — not market proof — so it contributes ZERO confidence. Only live
+    x_search results with real citations are trusted, and even then the weight
+    is driven by REAL engagement (log-scaled likes+retweets+replies) blended
+    with tweet volume, so a handful of low-engagement posts barely register
+    while a high-engagement cluster carries real weight.
+
+        no citations               → 0.00  (paraphrase is not proof)
+        citations, ~0 engagement   → ~0.00-0.10
+        citations, ~1k engagement  → ~0.55
+        citations, 10k+ engagement → ~0.90-1.0
+    """
+    if not has_citations:
+        return 0.0
+    vol = min(1.0, math.log10(1 + max(0, tweet_count)) / 3.0)        # ~1.0 at 1k tweets
+    eng = min(1.0, math.log10(1 + max(0, total_engagement)) / 4.0)   # ~1.0 at 10k engagement
+    # Engagement is the real proof; volume only supports it.
+    return max(0.0, min(1.0, 0.35 * vol + 0.65 * eng))
+
+
 def reddit_weight(mention_count: int) -> float:
     """Reddit: log-saturated to 1.0 at ~100 posts.
        1 post → 0.15, 5 → 0.39, 20 → 0.66, 100+ → 1.0."""

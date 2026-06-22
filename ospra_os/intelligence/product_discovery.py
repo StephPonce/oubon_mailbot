@@ -3867,6 +3867,19 @@ class ProductDiscoveryEngine:
                 'sentiment_score': raw_score,
                 'buzz': sentiment.get('buzz_level'),
                 'tweet_count': sentiment.get('tweet_count', 0),
+                # #6: real-proof signals for the honest sentiment weight.
+                # has_citations=True only when live x_search returned verifiable
+                # posts; paraphrase has none and must contribute ≈0 confidence.
+                'has_citations': bool(sentiment.get('citations')),
+                'source_type': (
+                    'grok_live_search' if (sentiment.get('citations') or [])
+                    else 'grok_paraphrase'
+                ),
+                'total_engagement': int(
+                    (engagement.get('total_likes', 0) or 0)
+                    + (engagement.get('total_retweets', 0) or 0)
+                    + (engagement.get('total_replies', 0) or 0)
+                ),
             }
 
         return products
@@ -5819,7 +5832,7 @@ class ProductDiscoveryEngine:
                 compose as _compose_sentiment,
                 SentimentInput,
                 amazon_weight as _amazon_w,
-                twitter_weight as _twitter_w,
+                twitter_weight_v2 as _twitter_w_v2,
                 reddit_weight as _reddit_w,
                 tiktok_weight as _tiktok_w,
                 aliexpress_buyer_weight as _ae_buyer_w,
@@ -5849,16 +5862,26 @@ class ProductDiscoveryEngine:
                     weight=_amazon_w(int(amazon_review_count_raw)),
                 ))
 
-            # Twitter — Grok polarity, weighted by tweet count.
-            twitter_tweet_count = (
-                (data_sources.get('x_twitter') or {}).get('tweet_count', 0) or 0
-            )
+            # Twitter — Grok polarity. #6 (Option A): paraphrase/no-citation Grok
+            # is NOT proof → weight 0 (skipped). Only live x_search with real
+            # citations counts, weighted by REAL engagement (log-scaled
+            # likes+RT+replies) blended with tweet volume. This down-weights
+            # weak chatter to ≈0 so Amazon-review-count / Reddit-upvote /
+            # real-TikTok-engagement become the actual market proof.
+            _x_ds = data_sources.get('x_twitter') or {}
+            twitter_tweet_count = _x_ds.get('tweet_count', 0) or 0
+            twitter_has_citations = bool(_x_ds.get('has_citations'))
+            twitter_engagement = int(_x_ds.get('total_engagement', 0) or 0)
             if twitter_found_real and twitter_sentiment_raw is not None:
-                sentiment_inputs.append(SentimentInput(
-                    name='twitter',
-                    score=_twitter_s(twitter_sentiment_raw),
-                    weight=_twitter_w(int(twitter_tweet_count)),
-                ))
+                _tw_weight = _twitter_w_v2(
+                    int(twitter_tweet_count), twitter_engagement, twitter_has_citations
+                )
+                if _tw_weight > 0.0:  # paraphrase-only (weight 0) contributes nothing
+                    sentiment_inputs.append(SentimentInput(
+                        name='twitter',
+                        score=_twitter_s(twitter_sentiment_raw),
+                        weight=_tw_weight,
+                    ))
 
             # Reddit — mention count drives both score and weight.
             if reddit_mentions > 0:
