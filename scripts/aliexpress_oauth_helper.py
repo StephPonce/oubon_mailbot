@@ -21,8 +21,12 @@ AUTHORIZE_URL = "https://api-sg.aliexpress.com/oauth/authorize"
 TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
 
 # Your callback URL (this needs to match what's registered in your AliExpress app)
-# Use production HTTPS URL since AliExpress requires HTTPS
-REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
+# Use production HTTPS URL since AliExpress requires HTTPS. Env-driven; default
+# to the current API host (was the dead oubon-mailbot domain).
+REDIRECT_URI = os.getenv(
+    "ALIEXPRESS_REDIRECT_URI",
+    "https://ospra-intelligence-api.onrender.com/api/aliexpress/callback",
+)
 
 
 def step1_get_authorization_url():

@@ -24,7 +24,13 @@ ALIEXPRESS_APP_SECRET = os.getenv("ALIEXPRESS_APP_SECRET", "")
 #   - https://api-sg.aliexpress.com/rest/auth/token/create → "IncompleteSignature" error
 # Waiting for clarification from AliExpress support on correct endpoint
 ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
-ALIEXPRESS_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress/callback"
+# Redirect URI must point at the API host (this is a backend callback route).
+# Env-driven so it's never pinned to a stale domain again (was the dead
+# oubon-mailbot host, which broke the OAuth callback). Default = current API.
+ALIEXPRESS_REDIRECT_URI = os.getenv(
+    "ALIEXPRESS_REDIRECT_URI",
+    "https://ospra-intelligence-api.onrender.com/api/aliexpress/callback",
+)
 
 # Token storage path
 TOKENS_FILE = Path(".secrets/aliexpress_tokens.json")

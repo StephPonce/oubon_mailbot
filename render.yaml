@@ -63,6 +63,12 @@ services:
         sync: false
       - key: ALIEXPRESS_ACCESS_TOKEN
         sync: false
+      # OAuth callback redirect URIs — must point at THIS API host. Defaults in
+      # code already use the API host; override here if the host ever changes.
+      - key: ALIEXPRESS_REDIRECT_URI
+        value: "https://ospra-intelligence-api.onrender.com/api/aliexpress/callback"
+      - key: ALIEXPRESS_AFFILIATE_REDIRECT_URI
+        value: "https://ospra-intelligence-api.onrender.com/api/aliexpress-affiliate/callback"
 
       # Other API Keys
       - key: CJ_ACCESS_TOKEN

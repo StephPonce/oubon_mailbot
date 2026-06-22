@@ -24,7 +24,12 @@ ALIEXPRESS_AFFILIATE_APP_SECRET = os.getenv("ALIEXPRESS_AFFILIATE_APP_SECRET", "
 #   - https://api-sg.aliexpress.com/rest/auth/token/create → "IncompleteSignature" error
 # Waiting for clarification from AliExpress support on correct endpoint
 ALIEXPRESS_TOKEN_URL = "https://api-sg.aliexpress.com/rest/auth/token/create"
-ALIEXPRESS_AFFILIATE_REDIRECT_URI = "https://oubon-mailbot.onrender.com/api/aliexpress-affiliate/callback"
+# Backend callback route — env-driven, default to the current API host (was the
+# dead oubon-mailbot host, which broke the affiliate OAuth callback).
+ALIEXPRESS_AFFILIATE_REDIRECT_URI = os.getenv(
+    "ALIEXPRESS_AFFILIATE_REDIRECT_URI",
+    "https://ospra-intelligence-api.onrender.com/api/aliexpress-affiliate/callback",
+)
 
 # Token storage path
 TOKENS_FILE = Path(".secrets/aliexpress_affiliate_tokens.json")
