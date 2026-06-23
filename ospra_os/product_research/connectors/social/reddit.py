@@ -1,4 +1,7 @@
-"""Reddit connector for community-driven product discovery."""
+"""SECONDARY / OFF BY DEFAULT (#57) — weak corroboration only (lagging indicator).
+Disabled unless DISCOVERY_DISABLE_REDDIT=false.
+
+Reddit connector for community-driven product discovery."""
 
 from typing import List, Optional
 import asyncio

@@ -842,11 +842,17 @@ class ProductDiscoveryEngine:
     
     def _init_sentiment_sources(self):
         """Initialize SENTIMENT sources (social validation)"""
-        # X/Twitter via xAI
+        # X/Twitter via xAI — SECONDARY / OFF BY DEFAULT (weak corroboration
+        # only, #57). Grok sentiment is paraphrase-prone (see #6), so it's
+        # disabled unless DISCOVERY_DISABLE_X is explicitly false/0/no. Off = it
+        # costs nothing and can't affect grades; the flag keeps it re-enableable.
         self.xai_twitter = None
         self.xai_available = False
+        _x_enabled = os.getenv("DISCOVERY_DISABLE_X", "").strip().lower() in {"0", "false", "no"}
         xai_key = os.getenv('XAI_API_KEY')
-        if xai_key:
+        if not _x_enabled:
+            self.sources_status['x_twitter'] = '[DISABLED] off by default (set DISCOVERY_DISABLE_X=false to enable)'
+        elif xai_key:
             try:
                 from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
                 self.xai_twitter = XAITwitterDiscovery(api_key=xai_key)
@@ -857,24 +863,16 @@ class ProductDiscoveryEngine:
         else:
             self.sources_status['x_twitter'] = '[ERROR] No XAI_API_KEY'
         
-        # Reddit — RE-ENABLED 2026-06-03. The May-2026 deprecation was
-        # premature: the dashboard was reporting "Est." on every product
-        # because no FREE sentiment source was firing reliably. Reddit's
-        # public JSON API is genuinely free (no auth, no rentals, no Apify
-        # actor cost) and the connector below already produces honest
-        # sentiment evidence — turning it back on is the fastest way to put
-        # a real (not estimated) sentiment number on more products.
-        #
-        # If a future architectural review wants Reddit back off, set
-        # ``DISCOVERY_DISABLE_REDDIT=1``. The qualitative case for the May
-        # pivot (Reddit is a LAGGING indicator) still holds for early-winner
-        # surfacing — but Meta Ad Library + TikTok Shop are mostly paid
-        # right now, so Reddit is the only free-and-running sentiment
-        # source until those come back on rentals.
+        # Reddit — SECONDARY / OFF BY DEFAULT (weak corroboration only, #57).
+        # Reddit is a LAGGING indicator (poor for EARLY-winner surfacing, which
+        # is the whole point of the overhaul), so it's disabled unless
+        # DISCOVERY_DISABLE_REDDIT is explicitly false/0/no. Off = costs nothing
+        # and can't affect grades; the flag keeps it re-enableable.
         self.reddit = None
         self.reddit_available = False
-        if os.getenv("DISCOVERY_DISABLE_REDDIT", "").strip() in {"1", "true", "yes"}:
-            self.sources_status['reddit'] = '[DISABLED] DISCOVERY_DISABLE_REDDIT set'
+        _reddit_enabled = os.getenv("DISCOVERY_DISABLE_REDDIT", "").strip().lower() in {"0", "false", "no"}
+        if not _reddit_enabled:
+            self.sources_status['reddit'] = '[DISABLED] off by default (set DISCOVERY_DISABLE_REDDIT=false to enable)'
         else:
             try:
                 from ospra_os.product_research.connectors.social.reddit import RedditConnector

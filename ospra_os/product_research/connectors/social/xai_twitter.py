@@ -1,4 +1,7 @@
 """
+SECONDARY / OFF BY DEFAULT (#57) — weak corroboration only. Disabled unless
+DISCOVERY_DISABLE_X=false; Grok sentiment is paraphrase-prone (see #6).
+
 xAI Grok-powered Twitter/X Product Discovery
 
 WHY xAI?
