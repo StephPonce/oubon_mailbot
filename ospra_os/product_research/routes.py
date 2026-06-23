@@ -1,15 +1,16 @@
-"""Product Research API routes."""
+"""Product Research API routes.
 
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import List, Optional
+#57: legacy /research/* discovery endpoints retired (find-products, trending,
+discover, validate, reddit/trending, twitter-viral, test-aliexpress) — they were
+old discovery-v1 paths superseded by /api/discovery/*. Only the lightweight
+/research/sources status endpoint is kept (a cheap connector-availability probe).
+"""
+
+from fastapi import APIRouter, Depends
+
 from ospra_os.core.settings import Settings, get_settings
 
-from .scorer import ProductScorer
-from .pipeline import ProductDiscoveryPipeline
 from .connectors.trends.google_trends import GoogleTrendsConnector
-from .connectors.social.meta import MetaConnector
-from .connectors.social.twitter import TwitterConnector
 from .connectors.social.reddit import RedditConnector
 from .connectors.suppliers.aliexpress import AliExpressConnector
 from .connectors.suppliers.dhgate import DHgateConnector
@@ -18,284 +19,34 @@ from .connectors.suppliers.cjdropshipping import CJDropshippingConnector
 router = APIRouter(prefix="/research", tags=["Product Research"])
 
 
-class FindProductsRequest(BaseModel):
-    """Request for finding product candidates."""
-
-    query: Optional[str] = None  # Search term or category
-    category: Optional[str] = None
-    max_results: int = 10
-    sources: List[str] = ["google_trends"]  # Which connectors to use
-    min_score: float = 5.0  # Minimum score to return
-
-
-class ProductResponse(BaseModel):
-    """Product candidate response."""
-
-    name: str
-    score: float
-    recommendation: str
-    source: str
-    details: dict
-
-
-@router.post("/find-products", response_model=List[ProductResponse])
-async def find_products(request: FindProductsRequest, settings: Settings = Depends(get_settings)):
-    """
-    Find and rank product candidates.
-
-    Sources available:
-    - google_trends: Google Trends (no API key needed) - TREND DATA ONLY
-    - meta: Facebook/Instagram (requires META_ACCESS_TOKEN)
-    - twitter: Twitter/X (requires X_API_KEY)
-    - aliexpress: AliExpress (requires ALIEXPRESS_API_KEY)
-    - dhgate: DHgate (requires DHGATE_API_KEY)
-    - cjdropshipping: CJ Dropshipping (requires CJDROPSHIPPING_TOKEN)
-
-    NOTE: For mass discovery, use UnifiedProductDiscoveryV2 directly (Apify + AliExpress)
-
-    Example:
-        {
-            "query": "home decor",
-            "category": "home_and_garden",
-            "max_results": 10,
-            "sources": ["google_trends", "aliexpress"],
-            "min_score": 6.0
-        }
-    """
-    # Initialize connectors based on requested sources
-    connectors = []
-
-    if "google_trends" in request.sources:
-        connectors.append(GoogleTrendsConnector())
-
-    if "meta" in request.sources:
-        meta_token = getattr(settings, "META_ACCESS_TOKEN", None)
-        connectors.append(MetaConnector(api_key=meta_token))
-
-    if "twitter" in request.sources:
-        twitter_key = getattr(settings, "X_API_KEY", None)
-        connectors.append(TwitterConnector(api_key=twitter_key))
-
-    # Reddit removed per user request (2025-12-07)
-    # if "reddit" in request.sources:
-    #     reddit_id = getattr(settings, "REDDIT_CLIENT_ID", None)
-    #     reddit_secret = getattr(settings, "REDDIT_SECRET", None)
-    #     connectors.append(RedditConnector(client_id=reddit_id, client_secret=reddit_secret))
-
-    if "aliexpress" in request.sources:
-        ali_key = getattr(settings, "ALIEXPRESS_API_KEY", None)
-        ali_secret = getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-        connectors.append(AliExpressConnector(api_key=ali_key, app_secret=ali_secret))
-
-    if "dhgate" in request.sources:
-        dh_key = getattr(settings, "DHGATE_API_KEY", None)
-        connectors.append(DHgateConnector(api_key=dh_key))
-
-    if "cjdropshipping" in request.sources:
-        cj_token = getattr(settings, "CJDROPSHIPPING_TOKEN", None)
-        connectors.append(CJDropshippingConnector(api_key=cj_token))
-
-    if not connectors:
-        raise HTTPException(status_code=400, detail="No valid sources specified")
-
-    # Collect candidates from all connectors
-    all_candidates = []
-
-    for connector in connectors:
-        if not connector.is_available():
-            print(f"[WARNING]  {connector.name} not available (missing API key)")
-            continue
-
-        try:
-            if request.query:
-                # Search for specific query
-                candidates = await connector.search(request.query, category=request.category)
-            else:
-                # Get trending products
-                candidates = await connector.get_trending(category=request.category, limit=request.max_results)
-
-            all_candidates.extend(candidates)
-            print(f"[SUCCESS] {connector.name}: Found {len(candidates)} candidates")
-
-        except Exception as e:
-            print(f"[ERROR] {connector.name} error: {e}")
-            continue
-
-    if not all_candidates:
-        return []
-
-    # Score and rank candidates
-    scorer = ProductScorer()
-    ranked = scorer.rank(all_candidates, limit=request.max_results)
-
-    # Filter by minimum score
-    filtered = [r for r in ranked if r["score"] >= request.min_score]
-
-    # Convert to response format
-    return [
-        ProductResponse(
-            name=r["product"]["name"],
-            score=r["score"],
-            recommendation=r["recommendation"],
-            source=r["product"]["source"],
-            details=r["product"],
-        )
-        for r in filtered
-    ]
-
-
-@router.get("/trending")
-async def get_trending_products(
-    category: Optional[str] = None,
-    source: str = "google_trends",
-    limit: int = 10,
-    settings: Settings = Depends(get_settings),
-):
-    """
-    Get trending products from a specific source.
-
-    Args:
-        category: Product category filter
-        source: Data source (google_trends, meta, twitter, reddit, aliexpress, etc.)
-        limit: Max results
-
-    Returns:
-        List of trending products with scores
-    """
-    # Initialize the requested connector
-    connector = None
-
-    if source == "google_trends":
-        connector = GoogleTrendsConnector()
-    elif source == "meta":
-        connector = MetaConnector(api_key=getattr(settings, "META_ACCESS_TOKEN", None))
-    elif source == "twitter":
-        connector = TwitterConnector(api_key=getattr(settings, "X_API_KEY", None))
-    elif source == "reddit":
-        connector = RedditConnector(
-            client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-            client_secret=getattr(settings, "REDDIT_SECRET", None)
-        )
-    elif source == "aliexpress":
-        connector = AliExpressConnector(
-            api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
-            app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-        )
-    elif source == "dhgate":
-        connector = DHgateConnector(api_key=getattr(settings, "DHGATE_API_KEY", None))
-    elif source == "cjdropshipping":
-        connector = CJDropshippingConnector(api_key=getattr(settings, "CJDROPSHIPPING_TOKEN", None))
-    else:
-        raise HTTPException(status_code=400, detail=f"Unknown source: {source}")
-
-    if not connector.is_available():
-        raise HTTPException(status_code=400, detail=f"{connector.name} API key not configured")
-
-    # Get trending products
-    candidates = await connector.get_trending(category=category, limit=limit)
-
-    # Score them
-    scorer = ProductScorer()
-    ranked = scorer.rank(candidates, limit=limit)
-
-    return ranked
-
-
-@router.get("/test-aliexpress")
-async def test_aliexpress(settings: Settings = Depends(get_settings)):
-    """
-    Test AliExpress API directly and return raw response.
-
-    This is for debugging only.
-    """
-    from .connectors.suppliers.aliexpress import AliExpressConnector
-    import asyncio
-    import time
-    import hmac
-    import hashlib
-    import requests
-
-    api_key = getattr(settings, "ALIEXPRESS_API_KEY", None)
-    app_secret = getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-
-    if not api_key or not app_secret:
-        return {"error": "AliExpress credentials not configured"}
-
-    # Build test request
-    params = {
-        "app_key": api_key,
-        "method": "aliexpress.affiliate.product.query",
-        "timestamp": str(int(time.time() * 1000)),
-        "format": "json",
-        "v": "2.0",
-        "sign_method": "sha256",
-        "keywords": "phone case",
-        "target_currency": "USD",
-        "target_language": "EN",
-        "page_size": "5",
-    }
-
-    # Generate signature
-    sorted_params = sorted(params.items())
-    sign_string = "".join([f"{k}{v}" for k, v in sorted_params])
-    signature = hmac.new(
-        app_secret.encode('utf-8'),
-        sign_string.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest().upper()
-
-    params["sign"] = signature
-
-    # Make request — sync requests.get would block the asyncio event loop
-    # for the duration of the AE roundtrip. Offload to a worker thread.
-    # Task #30.
-    try:
-        response = await asyncio.to_thread(
-            requests.get,
-            "https://api-sg.aliexpress.com/sync",
-            params=params,
-            timeout=10,
-        )
-
-        return {
-            "status_code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text,
-            "request_url": response.url[:100] + "..."  # Truncate for safety
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-
 @router.get("/sources")
 async def list_sources(settings: Settings = Depends(get_settings)):
-    """
-    List all available data sources and their status.
+    """List available data sources and their configured/available status.
 
-    Returns which connectors are configured and ready to use.
+    Note: the X/Twitter and Meta connectors were retired from this probe (#57) —
+    X is now an opt-in, off-by-default sentiment source (DISCOVERY_DISABLE_X) and
+    Meta's organic Graph API is sunset; Meta signal comes from the Ad Library
+    actor in the main discovery pipeline, not from this status endpoint.
     """
-    sources = []
-
-    # Check each connector
     connectors_to_check = [
         ("google_trends", GoogleTrendsConnector(), None),
-        ("meta", MetaConnector(api_key=getattr(settings, "META_ACCESS_TOKEN", None)), "META_ACCESS_TOKEN"),
-        ("twitter", TwitterConnector(api_key=getattr(settings, "X_API_KEY", None)), "X_API_KEY"),
         ("reddit", RedditConnector(
             client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-            client_secret=getattr(settings, "REDDIT_SECRET", None)
+            client_secret=getattr(settings, "REDDIT_SECRET", None),
         ), "REDDIT_CLIENT_ID"),
         ("aliexpress", AliExpressConnector(
             api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
-            app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
+            app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None),
         ), "ALIEXPRESS_API_KEY"),
         ("dhgate", DHgateConnector(api_key=getattr(settings, "DHGATE_API_KEY", None)), "DHGATE_API_KEY"),
         ("cjdropshipping", CJDropshippingConnector(api_key=getattr(settings, "CJDROPSHIPPING_TOKEN", None)), "CJDROPSHIPPING_TOKEN"),
     ]
 
+    sources = []
     for source_id, connector, env_var in connectors_to_check:
         sources.append({
             "id": source_id,
-            "name": connector.name,
+            "name": getattr(connector, "name", source_id),
             "available": connector.is_available(),
             "env_var": env_var,
         })
@@ -305,199 +56,3 @@ async def list_sources(settings: Settings = Depends(get_settings)):
         "configured_count": sum(1 for s in sources if s["available"]),
         "total_count": len(sources),
     }
-
-
-# ========================================================================
-# NEW: Product Discovery Pipeline Routes
-# ========================================================================
-
-class DiscoverRequest(BaseModel):
-    """Request for full product discovery pipeline."""
-    niche: str
-    max_results: int = 10
-    min_score: float = 5.0
-    include_reddit: bool = True
-    include_aliexpress: bool = True
-    include_trends: bool = True
-
-
-class ValidateRequest(BaseModel):
-    """Request to validate a product idea."""
-    product_name: str
-
-
-@router.post("/discover")
-async def discover_products(request: DiscoverRequest, settings: Settings = Depends(get_settings)):
-    """
-    Run full product discovery pipeline.
-
-    Combines Reddit, Google Trends, and AliExpress to find and validate
-    product opportunities in a given niche.
-
-    Example:
-        {
-            "niche": "smart home devices",
-            "max_results": 10,
-            "min_score": 5.0,
-            "include_reddit": true,
-            "include_aliexpress": true,
-            "include_trends": true
-        }
-
-    Returns:
-        List of scored products with sourcing options
-    """
-    # Initialize pipeline with credentials
-    pipeline = ProductDiscoveryPipeline(
-        reddit_client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-        reddit_secret=getattr(settings, "REDDIT_SECRET", None),
-        aliexpress_api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
-        aliexpress_app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-    )
-
-    # Run discovery
-    results = await pipeline.discover_products(
-        niche=request.niche,
-        max_results=request.max_results,
-        min_score=request.min_score,
-        include_reddit=request.include_reddit,
-        include_aliexpress=request.include_aliexpress,
-        include_trends=request.include_trends
-    )
-
-    return {
-        "niche": request.niche,
-        "total_found": len(results),
-        "products": results
-    }
-
-
-@router.post("/validate")
-async def validate_product(request: ValidateRequest, settings: Settings = Depends(get_settings)):
-    """
-    Validate a product idea across multiple data sources.
-
-    Checks Reddit engagement, Google Trends, and AliExpress sourcing
-    to provide a validation report.
-
-    Example:
-        {
-            "product_name": "wireless charging pad"
-        }
-
-    Returns:
-        Validation report with scores and recommendation
-    """
-    pipeline = ProductDiscoveryPipeline(
-        reddit_client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-        reddit_secret=getattr(settings, "REDDIT_SECRET", None),
-        aliexpress_api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
-        aliexpress_app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-    )
-
-    validation = await pipeline.validate_product_idea(request.product_name)
-    return validation
-
-
-@router.get("/reddit/trending")
-async def get_reddit_trending(
-    category: Optional[str] = None,
-    limit: int = 10,
-    settings: Settings = Depends(get_settings)
-):
-    """
-    Get trending products from Reddit.
-
-    Args:
-        category: Optional category filter (e.g. "smart home")
-        limit: Max results
-
-    Returns:
-        Trending products from Reddit with engagement scores
-    """
-    reddit = RedditConnector(
-        client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-        client_secret=getattr(settings, "REDDIT_SECRET", None)
-    )
-
-    if not reddit.is_available():
-        raise HTTPException(status_code=400, detail="Reddit API not configured")
-
-    products = await reddit.get_trending(category=category, limit=limit)
-
-    # Score products
-    scorer = ProductScorer()
-    ranked = scorer.rank(products, limit=limit)
-
-    return {
-        "category": category,
-        "total_found": len(ranked),
-        "products": ranked
-    }
-
-
-# ========================================================================
-# NEW: xAI Twitter Discovery Routes
-# ========================================================================
-
-class TwitterDiscoveryRequest(BaseModel):
-    """Request for Twitter/X viral product discovery."""
-    niche: str
-    max_products: int = 10
-    time_range: str = "24h"  # "24h", "7d", "30d"
-
-
-@router.post("/twitter-viral", response_model=List[ProductResponse])
-async def discover_twitter_viral(
-    request: TwitterDiscoveryRequest,
-    settings: Settings = Depends(get_settings)
-):
-    """
-    Discover viral products from Twitter/X using xAI Grok.
-
-    Analyzes Twitter engagement, viral trends, and social sentiment
-    to find products gaining traction on social media.
-
-    Requires XAI_API_KEY in environment.
-
-    Example:
-        {
-            "niche": "smart_home",
-            "max_products": 10,
-            "time_range": "24h"
-        }
-
-    Time Ranges:
-        - "24h": Last 24 hours (most viral)
-        - "7d": Last 7 days (trending up)
-        - "30d": Last 30 days (sustained interest)
-
-    Returns:
-        List of viral products with Twitter engagement metrics
-    """
-    from .multi_source_discovery import MultiSourceDiscovery
-
-    # Initialize discovery engine
-    discovery = MultiSourceDiscovery()
-
-    # Discover viral products from Twitter
-    products = await discovery.discover_with_twitter(
-        niche=request.niche,
-        max_products=request.max_products,
-        time_range=request.time_range
-    )
-
-    if not products:
-        return []
-
-    # Convert to response format
-    return [
-        ProductResponse(
-            name=p.get("name", "Unknown Product"),
-            score=p.get("viral_score", 0.0),
-            recommendation=p.get("buy_signal", "[PAUSE] WATCH"),
-            source="twitter_xai",
-            details=p
-        )
-        for p in products
-    ]

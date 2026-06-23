@@ -1,23 +1,18 @@
 """
 Social media platform connectors.
 
-RECOMMENDED (2025-12-07):
-- Use XAITwitterDiscovery for sentiment analysis (real-time Twitter/X data via Grok)
-- Replaces Reddit sentiment (deprecated)
+#57: twitter.py (empty stub) deleted and meta.py sunset (organic Graph API is
+dead; Meta signal now comes from the Ad Library actor in the main pipeline).
 
-AVAILABLE CONNECTORS:
-- XAITwitterDiscovery: PRIMARY sentiment source (via xAI Grok)
-- TwitterConnector: Basic Twitter API v2 wrapper (requires separate API key)
-- RedditConnector: DEPRECATED - use XAITwitterDiscovery instead
-- MetaConnector: Facebook/Instagram (requires separate setup)
+ACTIVE CONNECTORS:
+- RedditConnector: SECONDARY / off by default (DISCOVERY_DISABLE_REDDIT)
+- XAITwitterDiscovery: SECONDARY / off by default (DISCOVERY_DISABLE_X) — weak
+  corroboration only; Grok sentiment is paraphrase-prone.
 """
 
-from .meta import MetaConnector
-from .twitter import TwitterConnector
 from .reddit import RedditConnector
 
-# xAI-powered Twitter discovery (REAL Twitter data access)
-# This is the PRIMARY sentiment analysis source
+# xAI-powered Twitter discovery — opt-in, off by default (see DISCOVERY_DISABLE_X).
 try:
     from .xai_twitter import XAITwitterDiscovery, TwitterProduct, discover_twitter_products
     HAS_XAI_TWITTER = True
@@ -28,11 +23,9 @@ except ImportError:
     HAS_XAI_TWITTER = False
 
 __all__ = [
-    "MetaConnector",
-    "TwitterConnector",
-    "RedditConnector",  # DEPRECATED - use XAITwitterDiscovery
-    "XAITwitterDiscovery",  # PRIMARY sentiment source
+    "RedditConnector",
+    "XAITwitterDiscovery",
     "TwitterProduct",
     "discover_twitter_products",
-    "HAS_XAI_TWITTER"
+    "HAS_XAI_TWITTER",
 ]

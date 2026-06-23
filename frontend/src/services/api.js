@@ -558,47 +558,21 @@ class OspraAPI {
   }
   
   /**
-   * Get trending products
-   * Uses: GET /research/trending
+   * Get trending products — now reads the persistent catalog (#57).
+   * The legacy /research/trending endpoint was retired; the catalog
+   * (populated by the catalog_warm cron) is the precomputed, DB-read source.
    */
   async getTrendingProducts(niche = null) {
     try {
-      // Try research endpoint first
-      const response = await fetch(`${API_BASE_URL}/research/trending?limit=10`);
-      const data = await response.json();
-      return data.products || data.trends || data.data || data || [];
+      const products = await this.getCatalog({ niche, sort: 'freshness', limit: 10 });
+      if (Array.isArray(products) && products.length > 0) return products;
     } catch (error) {
-      console.error('getTrendingProducts error, falling back to discovery:', error);
-      // Fallback to quick discovery; if that also fails, the error propagates
-      // to the caller (task #51b) instead of masquerading as an empty list.
-      return this.discoverProducts({ niche: niche || 'trending', count: 10 });
+      console.error('getTrendingProducts (catalog) error:', error);
     }
+    // Catalog empty (cron not yet warmed) → fall back to on-demand discovery.
+    return this.discoverProducts({ niche: niche || 'trending', count: 10 });
   }
-  
-  /**
-   * Search products across sources
-   * Uses: POST /research/find-products
-   */
-  async searchProducts(query, sources = ['aliexpress', 'cj']) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/research/find-products`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query, 
-          sources,
-          niche: query,
-          limit: 20
-        })
-      });
-      const data = await response.json();
-      return data.products || data.data || data || [];
-    } catch (error) {
-      console.error('searchProducts error:', error);
-      throw error; // surface to the caller (task #51b)
-    }
-  }
-  
+
   /**
    * Get products from database with filters
    * Uses: GET /api/dashboard/v2/products
