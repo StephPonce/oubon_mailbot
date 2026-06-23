@@ -12,12 +12,57 @@ NO MOCK DATA. REAL API CALLS ONLY.
 """
 import os
 import asyncio
+import logging
 import httpx
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# ===========================================================================
+# Per-run Apify circuit breaker + spend tracking (SaaS cost brief)
+# ===========================================================================
+# Stops the retry storms the logs showed: once an actor returns quota/403
+# failures >= threshold in a run, it's "tripped" and skipped for the rest of
+# the run (no more actor-starts → no more metered cost / cap hammering).
+# State is process-global, which == per-run for the catalog-warm cron (fresh
+# process each run); call reset_apify_budget() at run start to be explicit.
+_APIFY_BREAKER_THRESHOLD = int(os.getenv("APIFY_BREAKER_THRESHOLD", "2"))
+_apify_run_state = {"starts": 0, "fails_by_actor": {}, "tripped": set()}
+
+
+def reset_apify_budget() -> None:
+    """Reset per-run Apify counters (call at the start of a cron run)."""
+    _apify_run_state["starts"] = 0
+    _apify_run_state["fails_by_actor"] = {}
+    _apify_run_state["tripped"] = set()
+
+
+def apify_actor_tripped(actor_id: str) -> bool:
+    return actor_id in _apify_run_state["tripped"]
+
+
+def _record_apify_quota_fail(actor_id: str) -> None:
+    c = _apify_run_state["fails_by_actor"].get(actor_id, 0) + 1
+    _apify_run_state["fails_by_actor"][actor_id] = c
+    if c >= _APIFY_BREAKER_THRESHOLD and actor_id not in _apify_run_state["tripped"]:
+        _apify_run_state["tripped"].add(actor_id)
+        logger.warning(
+            f"[APIFY BREAKER] {actor_id} tripped after {c} quota/403 failures — "
+            f"skipping for the rest of this run"
+        )
+
+
+def get_apify_budget_report() -> Dict:
+    """Per-run spend proxy: actor-start count drives metered cost."""
+    return {
+        "actor_starts": _apify_run_state["starts"],
+        "quota_failures": dict(_apify_run_state["fails_by_actor"]),
+        "tripped_actors": sorted(_apify_run_state["tripped"]),
+    }
 
 
 @dataclass
@@ -236,17 +281,24 @@ class ApifyClient:
         Returns:
             List of results from the actor
         """
+        # Circuit breaker: if this actor already hit quota/403 this run, skip it
+        # entirely — no retry storms, no further metered starts.
+        if apify_actor_tripped(actor_id):
+            print(f"[APIFY BREAKER] skipping {actor_id} (tripped this run)")
+            return []
+
         # Convert actor ID format for API
         actor_id_safe = actor_id.replace('/', '~')
-        
+
         print(f"[START] Starting Apify actor: {actor_id}")
         print(f"   Input: {run_input}")
-        
+
         try:
             async with httpx.AsyncClient(timeout=timeout_secs) as client:
                 # Start the actor run
                 run_url = f"{self.base_url}/acts/{actor_id_safe}/runs"
-                
+
+                _apify_run_state["starts"] += 1
                 response = await client.post(
                     run_url,
                     headers=self.headers,
@@ -255,8 +307,13 @@ class ApifyClient:
                         "memory": memory_mbytes
                     }
                 )
-                
+
                 if response.status_code not in [200, 201]:
+                    # Quota/permission failures feed the breaker so repeated
+                    # cap hits trip the actor instead of retrying all run.
+                    body = (response.text or "")[:300].lower()
+                    if response.status_code in (402, 403, 429) or "quota" in body or "limit" in body or "exceeded" in body:
+                        _record_apify_quota_fail(actor_id)
                     print(f"[ERROR] Failed to start actor: {response.status_code}")
                     print(f"   Response: {response.text}")
                     return []

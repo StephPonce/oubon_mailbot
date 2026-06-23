@@ -250,6 +250,12 @@ async def warm_niche(niche: str) -> dict:
 
 async def run() -> dict:
     _bootstrap_table()
+    # Reset the per-run Apify circuit breaker / spend counters (cost brief).
+    try:
+        from ospra_os.product_research.connectors.apify.base_apify import reset_apify_budget
+        reset_apify_budget()
+    except Exception:
+        pass
     niches = _niches()
     logger.info(f"Catalog warm starting for {len(niches)} niches: {niches}")
     results = []
@@ -263,9 +269,23 @@ async def run() -> dict:
         f"Catalog warm complete: {total_disc} discovered across {len(niches)} niches "
         f"({total_new} new, {total_seen} refreshed, {total_snap} daily snapshots)."
     )
+    # Per-run Apify spend report (actor-starts drive metered cost). In steady
+    # state this should show ONLY Meta Ad Library actor-starts (~1/niche).
+    apify_report = {}
+    try:
+        from ospra_os.product_research.connectors.apify.base_apify import get_apify_budget_report
+        apify_report = get_apify_budget_report()
+        logger.info(
+            f"[APIFY SPEND] actor_starts={apify_report.get('actor_starts', 0)} "
+            f"tripped={apify_report.get('tripped_actors', [])} "
+            f"quota_failures={apify_report.get('quota_failures', {})}"
+        )
+    except Exception:
+        pass
     return {
         "niches": len(niches), "discovered": total_disc, "new": total_new,
-        "seen": total_seen, "snapshots": total_snap, "by_niche": results,
+        "seen": total_seen, "snapshots": total_snap,
+        "apify": apify_report, "by_niche": results,
     }
 
 

@@ -735,41 +735,66 @@ class ProductDiscoveryEngine:
             logger.warning(f"[WARNING] Amazon Movers RSS init failed: {exc}")
 
         if self.apify_token:
-            try:
-                from ospra_os.product_research.connectors.apify import TikTokShopScraper, AmazonBestsellersScraper
-                self.tiktok_scraper = TikTokShopScraper()
-                self.amazon_scraper = AmazonBestsellersScraper()
-                self.apify_available = True
-                self.sources_status['tiktok'] = '[SUCCESS] Connected (Apify)'
-                self.sources_status['amazon'] = '[SUCCESS] Connected (Apify)'
-                logger.info("[SUCCESS] TikTok + Amazon scrapers loaded")
+            # COST BRIEF (SaaS-sustainable data layer): Apify = Meta Ad Library
+            # ONLY by default. Meta has no free path ($0.75/1k, cheap, money-
+            # backed winner signal — worth it). TikTok + Amazon Apify actors are
+            # gated OFF (free/first-party replacements: TikTok Shop Partner API,
+            # Amazon Movers/New-Releases RSS). Etsy + Pinterest (epctex rentals)
+            # stay OFF. Re-enable a source only via its DISCOVERY_*_APIFY_ENABLED
+            # flag. apify_available=True just means "token present" so Meta runs;
+            # the per-source scrapers stay None when their flag is off, so the
+            # trend fan-out skips them with zero actor-starts.
+            self.apify_available = True
 
-                # Meta Ad Library — proven-winner signal (advertisers
-                # actively spending = product is paying for itself).
-                # Best-effort like Pinterest: log + skip on ImportError.
+            def _apify_flag(name: str) -> bool:
+                return os.getenv(name, "").strip().lower() in {"1", "true", "yes"}
+
+            _tiktok_apify = _apify_flag("DISCOVERY_TIKTOK_APIFY_ENABLED")
+            _amazon_apify = _apify_flag("DISCOVERY_AMAZON_APIFY_ENABLED")
+            _etsy_apify = _apify_flag("DISCOVERY_ETSY_APIFY_ENABLED")
+            _pinterest_apify = _apify_flag("DISCOVERY_PINTEREST_APIFY_ENABLED")
+
+            # --- TikTok / Amazon Apify scrapers (OFF by default) ---
+            if _tiktok_apify or _amazon_apify:
                 try:
-                    from ospra_os.product_research.connectors.apify.meta_ads_library import (
-                        get_meta_ads_library,
+                    from ospra_os.product_research.connectors.apify import (
+                        TikTokShopScraper, AmazonBestsellersScraper,
                     )
-                    self.meta_ads_scraper = get_meta_ads_library()
-                    if self.meta_ads_scraper.is_available():
-                        self.sources_status['meta_ads'] = '[SUCCESS] Connected (Apify)'
-                        logger.info("[SUCCESS] Meta Ad Library scraper loaded")
-                    else:
-                        self.sources_status['meta_ads'] = '[WARNING] Token check failed'
-                        self.meta_ads_scraper = None
-                except ImportError as exc:
-                    self.sources_status['meta_ads'] = f'[INFO] Connector not installed: {exc}'
-                    logger.info(f"[INFO] Meta Ad Library: connector not available ({exc})")
-                except Exception as exc:
-                    self.sources_status['meta_ads'] = f'[ERROR] {exc}'
-                    logger.warning(f"[WARNING] Meta Ad Library init failed: {exc}")
+                    if _tiktok_apify:
+                        self.tiktok_scraper = TikTokShopScraper()
+                        self.sources_status['tiktok'] = '[SUCCESS] Connected (Apify)'
+                    if _amazon_apify:
+                        self.amazon_scraper = AmazonBestsellersScraper()
+                        self.sources_status['amazon'] = '[SUCCESS] Connected (Apify)'
+                except Exception as e:
+                    self.sources_status['tiktok'] = f'[ERROR] {e}'
+                    self.sources_status['amazon'] = f'[ERROR] {e}'
+            if not _tiktok_apify:
+                self.sources_status['tiktok'] = '[DISABLED] Apify off by default (set DISCOVERY_TIKTOK_APIFY_ENABLED=true)'
+            if not _amazon_apify:
+                self.sources_status['amazon'] = '[DISABLED] Apify off by default — using free Amazon RSS'
 
-                # Option B: Etsy trending — supplementary signal for
-                # handmade/lifestyle niches (decor, jewelry, beauty)
-                # where Amazon's data is weak. Niches Etsy doesn't
-                # cover well (tech, fitness) are skipped at fetch time.
-                self.etsy_trending = None
+            # --- Meta Ad Library: THE KEEP (independent of TikTok/Amazon) ---
+            try:
+                from ospra_os.product_research.connectors.apify.meta_ads_library import (
+                    get_meta_ads_library,
+                )
+                self.meta_ads_scraper = get_meta_ads_library()
+                if self.meta_ads_scraper.is_available():
+                    self.sources_status['meta_ads'] = '[SUCCESS] Connected (Apify)'
+                    logger.info("[SUCCESS] Meta Ad Library scraper loaded")
+                else:
+                    self.sources_status['meta_ads'] = '[WARNING] Token check failed'
+                    self.meta_ads_scraper = None
+            except ImportError as exc:
+                self.sources_status['meta_ads'] = f'[INFO] Connector not installed: {exc}'
+            except Exception as exc:
+                self.sources_status['meta_ads'] = f'[ERROR] {exc}'
+                logger.warning(f"[WARNING] Meta Ad Library init failed: {exc}")
+
+            # --- Etsy / Pinterest (epctex rentals) — OFF by default ---
+            self.etsy_trending = None
+            if _etsy_apify:
                 try:
                     from ospra_os.product_research.connectors.apify.etsy_trending import (
                         get_etsy_trending,
@@ -777,36 +802,26 @@ class ProductDiscoveryEngine:
                     self.etsy_trending = get_etsy_trending()
                     if self.etsy_trending.is_available():
                         self.sources_status['etsy'] = '[SUCCESS] Connected (Apify)'
-                        logger.info("[SUCCESS] Etsy trending scraper loaded")
                     else:
                         self.sources_status['etsy'] = '[WARNING] Token check failed'
                         self.etsy_trending = None
-                except ImportError as exc:
-                    self.sources_status['etsy'] = f'[INFO] Connector not installed: {exc}'
                 except Exception as exc:
                     self.sources_status['etsy'] = f'[ERROR] {exc}'
-                    logger.warning(f"[WARNING] Etsy trending init failed: {exc}")
+            else:
+                self.sources_status['etsy'] = '[DISABLED] Apify off by default'
 
-                # Pinterest is best-effort. Older codebases or deploys
-                # that don't have the actor configured will hit ImportError
-                # — that's fine, we just log + skip.
+            self.pinterest_scraper = None
+            if _pinterest_apify:
                 try:
                     from ospra_os.product_research.connectors.apify.pinterest_trends import (
                         PinterestTrendsApify,
                     )
                     self.pinterest_scraper = PinterestTrendsApify(api_token=self.apify_token)
                     self.sources_status['pinterest'] = '[SUCCESS] Connected (Apify)'
-                    logger.info("[SUCCESS] Pinterest Trends scraper loaded")
-                except ImportError as exc:
-                    self.sources_status['pinterest'] = f'[INFO] Connector not installed: {exc}'
-                    logger.info(f"[INFO] Pinterest Trends: connector not available ({exc})")
                 except Exception as exc:
                     self.sources_status['pinterest'] = f'[ERROR] {exc}'
-                    logger.warning(f"[WARNING] Pinterest Trends init failed: {exc}")
-
-            except Exception as e:
-                self.sources_status['tiktok'] = f'[ERROR] {e}'
-                self.sources_status['amazon'] = f'[ERROR] {e}'
+            else:
+                self.sources_status['pinterest'] = '[DISABLED] Apify off by default'
         else:
             self.sources_status['tiktok'] = '[ERROR] No APIFY_API_TOKEN'
             self.sources_status['amazon'] = '[ERROR] No APIFY_API_TOKEN'
@@ -893,9 +908,16 @@ class ProductDiscoveryEngine:
         # Amazon aggregate rating × review count is the strongest purchase-intent
         # signal available. We run ONE niche-level search per discovery and
         # fuzzy-match our supplier products against the pool.
+        # COST BRIEF: Amazon reviews run on the same metered Apify Amazon actor,
+        # so they're gated OFF by default (DISCOVERY_AMAZON_APIFY_ENABLED). By
+        # default there are ZERO Amazon Apify calls anywhere — the Amazon demand
+        # signal comes from the free Movers/New-Releases RSS; review-sentiment is
+        # opt-in. Sentiment then leans on AliExpress buyer ratings + (opt-in) X/
+        # Reddit; the confidence gate handles thinner coverage honestly.
         self.amazon_reviews = None
         self.amazon_reviews_available = False
-        if self.apify_token:
+        _amazon_apify_on = os.getenv("DISCOVERY_AMAZON_APIFY_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+        if self.apify_token and _amazon_apify_on:
             try:
                 from ospra_os.product_research.connectors.social.amazon_reviews import AmazonReviewsConnector
                 self.amazon_reviews = AmazonReviewsConnector(api_token=self.apify_token)
@@ -907,6 +929,8 @@ class ProductDiscoveryEngine:
                     self.sources_status['amazon_reviews'] = '[ERROR] Init failed'
             except Exception as e:
                 self.sources_status['amazon_reviews'] = f'[ERROR] {e}'
+        elif not _amazon_apify_on:
+            self.sources_status['amazon_reviews'] = '[DISABLED] Apify off by default (set DISCOVERY_AMAZON_APIFY_ENABLED=true)'
         else:
             self.sources_status['amazon_reviews'] = '[ERROR] No APIFY_API_TOKEN'
 
@@ -961,9 +985,10 @@ class ProductDiscoveryEngine:
         # prose) via a dedicated Apify actor. The niche-level
         # ``amazon_reviews`` connector gives aggregate rating only;
         # this fills the qualitative gap on the top-N ranked products.
+        # Same metered Amazon Apify actor → OFF by default (cost brief).
         self.amazon_reviews_text = None
         self.amazon_reviews_text_available = False
-        if self.apify_token:
+        if self.apify_token and _amazon_apify_on:
             try:
                 from ospra_os.product_research.connectors.apify.amazon_reviews_text import (
                     AmazonReviewsTextApify,
@@ -977,6 +1002,8 @@ class ProductDiscoveryEngine:
                     self.sources_status['amazon_reviews_text'] = '[ERROR] Init failed'
             except Exception as e:
                 self.sources_status['amazon_reviews_text'] = f'[ERROR] {e}'
+        elif not _amazon_apify_on:
+            self.sources_status['amazon_reviews_text'] = '[DISABLED] Apify off by default (set DISCOVERY_AMAZON_APIFY_ENABLED=true)'
         else:
             self.sources_status['amazon_reviews_text'] = '[ERROR] No APIFY_API_TOKEN'
 
