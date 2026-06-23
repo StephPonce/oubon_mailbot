@@ -23,10 +23,17 @@ Goal: move discovery from fragile live per-request multi-source scraping to batc
 
 **Decision resolved — ranking subsystem:** frontend calls ZERO `/api/rankings` paths (verified). Per owner rule → retire wholesale (ranking_engine + rankings_routes + daily_ranking_job), which frees the dead tables. NUANCE found: `/api/rankings/*` is registered TWICE — rankings_routes (→ranking_engine→dead ORM tables, wins by order) AND a duplicate block in main.py:4441-4772 (→ProductHistoryDB raw sqlite, shadowed). Both unused by frontend. Retire is queued as its own carefully-verified commit (≈400 lines across main.py two surfaces + 3 files) — NOT yet executed.
 
-**Remaining (queued, in order):**
-1. Ranking retire (the dual-surface surgery above) → then drop the freed dead tables (product_intelligence, ProductSnapshot, product_saturation, product_velocity) via migration.
-2. Rest of retire batch: /research/* (+ repoint frontend fallback + remove twitter.py/meta.py), dead /api/discovery aliases, stub Celery tasks, admin-gate /test-* /cache/* /sources-health.
-3. Phase 1 cont.: velocity-based saturation as a first-class grade term (advertiser-density + weekly slope; reward 5–15 advertisers + rising demand); TikTok-Shop sales-velocity as primary TikTok input; consolidate to ONE velocity + ONE saturation impl. Variance-test, don't loosen.
+**Retire batch — progress (2026-06-23):**
+- [x] Ranking retire wholesale (71f8e56): deleted rankings_routes.py + ranking_engine.py + daily_ranking_job.py + both main.py /api/rankings surfaces (~409 lines) + scheduler start. App boots.
+- [x] X/Grok + Reddit OFF by default via env flags (bd89739): DISCOVERY_DISABLE_X added, both default-disabled, re-enableable; labeled headers. NOT deleted (per owner).
+- [x] /research/* retired to just /sources + twitter.py deleted + meta.py sunset (c10fdf8); frontend getTrendingProducts repointed to /catalog; dead searchProducts removed; build green.
+- [x] Dead /api/discovery aliases removed: /products, /live-products, /multi-niche (4ee8129).
+- [ ] **Stub Celery tasks** — NOT done. Entangled tentacle found: `api/task_routes.py:314` exposes a live route calling stub `discover_products_for_user.delay()`; plus celery_app include/rate_limit/beat refs. Celery isn't deployed (stubs are inert) so this is lowest-value; needs its own careful pass (decide the task_routes route too).
+- [ ] **Admin-gate /test-* /cache/* /sources-health** — NOT done. Needs an auth dependency wired on each diagnostic; own commit.
+
+**Table drops still HELD** — verification showed only ProductIntelligence is cleanly freed by the ranking retire; ProductSaturation/ProductVelocity still held by velocity_detector→smart_recommendations (live), RankingHistory still held by niche_analyzer. Drop migration deferred until those holders are resolved.
+
+**Phase 1 cont. (next major):** velocity-based saturation as a first-class grade term (advertiser-density + weekly slope; reward 5–15 advertisers + rising demand); TikTok-Shop sales-velocity as primary TikTok input; consolidate to ONE velocity + ONE saturation impl. Variance-test, don't loosen. GATED on a few days of product_timeseries existing → needs the catalog-warm cron running in prod first (owner: set cron env vars).
 4. /api/discovery/quick → read discovered_catalog first (DB-read), live only as fallback.
 5. Phase 2: AliExpress catalog ingest (blocked on owner AE keys); lifecycle-stage classifier (Emergence/Growth/Maturity/Decline/Pump-fad via trend_trajectory.py); confidence gate.
 6. Phase 3: per-source enrichment crons (read/write product_timeseries); outcome scoreboard.
