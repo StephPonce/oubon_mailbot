@@ -118,7 +118,17 @@ class CJDropshippingClient:
     
     def __init__(self):
         self.access_token = os.getenv('CJ_ACCESS_TOKEN') or os.getenv('OUBONSHOP_CJ_ACCESS_TOKEN')
-        self._available = bool(self.access_token)
+        # Task #15 — auto-refresh so 401s self-heal (no manual token swaps). With
+        # CJ_EMAIL + CJ_API_KEY we mint a token via authentication/getAccessToken
+        # on a 401 and retry. Falls back to the static env token when creds absent.
+        self.cj_email = os.getenv('CJ_EMAIL') or os.getenv('OUBONSHOP_CJ_EMAIL')
+        self.cj_api_key = os.getenv('CJ_API_KEY') or os.getenv('OUBONSHOP_CJ_API_KEY')
+        self._cj_token_cache = CJ_CATEGORY_CACHE_DIR / "cj_access_token.json"
+        self._cj_last_refresh = 0.0
+        self._cj_refresh_min_interval = 305  # CJ caps getAccessToken at ~1/300s
+        if not self.access_token:
+            self._load_cached_cj_token()
+        self._available = bool(self.access_token) or bool(self.cj_email and self.cj_api_key)
         self._last_request_time = 0
         self._rate_limit_delay = 3.0  # 3 seconds between requests (CJ very strict limit)
         self._consecutive_429s = 0
@@ -152,7 +162,65 @@ class CJDropshippingClient:
     
     def is_available(self) -> bool:
         return self._available
-    
+
+    def _load_cached_cj_token(self) -> None:
+        """Load a previously-refreshed CJ access token from disk cache."""
+        try:
+            if self._cj_token_cache.exists():
+                data = json.loads(self._cj_token_cache.read_text())
+                tok = data.get("access_token")
+                if tok:
+                    self.access_token = tok
+        except Exception:
+            pass
+
+    async def _refresh_access_token(self) -> bool:
+        """Task #15: mint a fresh CJ access token so 401s self-heal.
+
+        Needs CJ_EMAIL + CJ_API_KEY. Rate-limited to CJ's ~1/300s auth cap so a
+        burst of 401s can't hammer the auth endpoint. Persists the new token to
+        the on-disk cache so sibling processes (web + cron) reuse it.
+        """
+        if not (self.cj_email and self.cj_api_key):
+            return False
+        now = time.time()
+        if now - self._cj_last_refresh < self._cj_refresh_min_interval:
+            return False  # too soon — respect CJ's getAccessToken rate cap
+        self._cj_last_refresh = now
+        try:
+            url = f"{CJ_API_BASE}/authentication/getAccessToken"
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url,
+                    json={"email": self.cj_email, "password": self.cj_api_key},
+                    timeout=15,
+                ) as resp:
+                    try:
+                        data = await resp.json()
+                    except Exception:
+                        logger.warning("[CJ-AUTH] token refresh: non-JSON response")
+                        return False
+                    token = (data.get("data") or {}).get("accessToken")
+                    if resp.status == 200 and data.get("result") and token:
+                        self.access_token = token
+                        self._available = True
+                        try:
+                            CJ_CATEGORY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                            self._cj_token_cache.write_text(
+                                json.dumps({"access_token": token, "refreshed_at": now})
+                            )
+                        except Exception:
+                            pass
+                        logger.info("[CJ-AUTH] access token refreshed (self-healed)")
+                        return True
+                    logger.warning(
+                        f"[CJ-AUTH] token refresh failed: {data.get('message', resp.status)}"
+                    )
+                    return False
+        except Exception as e:
+            logger.warning(f"[CJ-AUTH] token refresh error: {e}")
+            return False
+
     async def _rate_limit_wait(self):
         """Ensure we don't exceed rate limit with exponential backoff for 429s.
 
@@ -197,7 +265,8 @@ class CJDropshippingClient:
         async with self._get_lock():
             return await self._request_locked(endpoint, params)
 
-    async def _request_locked(self, endpoint: str, params: dict = None) -> Optional[Dict]:
+    async def _request_locked(self, endpoint: str, params: dict = None,
+                              _auth_retried: bool = False) -> Optional[Dict]:
         """Inner request implementation. Assumes `_request_lock` is held."""
         # Rate limiting
         await self._rate_limit_wait()
@@ -251,8 +320,23 @@ class CJDropshippingClient:
                             return result.get('data')
                         else:
                             error_msg = result.get('message', 'Unknown error')
+                            # Task #15: CJ sometimes returns 200 with a token-expiry
+                            # message instead of 401 — treat it the same: refresh + retry.
+                            if (not _auth_retried and "token" in error_msg.lower()
+                                    and any(w in error_msg.lower() for w in ("expire", "invalid", "auth"))):
+                                if await self._refresh_access_token():
+                                    logger.info("[CJ-AUTH] retrying after token refresh (200/expiry)")
+                                    return await self._request_locked(endpoint, params, _auth_retried=True)
                             logger.warning(f"[WARNING] CJ API error: {error_msg}")
                             return None
+                    elif response.status == 401 and not _auth_retried:
+                        # Task #15: token expired/invalid — self-heal by minting a
+                        # fresh token and retrying once.
+                        logger.warning("[CJ-AUTH] 401 — attempting token refresh + retry")
+                        if await self._refresh_access_token():
+                            return await self._request_locked(endpoint, params, _auth_retried=True)
+                        logger.error("[ERROR] CJ 401 and token refresh unavailable/failed")
+                        return None
                     else:
                         logger.error(f"[ERROR] CJ API HTTP {response.status}: {response_text[:200]}")
                         return None
