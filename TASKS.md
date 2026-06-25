@@ -40,7 +40,12 @@ Goal: move discovery from fragile live per-request multi-source scraping to batc
 
 **Table drops still HELD** — verification showed only ProductIntelligence is cleanly freed by the ranking retire; ProductSaturation/ProductVelocity still held by velocity_detector→smart_recommendations (live), RankingHistory still held by niche_analyzer. Drop migration deferred until those holders are resolved.
 
-**Phase 1 cont. (next major):** velocity-based saturation as a first-class grade term (advertiser-density + weekly slope; reward 5–15 advertisers + rising demand); TikTok-Shop sales-velocity as primary TikTok input; consolidate to ONE velocity + ONE saturation impl. Variance-test, don't loosen. GATED on a few days of product_timeseries existing → needs the catalog-warm cron running in prod first (owner: set cron env vars).
+**Phase 1 cont.:**
+- [x] **Velocity-based saturation SCAFFOLDING (0764383, flag-gated OFF):** `velocity_saturation.py` (pure: linear_slope + advertiser_density_penalty rewarding 5–15 / demoting 0–2 & 30+ + density/fill-speed/demand-slope blend) + `_load_velocity_saturation()` reading last 14d of product_timeseries + gated blend in `_calculate_scores` (`DISCOVERY_VELOCITY_SATURATION_ENABLED`, default OFF; `VELOCITY_SAT_WEIGHT` def 0.5). 13 synthetic tests; variance PASS; grading byte-identical with flag off. **Ready to flip once snapshots accumulate.**
+- [ ] **Validate + flip on:** after ~7 days of real snapshots, compare grade distribution flag-on vs off on a sample niche, variance-test, then enable `DISCOVERY_VELOCITY_SATURATION_ENABLED=true`.
+- [ ] TikTok-Shop sales-velocity as primary TikTok input (Partner API, owner creds).
+- [ ] Consolidate to ONE velocity + ONE saturation impl (retire velocity_detector once smart_recommendations is migrated).
+- **GATED on a few days of product_timeseries → needs the catalog-warm cron running in prod (owner: set cron env vars).**
 4. /api/discovery/quick → read discovered_catalog first (DB-read), live only as fallback.
 5. Phase 2: AliExpress catalog ingest (blocked on owner AE keys); lifecycle-stage classifier (Emergence/Growth/Maturity/Decline/Pump-fad via trend_trajectory.py); confidence gate.
 6. Phase 3: per-source enrichment crons (read/write product_timeseries); outcome scoreboard.
