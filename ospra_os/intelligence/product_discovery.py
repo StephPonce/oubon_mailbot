@@ -467,6 +467,58 @@ def _compute_saturation(product: Dict) -> Dict:
     }
 
 
+def _velocity_timeseries_key(product: Dict) -> str:
+    """Same sha256(title|image)[:32] key catalog_warm uses for product_timeseries,
+    so a product graded in discovery joins its own snapshot history."""
+    import hashlib
+    title = (product.get("title") or product.get("product_name") or "").strip().lower()
+    image = (product.get("image_url") or product.get("main_image") or "").strip()
+    return hashlib.sha256(f"{title}|{image}".encode()).hexdigest()[:32]
+
+
+def _load_velocity_saturation(product: Dict, days: int = 14) -> Optional[Dict]:
+    """Velocity-based saturation from product_timeseries history (#57 Phase 1).
+
+    Reads the last `days` of daily snapshots for this product and computes the
+    trajectory-aware saturation term. Best-effort and side-effect-free: returns
+    None on any error / no history (caller then keeps the snapshot saturation).
+    Only ever invoked when DISCOVERY_VELOCITY_SATURATION_ENABLED is set.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from ospra_os.database.connection import SessionLocal
+        from ospra_os.database.product_timeseries import ProductTimeseries
+        from ospra_os.intelligence.velocity_saturation import velocity_saturation_from_series
+
+        key = _velocity_timeseries_key(product)
+        cutoff = datetime.utcnow().date() - timedelta(days=days)
+        session = SessionLocal()
+        try:
+            rows = (
+                session.query(ProductTimeseries)
+                .filter(
+                    ProductTimeseries.product_key == key,
+                    ProductTimeseries.snapshot_date >= cutoff,
+                )
+                .order_by(ProductTimeseries.snapshot_date.asc())
+                .all()
+            )
+        finally:
+            session.close()
+        if not rows:
+            return None
+        advertiser_series = [r.meta_advertiser_count for r in rows]
+        # Demand signal: prefer AE order volume, fall back to Trends interest.
+        demand_series = [
+            r.aliexpress_orders if r.aliexpress_orders is not None else r.google_trends_interest
+            for r in rows
+        ]
+        return velocity_saturation_from_series(advertiser_series, demand_series)
+    except Exception as e:
+        logger.debug(f"[VELOCITY-SAT] skipped: {e}")
+        return None
+
+
 def _dedupe_by_title(products: List[Dict], threshold: float = 0.7) -> List[Dict]:
     """Drop near-duplicate products by title token overlap.
 
@@ -6400,6 +6452,22 @@ class ProductDiscoveryEngine:
             saturation_result = _compute_saturation(product)
             sat_score = saturation_result['score']
             sat_conf = saturation_result['confidence']
+
+            # #57 Phase 1 — velocity-based saturation (SCAFFOLDING, OFF BY
+            # DEFAULT). When DISCOVERY_VELOCITY_SATURATION_ENABLED is set AND we
+            # have enough product_timeseries history, blend the trajectory-aware
+            # term into the snapshot saturation, weighted by its confidence so a
+            # thin slope barely moves the grade. UNVALIDATED until real snapshots
+            # accumulate — the flag keeps it out of live grading until then.
+            if os.getenv("DISCOVERY_VELOCITY_SATURATION_ENABLED", "").strip().lower() in {"1", "true", "yes"}:
+                vsat = _load_velocity_saturation(product)
+                if vsat and vsat.get("confidence", 0) > 0:
+                    # Velocity contributes up to VELOCITY_SAT_WEIGHT of the blend
+                    # at full confidence (tunable post-validation).
+                    w = vsat["confidence"] * float(os.getenv("VELOCITY_SAT_WEIGHT", "0.5"))
+                    sat_score = round((1 - w) * sat_score + w * vsat["score"], 3)
+                    sat_conf = max(sat_conf, vsat["confidence"])
+                    product['velocity_saturation'] = vsat
 
             if sat_conf >= 0.3:
                 saturation_multiplier = (1.0 - sat_score) ** 0.5
