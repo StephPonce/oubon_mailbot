@@ -7,6 +7,27 @@ Status values: `todo` / `in-progress` / `blocked` / `done`. Keep the most recent
 
 ---
 
+## #58 — AliExpress affiliate returns 0 products (2026-06-27, diagnosing)
+
+Affiliate auth works (200, app 522382, no permission error) but
+`aliexpress.affiliate.product.query` returns 0 products for common keywords.
+- **Shipped (aac9464):** (1) log the RAW 200 body of the first query/process
+  ([AE RAW]) + surface `resp_result.resp_code/resp_msg` (AE returns affiliate
+  errors like "tracking_id mandatory" INSIDE a 200 body — was silently swallowed
+  as empty). (2) tracking_id is mandatory: live integrations client now defaults
+  to '' + warns when unset (was bogus 'ospra_tracking' placeholder); added
+  `tracking_id`=ALIEXPRESS_TRACKING_ID to the 2 other affiliate clients that
+  omitted it; render.yaml ALIEXPRESS_TRACKING_ID on both services.
+- **Owner next:** set `ALIEXPRESS_TRACKING_ID` to a REAL tracking_id from the
+  affiliate account, redeploy, run one query, read the [AE RAW] log → confirms
+  tracking_id-error vs genuinely-empty.
+- **NOTED (separate follow-up): redundant 2nd AE/Apify pass.** Every
+  `discover_products(niche)` queries AliExpress + CJ TWICE — STEP 2a (winner-
+  first, per winner, `_source_winners_to_products` → `_fetch_aliexpress`) and
+  again STEP 2b (keyword search → `_fetch_aliexpress`). `_should_run_step_2b`
+  doesn't suppress it. Doubles supplier calls per niche; fix = skip/short-circuit
+  STEP 2b's supplier search when STEP 2a already yielded enough candidates.
+
 ## #57 — Discovery architecture overhaul (2026-06-22, IN PROGRESS — audit-first, phased)
 
 Goal: move discovery from fragile live per-request multi-source scraping to batch-ingest + scheduled-enrichment + DB-read, graded anti-saturation-first to surface EARLY, uncrowded products. Owner-directed, phased, reversible.
