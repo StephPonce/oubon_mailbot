@@ -306,6 +306,8 @@ class AliExpressConnector(BaseConnector):
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
+            # tracking_id is MANDATORY for affiliate.product.query (#AE).
+            "tracking_id": os.getenv("ALIEXPRESS_TRACKING_ID", ""),
             # Search parameters
             "keywords": query,
             "target_currency": "USD",
@@ -539,6 +541,7 @@ class AliExpressConnector(BaseConnector):
             "format": "json",
             "v": "2.0",
             "sign_method": "sha256",
+            "tracking_id": os.getenv("ALIEXPRESS_TRACKING_ID", ""),  # mandatory (#AE)
             "category_ids": category_id,
             "target_currency": "USD",
             "target_language": "EN",

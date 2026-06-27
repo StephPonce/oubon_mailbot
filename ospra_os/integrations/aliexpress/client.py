@@ -4,6 +4,7 @@ AliExpress API Client - Affiliate and Dropshipping Integration
 import os
 import hmac
 import hashlib
+import logging
 import time
 import httpx
 from typing import Dict, List, Optional
@@ -11,6 +12,13 @@ from urllib.parse import urlencode
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
+
+# Diagnostic: log the RAW 200 body of the FIRST affiliate.product.query per
+# process so we can see exactly what AliExpress says (tracking_id error vs
+# genuinely-empty results) without spamming every keyword call.
+_ae_raw_logged = False
 
 
 class AliExpressClient:
@@ -37,7 +45,16 @@ class AliExpressClient:
             raise ValueError("AliExpress API credentials not found in environment")
 
         self.base_url = "https://api-sg.aliexpress.com/sync"
-        self.tracking_id = os.getenv('ALIEXPRESS_TRACKING_ID', 'ospra_tracking')
+        # tracking_id is MANDATORY for aliexpress.affiliate.product.query and must
+        # be a REAL tracking_id registered in the affiliate account. Default empty
+        # (not a bogus placeholder) so a missing value surfaces AE's explicit
+        # "tracking_id mandatory" error instead of silently returning 0 products.
+        self.tracking_id = os.getenv('ALIEXPRESS_TRACKING_ID', '').strip()
+        if not self.tracking_id:
+            logger.warning(
+                "[AE] ALIEXPRESS_TRACKING_ID not set — affiliate.product.query "
+                "will likely return 0 products (tracking_id is mandatory)."
+            )
 
         print(f"[SUCCESS] AliExpress Client initialized (App Key: {self.app_key[:6]}...)")
 
@@ -85,13 +102,38 @@ class AliExpressClient:
                     print(response.text)
                     return None
 
+                # DIAGNOSTIC: dump the RAW 200 body of the first
+                # affiliate.product.query so we see exactly what AE returns.
+                global _ae_raw_logged
+                if method == 'aliexpress.affiliate.product.query' and not _ae_raw_logged:
+                    _ae_raw_logged = True
+                    logger.warning(
+                        f"[AE RAW] affiliate.product.query 200 body (first call this "
+                        f"process, tracking_id={self.tracking_id!r}): {response.text[:2000]}"
+                    )
+
                 result = response.json()
 
-                # Check for API errors
+                # Top-level API error (auth/signature/etc.)
                 if 'error_response' in result:
                     error = result['error_response']
                     print(f"[ERROR] AliExpress error: {error.get('msg')}")
+                    logger.warning(f"[AE] error_response: {error}")
                     return None
+
+                # AE affiliate errors ALSO come back inside a 200 body as
+                # resp_result.resp_code / resp_msg (e.g. "tracking_id mandatory")
+                # — surface them instead of silently yielding 0 products.
+                try:
+                    resp_key = f"{method.replace('.', '_')}_response"
+                    rr = (result.get(resp_key, {}) or {}).get('resp_result', {}) or {}
+                    code = rr.get('resp_code')
+                    if code is not None and str(code) != '200':
+                        logger.warning(
+                            f"[AE] {method} resp_code={code} resp_msg={rr.get('resp_msg')!r}"
+                        )
+                except Exception:
+                    pass
 
                 return result
 

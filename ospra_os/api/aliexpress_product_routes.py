@@ -335,6 +335,7 @@ class AliExpressProductAPI:
             "v": "2.0",
             "sign_method": "sha256",
             "session": tokens["access_token"],
+            "tracking_id": os.getenv("ALIEXPRESS_TRACKING_ID", ""),  # mandatory (#AE)
             "target_currency": "USD",
             "target_language": "EN",
             "ship_to_country": "US",
