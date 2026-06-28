@@ -893,6 +893,25 @@ class ProductDiscoveryEngine:
             logger.info("[SUCCESS] AliExpress API loaded")
         except Exception as e:
             self.sources_status['aliexpress'] = f'[ERROR] {e}'
+
+        # AliExpress Dropshipping API (#AE) — PRIMARY AE source. The DS
+        # hot-products feed (aliexpress.ds.recommend.feed.get) needs NO affiliate
+        # tracking_id (Steph isn't enrolled in the affiliate portal), uses the DS
+        # app (520918) + a dropship OAuth token, and self-heals on expiry. The
+        # affiliate keyword search above is the FALLBACK for if/when a tracking_id
+        # exists.
+        self.aliexpress_ds = None
+        self.aliexpress_ds_available = False
+        try:
+            from ospra_os.aliexpress.ds_client import AliExpressDSClient
+            self.aliexpress_ds = AliExpressDSClient()
+            self.aliexpress_ds_available = self.aliexpress_ds.is_available()
+            self.sources_status['aliexpress_ds'] = (
+                '[SUCCESS] Connected (DS hot-products feed)' if self.aliexpress_ds_available
+                else '[INFO] DS token not authorized (run /api/aliexpress/auth/start)'
+            )
+        except Exception as e:
+            self.sources_status['aliexpress_ds'] = f'[ERROR] {e}'
         
         # CJ Dropshipping
         self.cj_client = None
@@ -1263,8 +1282,15 @@ class ProductDiscoveryEngine:
         # produce enough to fill the page. Saves ~10s on hot niches where
         # Meta/TikTok-Shop/etc. already nailed it.
         if not skip_keyword_search:
-            # AliExpress tasks - one per keyword (parallel keyword fetches)
-            if self.aliexpress_available:
+            # AliExpress (#AE): DS hot-products feed is PRIMARY (no tracking_id
+            # needed); affiliate keyword search is the FALLBACK for if/when a
+            # tracking_id exists.
+            if self.aliexpress_ds_available:
+                supplier_tasks.append(
+                    self._fetch_aliexpress_ds(niche, count=ali_keywords * ali_per_kw)
+                )
+                task_labels.append(f"aliexpress_ds:{niche}")
+            elif self.aliexpress_available:
                 for keyword in trending_keywords[:ali_keywords]:
                     supplier_tasks.append(self._fetch_aliexpress(keyword, count=ali_per_kw))
                     task_labels.append(f"aliexpress:{keyword[:20]}")
@@ -3209,6 +3235,35 @@ class ProductDiscoveryEngine:
         # Intake relevance (#55): reject results that don't match the keyword
         # that found them (AE sometimes returns promoted/loosely-related items).
         return self._filter_supplier_results(products, query=keyword)
+
+    # AliExpress DS feed → AE category_ids. Empty for now (global hot-products
+    # feed); the STEP-3b niche gate trims off-niche items. Populate per niche
+    # later for sharper feeds (follow-up).
+    _AE_DS_NICHE_CATEGORY: Dict[str, str] = {}
+
+    async def _fetch_aliexpress_ds(self, niche: str, count: int = 40) -> List[Dict]:
+        """PRIMARY AliExpress source (#AE): the DS hot-products feed
+        (aliexpress.ds.recommend.feed.get). No affiliate tracking_id required.
+        Rows come back normalized to the affiliate-product shape (the DS client
+        maps them), so downstream readers are unchanged. The feed is niche-wide,
+        so we lean on the STEP-3b niche gate (query="" → niche relevance) to trim.
+        """
+        if not self.aliexpress_ds_available:
+            return []
+        try:
+            products = await self.aliexpress_ds.get_hot_products(
+                page_size=min(int(count), 50),
+                category_ids=self._AE_DS_NICHE_CATEGORY.get(niche),
+            )
+        except Exception as e:
+            logger.warning(f"[AE-DS] feed fetch failed for niche '{niche}': {e}")
+            return []
+        for p in products:
+            if isinstance(p, dict):
+                p.setdefault('niche', niche)
+                p.setdefault('source', 'aliexpress')
+        # Feed isn't keyword-scoped → filter by NICHE relevance, not query overlap.
+        return self._filter_supplier_results(products, query="", niche=niche)
 
     async def _fetch_cj(self, keyword: str, count: int, niche: str = None) -> List[Dict]:
         """Fetch from CJ Dropshipping using smart search with keyword mappings.

@@ -127,14 +127,80 @@ class AliExpressDSClient:
             return None
 
         if not payload or not payload.get("access_token"):
+            # Fallback: a manually-set ALIEXPRESS_ACCESS_TOKEN env (no DB/OAuth).
+            # NOTE: env tokens carry no refresh_token, so they can't self-heal —
+            # OAuth (/api/aliexpress/auth/start) is the durable path.
+            env_tok = os.getenv("ALIEXPRESS_ACCESS_TOKEN", "").strip()
+            if env_tok:
+                logger.info("[AE-DS] using ALIEXPRESS_ACCESS_TOKEN env (no DB token)")
+                self._access_token = env_tok
+                return self._access_token
             logger.info("[AE-DS] No dropship token configured")
             return None
-        if payload.get("is_expired"):
-            logger.warning("[AE-DS] Dropship token is expired — needs refresh")
-            return None
 
+        # Return the token even if the DB says it's expired — let the API be the
+        # source of truth. _request() self-heals on IllegalAccessToken via the
+        # stored refresh_token, so a stale DB flag shouldn't block the call.
+        if payload.get("is_expired"):
+            logger.info("[AE-DS] Dropship token marked expired — will refresh on demand")
         self._access_token = payload["access_token"]
         return self._access_token
+
+    async def _refresh_token(self) -> bool:
+        """Self-heal an expired DS access token via the stored refresh_token (#AE).
+
+        Mirrors the CJ auto-refresh: read refresh_token from the aliexpress_tokens
+        DB, POST grant_type=refresh_token, persist the new token, update memory.
+        Returns False (and logs that re-auth is needed) when no refresh_token is
+        stored — env-only tokens can't self-heal; OAuth is required to seed one.
+        """
+        if not (self._app_key and self._app_secret):
+            return False
+        try:
+            from ospra_os.database.aliexpress_tokens import load_token, save_token
+            payload = load_token("dropship")
+        except Exception:
+            payload = None
+        refresh_token = (payload or {}).get("refresh_token")
+        if not refresh_token:
+            logger.warning(
+                "[AE-DS] no refresh_token stored — re-authorize at "
+                "/api/aliexpress/auth/start to seed one"
+            )
+            return False
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    AE_API_BASE,
+                    data={
+                        "client_id": self._app_key,
+                        "client_secret": self._app_secret,
+                        "grant_type": "refresh_token",
+                        "refresh_token": refresh_token,
+                    },
+                    timeout=15,
+                ) as resp:
+                    body = await resp.json(content_type=None)
+        except Exception as e:
+            logger.warning(f"[AE-DS] token refresh transport error: {e}")
+            return False
+        new_access = body.get("access_token") if isinstance(body, dict) else None
+        if not new_access:
+            logger.warning(
+                f"[AE-DS] token refresh failed: "
+                f"{(body or {}).get('error') if isinstance(body, dict) else body}"
+            )
+            return False
+        new_refresh = body.get("refresh_token", refresh_token)
+        expires_in = int(body.get("expires_in", 86400))
+        try:
+            save_token("dropship", new_access, new_refresh, expires_in)
+        except Exception as e:
+            logger.warning(f"[AE-DS] could not persist refreshed token: {e}")
+        self._access_token = new_access
+        self._token_loaded = True
+        logger.info("[AE-DS] access token refreshed (self-healed)")
+        return True
 
     def is_available(self) -> bool:
         """Cheap check the caller can use to decide whether to invoke DS
@@ -183,6 +249,7 @@ class AliExpressDSClient:
         method: str,
         extra_params: Dict[str, str],
         timeout: int = 15,
+        _auth_retried: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Make a signed DS API GET. Returns the raw parsed JSON response
         or None on transport/auth failure. Callers are responsible for
@@ -225,10 +292,18 @@ class AliExpressDSClient:
 
         if isinstance(body, dict) and "error_response" in body:
             err = body["error_response"]
-            logger.warning(
-                f"[AE-DS] {method} API error code={err.get('code')} "
-                f"msg={err.get('msg')!r}"
+            code = str(err.get("code", ""))
+            msg = str(err.get("msg", ""))
+            # Self-heal an expired/invalid token: refresh once and retry.
+            token_dead = (
+                "IllegalAccessToken" in code
+                or ("token" in msg.lower() and ("expire" in msg.lower() or "invalid" in msg.lower()))
             )
+            if token_dead and not _auth_retried:
+                logger.warning(f"[AE-DS] {method} token invalid/expired — refreshing + retrying")
+                if await self._refresh_token():
+                    return await self._request(method, extra_params, timeout=timeout, _auth_retried=True)
+            logger.warning(f"[AE-DS] {method} API error code={code} msg={msg!r}")
             return None
 
         return body
