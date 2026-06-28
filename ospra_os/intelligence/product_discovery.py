@@ -770,21 +770,27 @@ class ProductDiscoveryEngine:
         # Initialized in the Apify block below so it shares the token.
         self.meta_ads_scraper = None
 
-        # Task #12 — Amazon Movers & Shakers RSS. Public feed, no token,
-        # no rate limit. Initialized eagerly because it's always
-        # available; gracefully no-ops if Amazon temporarily blocks us
-        # (handled inside the connector).
+        # Amazon Movers/New-Releases — DESPITE the "rss" name this connector
+        # actually calls the junglee/amazon-bestsellers APIFY actor (the old free
+        # RSS feeds were retired May 2026). So it's metered Apify, NOT free, and
+        # must obey the cost brief: gated OFF by default behind the same Amazon
+        # flag. (This was the source of the stray junglee/amazon-bestsellers 403
+        # actor-starts the breaker tripped.) There is currently NO free Amazon
+        # path — Amazon stays dark until DISCOVERY_AMAZON_APIFY_ENABLED=true.
         self.amazon_movers_rss = None
-        try:
-            from ospra_os.product_research.connectors.amazon_movers_rss import (
-                get_amazon_movers_rss,
-            )
-            self.amazon_movers_rss = get_amazon_movers_rss()
-            self.sources_status['amazon_movers'] = '[SUCCESS] Connected (public RSS)'
-            logger.info("[SUCCESS] Amazon Movers RSS loaded (free, no auth)")
-        except Exception as exc:
-            self.sources_status['amazon_movers'] = f'[ERROR] {exc}'
-            logger.warning(f"[WARNING] Amazon Movers RSS init failed: {exc}")
+        if os.getenv("DISCOVERY_AMAZON_APIFY_ENABLED", "").strip().lower() in {"1", "true", "yes"}:
+            try:
+                from ospra_os.product_research.connectors.amazon_movers_rss import (
+                    get_amazon_movers_rss,
+                )
+                self.amazon_movers_rss = get_amazon_movers_rss()
+                self.sources_status['amazon_movers'] = '[SUCCESS] Connected (Apify junglee)'
+                logger.info("[SUCCESS] Amazon Movers (Apify) loaded")
+            except Exception as exc:
+                self.sources_status['amazon_movers'] = f'[ERROR] {exc}'
+                logger.warning(f"[WARNING] Amazon Movers init failed: {exc}")
+        else:
+            self.sources_status['amazon_movers'] = '[DISABLED] Apify off by default (junglee actor; set DISCOVERY_AMAZON_APIFY_ENABLED=true)'
 
         if self.apify_token:
             # COST BRIEF (SaaS-sustainable data layer): Apify = Meta Ad Library
