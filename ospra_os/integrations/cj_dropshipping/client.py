@@ -206,9 +206,14 @@ class CJDropshippingClient:
                         self._available = True
                         try:
                             CJ_CATEGORY_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+                            # Re-audit S3: cache dir defaults to /tmp (world-
+                            # readable). This file holds a live bearer token;
+                            # clamp dir+file to owner-only.
+                            os.chmod(CJ_CATEGORY_CACHE_DIR, 0o700)
                             self._cj_token_cache.write_text(
                                 json.dumps({"access_token": token, "refreshed_at": now})
                             )
+                            os.chmod(self._cj_token_cache, 0o600)
                         except Exception:
                             pass
                         logger.info("[CJ-AUTH] access token refreshed (self-healed)")

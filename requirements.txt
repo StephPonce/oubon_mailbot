@@ -2,7 +2,7 @@
 # Generated for Render deployment
 
 # Web Framework
-fastapi>=0.109.0
+fastapi>=0.109.0,<0.119  # <0.119: starlette 1.x breaks conftest under filterwarnings=error
 uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6
 pydantic>=2.5.0
@@ -87,7 +87,7 @@ msal>=1.24.0
 
 # Testing
 pytest>=7.4.0
-pytest-asyncio>=0.23.0
+pytest-asyncio>=1.3.0,<2  # match pyproject; 0.2x/1.x differ on event-loop teardown
 pytest-cov>=4.1.0
 pytest-xdist>=3.5.0
 httpx>=0.26.0

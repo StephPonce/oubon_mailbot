@@ -168,31 +168,60 @@ class AliExpressDSClient:
                 "/api/aliexpress/auth/start to seed one"
             )
             return False
+
+        # Re-audit M8: the old refresh POSTed an UNSIGNED grant_type form,
+        # which AE's TOP gateway rejects — the "self-heal" never healed. AE
+        # token refresh is a SIGNED TOP call (method=/auth/token/refresh),
+        # mirroring the proven /auth/token/create recipe in oauth.py.
+        params = {
+            "app_key": self._app_key,
+            "method": "/auth/token/refresh",
+            "timestamp": str(int(time.time() * 1000)),
+            "format": "json",
+            "v": "2.0",
+            "sign_method": "sha256",
+            "refresh_token": refresh_token,
+        }
+        sign_string = "".join(f"{k}{v}" for k, v in sorted(params.items()))
+        params["sign"] = hmac.new(
+            self._app_secret.encode("utf-8"),
+            sign_string.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest().upper()
+
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    AE_API_BASE,
-                    data={
-                        "client_id": self._app_key,
-                        "client_secret": self._app_secret,
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token,
-                    },
-                    timeout=15,
-                ) as resp:
+                async with session.post(AE_API_BASE, params=params, timeout=15) as resp:
                     body = await resp.json(content_type=None)
         except Exception as e:
             logger.warning(f"[AE-DS] token refresh transport error: {e}")
             return False
-        new_access = body.get("access_token") if isinstance(body, dict) else None
+
+        # Success payload arrives under a *_response envelope (key name varies
+        # by gateway version); find whichever envelope carries access_token.
+        token_data: Dict[str, Any] = {}
+        if isinstance(body, dict):
+            if "error_response" in body:
+                err = body["error_response"]
+                logger.warning(
+                    f"[AE-DS] token refresh rejected: code={err.get('code')} "
+                    f"msg={err.get('msg')!r}"
+                )
+                return False
+            for v in body.values():
+                if isinstance(v, dict) and v.get("access_token"):
+                    token_data = v
+                    break
+            if not token_data and body.get("access_token"):
+                token_data = body
+
+        new_access = token_data.get("access_token")
         if not new_access:
-            logger.warning(
-                f"[AE-DS] token refresh failed: "
-                f"{(body or {}).get('error') if isinstance(body, dict) else body}"
-            )
+            keys = list(body.keys()) if isinstance(body, dict) else type(body).__name__
+            logger.warning(f"[AE-DS] token refresh failed: unexpected response keys={keys}")
             return False
-        new_refresh = body.get("refresh_token", refresh_token)
-        expires_in = int(body.get("expires_in", 86400))
+        new_refresh = token_data.get("refresh_token", refresh_token)
+        expires_in = int(token_data.get("expires_in", 86400))
         try:
             save_token("dropship", new_access, new_refresh, expires_in)
         except Exception as e:

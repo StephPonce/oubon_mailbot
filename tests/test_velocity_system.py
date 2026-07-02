@@ -16,7 +16,12 @@ from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 import random
 
-DATABASE_URL = "sqlite:///./data/multi_store.db"
+# Re-audit hygiene: this test previously pointed at the REAL repo database
+# (./data/multi_store.db) and mutated it on every host run. Isolated temp file.
+import os
+import tempfile
+
+DATABASE_URL = f"sqlite:///{os.path.join(tempfile.gettempdir(), 'ospra_velocity_test.db')}"
 
 
 async def test_database_tables():

@@ -468,12 +468,10 @@ def _compute_saturation(product: Dict) -> Dict:
 
 
 def _velocity_timeseries_key(product: Dict) -> str:
-    """Same sha256(title|image)[:32] key catalog_warm uses for product_timeseries,
-    so a product graded in discovery joins its own snapshot history."""
-    import hashlib
-    title = (product.get("title") or product.get("product_name") or "").strip().lower()
-    image = (product.get("image_url") or product.get("main_image") or "").strip()
-    return hashlib.sha256(f"{title}|{image}".encode()).hexdigest()[:32]
+    """Delegates to the SHARED identity key (re-audit M7) so reader and writer
+    can never drift: supplier-ID-first, legacy title|image hash as fallback."""
+    from ospra_os.database.product_timeseries import product_identity_key
+    return product_identity_key(product)
 
 
 def _load_velocity_saturation(product: Dict, days: int = 14) -> Optional[Dict]:
@@ -513,7 +511,14 @@ def _load_velocity_saturation(product: Dict, days: int = 14) -> Optional[Dict]:
             r.aliexpress_orders if r.aliexpress_orders is not None else r.google_trends_interest
             for r in rows
         ]
-        return velocity_saturation_from_series(advertiser_series, demand_series)
+        # Re-audit M3: pass ACTUAL day offsets so calendar gaps (including
+        # seen_in_discovery=False absence rows, whose signals are NULL) don't
+        # compress and inflate slopes.
+        day0 = rows[0].snapshot_date
+        day_offsets = [(r.snapshot_date - day0).days for r in rows]
+        return velocity_saturation_from_series(
+            advertiser_series, demand_series, day_offsets=day_offsets
+        )
     except Exception as e:
         logger.debug(f"[VELOCITY-SAT] skipped: {e}")
         return None
@@ -6522,13 +6527,22 @@ class ProductDiscoveryEngine:
             # accumulate — the flag keeps it out of live grading until then.
             if os.getenv("DISCOVERY_VELOCITY_SATURATION_ENABLED", "").strip().lower() in {"1", "true", "yes"}:
                 vsat = _load_velocity_saturation(product)
-                if vsat and vsat.get("confidence", 0) > 0:
+                # Re-audit M4: only blend when the velocity term is backed by
+                # real slope data (confidence >= 0.4 ≈ 3+ daily points). The
+                # old `> 0` gate let a 0.3-confidence density-only reading
+                # cross the >=0.3 haircut threshold via max() — thin data
+                # could flip a grade that snapshot data alone kept neutral.
+                _min_conf = float(os.getenv("VELOCITY_SAT_MIN_CONFIDENCE", "0.4"))
+                if vsat and vsat.get("confidence", 0) >= _min_conf:
                     # Velocity contributes up to VELOCITY_SAT_WEIGHT of the blend
                     # at full confidence (tunable post-validation).
                     w = vsat["confidence"] * float(os.getenv("VELOCITY_SAT_WEIGHT", "0.5"))
                     sat_score = round((1 - w) * sat_score + w * vsat["score"], 3)
                     sat_conf = max(sat_conf, vsat["confidence"])
                     product['velocity_saturation'] = vsat
+                elif vsat:
+                    # Surface for observability, but do NOT let it touch the grade.
+                    product['velocity_saturation'] = {**vsat, "blended": False}
 
             if sat_conf >= 0.3:
                 saturation_multiplier = (1.0 - sat_score) ** 0.5
@@ -7216,11 +7230,18 @@ def get_engine() -> ProductDiscoveryEngine:
     return _engine_instance
 
 
-async def discover_products(niche: str = "smart_home", count: int = 20, limit: int = None) -> List[Dict]:
+async def discover_products(
+    niche: str = "smart_home",
+    count: int = 20,
+    limit: int = None,
+    include_captions: bool = True,
+) -> List[Dict]:
     """Convenience function - accepts both 'count' and 'limit' for backward compatibility"""
     engine = get_engine()
     max_products = limit if limit is not None else count
-    return await engine.discover_products(niche=niche, max_products=max_products)
+    return await engine.discover_products(
+        niche=niche, max_products=max_products, include_captions=include_captions
+    )
 
 
 # Backward compatibility

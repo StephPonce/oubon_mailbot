@@ -50,6 +50,8 @@ def _session():
 
 
 def _bootstrap_table() -> None:
+    from sqlalchemy import text
+
     from ospra_os.database.base import Base
     from ospra_os.database.connection import engine
     from ospra_os.database.discovered_catalog import DiscoveredProduct
@@ -59,6 +61,25 @@ def _bootstrap_table() -> None:
         bind=engine,
         tables=[DiscoveredProduct.__table__, ProductTimeseries.__table__],
     )
+    # create_all never ALTERs an existing table (the June init_database lesson),
+    # so backfill columns added after the table first shipped. Idempotent.
+    try:
+        with engine.begin() as conn:
+            if engine.dialect.name == "postgresql":
+                conn.execute(text(
+                    "ALTER TABLE product_timeseries ADD COLUMN IF NOT EXISTS "
+                    "seen_in_discovery BOOLEAN NOT NULL DEFAULT TRUE"
+                ))
+            else:  # sqlite (dev/tests) — no IF NOT EXISTS for ADD COLUMN
+                cols = [r[1] for r in conn.exec_driver_sql(
+                    "PRAGMA table_info(product_timeseries)").fetchall()]
+                if "seen_in_discovery" not in cols:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE product_timeseries ADD COLUMN "
+                        "seen_in_discovery BOOLEAN NOT NULL DEFAULT 1"
+                    )
+    except Exception as e:
+        logger.warning(f"seen_in_discovery column backfill skipped: {e}")
 
 
 def _int_or_none(v):
@@ -133,6 +154,8 @@ def snapshot_timeseries(session, product: dict, niche: str) -> str:
         "opportunity_score": cat["opportunity_score"],
         "velocity_phase": cat["velocity_phase"],
         "sentiment_score": cat["sentiment_score"],
+        # A real discovery hit: flips a same-day absence row back to seen.
+        "seen_in_discovery": True,
         **sig,
     }
 
@@ -153,9 +176,12 @@ def snapshot_timeseries(session, product: dict, niche: str) -> str:
 
 
 def _product_key(product: dict) -> str:
-    title = (product.get("title") or product.get("product_name") or "").strip().lower()
-    image = (product.get("image_url") or product.get("main_image") or "").strip()
-    return hashlib.sha256(f"{title}|{image}".encode()).hexdigest()[:32]
+    """Delegates to the shared identity key (re-audit M7) — supplier-ID-first,
+    title|image hash only as fallback. Single source of truth lives next to the
+    timeseries model so writer (here) and reader (product_discovery) can never
+    drift apart again."""
+    from ospra_os.database.product_timeseries import product_identity_key
+    return product_identity_key(product)
 
 
 def _extract(product: dict, niche: str) -> dict:
@@ -214,38 +240,112 @@ async def warm_niche(niche: str) -> dict:
 
     logger.info(f"[{niche}] discovering (count={COUNT_PER_NICHE})...")
     try:
-        products = await discover_products(niche=niche, count=COUNT_PER_NICHE)
+        # include_captions=False: the cron has no reader for Shopify captions —
+        # generating them 2x/day x N niches was pure LLM spend (re-audit M11).
+        products = await discover_products(
+            niche=niche, count=COUNT_PER_NICHE, include_captions=False
+        )
     except Exception as e:  # one bad niche must not abort the whole run
         logger.error(f"[{niche}] discovery failed: {e}")
         return {"niche": niche, "discovered": 0, "new": 0, "seen": 0, "error": str(e)}
 
     new = seen = 0
     session = _session()
+    seen_keys: set = set()
     try:
         snapshots = 0
         for p in products or []:
+            # Re-audit M5: COMMIT PER PRODUCT. The old single-commit-per-niche
+            # meant one malformed product rolled back every earlier uncommitted
+            # row while the counters kept counting them — silent data loss with
+            # inflated success logs. Counters now only increment AFTER commit.
             try:
                 result = upsert_product(session, p, niche)
+                snapshot_timeseries(session, p, niche)
+                session.commit()
                 new += result == "new"
                 seen += result == "seen"
-                # #56 Phase 1 (the moat): also write today's time-series row.
-                snapshot_timeseries(session, p, niche)
                 snapshots += 1
+                seen_keys.add(_product_key(p))
             except Exception as e:
                 logger.warning(f"[{niche}] skip one product: {e}")
                 session.rollback()
-        session.commit()
+
+        # Re-audit M2 (survivorship bias): products in the catalog that did NOT
+        # resurface today still get an "absence" snapshot (signals NULL,
+        # seen_in_discovery=False), so decliners' trajectories keep recording
+        # instead of truncating exactly when they'd teach the most. Bounded to
+        # products seen in the last ABSENCE_WINDOW_DAYS so retired zombies
+        # don't snapshot forever.
+        absences = 0
+        try:
+            absences = _snapshot_absent_products(session, niche, seen_keys)
+        except Exception as e:
+            logger.warning(f"[{niche}] absence snapshots failed: {e}")
+            session.rollback()
     finally:
         session.close()
 
     logger.info(
         f"[{niche}] discovered={len(products or [])} new={new} refreshed={seen} "
-        f"snapshots={snapshots}"
+        f"snapshots={snapshots} absence_rows={absences}"
     )
     return {
         "niche": niche, "discovered": len(products or []),
-        "new": new, "seen": seen, "snapshots": snapshots,
+        "new": new, "seen": seen, "snapshots": snapshots, "absences": absences,
     }
+
+
+ABSENCE_WINDOW_DAYS = int(os.getenv("DISCOVERY_ABSENCE_WINDOW_DAYS", "30"))
+
+
+def _snapshot_absent_products(session, niche: str, seen_keys: set) -> int:
+    """Write seen_in_discovery=False snapshots for recently-active catalog
+    products that didn't appear in today's discovery output (re-audit M2)."""
+    from datetime import timedelta
+
+    from ospra_os.database.discovered_catalog import DiscoveredProduct
+    from ospra_os.database.product_timeseries import ProductTimeseries
+
+    today = datetime.utcnow().date()
+    active_cutoff = datetime.utcnow() - timedelta(days=ABSENCE_WINDOW_DAYS)
+    rows = (
+        session.query(DiscoveredProduct)
+        .filter(
+            DiscoveredProduct.niche == niche,
+            DiscoveredProduct.last_seen_at >= active_cutoff,
+        )
+        .all()
+    )
+    written = 0
+    for cat in rows:
+        if cat.product_key in seen_keys:
+            continue
+        try:
+            existing = (
+                session.query(ProductTimeseries)
+                .filter_by(product_key=cat.product_key, snapshot_date=today)
+                .first()
+            )
+            if existing is not None:
+                continue  # already has a real row today — don't overwrite
+            session.add(ProductTimeseries(
+                product_key=cat.product_key,
+                snapshot_date=today,
+                niche=niche,
+                title=cat.title,
+                # Signals + grade stay NULL: nothing was measured today.
+                # Absence itself is the datum.
+                signal_count=0,
+                seen_in_discovery=False,
+                created_at=datetime.utcnow(),
+            ))
+            session.commit()
+            written += 1
+        except Exception as e:
+            logger.warning(f"[{niche}] absence row failed for {cat.product_key[:8]}: {e}")
+            session.rollback()
+    return written
 
 
 async def run() -> dict:
@@ -282,6 +382,16 @@ async def run() -> dict:
         )
     except Exception:
         pass
+    # Re-audit M6: a run that discovers NOTHING across every niche means the
+    # data layer is dead (expired tokens, quota, outage) and the moat clock is
+    # NOT ticking. That must be loud — not a green checkmark in Render.
+    if total_disc == 0 and niches:
+        logger.error(
+            "[ALERT] Catalog warm discovered 0 products across ALL niches — "
+            "every supplier source is likely dead (check CJ/AliExpress/Apify "
+            "tokens). No snapshots were written; the timeseries clock is "
+            "stopped. This run will exit non-zero so Render shows it red."
+        )
     return {
         "niches": len(niches), "discovered": total_disc, "new": total_new,
         "seen": total_seen, "snapshots": total_snap,
@@ -291,10 +401,14 @@ async def run() -> dict:
 
 def main() -> None:
     try:
-        asyncio.run(run())
+        result = asyncio.run(run())
     except Exception as e:
         logger.error(f"Catalog warm aborted: {e}")
         sys.exit(1)
+    # M6: empty run = failed run. Exit 2 distinguishes "sources dead" from
+    # "crashed" (1) so the Render cron history tells the story at a glance.
+    if result.get("discovered", 0) == 0 and result.get("niches", 0) > 0:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

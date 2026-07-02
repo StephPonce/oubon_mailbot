@@ -1,6 +1,6 @@
-import sys
-sys.path.insert(0, '/Users/stephenponce/Documents/Ospra OS/Bots/oubon_mailbot')
-
+# Re-audit hygiene: dropped the hardcoded /Users/... sys.path hack — the
+# package imports fine from the repo root, and a machine-specific path broke
+# every other environment.
 from ospra_os.utils.image_handler import ImageHandler
 
 def test_image_download():

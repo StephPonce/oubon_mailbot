@@ -22,15 +22,24 @@ as _compute_saturation, so the two can blend directly.
 from typing import Dict, List, Optional
 
 
-def linear_slope(values: List[float]) -> float:
-    """Least-squares slope per step (per day, given daily snapshots).
+def linear_slope(values: List[float], xs: Optional[List[float]] = None) -> float:
+    """Least-squares slope PER DAY.
+
+    Re-audit M3: the original assumed uniform daily spacing (xs = 0,1,2,...),
+    so two snapshots 10 calendar days apart read as 1 day apart — inflating the
+    slope ~10x whenever the series has gaps. Callers should pass `xs` as the
+    actual day offsets of each value; the index fallback remains only for
+    genuinely gap-free daily series.
 
     Returns 0.0 for <2 points (no trend). Robust to noise vs (last-first)/n.
     """
     n = len(values)
     if n < 2:
         return 0.0
-    xs = list(range(n))
+    if xs is None:
+        xs = list(range(n))
+    if len(xs) != n:
+        raise ValueError("xs and values must be the same length")
     mean_x = sum(xs) / n
     mean_y = sum(values) / n
     denom = sum((x - mean_x) ** 2 for x in xs)
@@ -132,26 +141,60 @@ def velocity_saturation(
     }
 
 
+MIN_SLOPE_POINTS = 3  # Re-audit M4: below this, slopes are noise — contribute 0.
+
+
 def velocity_saturation_from_series(
     advertiser_series: List[Optional[float]],
     demand_series: List[Optional[float]],
+    day_offsets: Optional[List[float]] = None,
 ) -> Optional[Dict]:
     """Convenience: turn raw daily time-series into a velocity-saturation score.
 
-    `advertiser_series` / `demand_series` are oldest→newest daily values (None
-    entries are dropped). Computes weekly slopes (per-day slope × 7) and the
-    recent demand level, then calls velocity_saturation(). This is the single
-    entry point product_discovery calls after loading rows from the DB.
+    `advertiser_series` / `demand_series` are oldest→newest values; None means
+    "not measured that day". `day_offsets` are the ACTUAL day offsets of each
+    entry (e.g. [0, 1, 4, 9] for a gappy series) — re-audit M3: without them,
+    gaps compress and slopes inflate by the gap ratio. Each series keeps its
+    values paired with its OWN offsets (fixing the old None-drop misalignment).
+
+    Re-audit M4: slopes contribute 0.0 unless backed by ≥MIN_SLOPE_POINTS real
+    measurements — a 2-point "trend" no longer moves any grade component.
     """
-    adv = [float(v) for v in advertiser_series if v is not None]
-    dem = [float(v) for v in demand_series if v is not None]
-    n_points = max(len(adv), len(dem))
+    if day_offsets is None:
+        # Legacy call shape: tolerate unequal lengths by padding with None
+        # (older callers zipped the series independently).
+        n = max(len(advertiser_series), len(demand_series))
+        advertiser_series = list(advertiser_series) + [None] * (n - len(advertiser_series))
+        demand_series = list(demand_series) + [None] * (n - len(demand_series))
+        day_offsets = list(range(n))
+    else:
+        n = len(advertiser_series)
+        if len(demand_series) != n or len(day_offsets) != n:
+            raise ValueError("series and day_offsets must be the same length")
+
+    adv_pts = [(day_offsets[i], float(v))
+               for i, v in enumerate(advertiser_series) if v is not None]
+    dem_pts = [(day_offsets[i], float(v))
+               for i, v in enumerate(demand_series) if v is not None]
+    n_points = max(len(adv_pts), len(dem_pts))
     if n_points == 0:
         return None
-    advertiser_count = int(round(adv[-1])) if adv else None
-    advertiser_weekly_slope = linear_slope(adv) * 7.0 if len(adv) >= 2 else 0.0
-    demand_weekly_slope = linear_slope(dem) * 7.0 if len(dem) >= 2 else 0.0
-    demand_recent_level = (sum(dem) / len(dem)) if dem else 0.0
+
+    advertiser_count = int(round(adv_pts[-1][1])) if adv_pts else None
+
+    advertiser_weekly_slope = 0.0
+    if len(adv_pts) >= MIN_SLOPE_POINTS:
+        advertiser_weekly_slope = linear_slope(
+            [p[1] for p in adv_pts], xs=[p[0] for p in adv_pts]) * 7.0
+
+    demand_weekly_slope = 0.0
+    if len(dem_pts) >= MIN_SLOPE_POINTS:
+        demand_weekly_slope = linear_slope(
+            [p[1] for p in dem_pts], xs=[p[0] for p in dem_pts]) * 7.0
+
+    demand_recent_level = (
+        sum(p[1] for p in dem_pts) / len(dem_pts) if dem_pts else 0.0
+    )
     return velocity_saturation(
         advertiser_count=advertiser_count,
         advertiser_weekly_slope=advertiser_weekly_slope,

@@ -43,12 +43,65 @@ import time
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
 
-# OAuth CSRF state still lives in-process. It's session-scoped (cleared after
-# the callback consumes it) and not a credential, so the multi-worker
-# fragility is bounded — at worst the state check fails and the user has to
-# reauth, never a credential leak. A follow-up will move this to Redis along
-# with the Shopify/Woo OAuth state stores (audit blocker #8).
-_oauth_state: Optional[str] = None
+# ---------------------------------------------------------------------------
+# OAuth CSRF state — re-audit S1 fix.
+#
+# The old design stored one state string in-process and SKIPPED verification
+# when the callback arrived without a state param. That allowed an attacker to
+# authorize THEIR AliExpress account and hit /callback with their code —
+# overwriting the platform-wide supplier credential (token-planting). It also
+# broke on multi-worker deploys (each worker had its own _oauth_state).
+#
+# New design — stateless + owner-bound, works on any number of workers:
+#   * /auth/start requires proof of ownership (a logged-in user OR the
+#     AE_OAUTH_SETUP_KEY env value passed as ?key=...), then mints an
+#     HMAC-signed state: "<nonce>.<expiry>.<sig>" (10-min TTL).
+#   * /callback REQUIRES a state that verifies against the same secret.
+#     No valid state → 400, unconditionally. Only /auth/start can mint one,
+#     and only the owner can reach /auth/start — closing the planting hole.
+# ---------------------------------------------------------------------------
+import hashlib
+import hmac as _hmac
+import secrets as _secrets
+
+_OAUTH_STATE_TTL_SECONDS = 600
+
+
+def _state_secret() -> bytes:
+    from ospra_os.auth.jwt_auth import SECRET_KEY
+    return f"ae-oauth-state:{SECRET_KEY}".encode()
+
+
+def _make_oauth_state() -> str:
+    nonce = _secrets.token_urlsafe(16)
+    expiry = int(time.time()) + _OAUTH_STATE_TTL_SECONDS
+    payload = f"{nonce}.{expiry}"
+    sig = _hmac.new(_state_secret(), payload.encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{payload}.{sig}"
+
+
+def _verify_oauth_state(state: Optional[str]) -> bool:
+    if not state:
+        return False
+    parts = state.split(".")
+    if len(parts) != 3:
+        return False
+    nonce, expiry_raw, sig = parts
+    try:
+        if int(expiry_raw) < time.time():
+            return False  # expired
+    except ValueError:
+        return False
+    expected = _hmac.new(
+        _state_secret(), f"{nonce}.{expiry_raw}".encode(), hashlib.sha256
+    ).hexdigest()[:32]
+    return _hmac.compare_digest(expected, sig)
+
+
+def _setup_key_ok(key: Optional[str]) -> bool:
+    """True when the caller presented the AE_OAUTH_SETUP_KEY env value."""
+    configured = os.getenv("AE_OAUTH_SETUP_KEY", "").strip()
+    return bool(configured) and bool(key) and _hmac.compare_digest(configured, key)
 
 # Platform credential cache. Source of truth is the DB; this is a cheap
 # memo so /auth/status and /auth/token don't round-trip Postgres on every
@@ -104,22 +157,35 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
 
 
 @router.get("/auth/start")
-async def start_oauth(oauth: AliExpressOAuth = Depends(get_oauth_client)):
+async def start_oauth(
+    key: Optional[str] = Query(None, description="AE_OAUTH_SETUP_KEY value"),
+    oauth: AliExpressOAuth = Depends(get_oauth_client),
+):
     """
     STEP 1 & 2: Start OAuth flow and guide user to authorize.
 
+    SECURITY (re-audit S1): only the owner may mint an OAuth state — pass
+    ?key=<AE_OAUTH_SETUP_KEY> (set that env var on the API service first).
+    Without it, an attacker could mint a state and plant their own AliExpress
+    token as the platform credential.
+
     Returns an HTML page with instructions and authorization button.
     """
-    global _oauth_state
+    if not _setup_key_ok(key):
+        configured = bool(os.getenv("AE_OAUTH_SETUP_KEY", "").strip())
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "OAuth setup requires ?key=<AE_OAUTH_SETUP_KEY>."
+                if configured else
+                "Set AE_OAUTH_SETUP_KEY on the API service, then open "
+                "/aliexpress/auth/start?key=<that value>."
+            ),
+        )
 
     try:
-        auth_url = oauth.get_authorization_url()
-
-        # Store state for CSRF protection
-        from urllib.parse import urlparse, parse_qs
-        parsed = urlparse(auth_url)
-        params = parse_qs(parsed.query)
-        _oauth_state = params.get("state", [None])[0]
+        # Mint the HMAC-signed CSRF state and bake it into the authorize URL.
+        auth_url = oauth.get_authorization_url(state=_make_oauth_state())
 
         # Return HTML page with authorization button
         from fastapi.responses import HTMLResponse
@@ -213,8 +279,6 @@ async def oauth_callback(
 
     AliExpress redirects here after user approves → exchange code for token
     """
-    global _oauth_state
-
     # Check for errors
     if error:
         return JSONResponse(
@@ -236,15 +300,17 @@ async def oauth_callback(
             }
         )
 
-    # Verify state (optional for now)
-    if state and _oauth_state and state != _oauth_state:
+    # SECURITY (re-audit S1): state is MANDATORY and must verify. The old code
+    # skipped the check when state was absent, which allowed token-planting —
+    # an attacker authorizing their own AE account into our platform slot.
+    # (Never echo the expected value back.)
+    if not _verify_oauth_state(state):
         return JSONResponse(
             status_code=400,
             content={
                 "success": False,
-                "error": "Invalid state parameter (CSRF protection)",
-                "expected": _oauth_state,
-                "received": state
+                "error": "Missing or invalid state parameter (CSRF protection)",
+                "hint": "Restart the flow at /aliexpress/auth/start",
             }
         )
 

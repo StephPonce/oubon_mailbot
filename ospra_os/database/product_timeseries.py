@@ -20,13 +20,38 @@ Design notes:
   confidence gate can mark thin days as low-confidence rather than bad products.
 """
 
+import hashlib
 from datetime import datetime
 
 from sqlalchemy import (
-    Column, Date, DateTime, Float, Integer, String, UniqueConstraint, Index,
+    Boolean, Column, Date, DateTime, Float, Integer, String, UniqueConstraint, Index,
 )
 
 from ospra_os.database.base import Base
+
+
+def product_identity_key(product: dict) -> str:
+    """THE product identity for catalog/timeseries joins — single source of truth.
+
+    Re-audit M7: the original key was sha256(title|image), but supplier titles
+    and CDN image URLs mutate — any change forked the product's history and
+    reset its proof-age, silently undermining the "days of proof" premise.
+
+    Prefer IMMUTABLE supplier IDs (in deterministic priority order); fall back
+    to the legacy title|image hash ONLY when no supplier ID exists. The field
+    name is baked into the hash so cj_pid=123 and product_id=123 can't collide.
+
+    Used by BOTH catalog_warm (writer) and product_discovery (reader) — do not
+    duplicate this logic elsewhere.
+    """
+    for field in ("cj_pid", "aliexpress_product_id", "product_id", "productId",
+                  "supplier_product_id"):
+        val = product.get(field)
+        if val not in (None, "", 0):
+            return hashlib.sha256(f"{field}:{val}".encode()).hexdigest()[:32]
+    title = (product.get("title") or product.get("product_name") or "").strip().lower()
+    image = (product.get("image_url") or product.get("main_image") or "").strip()
+    return hashlib.sha256(f"{title}|{image}".encode()).hexdigest()[:32]
 
 
 class ProductTimeseries(Base):
@@ -59,6 +84,13 @@ class ProductTimeseries(Base):
 
     # How many of the 5 raw signals were fresh this day (confidence gate).
     signal_count = Column(Integer, nullable=False, default=0)
+
+    # Re-audit M2 (survivorship bias): False = the product was in the catalog
+    # but did NOT appear in this day's discovery output. These "absence rows"
+    # keep dropped products' trajectories alive — the decliners are exactly
+    # what the velocity model needs to learn from. Signals are NULL on such
+    # rows; presence/absence itself is the datum.
+    seen_in_discovery = Column(Boolean, nullable=False, default=True)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 

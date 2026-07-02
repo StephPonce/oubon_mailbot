@@ -159,74 +159,41 @@ class TokenRefreshJob:
 
     def _refresh_aliexpress_tokens(self) -> Dict[str, int]:
         """
-        Check and refresh AliExpress tokens approaching expiry.
+        Proactively refresh the platform AliExpress dropship token when it's
+        approaching expiry.
 
-        Returns:
-            Dict with refreshed and failed counts
+        Re-audit M9: the old implementation queried the legacy AliExpressToken
+        ORM model, whose columns (is_valid, expires_at) don't physically exist
+        in the `aliexpress_tokens` table the OAuth callback actually writes
+        (api_type/obtained_at/expires_in schema) — so this job errored on
+        every run and was dead code. It now reads the REAL token store and
+        delegates to the DS client's signed refresh (single refresh
+        implementation, shared with the on-demand self-heal).
         """
-        refreshed = 0
-        failed = 0
-
         try:
-            # Get AliExpress OAuth credentials from environment
             app_key = os.getenv("ALIEXPRESS_APP_KEY")
             app_secret = os.getenv("ALIEXPRESS_APP_SECRET")
-            redirect_uri = os.getenv("ALIEXPRESS_REDIRECT_URI", "")
-
             if not app_key or not app_secret:
                 logger.debug("AliExpress OAuth not configured, skipping token refresh")
                 return {"refreshed": 0, "failed": 0}
 
-            # Get database session
-            session = get_multi_store_session(self.database_url)
-
-            # Calculate threshold: tokens expiring within buffer period
-            expiry_threshold = datetime.now(timezone.utc) + timedelta(days=ALIEXPRESS_REFRESH_BUFFER_DAYS)
-
-            # Find tokens approaching expiry (limit to prevent memory issues)
-            expiring_tokens = session.query(AliExpressToken).filter(
-                AliExpressToken.is_valid == True,
-                AliExpressToken.expires_at <= expiry_threshold,
-                AliExpressToken.refresh_token.isnot(None)
-            ).limit(100).all()
-
-            if not expiring_tokens:
-                logger.debug("No AliExpress tokens need refresh")
+            from ospra_os.database.aliexpress_tokens import load_token
+            payload = load_token("dropship")
+            if not payload or not payload.get("refresh_token"):
+                logger.debug("No dropship refresh_token stored — nothing to refresh")
+                return {"refreshed": 0, "failed": 0}
+            if not payload.get("needs_refresh") and not payload.get("is_expired"):
+                logger.debug("AliExpress dropship token still fresh")
                 return {"refreshed": 0, "failed": 0}
 
-            logger.info(f"Found {len(expiring_tokens)} AliExpress token(s) approaching expiry")
-
-            # Initialize OAuth client
-            oauth = AliExpressOAuth(
-                app_key=app_key,
-                app_secret=app_secret,
-                redirect_uri=redirect_uri,
-                database_url=self.database_url
-            )
-
-            # Refresh each token
-            for token in expiring_tokens:
-                try:
-                    logger.info(f"Refreshing AliExpress token (expires: {token.expires_at})")
-
-                    result = oauth.refresh_access_token(token.refresh_token)
-
-                    if result.get("success"):
-                        refreshed += 1
-                        logger.info(f"[SUCCESS] Token refreshed, new expiry: {result.get('expires_at')}")
-                    else:
-                        failed += 1
-                        logger.error(f"Token refresh failed: {result.get('error')}")
-
-                        # Mark token as invalid if refresh fails
-                        token.is_valid = False
-                        session.commit()
-
-                except Exception as e:
-                    failed += 1
-                    logger.error(f"Error refreshing token {token.id}: {e}")
-
-            return {"refreshed": refreshed, "failed": failed}
+            import asyncio as _asyncio
+            from ospra_os.aliexpress.ds_client import AliExpressDSClient
+            ok = _asyncio.run(AliExpressDSClient()._refresh_token())
+            if ok:
+                logger.info("[SUCCESS] AliExpress dropship token proactively refreshed")
+                return {"refreshed": 1, "failed": 0}
+            logger.warning("AliExpress dropship token refresh failed — will retry next cycle")
+            return {"refreshed": 0, "failed": 1}
 
         except Exception as e:
             logger.error(f"AliExpress token refresh check failed: {e}")
