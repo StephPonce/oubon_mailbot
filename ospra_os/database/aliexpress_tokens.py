@@ -25,19 +25,27 @@ class AliExpressToken(Base):
 
     @property
     def expires_at(self):
-        """Calculate expiration time"""
+        """Calculate expiration time (naive UTC, matching the column)."""
         return self.obtained_at + timedelta(seconds=self.expires_in)
+
+    # Adversarial-review fix (re-audit follow-up): `obtained_at` is a naive
+    # DateTime column, so `expires_at` is naive — comparing it against the
+    # AWARE datetime.now(timezone.utc) raised
+    # `TypeError: can't compare offset-naive and offset-aware datetimes`
+    # on EVERY load of a real token row. That crash silently disabled both
+    # the DS self-heal and the proactive refresh job (load_token caught it
+    # and returned None). Compare naive-to-naive.
 
     @property
     def is_expired(self):
         """Check if token is expired"""
-        return datetime.now(timezone.utc) >= self.expires_at
+        return datetime.utcnow() >= self.expires_at
 
     @property
     def needs_refresh(self):
         """Check if token needs refresh (7 days before expiry)"""
         refresh_threshold = self.expires_at - timedelta(days=7)
-        return datetime.now(timezone.utc) >= refresh_threshold
+        return datetime.utcnow() >= refresh_threshold
 
 
 # Database connection

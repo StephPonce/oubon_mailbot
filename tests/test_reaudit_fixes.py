@@ -364,3 +364,113 @@ class TestDSRefresh:
         import ospra_os.database.aliexpress_tokens as tok
         monkeypatch.setattr(tok, "load_token", lambda api_type: {"access_token": "x"})
         assert asyncio.run(client._refresh_token()) is False
+
+
+# ---------------------------------------------------------------------------
+# Adversarial-review follow-ups (the bugs the mocked tests hid)
+# ---------------------------------------------------------------------------
+
+class TestTokenRoundTripUnmocked:
+    """The M8 refresh was 'fixed' but unreachable in prod: load_token raised
+    TypeError (naive vs aware datetime) on EVERY real row — invisible to the
+    earlier tests because they monkeypatched load_token. This round-trip uses
+    the REAL save/load path against a real (temp) database."""
+
+    def test_save_then_load_returns_usable_payload(self, tmp_path, monkeypatch):
+        db = tmp_path / "tok.db"
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
+        # Fresh import so the module binds to the temp DATABASE_URL.
+        import importlib
+        import ospra_os.database.aliexpress_tokens as tok
+        importlib.reload(tok)
+        try:
+            tok.init_db()
+            assert tok.save_token("dropship", "at-1", "rt-1", 3600)
+            payload = tok.load_token("dropship")   # must NOT raise TypeError
+            assert payload is not None
+            assert payload["access_token"] == "at-1"
+            assert payload["refresh_token"] == "rt-1"
+            assert payload["is_expired"] is False
+            assert isinstance(payload["needs_refresh"], bool)
+
+            # Expired token: is_expired flips without raising.
+            assert tok.save_token("dropship", "at-2", "rt-2", 1)
+            import time as _t
+            _t.sleep(1.1)
+            payload = tok.load_token("dropship")
+            assert payload["is_expired"] is True
+        finally:
+            importlib.reload(tok)  # restore module state for other tests
+
+
+class TestAbsenceGating:
+    def test_no_absence_rows_on_zero_discovery_run(self, session, monkeypatch):
+        """Outage days must NOT be recorded as 'every product vanished'."""
+        now = datetime.utcnow()
+        session.add(DiscoveredProduct(
+            product_key="0" * 32, niche="smart_home", title="Active Product",
+            first_seen_at=now - timedelta(days=2), last_seen_at=now - timedelta(days=1),
+            times_seen=2, created_at=now,
+        ))
+        session.commit()
+
+        monkeypatch.setattr(cw, "_session", lambda: session)
+
+        async def dead_sources(niche, count, include_captions=True):
+            return []
+        import ospra_os.intelligence.product_discovery as pd
+        monkeypatch.setattr(pd, "discover_products", dead_sources)
+
+        result = asyncio.run(cw.warm_niche("smart_home"))
+        assert result["discovered"] == 0
+        assert session.query(ProductTimeseries).count() == 0, \
+            "zero-discovery run must write NO absence rows"
+
+    def test_failed_commit_product_not_marked_absent(self, session, monkeypatch):
+        """A product discovered today whose persistence failed must not get a
+        seen_in_discovery=False row — it did NOT vanish from the market."""
+        now = datetime.utcnow()
+        bad = {"cj_pid": "CJ-EXPLODES", "title": "Fragile", "image_url": "i"}
+        key = cw._product_key(bad)
+        session.add(DiscoveredProduct(
+            product_key=key, niche="smart_home", title="Fragile",
+            first_seen_at=now - timedelta(days=2), last_seen_at=now - timedelta(days=1),
+            times_seen=2, created_at=now,
+        ))
+        session.commit()
+
+        monkeypatch.setattr(cw, "_session", lambda: session)
+        real_snapshot = cw.snapshot_timeseries
+
+        def exploding(sess, product, niche):
+            if product.get("cj_pid") == "CJ-EXPLODES":
+                raise RuntimeError("boom")
+            return real_snapshot(sess, product, niche)
+        monkeypatch.setattr(cw, "snapshot_timeseries", exploding)
+
+        async def fake_discover(niche, count, include_captions=True):
+            return [dict(bad), dict(GOOD)]
+        import ospra_os.intelligence.product_discovery as pd
+        monkeypatch.setattr(pd, "discover_products", fake_discover)
+
+        asyncio.run(cw.warm_niche("smart_home"))
+        rows = {r.product_key: r for r in session.query(ProductTimeseries).all()}
+        assert key not in rows or rows[key].seen_in_discovery is True
+
+
+class TestDemoIdentityFallback:
+    def test_demo_product_id_falls_back_to_stable_hash(self):
+        """Timestamped demo IDs must not fork identity every run."""
+        d1 = {"product_id": "demo_smart_home_1_1750000000", "title": "Demo Plug", "image_url": "d.jpg"}
+        d2 = {"product_id": "demo_smart_home_1_1750000999", "title": "Demo Plug", "image_url": "d.jpg"}
+        assert product_identity_key(d1) == product_identity_key(d2)
+
+
+def test_zero_snapshots_with_discoveries_exits_nonzero(monkeypatch):
+    """DB dead while APIs healthy = moat clock stopped = red cron."""
+    async def db_dead_run():
+        return {"niches": 5, "discovered": 40, "new": 0, "seen": 0, "snapshots": 0}
+    monkeypatch.setattr(cw, "run", db_dead_run)
+    with pytest.raises(SystemExit) as exc:
+        cw.main()
+    assert exc.value.code == 2

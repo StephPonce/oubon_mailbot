@@ -18,7 +18,6 @@ any web deploy has provisioned it (same pattern as trend_warm).
 """
 
 import asyncio
-import hashlib
 import logging
 import os
 import sys
@@ -260,13 +259,16 @@ async def warm_niche(niche: str) -> dict:
             # row while the counters kept counting them — silent data loss with
             # inflated success logs. Counters now only increment AFTER commit.
             try:
+                # Discovered today regardless of persistence outcome — a
+                # failed COMMIT below must not mislabel the product as
+                # "absent from discovery" in the absence pass.
+                seen_keys.add(_product_key(p))
                 result = upsert_product(session, p, niche)
                 snapshot_timeseries(session, p, niche)
                 session.commit()
                 new += result == "new"
                 seen += result == "seen"
                 snapshots += 1
-                seen_keys.add(_product_key(p))
             except Exception as e:
                 logger.warning(f"[{niche}] skip one product: {e}")
                 session.rollback()
@@ -277,12 +279,23 @@ async def warm_niche(niche: str) -> dict:
         # instead of truncating exactly when they'd teach the most. Bounded to
         # products seen in the last ABSENCE_WINDOW_DAYS so retired zombies
         # don't snapshot forever.
+        #
+        # Adversarial-review fix: ONLY when discovery itself produced output.
+        # A zero-product run means the SOURCES are dead (the M6 alert case),
+        # not that every product vanished — writing absence rows on outage
+        # days would poison the presence data with false "gone" signals.
         absences = 0
-        try:
-            absences = _snapshot_absent_products(session, niche, seen_keys)
-        except Exception as e:
-            logger.warning(f"[{niche}] absence snapshots failed: {e}")
-            session.rollback()
+        if products:
+            try:
+                absences = _snapshot_absent_products(session, niche, seen_keys)
+            except Exception as e:
+                logger.warning(f"[{niche}] absence snapshots failed: {e}")
+                session.rollback()
+        else:
+            logger.info(
+                f"[{niche}] discovery returned 0 products — skipping absence "
+                f"snapshots (source outage, not product disappearance)"
+            )
     finally:
         session.close()
 
@@ -407,7 +420,12 @@ def main() -> None:
         sys.exit(1)
     # M6: empty run = failed run. Exit 2 distinguishes "sources dead" from
     # "crashed" (1) so the Render cron history tells the story at a glance.
-    if result.get("discovered", 0) == 0 and result.get("niches", 0) > 0:
+    # Also red when products were discovered but ZERO snapshots persisted
+    # (DB dead while APIs healthy) — the moat clock is equally stopped.
+    if result.get("niches", 0) > 0 and (
+        result.get("discovered", 0) == 0
+        or (result.get("discovered", 0) > 0 and result.get("snapshots", 0) == 0)
+    ):
         sys.exit(2)
 
 

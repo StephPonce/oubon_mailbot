@@ -47,8 +47,15 @@ def product_identity_key(product: dict) -> str:
     for field in ("cj_pid", "aliexpress_product_id", "product_id", "productId",
                   "supplier_product_id"):
         val = product.get(field)
-        if val not in (None, "", 0):
-            return hashlib.sha256(f"{field}:{val}".encode()).hexdigest()[:32]
+        if val in (None, "", 0):
+            continue
+        # Demo-fallback products carry a TIMESTAMPED product_id
+        # (demo_<niche>_<i>_<ts>) — under an ID-based key their identity would
+        # fork every run. Let them fall through to the title|image hash,
+        # which is stable for them.
+        if isinstance(val, str) and val.startswith("demo_"):
+            continue
+        return hashlib.sha256(f"{field}:{val}".encode()).hexdigest()[:32]
     title = (product.get("title") or product.get("product_name") or "").strip().lower()
     image = (product.get("image_url") or product.get("main_image") or "").strip()
     return hashlib.sha256(f"{title}|{image}".encode()).hexdigest()[:32]

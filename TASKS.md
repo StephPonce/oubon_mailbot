@@ -28,7 +28,7 @@ Affiliate path dead-ended (Steph not enrolled in affiliate portal → no trackin
 - **LIVE TEST RESULT:** DS auth + signing correct, but **token EXPIRED** — AE returns `IllegalAccessToken`. DB has NO dropship token/refresh_token either. So DS returns **0 products until re-authorized.**
 - **OWNER ACTION (to make DS return products):**
   1. Ensure AE app **520918** has OAuth callback URL = `{API}/aliexpress/callback` registered, and Render `BASE_URL` = the API host.
-  2. Visit **`{API}/api/aliexpress/auth/start`**, authorize with the AE seller account → callback stores a fresh DS token **+ refresh_token** in the `aliexpress_tokens` DB (api_type=dropship). After that, auto-refresh keeps it alive (no more expiring-token fires).
+  2. Visit **`{API}/aliexpress/auth/start?key=<AE_OAUTH_SETUP_KEY>`** (set that env var on the API service first — hardened in #60c), authorize with the AE seller account → callback stores a fresh DS token **+ refresh_token** in the `aliexpress_tokens` DB (api_type=dropship). After that, auto-refresh keeps it alive (no more expiring-token fires).
   3. (Quick stopgap only) a freshly-generated `ALIEXPRESS_ACCESS_TOKEN` env will now be used too — but it has no refresh_token, so it'll expire again; OAuth is the durable fix.
 - **Follow-up:** populate `_AE_DS_NICHE_CATEGORY` (niche → AE category_ids) for sharper per-niche feeds (currently global feed + niche gate). Plus #58's redundant 2nd supplier pass.
 

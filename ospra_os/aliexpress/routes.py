@@ -53,8 +53,8 @@ router = APIRouter(prefix="/aliexpress", tags=["aliexpress"])
 # broke on multi-worker deploys (each worker had its own _oauth_state).
 #
 # New design — stateless + owner-bound, works on any number of workers:
-#   * /auth/start requires proof of ownership (a logged-in user OR the
-#     AE_OAUTH_SETUP_KEY env value passed as ?key=...), then mints an
+#   * /auth/start requires proof of ownership (the AE_OAUTH_SETUP_KEY env
+#     value passed as ?key=...), then mints an
 #     HMAC-signed state: "<nonce>.<expiry>.<sig>" (10-min TTL).
 #   * /callback REQUIRES a state that verifies against the same secret.
 #     No valid state → 400, unconditionally. Only /auth/start can mint one,
