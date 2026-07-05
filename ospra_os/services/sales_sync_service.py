@@ -9,11 +9,17 @@ enables the entire feedback loop system.
 Without real sales data, the AI cannot learn what actually works.
 """
 
+import logging
 import httpx
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
+
+# T90: this module referenced `logger` with no import — so the per-store
+# except handler (the "don't fail the whole batch" resilience path) itself
+# raised NameError on the FIRST store error, aborting the entire G4 sync run.
+logger = logging.getLogger(__name__)
 
 from ospra_os.database import (
     Store, Product, ProductPerformance,

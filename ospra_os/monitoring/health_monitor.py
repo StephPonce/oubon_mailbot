@@ -5,6 +5,7 @@ Central health monitoring for all system components
 
 import uuid
 import asyncio
+import logging
 import time
 import os
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,8 @@ import httpx
 
 from ospra_os.monitoring.metrics_collector import metrics_collector
 from ospra_os.monitoring.error_tracker import error_tracker
+
+logger = logging.getLogger(__name__)  # T86: `logger` used at :554 with no import → crash on any psutil failure
 from ospra_os.monitoring.job_monitor import job_monitor
 from ospra_os.core.settings import get_settings
 

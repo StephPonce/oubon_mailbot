@@ -45,7 +45,8 @@ from .jwt_handler import (
     hash_password,
     verify_password,
     get_token_info,
-    TokenPair
+    TokenPair,
+    ACCESS_TOKEN_EXPIRE_MINUTES,  # T84: report the real TTL, not a hardcoded 15m
 )
 from .dependencies import (
     require_auth,
@@ -357,7 +358,7 @@ async def refresh_tokens(request: RefreshRequest, db: Session = Depends(get_db))
         access_token=new_access,
         refresh_token=new_refresh,
         token_type="bearer",
-        expires_in=15 * 60  # 15 minutes
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # T84: real configured lifetime
     )
 
 

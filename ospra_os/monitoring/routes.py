@@ -37,7 +37,7 @@ async def get_overall_health():
     1. GET /api/health
     Returns: Overall system health status with service details
     """
-    from datetime import datetime
+    from datetime import datetime, timezone  # T87: timezone was missing → NameError on /api/health
 
     integrations = await health_monitor.check_all_integrations()
     overall_status = await health_monitor.get_overall_status()

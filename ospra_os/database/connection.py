@@ -398,21 +398,26 @@ def init_database(database_url: str = None):
             Base.metadata.create_all(bind=engine)
         except Exception as create_error:
             print(f"[DB INIT] create_all() failed: {create_error}")
-            
-            # For empty databases, try dropping everything first
+
+            # Audit T100 — DATA-LOSS FIX. The previous code, on a create_all
+            # failure against a NON-EMPTY database, ran
+            #   DROP TABLE ... CASCADE
+            # on every existing table and retried — i.e. it wiped all
+            # production data (orders, users, tokens, snapshots) to "fix" a
+            # schema error. `create_all` is idempotent (it only CREATEs missing
+            # tables), so a failure here means a genuine schema conflict a human
+            # must resolve via a migration, NOT something to paper over by
+            # deleting data. Never auto-drop. Fail loud so the deploy is red and
+            # the DB is untouched.
             if len(existing_tables) > 0:
-                print("[DB INIT] Partial schema detected - attempting clean slate...")
-                from sqlalchemy import text
-                with engine.connect() as conn:
-                    for table in existing_tables:
-                        try:
-                            conn.execute(text(f'DROP TABLE IF EXISTS "{table}" CASCADE'))
-                        except Exception as e:
-                            logger.warning(f"Failed to drop table {table}: {e}")
-                    conn.commit()
-                
-                # Retry create_all
-                Base.metadata.create_all(bind=engine)
+                raise RuntimeError(
+                    "[DB INIT] create_all() failed against a non-empty database. "
+                    "Refusing to auto-drop tables (would destroy data). Resolve "
+                    "the schema conflict with an Alembic migration and redeploy. "
+                    f"Original error: {create_error}"
+                ) from create_error
+            # Empty DB: safe to surface the real error (no data to lose).
+            raise
         
         # Final verification
         inspector = inspect(engine)

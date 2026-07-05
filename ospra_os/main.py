@@ -4426,7 +4426,7 @@ async def trends_websocket(websocket: WebSocket):
     """
     import asyncio
     import json
-    from datetime import datetime
+    from datetime import datetime, timezone  # T83: timezone was missing → NameError on every update
 
     await websocket.accept()
     logger.info("[SUCCESS] WebSocket client connected to /ws/trends")

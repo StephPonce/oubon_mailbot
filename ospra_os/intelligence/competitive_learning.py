@@ -534,9 +534,11 @@ def get_competitive_learning_engine(db: Session) -> CompetitiveLearningEngine:
 
     load_dotenv()
 
-    claude_key = os.getenv("CLAUDE_API_KEY")
+    # T99: the rest of the codebase uses ANTHROPIC_API_KEY; this path read the
+    # nonexistent CLAUDE_API_KEY and raised on every call in a standard deploy.
+    claude_key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY")
     if not claude_key:
-        raise ValueError("CLAUDE_API_KEY not found in environment")
+        raise ValueError("ANTHROPIC_API_KEY not found in environment")
 
     claude = ClaudeProvider(api_key=claude_key)
 
