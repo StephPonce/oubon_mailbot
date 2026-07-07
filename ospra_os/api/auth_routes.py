@@ -195,6 +195,17 @@ async def login(
         db=db,
     )
 
+    # PostHog: identify returning user and capture login event
+    posthog_identify(
+        user.id,
+        properties={"plan": getattr(user, "subscription_tier", "nest")},
+    )
+    posthog_capture(
+        user.id,
+        "user_logged_in",
+        properties={"plan": getattr(user, "subscription_tier", "nest")},
+    )
+
     # Generate tokens
     return generate_tokens(user)
 

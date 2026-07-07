@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from ospra_os.services.product_deployer import ProductDeployer
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database.user_models import User
+from ospra_os.observability.posthog_client import capture as posthog_capture, FunnelEvent
 
 logger = logging.getLogger(__name__)
 
@@ -307,6 +308,17 @@ async def deploy_product(
                     f"[self-learning] failed to record outcome for deploy "
                     f"(deploy itself succeeded): {exc}"
                 )
+
+            posthog_capture(
+                current_user.id,
+                FunnelEvent.FIRST_DEPLOY,
+                properties={
+                    "niche": request.niche,
+                    "source": request.product.source,
+                    "published": result.get("published"),
+                    "total_cost": result.get("total_cost"),
+                },
+            )
 
             return DeployResponse(
                 success=True,

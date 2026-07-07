@@ -28,6 +28,7 @@ from ospra_os.security.webhook_verification import (
 )
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.observability.posthog_client import capture as posthog_capture, FunnelEvent
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,11 @@ async def lemonsqueezy_subscription(
             if user_id and tier:
                 _enqueue_tier_change(int(user_id), tier, event_name, data)
                 logger.info(f"[SUCCESS] Scheduled tier upgrade for user {user_id} to {tier}")
+                posthog_capture(
+                    int(user_id),
+                    FunnelEvent.SUBSCRIPTION_STARTED,
+                    properties={"tier": tier, "billing_status": status},
+                )
             else:
                 logger.warning(f"[WARNING] Missing user_id or tier in custom_data")
 
@@ -202,12 +208,22 @@ async def lemonsqueezy_subscription(
                 if user_id:
                     _enqueue_tier_change(int(user_id), "nest", event_name, data)
                     logger.info(f"[DOWNGRADE] User {user_id} subscription {status}")
+                    posthog_capture(
+                        int(user_id),
+                        FunnelEvent.SUBSCRIPTION_CANCELLED,
+                        properties={"tier": tier, "billing_status": status},
+                    )
 
         elif event_name == "subscription_cancelled":
             # Downgrade to free tier
             if user_id:
                 _enqueue_tier_change(int(user_id), "nest", event_name, data)
                 logger.info(f"[DOWNGRADE] User {user_id} subscription cancelled")
+                posthog_capture(
+                    int(user_id),
+                    FunnelEvent.SUBSCRIPTION_CANCELLED,
+                    properties={"tier": tier, "billing_status": "cancelled"},
+                )
         
         return {
             "success": True,

@@ -31,6 +31,7 @@ from urllib.parse import urlencode, parse_qs
 from pydantic import BaseModel
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.observability.posthog_client import capture as posthog_capture, FunnelEvent
 from ospra_os.security.security_audit import (
     log_oauth_completed,
     log_credential_stored,
@@ -464,7 +465,13 @@ async def oauth_callback(
     # STEP 8: Redirect to frontend with success
     # ==========================================================
     logger.info(f"🎉 Store {store_name} ({shop_domain}) successfully connected!")
-    
+
+    posthog_capture(
+        user_id,
+        FunnelEvent.SHOPIFY_CONNECTED,
+        properties={"shop_domain": shop_domain},
+    )
+
     success_url = (
         f"{get_frontend_url()}/settings/stores"
         f"?success=true"

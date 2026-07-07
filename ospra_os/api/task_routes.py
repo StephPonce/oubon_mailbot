@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from ospra_os.celery_app import celery_app
 from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.database import User
+from ospra_os.observability.posthog_client import capture as posthog_capture, FunnelEvent
 from ospra_os.api.schemas import (
     TaskStatusResponse,
     ActiveTaskResponse,
@@ -314,6 +315,12 @@ def trigger_product_discovery(
         from ospra_os.tasks.product_tasks import discover_products_for_user
 
         result = discover_products_for_user.delay(user_id)
+
+        posthog_capture(
+            user.id,
+            FunnelEvent.FIRST_DISCOVERY,
+            properties={"target_user_id": user_id},
+        )
 
         return {
             "task_id": result.id,

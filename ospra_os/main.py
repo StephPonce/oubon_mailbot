@@ -1132,6 +1132,17 @@ if _HAS_OBSERVABILITY:
         except Exception as _e:
             logger.warning(f"PostHog init failed (analytics disabled): {_e}")
 
+    # Setup LLM analytics — OTel auto-instrumentation for Anthropic + OpenAI
+    if settings.POSTHOG_ENABLED and settings.POSTHOG_API_KEY:
+        try:
+            from ospra_os.observability.llm_tracing import setup_llm_tracing
+            setup_llm_tracing(
+                posthog_api_key=settings.POSTHOG_API_KEY,
+                posthog_host=settings.POSTHOG_HOST,
+            )
+        except Exception as _e:
+            logger.warning(f"LLM tracing init failed (AI observability disabled): {_e}")
+
     # Register exception handlers
     register_exception_handlers(app)
 
