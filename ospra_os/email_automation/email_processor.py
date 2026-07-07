@@ -224,8 +224,24 @@ class EmailProcessor:
             references = headers.get("references", "")
             in_reply_to = headers.get("in-reply-to", "")
 
-            # If this email has threading headers, it's a customer response - allow AI to continue
-            is_customer_response = bool(references or in_reply_to)
+            # T110: a threading header alone does NOT prove this is a genuine
+            # customer reply. Our OWN re-ingested outbound and a spoofed
+            # In-Reply-To also carry these headers, and treating them as
+            # "customer responded" restarts the auto-reply loop against
+            # ourselves. Require a threading header AND that this message is not
+            # our own outbound. Gmail tags our sent mail with the SENT system
+            # label (no config needed); a sender in OSPRA_SELF_EMAILS is also us.
+            import os as _os
+            _self_emails = {
+                e.strip().lower()
+                for e in _os.getenv("OSPRA_SELF_EMAILS", "").split(",")
+                if e.strip()
+            }
+            _is_own_outbound = (
+                "SENT" in full_msg.get("labelIds", [])
+                or (from_email or "").lower() in _self_emails
+            )
+            is_customer_response = bool(references or in_reply_to) and not _is_own_outbound
 
             if is_customer_response:
                 can_reply = True

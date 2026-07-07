@@ -91,9 +91,22 @@ class AIEmailResponder:
         return self._router
     
     def is_operating_hours(self) -> bool:
-        """Check if within business hours."""
-        now = datetime.now().time()
-        return self.OPERATING_HOURS_START <= now <= self.OPERATING_HOURS_END
+        """Check if within business hours (timezone-aware, weekday/weekend).
+
+        T109: this used naive ``datetime.now().time()``. On a UTC server (Render)
+        that evaluated the 7am-9pm window in UTC — 4-5 hours off from the store's
+        real timezone — so customers received full AI replies in the middle of
+        the night and quiet-hours acknowledgements during business hours.
+        Delegate to the single correct, pytz-based ``BusinessHours`` (defaults to
+        America/New_York, weekend-aware). Override with OSPRA_BUSINESS_TIMEZONE.
+        """
+        if getattr(self, "_business_hours", None) is None:
+            import os
+            from ospra_os.email_automation.business_hours import BusinessHours
+            self._business_hours = BusinessHours(
+                timezone=os.getenv("OSPRA_BUSINESS_TIMEZONE", "America/New_York")
+            )
+        return self._business_hours.is_operating_hours()
     
     def should_auto_ignore(self, from_address: str, subject: str) -> bool:
         """Check if email should be auto-ignored (no reply needed)."""
