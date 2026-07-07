@@ -165,40 +165,28 @@ class WooCommerceAdapter(PlatformAdapter):
         headers = self._build_headers()
 
         try:
-            # Make request
+            # Make request. T106: `requests` is synchronous — calling it directly
+            # in this async method blocked the event loop for the full round-trip.
+            # Offload to a worker thread so the loop stays responsive.
             if method.upper() == "GET":
-                response = requests.get(
-                    url,
-                    auth=self.auth,
-                    headers=headers,
-                    params=params,
-                    timeout=30
+                response = await asyncio.to_thread(
+                    requests.get, url,
+                    auth=self.auth, headers=headers, params=params, timeout=30,
                 )
             elif method.upper() == "POST":
-                response = requests.post(
-                    url,
-                    auth=self.auth,
-                    headers=headers,
-                    params=params,
-                    json=data,
-                    timeout=30
+                response = await asyncio.to_thread(
+                    requests.post, url,
+                    auth=self.auth, headers=headers, params=params, json=data, timeout=30,
                 )
             elif method.upper() == "PUT":
-                response = requests.put(
-                    url,
-                    auth=self.auth,
-                    headers=headers,
-                    params=params,
-                    json=data,
-                    timeout=30
+                response = await asyncio.to_thread(
+                    requests.put, url,
+                    auth=self.auth, headers=headers, params=params, json=data, timeout=30,
                 )
             elif method.upper() == "DELETE":
-                response = requests.delete(
-                    url,
-                    auth=self.auth,
-                    headers=headers,
-                    params=params,
-                    timeout=30
+                response = await asyncio.to_thread(
+                    requests.delete, url,
+                    auth=self.auth, headers=headers, params=params, timeout=30,
                 )
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")

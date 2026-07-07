@@ -219,7 +219,12 @@ class CohortAnalyzer:
             cohort_start = datetime.strptime(cohort_key, '%Y-%m').date()
         else:  # weekly
             year, week = cohort_key.split('-W')
-            cohort_start = datetime.strptime(f"{year} {week} 1", "%Y %W %w").date()
+            # T93: the cohort key is built from acq_date.isocalendar() (ISO week),
+            # so it MUST be inverted with ISO-week semantics. The old
+            # strptime("%Y %W %w") uses non-ISO week numbering and drifted by up
+            # to a week near year boundaries, mis-bucketing those cohorts.
+            # date.fromisocalendar is the exact inverse of isocalendar().
+            cohort_start = date.fromisocalendar(int(year), int(week), 1)
 
         # Calculate retention for each subsequent period
         retention = [100]  # Period 0 is always 100%

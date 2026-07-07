@@ -23,10 +23,16 @@ logger = logging.getLogger(__name__)
 class PlatformAPIError(Exception):
     """Base exception for platform API errors"""
 
-    def __init__(self, message: str, platform: str = "unknown", details: Optional[dict] = None):
+    def __init__(self, message: str, platform: str = "unknown", details: Optional[dict] = None,
+                 status_code: Optional[int] = None):
+        # T106: callers (WooCommerce, Amazon adapters) raise this with
+        # status_code=..., but the constructor didn't accept it → every real API
+        # error became a confusing TypeError that masked the actual HTTP status.
+        # Accept it (optional, backward-compatible) and expose it.
         self.message = message
         self.platform = platform
         self.details = details or {}
+        self.status_code = status_code
         super().__init__(self.message)
 
     def __str__(self):

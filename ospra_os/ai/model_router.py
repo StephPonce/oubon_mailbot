@@ -22,6 +22,7 @@ Brand parameterization (Cleanup Pass 4 SaaS refactor):
 from typing import Dict, List, Any, Optional
 from enum import Enum
 import os
+import asyncio  # T97: offload blocking sync SDK calls so they don't freeze the event loop
 import logging
 
 from ospra_os.tenancy.brand import DEFAULT_BRAND_NAME, DEFAULT_BRAND_DESCRIPTOR
@@ -414,7 +415,9 @@ class ModelRouter:
         if system_prompt:
             kwargs["system"] = system_prompt
         
-        response = client.messages.create(**kwargs)
+        # T97: run the blocking SDK call in a worker thread so we don't block
+        # the event loop for the full API round-trip.
+        response = await asyncio.to_thread(client.messages.create, **kwargs)
         return strip_markdown(response.content[0].text)
     
     async def _call_groq(self, model: AIModel, message: str,
@@ -427,11 +430,12 @@ class ModelRouter:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": message})
         
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=model.model_id,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=temp
+            temperature=temp,
         )
         return strip_markdown(response.choices[0].message.content)
     
@@ -445,7 +449,7 @@ class ModelRouter:
         if system_prompt:
             full_prompt = f"{system_prompt}\n\n{message}"
         
-        response = gemini_model.generate_content(full_prompt)
+        response = await asyncio.to_thread(gemini_model.generate_content, full_prompt)
         return strip_markdown(response.text)
     
     async def _call_openai(self, model: AIModel, message: str,
@@ -458,11 +462,12 @@ class ModelRouter:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": message})
         
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=model.model_id,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=temp
+            temperature=temp,
         )
         return strip_markdown(response.choices[0].message.content)
     
@@ -476,11 +481,12 @@ class ModelRouter:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": message})
         
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model=model.model_id,
             messages=messages,
             max_tokens=max_tokens,
-            temperature=temp
+            temperature=temp,
         )
         return strip_markdown(response.choices[0].message.content)
     
