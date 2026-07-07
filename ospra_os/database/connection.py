@@ -93,8 +93,22 @@ def get_engine(database_url: str = None):
     if not url and is_test_mode():
         url = "sqlite:///:memory:"
 
-    # In local development (no DATABASE_URL set), use SQLite file database
+    # In local development (no DATABASE_URL set), use SQLite file database.
     if not url:
+        # T101: in production, a missing DATABASE_URL previously fell back to an
+        # ephemeral SQLite file that Render wipes on every deploy/restart — real
+        # customer data would silently vanish with no alert. Fail fast instead so
+        # the deploy goes red and the misconfiguration is obvious, never silent.
+        _prod = (
+            os.getenv("ENVIRONMENT", "").lower() == "production"
+            or os.getenv("RENDER") is not None
+        )
+        if _prod:
+            raise RuntimeError(
+                "DATABASE_URL is not set in a production environment. Refusing to "
+                "fall back to ephemeral SQLite (data would be lost on restart). "
+                "Set DATABASE_URL to the managed Postgres connection string."
+            )
         print("[INFO] DATABASE_URL not set - using SQLite for local development")
         url = "sqlite:///./data/ospra_local.db"
 

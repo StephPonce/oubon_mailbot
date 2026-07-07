@@ -109,7 +109,11 @@ class HealthMonitor:
 
     def _check_resources(self) -> Dict:
         """Check system resources"""
-        cpu = psutil.cpu_percent(interval=1)
+        # T85: interval=1 blocks for a full second per call (freezing the event
+        # loop when this runs on the request path). interval=None is
+        # non-blocking — it reports CPU% since the previous call, which is
+        # exactly right for a periodically-polled health check.
+        cpu = psutil.cpu_percent(interval=None)
         memory = psutil.virtual_memory()
         disk = psutil.disk_usage('/')
 

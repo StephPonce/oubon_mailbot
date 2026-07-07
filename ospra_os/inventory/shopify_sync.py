@@ -71,26 +71,46 @@ class ShopifyInventorySync:
             products = products_response.get("products", [])
             logger.info(f"Fetched {len(products)} products from Shopify")
 
-            # Transform to inventory format
+            # Transform to inventory format.
+            # T95: two bugs fixed here.
+            #  (1) Only the FIRST variant was read — every additional SKU/size/
+            #      color was silently dropped. Now we emit one row per variant.
+            #  (2) unit_cost was set to variant['price'] (the SELLING price), so
+            #      every synced product reported a 0% margin. Shopify's
+            #      products.json does NOT expose supplier cost (it lives on the
+            #      InventoryItem.unit_cost, a separate endpoint), so we do NOT
+            #      fabricate it: unit_cost stays 0.0 = "unknown", which the
+            #      restock optimizer already treats as "skip cost math" (it
+            #      guards unit_cost <= 0). Real cost enrichment is a follow-up.
+            def _to_float(v, default=0.0):
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return default
+
             inventory_products = []
             for product in products:
-                # Get first variant (most products have one variant)
-                variant = product.get("variants", [{}])[0]
-
-                inventory_products.append({
-                    'product_id': str(product['id']),
-                    'product_name': product['title'],
-                    'sku': variant.get('sku', f"SHOP-{product['id']}"),
-                    'current_stock': variant.get('inventory_quantity', 0),
-                    'reserved': 0,  # Shopify doesn't expose this directly
-                    'unit_cost': float(variant.get('price', 0)),
-                    'unit_price': float(variant.get('price', 0)),
-                    'lead_time_days': 14,  # Default lead time
-                    'min_order_qty': 10,
-                    'incoming_stock': 0,
-                    'variant_id': variant.get('id'),
-                    'inventory_item_id': variant.get('inventory_item_id')
-                })
+                variants = product.get("variants") or [{}]
+                for variant in variants:
+                    inventory_products.append({
+                        'product_id': str(product['id']),
+                        'product_name': product['title'],
+                        'sku': variant.get('sku', f"SHOP-{product['id']}-{variant.get('id', '0')}"),
+                        'current_stock': variant.get('inventory_quantity', 0) or 0,
+                        'reserved': 0,  # Shopify doesn't expose this directly
+                        # unit_cost unknown from products.json — 0.0 signals
+                        # "unknown" (optimizer guards <=0), never the sale price.
+                        'unit_cost': 0.0,
+                        'unit_price': _to_float(variant.get('price', 0)),
+                        'compare_at_price': _to_float(variant.get('compare_at_price', 0)),
+                        'cost_known': False,
+                        'lead_time_days': 14,  # Default lead time
+                        'min_order_qty': 10,
+                        'incoming_stock': 0,
+                        'variant_id': variant.get('id'),
+                        'variant_title': variant.get('title'),
+                        'inventory_item_id': variant.get('inventory_item_id')
+                    })
 
             return inventory_products
 

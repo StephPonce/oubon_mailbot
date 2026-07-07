@@ -544,20 +544,25 @@ class TierUsageEnforcer:
         tier_def = get_tier_definition(tier)
         if not tier_def:
             return None
-        
-        # Navigate nested keys (e.g., "limits.stores")
-        limits = tier_def.get("limits", {})
-        features = tier_def.get("features", {})
-        aliexpress = tier_def.get("aliexpress", {})
-        
-        # Check in order: limits, aliexpress, features
-        if limit_key in limits:
-            return limits[limit_key]
-        if limit_key in aliexpress:
-            return aliexpress[limit_key]
-        if limit_key in features:
-            return features[limit_key]
-        
+
+        # T96: TIER_DEFINITIONS is FLAT — limit keys like
+        # "aliexpress_searches_per_day", "products_per_week", "email_templates"
+        # live directly on the tier dict. The previous code looked them up under
+        # nested "limits"/"aliexpress"/"features" sub-dicts that don't exist (and
+        # "features" is actually a LIST), so every lookup returned None →
+        # can_perform() fell through to "allow" → every tier was effectively
+        # UNLIMITED. Read the flat key directly.
+        if limit_key in tier_def:
+            return tier_def[limit_key]
+
+        # Back-compat: support a dotted "section.key" form if any caller still
+        # uses it, without assuming the section exists or is a dict.
+        if "." in limit_key:
+            section, sub = limit_key.split(".", 1)
+            section_val = tier_def.get(section)
+            if isinstance(section_val, dict) and sub in section_val:
+                return section_val[sub]
+
         return None
     
     def can_perform(
