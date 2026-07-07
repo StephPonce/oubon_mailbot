@@ -104,7 +104,14 @@ class OiLearningSystem:
         
         # Detect patterns
         self._detect_patterns(interaction)
-        
+
+        # T98: persist learned state after each interaction. Previously
+        # save_data() had ZERO callers, so every profile/pattern update lived
+        # only in memory and vanished on restart — the "self-improvement"
+        # premise never survived a deploy. save_data() is failure-safe (it logs
+        # and never raises), so this cannot break the interaction path.
+        self.save_data()
+
         logger.debug(f"Recorded interaction: {interaction.type} for user {interaction.user_id}")
     
     def record_feedback(self, feedback: ConversationFeedback, user_id: str = "default") -> None:
@@ -113,7 +120,10 @@ class OiLearningSystem:
         
         # Learn from feedback
         self._learn_from_feedback(feedback, user_id)
-        
+
+        # T98: persist feedback-driven profile changes (see record_interaction).
+        self.save_data()
+
         logger.info(f"Recorded feedback: {'helpful' if feedback.helpful else 'not helpful'}")
     
     def record_oi_query(
@@ -488,7 +498,7 @@ class OiLearningSystem:
             profiles_path = os.path.join(self.storage_path, "user_profiles.json")
             with open(profiles_path, "w") as f:
                 json.dump(self._user_profiles, f, indent=2)
-            logger.info(f"Saved {len(self._user_profiles)} user profiles")
+            logger.debug(f"Saved {len(self._user_profiles)} user profiles")  # T98: debug — called per-interaction now
         except Exception as e:
             logger.error(f"Failed to save learning data: {e}")
     
