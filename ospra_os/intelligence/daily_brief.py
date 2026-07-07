@@ -207,7 +207,14 @@ class DailyBriefGenerator:
                 "orders_change": 0.0,
                 "roas_change": 0.0
             },
-            "health_score": 75.0  # Overall business health 0-100
+            # T54: this snapshot is NOT wired to real sales/ad/email sources yet
+            # (see the docstring TODO). It previously returned health_score=75.0
+            # alongside $0 revenue, which the AI summary narrated to the user as
+            # real business health. Flag it unavailable and null the score so
+            # every consumer says "not connected" instead of citing a fabricated
+            # figure. Wire real metrics here to light this back up.
+            "health_score": None,
+            "data_available": False,
         }
 
     async def _get_top_opportunities(
@@ -272,9 +279,11 @@ class DailyBriefGenerator:
 
         priorities = []
 
-        # Priority 1: Health issues
-        health_score = performance.get("health_score", 100)
-        if health_score < 60:
+        # Priority 1: Health issues.
+        # T54: only raise a health-based priority when the score is real; a
+        # missing (None) score means "not connected", not "critical".
+        health_score = performance.get("health_score")
+        if health_score is not None and health_score < 60:
             priorities.append({
                 "title": "Business Health Alert",
                 "description": f"Health score at {health_score:.0f}/100. Review performance metrics.",
@@ -345,6 +354,22 @@ Tone:
 - Personalized and helpful
 """
 
+        # T54: only feed real performance numbers to the AI. When the snapshot
+        # isn't connected to real data sources, tell the model explicitly NOT to
+        # cite figures, so it can't narrate a fabricated health score / revenue.
+        if performance.get("data_available"):
+            performance_block = (
+                f"- Revenue: ${performance['last_7_days']['revenue']:,.2f}\n"
+                f"- Orders: {performance['last_7_days']['orders']}\n"
+                f"- Health Score: {performance['health_score']:.0f}/100"
+            )
+        else:
+            performance_block = (
+                "- Not connected yet. Do NOT cite any specific revenue, order "
+                "count, or health-score number; if you mention performance at "
+                "all, say the metrics aren't connected yet."
+            )
+
         user_prompt = f"""Generate a brief morning summary for the user.
 
 PENDING ACTIONS:
@@ -353,9 +378,7 @@ PENDING ACTIONS:
 - By Type: {pending_actions['by_type']}
 
 PERFORMANCE (Last 7 Days):
-- Revenue: ${performance['last_7_days']['revenue']:,.2f}
-- Orders: {performance['last_7_days']['orders']}
-- Health Score: {performance['health_score']:.0f}/100
+{performance_block}
 
 OPPORTUNITIES:
 - {opportunities['count']} new product opportunities discovered
@@ -403,9 +426,13 @@ Write a warm 2-3 paragraph morning brief highlighting what they should focus on 
         action_count = pending_actions.get("count", 0)
         high_conf = pending_actions.get("high_confidence", 0)
         opp_count = opportunities.get("count", 0)
-        health = performance.get("health_score", 0)
+        health = performance.get("health_score")
 
-        summary = f"Your business health score is {health:.0f}/100. "
+        # T54: don't state a health score when it isn't real.
+        if health is not None:
+            summary = f"Your business health score is {health:.0f}/100. "
+        else:
+            summary = "Performance tracking isn't connected yet, so I can't report a health score. "
 
         if action_count > 0:
             summary += f"I've queued {action_count} AI-recommended action{'s' if action_count != 1 else ''} "

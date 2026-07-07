@@ -188,8 +188,20 @@ class MomentumTracker:
                 "final_score": product.get("final_score", 0),
             }
 
-            # Use current as baseline for now (TODO: fetch historical data)
-            baseline_metrics = {k: v * 0.7 for k, v in current_metrics.items()}
+            # T55: real baseline ONLY — never fabricate. This used
+            # baseline = current * 0.7, which forces velocity to
+            # ((c - 0.7c) / 0.7c) * 100 ≈ +42.9% for EVERY product, making the
+            # entire "trending / stock-market" view pure fiction. Use a real
+            # prior-period baseline when the caller supplies one (the discovery /
+            # moat pipeline populates baseline_metrics from product_timeseries);
+            # otherwise the product has no measured history yet, so baseline ==
+            # current → velocity 0, explicitly flagged insufficient_history
+            # rather than a fabricated surge. previous_rank is likewise left
+            # unknown (None) instead of a fake "idx + 5" that implied everything
+            # jumped up the ranks.
+            real_baseline = product.get("baseline_metrics") or product.get("previous_metrics")
+            has_history = bool(real_baseline)
+            baseline_metrics = dict(real_baseline) if has_history else dict(current_metrics)
 
             momentum = self.calculate_product_momentum(
                 product_id=product.get("id", f"prod_{idx}"),
@@ -197,8 +209,9 @@ class MomentumTracker:
                 current_metrics=current_metrics,
                 baseline_metrics=baseline_metrics,
                 current_rank=idx + 1,
-                previous_rank=product.get("previous_rank", idx + 5)
+                previous_rank=product.get("previous_rank")
             )
+            momentum["insufficient_history"] = not has_history
 
             trending.append(momentum)
 

@@ -117,8 +117,11 @@ Consider:
             "price": round(price, 2),
             "profit_margin": round(margin, 1),
             "estimated_profit": round(profit, 2),
-            "rating": float(data.get("rating", 4.2)),
-            "orders": int(data.get("orders", 500))
+            # T59: keep the model's estimate when it actually returns one, but
+            # do NOT default to 4.2/500 when it's absent — that silently
+            # fabricates market metrics. None = unknown.
+            "rating": float(data["rating"]) if data.get("rating") is not None else None,
+            "orders": int(data["orders"]) if data.get("orders") is not None else None,
         }
 
     def _rule_based_pricing(self, product_name: str, niche: str) -> Dict:
@@ -187,17 +190,18 @@ Consider:
         profit = price - cost
         margin = (profit / price) * 100
 
-        # Estimate rating and orders based on price point
-        rating = round(random.uniform(3.8, 4.7), 1)
-        orders = int(random.uniform(200, 2000) if price < 50 else random.uniform(100, 800))
-
+        # T59: rating and orders are real-world MARKET metrics this rule-based
+        # fallback cannot know. It used to return random.uniform values in the
+        # same shape as the real path, so fabricated numbers rendered as genuine
+        # market data. Return None (unknown) — callers/UI must treat None as
+        # "not available", never as a real rating/order count.
         return {
             "cost": cost,
             "price": price,
             "profit_margin": round(margin, 1),
             "estimated_profit": round(profit, 2),
-            "rating": rating,
-            "orders": orders
+            "rating": None,
+            "orders": None,
         }
 
 

@@ -143,43 +143,20 @@ class RealtimeUpdater:
             return products
 
         except Exception as e:
-            logger.warning(f"Could not fetch from discovery engine: {e}")
+            logger.error(f"[ERROR] Could not fetch from discovery engine: {e}")
 
-            # Fallback: Generate mock data for testing
-            logger.info("Using mock product data for momentum calculation")
-            return self._generate_mock_products()
+            # T56: on discovery failure, return EMPTY — never fabricate.
+            # Previously this returned _generate_mock_products() (random.uniform
+            # scores/orders/ratings), which flowed straight into the live
+            # cache['trending'] indistinguishable from real data. update_momentum
+            # bails on empty input WITHOUT overwriting the cache, so returning []
+            # preserves the last-known-good snapshot instead of poisoning it.
+            return []
 
-    def _generate_mock_products(self, count: int = 50) -> List[Dict]:
-        """
-        Generate mock product data for testing.
-
-        Args:
-            count: Number of mock products to generate
-
-        Returns:
-            List of mock product dictionaries
-        """
-        import random
-
-        products = []
-        niches = ['smart_home', 'fitness', 'beauty', 'tech', 'kitchen']
-
-        for i in range(count):
-            product = {
-                'id': f'mock_prod_{i}',
-                'name': f'Mock Product {i}',
-                'niche': random.choice(niches),
-                'trend_score': random.uniform(30, 95),
-                'velocity_score': random.uniform(10, 90),
-                'final_score': random.uniform(40, 98),
-                'orders': random.randint(100, 10000),
-                'price': round(random.uniform(9.99, 99.99), 2),
-                'rating': round(random.uniform(3.5, 5.0), 1),
-                'rank': i + 1
-            }
-            products.append(product)
-
-        return products
+    # T56: _generate_mock_products() was deleted. It fabricated random
+    # scores/orders/ratings that flowed into the live trending cache as if real.
+    # Discovery failures now surface as empty (last-known-good preserved), never
+    # as invented products.
 
     def _update_rank_changes(self, trending: List[Dict]) -> List[Dict]:
         """
