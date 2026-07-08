@@ -30,34 +30,23 @@ async def get_email_stats(settings: Settings) -> Dict[str, Any]:
 
 
 async def get_product_discoveries(settings: Settings) -> Dict[str, Any]:
-    """Get latest product discoveries."""
-    try:
-        from ospra_os.product_research.pipeline import ProductDiscoveryPipeline
+    """Legacy product-discoveries panel — REMOVED (T118/T119).
 
-        pipeline = ProductDiscoveryPipeline(
-            reddit_client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-            reddit_secret=getattr(settings, "REDDIT_SECRET", None),
-            aliexpress_api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
-            aliexpress_app_secret=getattr(settings, "ALIEXPRESS_APP_SECRET", None)
-        )
+    This was backed by product_research/pipeline.py, a dead v0 engine that
+    required the deprecated Reddit signal and whose sibling discovery.py had a
+    real bug (``self.reddit`` was never set, so get_stats() raised
+    AttributeError). Live discovery is intelligence/product_discovery.py.
 
-        # Quick discovery with caching
-        products = await pipeline.discover_products(
-            niche="smart home",
-            max_results=6,
-            min_score=3.0,
-            include_reddit=True,
-            include_trends=True,
-            include_aliexpress=False  # Skip for speed
-        )
-
-        return {
-            "total": len(products),
-            "products": products[:6]  # Top 6 for dashboard
-        }
-    except Exception as e:
-        print(f"[WARNING]  Product discovery error: {e}")
-        return {"total": 0, "products": [], "error": str(e)}
+    Returns an explicit "unavailable" payload in the original shape so the
+    dashboard contract stays intact — no fabricated products, and the dead
+    pipeline is no longer imported (making it safe to delete).
+    """
+    return {
+        "total": 0,
+        "products": [],
+        "unavailable": True,
+        "reason": "legacy_v0_pipeline_removed",
+    }
 
 
 async def get_reddit_sentiment(settings: Settings) -> Dict[str, Any]:
