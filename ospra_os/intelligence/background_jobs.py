@@ -472,25 +472,13 @@ class IntelligenceScheduler:
 
         logger.info("[TREND] Tracking market trends...")
 
-        try:
-            # In production, this would:
-            # 1. Query Google Trends API
-            # 2. Analyze seasonal patterns
-            # 3. Identify emerging niches
-
-            # For now, just log
-            logger.info("Trend tracking completed (placeholder)")
-
-            self.add_alert(
-                'info',
-                'Market Trends',
-                'Daily trend analysis completed',
-                {'trending_categories': ['smart_home', 'fitness_trackers']}
-            )
-
-        except Exception as e:
-            logger.error(f"Trend tracking failed: {e}")
-            raise
+        # T66: NOT IMPLEMENTED. This previously logged "completed (placeholder)"
+        # and pushed an 'info' alert — "Daily trend analysis completed" with
+        # hardcoded trending_categories (smart_home, fitness_trackers) — implying
+        # real work happened. It must not emit a success alert until it queries
+        # real trend data. No-op + honest log only.
+        logger.info("track_trends is not implemented yet — skipping (no alert emitted).")
+        return
 
     def weekly_report(self):
         """
@@ -499,28 +487,12 @@ class IntelligenceScheduler:
 
         logger.info("[STATS] Generating weekly report...")
 
-        try:
-            # In production, this would:
-            # 1. Summarize week's performance
-            # 2. Highlight wins and losses
-            # 3. Provide strategic recommendations
-
-            # For now, just log
-            logger.info("Weekly report generated (placeholder)")
-
-            self.add_alert(
-                'info',
-                'Weekly Report Available',
-                'Your weekly performance report is ready',
-                {
-                    'report_period': f'{(datetime.now() - timedelta(days=7)).date()} to {datetime.now().date()}',
-                    'summary': 'Report generation in development'
-                }
-            )
-
-        except Exception as e:
-            logger.error(f"Weekly report failed: {e}")
-            raise
+        # T66: NOT IMPLEMENTED. Previously pushed a 'Weekly Report Available'
+        # alert saying the report was "ready" while its own payload admitted
+        # "Report generation in development". No fake success alert until this
+        # produces a real report. No-op + honest log only.
+        logger.info("weekly_report is not implemented yet — skipping (no alert emitted).")
+        return
 
     def auto_discover_products(self):
         """

@@ -287,7 +287,12 @@ FORMATTING REQUIREMENTS:
                 try:
                     current_pattern['confidence'] = float(line.replace('CONFIDENCE:', '').strip())
                 except (ValueError, TypeError):
-                    current_pattern['confidence'] = 0.7  # Default confidence if parsing fails
+                    # T80: don't fabricate confidence on parse failure. 0.7 used
+                    # to sail past the min_confidence (0.65) filter, so an
+                    # unparseable pattern was kept as if the model were confident.
+                    # 0.0 makes the filter drop it — an unreadable pattern is not
+                    # a trusted one.
+                    current_pattern['confidence'] = 0.0
 
             elif line.startswith('ATTRIBUTES:'):
                 current_pattern['attributes'] = line.replace('ATTRIBUTES:', '').strip()
@@ -329,7 +334,9 @@ FORMATTING REQUIREMENTS:
         return LearningPattern(
             pattern_type=pattern_type,
             source=source,
-            confidence=pattern_dict.get('confidence', 0.7),
+            # T80: no fabricated 0.7 confidence default — an unspecified
+            # confidence is 0.0 (untrusted / filtered), never a passing grade.
+            confidence=pattern_dict.get('confidence', 0.0),
             attributes={
                 "description": pattern_dict.get('description', ''),
                 "attributes_list": pattern_dict.get('attributes', ''),
@@ -448,13 +455,19 @@ FORMATTING REQUIREMENTS:
         # Parse evaluation
         result = self._parse_evaluation(evaluation)
 
+        # T80: if the model's response didn't parse into the required fields,
+        # don't fabricate a 50% confidence / TEST_SMALL verdict — mark it
+        # unreliable and route to manual review so a fake evaluation can't drive
+        # a deploy decision.
+        parse_ok = ("success_match" in result) and ("recommendation" in result)
         return {
             "product": product.get("title", "Unknown"),
             "success_match": result.get("success_match", 0),
             "failure_match": result.get("failure_match", 0),
-            "recommendation": result.get("recommendation", "TEST_SMALL"),
+            "recommendation": result.get("recommendation", "MANUAL_REVIEW") if parse_ok else "MANUAL_REVIEW",
             "reasoning": result.get("reasoning", ""),
-            "confidence": result.get("confidence", 0.5),
+            "confidence": result.get("confidence", 0.0),
+            "parse_ok": parse_ok,
             "patterns_used": {
                 "success_patterns": len(self.success_patterns),
                 "failure_patterns": len(self.failure_patterns),
@@ -475,14 +488,16 @@ FORMATTING REQUIREMENTS:
                     match = line.replace('SUCCESS_MATCH:', '').strip().replace('%', '')
                     result['success_match'] = float(match) / 100
                 except (ValueError, TypeError):
-                    result['success_match'] = 0.5  # Default if parsing fails
+                    # T80: leave absent on parse failure — the caller flags the
+                    # whole evaluation as unreliable rather than inventing 0.5.
+                    pass
 
             elif line.startswith('FAILURE_MATCH:'):
                 try:
                     match = line.replace('FAILURE_MATCH:', '').strip().replace('%', '')
                     result['failure_match'] = float(match) / 100
                 except (ValueError, TypeError):
-                    result['failure_match'] = 0.3  # Default if parsing fails
+                    pass  # T80: leave absent, don't invent 0.3
 
             elif line.startswith('RECOMMENDATION:'):
                 rec = line.replace('RECOMMENDATION:', '').strip()
