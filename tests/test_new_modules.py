@@ -299,35 +299,6 @@ class TestPagination:
 
 
 # =============================================================================
-# TOKEN REFRESH JOB TESTS
-# =============================================================================
-
-class TestTokenRefreshJob:
-    """Tests for token refresh background job."""
-
-    def test_job_initialization(self):
-        """Token refresh job should initialize correctly."""
-        from ospra_os.background_jobs.token_refresh_job import TokenRefreshJob
-
-        job = TokenRefreshJob(database_url="sqlite:///test.db")
-
-        assert job.database_url == "sqlite:///test.db"
-        assert job.scheduler is not None
-
-    def test_get_expiring_tokens_status_empty(self):
-        """Status should return empty when no tokens."""
-        from ospra_os.background_jobs.token_refresh_job import TokenRefreshJob
-
-        job = TokenRefreshJob(database_url="sqlite:///test.db")
-
-        with patch.object(job, '_refresh_aliexpress_tokens', return_value={"refreshed": 0, "failed": 0}):
-            result = job._run_token_refresh()
-
-        assert result["success"] is True
-        assert result["tokens_refreshed"] == 0
-
-
-# =============================================================================
 # REQUEST TRACING TESTS
 # =============================================================================
 

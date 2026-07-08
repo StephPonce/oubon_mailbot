@@ -31,7 +31,9 @@ from .hybrid_learning_engine import (
 
 # Supporting utilities
 from .performance_tracker import PerformanceTracker
-from .trend_velocity_detector import TrendVelocityDetector
+# T116: trend_velocity_detector removed — dead (only ever re-exported here;
+# superseded by intelligence/trend_trajectory.py). Re-export deleted so the file
+# is orphaned and can be git rm'd.
 
 # Legacy (deprecated - forwards to hybrid)
 from .self_learning_engine import SelfLearningEngine
@@ -47,8 +49,7 @@ __all__ = [
     
     # Supporting
     'PerformanceTracker',
-    'TrendVelocityDetector',
-    
+
     # Legacy (deprecated)
     'SelfLearningEngine',
 ]
