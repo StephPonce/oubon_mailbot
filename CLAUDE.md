@@ -21,6 +21,8 @@ The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a leg
 
 ## Standing rules (carry across sessions)
 
+- **Desktop/Cowork sessions: do NOT run git commands in this repo.** Only the Claude Code CLI session (WebStorm terminal) commits and pushes. Cowork sessions edit files and stage nothing — leave everything in the working tree and note what changed (e.g. in `OSPRA_FIX_TASKLIST.md`); the user will have the CLI session commit. Reason: two agents running git here has repeatedly orphaned `.git/HEAD.lock` files (Cowork's git processes get killed mid-commit), blocking all commits until manually cleared. If you hit a "cannot lock ref 'HEAD'" error: verify no git process is running (`ps aux | grep "[g]it"`), check the lock file is minutes old, then remove it and retry.
+
 - **Don't manage the user's time or schedule.** Never say "let's stop here," "call it for the night," "we're done for today," "you've earned a break," or anything that implies when to stop working. The user decides when the session ends — Claude works until the user says so. Claude has no sleep schedule; the user does and will manage it themselves.
 
 - **ALWAYS ask before structural / architectural decisions.** Before creating new routes, tabs, components, endpoints, database tables, or anything that changes the system's shape — ASK. Don't decide unilaterally that "the new flow needs a separate page" or "this should be a new tab." Confirm with the user FIRST. Same for renaming, splitting, or merging existing features.
