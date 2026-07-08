@@ -45,13 +45,37 @@ class TenantContext:
             return True
         return self.tenant_id == tenant_id
 
-    def can_access_store(self, store_id: int) -> bool:
-        """Check if current context can access a specific store"""
+    def can_access_store(self, store_id: int, db) -> bool:
+        """Verify this tenant actually OWNS ``store_id``.
+
+        T163: this previously returned ``True`` unconditionally — the comment
+        said "trust the store_id if user is authenticated" — and it had zero
+        callers, so nothing in the app ever verified store ownership.
+
+        ``store_id`` arrives from a client-supplied ``?store_id=`` query param or
+        ``X-Store-ID`` header, so an authenticated user can hand us any store id.
+        Reads via TenantScopedSession are still filtered by ``Store.user_id``, but
+        writes/inserts keyed on that id — and any route using the unscoped
+        session — would touch another tenant's store. This now performs the real
+        ownership lookup against ``Store.user_id``.
+
+        Args:
+            store_id: The store id to verify.
+            db: An active SQLAlchemy session (required — ownership is a DB fact).
+        """
         if self.is_superuser:
             return True
-        # Would need to query DB to verify store belongs to user
-        # For now, trust the store_id if user is authenticated
-        return True
+        if store_id is None:
+            return False
+
+        from ospra_os.database import Store
+
+        return (
+            db.query(Store.id)
+            .filter(Store.id == store_id, Store.user_id == self.user_id)
+            .first()
+            is not None
+        )
 
     def __repr__(self) -> str:
         return f"TenantContext(tenant_id={self.tenant_id}, user_id={self.user_id}, store_id={self.store_id})"

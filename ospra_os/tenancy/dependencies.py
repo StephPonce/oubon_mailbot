@@ -109,10 +109,11 @@ def get_raw_db(db: Session = Depends(get_db)) -> Session:
 # ==================== STORE DEPENDENCIES ====================
 
 def require_store(
-    tenant: TenantContext = Depends(get_tenant)
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
 ) -> int:
     """
-    Require that tenant has a store_id in context.
+    Require that tenant has a store_id in context AND actually owns it.
 
     Use this for routes that operate on stores.
 
@@ -129,11 +130,24 @@ def require_store(
 
     Raises:
         HTTPException(400): If no store_id in context
+        HTTPException(403): If the store is not owned by this tenant
     """
     if tenant.store_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Store context required. Provide ?store_id=X or X-Store-ID header"
+        )
+
+    # T163: verify the caller actually OWNS this store. store_id is taken from a
+    # client-supplied ?store_id= query param / X-Store-ID header, so before this
+    # check any authenticated user could pass another tenant's store id. Reads
+    # through TenantScopedSession were still filtered by Store.user_id, but
+    # writes/inserts keyed on this id — and any route using the unscoped get_db
+    # session — would operate on the other tenant's store.
+    if not tenant.can_access_store(tenant.store_id, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this store.",
         )
 
     return tenant.store_id
