@@ -320,70 +320,26 @@ async def get_dashboard_products(
             }
 
     except Exception as e:
-        logger.warning(f"Product discovery with cache failed: {e}")
+        logger.error(f"[ERROR] Product discovery failed: {e}")
 
-    # Return demo products for development
-    import random
-    from datetime import datetime
-
-    logger.info(f"[DEMO] Returning demo products for dashboard")
-
-    DEMO_PRODUCTS = [
-        {"title": "Smart LED Strip Lights RGB WiFi", "cost_price": 8.50, "niche": "smart_home"},
-        {"title": "WiFi Smart Plug Energy Monitor", "cost_price": 6.99, "niche": "smart_home"},
-        {"title": "Smart Motion Sensor PIR", "cost_price": 5.50, "niche": "smart_home"},
-        {"title": "WiFi Smart Bulb RGBW", "cost_price": 4.99, "niche": "smart_home"},
-        {"title": "Electric Milk Frother", "cost_price": 5.99, "niche": "kitchen"},
-        {"title": "Silicone Kitchen Utensil Set", "cost_price": 12.50, "niche": "kitchen"},
-        {"title": "Resistance Bands Set", "cost_price": 6.50, "niche": "fitness"},
-        {"title": "Yoga Mat Non-Slip 6mm", "cost_price": 11.00, "niche": "fitness"},
-        {"title": "Wireless Earbuds Bluetooth", "cost_price": 12.50, "niche": "tech"},
-        {"title": "USB C Hub 7-in-1", "cost_price": 15.00, "niche": "tech"},
-    ]
-
-    demo_list = []
-    for i, item in enumerate(DEMO_PRODUCTS[:per_page]):
-        cost = item["cost_price"]
-        suggested = round(cost * 2.5, 2)
-        oi_score = random.randint(55, 88)
-
-        demo_list.append({
-            "product_id": f"demo_{i}_{int(datetime.now().timestamp())}",
-            "title": item["title"],
-            "cost_price": cost,
-            "supplier_cost": cost,
-            "suggested_price": suggested,
-            "profit": round(suggested - cost, 2),
-            "image_url": f"https://via.placeholder.com/300x300?text={item['title'][:10]}",
-            "source": "demo",
-            "available_on": ["demo_supplier"],
-            "is_mock": True,
-            "niche": item["niche"],
-            "sales_count": random.randint(100, 2000),
-            "trend_score": random.randint(50, 85),
-            "oi_score": oi_score,
-            "final_score": oi_score,
-            "tier": "GOOD" if oi_score >= 70 else "FAIR",
-            "recommendation": "Demo product - connect APIs for real discovery",
-            "_discovery_metadata": {
-                "sources_queried": ["demo"],
-                "discovered_at": datetime.now().isoformat(),
-                "niche": item["niche"],
-                "flow": "demo_fallback"
-            }
-        })
-
+    # T73: on failure, return an explicit ERROR — never fabricated products.
+    # This path used to return success=True with a list of demo products whose
+    # oi_score / sales_count / trend_score were random.randint() values. Even
+    # though each carried is_mock=True, the top-level success=True made the
+    # dashboard render invented grades as real product intelligence. A transient
+    # discovery/DB error must surface as an error state the UI can handle, not as
+    # made-up scores that poison the very grades the product is judged on.
     return {
-        "success": True,
-        "products": demo_list,
-        "total": len(demo_list),
+        "success": False,
+        "error": "product_discovery_unavailable",
+        "message": "Product discovery is temporarily unavailable. Please retry shortly.",
+        "products": [],
+        "total": 0,
         "page": page,
         "per_page": per_page,
         "niche": niche,
-        "demo_mode": True,
         "from_cache": False,
         "load_time_ms": round((time.time() - start_time) * 1000, 2),
-        "note": "Demo data - connect CJ/AliExpress APIs for real products"
     }
 
 
@@ -496,18 +452,17 @@ async def get_conversion_funnel(current_user: User = Depends(get_current_user)):
     Returns stages: Visitors → Product Views → Add to Cart → Checkout → Purchase
     Requires authentication.
     """
-    # Placeholder - would integrate with Shopify analytics
+    # T73: this was a permanent stub returning a hardcoded funnel
+    # (10,000 visitors -> 150 purchases, 1.5%) with success=True — fabricated
+    # analytics rendered to the user as real. Return an explicit not-implemented
+    # state (empty funnel) until wired to real Shopify analytics, so nothing
+    # invents a conversion rate.
     return {
-        "success": True,
-        "funnel": [
-            {"stage": "Visitors", "count": 10000, "conversion_rate": 100},
-            {"stage": "Product Views", "count": 3000, "conversion_rate": 30},
-            {"stage": "Add to Cart", "count": 600, "conversion_rate": 6},
-            {"stage": "Checkout", "count": 300, "conversion_rate": 3},
-            {"stage": "Purchase", "count": 150, "conversion_rate": 1.5},
-        ],
-        "overall_conversion": 1.5,
-        "note": "Demo data - integrate with Shopify for real metrics"
+        "success": False,
+        "error": "not_implemented",
+        "message": "Conversion funnel analytics aren't connected yet.",
+        "funnel": [],
+        "overall_conversion": None,
     }
 
 

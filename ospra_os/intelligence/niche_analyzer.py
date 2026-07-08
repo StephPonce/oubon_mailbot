@@ -197,8 +197,10 @@ class NicheAnalyzer:
                 "trend_momentum": {
                     "score": round(trend_momentum["score"], 2),
                     "search_volume": trend_momentum.get("search_volume", 0),
-                    "change_30d": round(trend_momentum.get("change_30d", 0), 2),
-                    "change_90d": round(trend_momentum.get("change_90d", 0), 2),
+                    # T64: change_30d/90d are None when there's no real history —
+                    # round() would crash on None, so pass it through as null.
+                    "change_30d": round(trend_momentum["change_30d"], 2) if trend_momentum.get("change_30d") is not None else None,
+                    "change_90d": round(trend_momentum["change_90d"], 2) if trend_momentum.get("change_90d") is not None else None,
                     "direction": trend_momentum.get("direction", "stable")
                 },
 
@@ -743,18 +745,19 @@ class NicheAnalyzer:
             avg_trend_score = statistics.mean(trend_scores)
             total_search_volume = sum(search_volumes) if search_volumes else 0
 
-            # Simulate 30d and 90d changes (in production, use historical data)
-            change_30d = avg_trend_score - 50  # Simplified
-            change_90d = avg_trend_score - 45  # Simplified
-
-            direction = "up" if change_30d > 0 else "down" if change_30d < 0 else "stable"
-
+            # T64: real 30/90-day change requires historical trend scores over
+            # time (product_timeseries / niche history). This used
+            # change = avg_score - 50 / - 45 — a fabricated delta from a single
+            # current snapshot that made every niche appear to have a trend and
+            # a confident up/down direction. The score itself is real; the change
+            # is unknown until history is wired, so report it as such rather than
+            # invent it.
             return {
                 "score": avg_trend_score,
                 "search_volume": total_search_volume,
-                "change_30d": change_30d,
-                "change_90d": change_90d,
-                "direction": direction
+                "change_30d": None,
+                "change_90d": None,
+                "direction": "insufficient_history",
             }
 
         return {
