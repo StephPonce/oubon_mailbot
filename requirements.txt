@@ -67,6 +67,20 @@ redis>=5.0.1
 # system silently degraded. Broker/result backend is the Redis dependency above.
 celery>=5.3.0
 
+# Analytics + LLM observability (T-PostHog). Render builds from THIS file,
+# not pyproject.toml — these were pyproject-only, so PostHog analytics and
+# OTel LLM tracing were silently disabled in prod (main.py catches the
+# ImportError and logs a warning). Keep in sync with pyproject.toml.
+posthog[otel]
+opentelemetry-sdk>=1.20.0
+opentelemetry-instrumentation-anthropic>=0.40.0
+opentelemetry-instrumentation-openai-v2>=2.0.0
+
+# Cloud image storage (T160). Without this, ImageStorage logs "Cloudinary
+# not installed" and silently falls back to ephemeral local disk even with
+# creds set — product images would die on the next deploy.
+cloudinary>=1.40.0
+
 # Rate Limiting
 slowapi>=0.1.9
 

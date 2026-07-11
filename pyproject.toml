@@ -75,6 +75,10 @@ dependencies = [
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-instrumentation-anthropic>=0.40.0",
     "opentelemetry-instrumentation-openai-v2>=2.0.0",
+    # T160: without this, ImageStorage logs "Cloudinary not installed" and
+    # silently falls back to ephemeral local disk even with creds set.
+    # (boto3 intentionally not added — S3 path unused; add it if we switch.)
+    "cloudinary>=1.40.0",
 ]
 
 [project.optional-dependencies]
