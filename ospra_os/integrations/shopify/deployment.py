@@ -382,13 +382,17 @@ Make it conversion-focused and SEO-friendly. Return ONLY the HTML description, n
                 )
 
                 if storage_result.get("success"):
-                    # Get HTTP accessible URL
-                    http_url = storage_result.get("url")  # e.g., /static/images/products/{id}/enhanced_...png
-
-                    # Convert to full URL (Shopify needs absolute URLs)
-                    # In production, this should use your domain
-                    base_url = os.getenv("BASE_URL", "http://localhost:8001")
-                    full_url = f"{base_url}{http_url}"
+                    # T160: prefer the durable cloud URL (Cloudinary/S3) when the
+                    # image was uploaded. The local path is on ephemeral disk and
+                    # dies on the next Render deploy — Shopify would be left
+                    # pointing at a dead image. Only fall back to BASE_URL + local
+                    # path when there is no cloud URL.
+                    cloud_url = storage_result.get("cloud_url")
+                    if cloud_url:
+                        full_url = cloud_url
+                    else:
+                        base_url = os.getenv("BASE_URL", "http://localhost:8001")
+                        full_url = f"{base_url}{storage_result.get('url')}"
 
                     enhanced_urls.append(full_url)
 

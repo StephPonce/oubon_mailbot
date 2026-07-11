@@ -252,9 +252,18 @@ class ProductDeployer:
                     )
 
                     if storage_result.get("success"):
-                        # Convert to absolute URL
-                        base_url = os.getenv("BASE_URL", "http://localhost:8001")
-                        full_url = f"{base_url}{storage_result['url']}"
+                        # T160: prefer the durable cloud URL when the image was
+                        # uploaded (Cloudinary/S3). Only fall back to the
+                        # BASE_URL + local path when there's no cloud URL — that
+                        # local path is on ephemeral disk and dies on the next
+                        # Render deploy, leaving the Shopify listing with a dead
+                        # image.
+                        cloud_url = storage_result.get("cloud_url")
+                        if cloud_url:
+                            full_url = cloud_url
+                        else:
+                            base_url = os.getenv("BASE_URL", "http://localhost:8001")
+                            full_url = f"{base_url}{storage_result['url']}"
                         enhanced_images.append(full_url)
 
                         costs["images"] += enhancement_result.get("cost_estimate", 0.04)

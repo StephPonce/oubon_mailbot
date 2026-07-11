@@ -40,40 +40,83 @@ class ImageStorage:
     def __init__(
         self,
         base_path: str = "data/images",
-        enable_cloud_upload: bool = False,
+        enable_cloud_upload: Optional[bool] = None,
         cloudinary_config: Optional[Dict[str, str]] = None,
         s3_config: Optional[Dict[str, str]] = None
     ):
         """
         Initialize image storage service.
 
+        T160: local disk (``data/images``) is wiped on every Render deploy, so a
+        generated/processed product image vanishes on the next release. Cloud
+        upload was fully implemented but gated behind ``enable_cloud_upload=False``
+        and every caller used ``ImageStorage()`` with the default — so nothing
+        ever persisted to the cloud. This now AUTO-ENABLES cloud upload when cloud
+        credentials are present in the environment: prod persists images with zero
+        caller changes, while local dev (no creds) transparently stays on disk.
+
         Args:
-            base_path: Base directory for local storage
-            enable_cloud_upload: Whether to upload to cloud storage
-            cloudinary_config: Cloudinary credentials (cloud_name, api_key, api_secret)
-            s3_config: S3 credentials (bucket, region, access_key, secret_key)
+            base_path: Base directory for local storage.
+            enable_cloud_upload: ``None`` = auto (enabled when cloud env creds
+                exist); pass ``True``/``False`` to force.
+            cloudinary_config: explicit Cloudinary creds; falls back to env.
+            s3_config: explicit S3 creds; falls back to env.
         """
         self.base_path = Path(base_path)
         self.products_path = self.base_path / "products"
         self.temp_path = self.base_path / "temp"
-        self.enable_cloud_upload = enable_cloud_upload
 
         # Create directories
         self._ensure_directories()
 
-        # Cloud storage configs
-        self.cloudinary_config = cloudinary_config
-        self.s3_config = s3_config
+        # Cloud storage configs — fall back to the environment when not passed.
+        self.cloudinary_config = cloudinary_config or self._cloudinary_config_from_env()
+        self.s3_config = s3_config or self._s3_config_from_env()
+
+        # Resolve whether cloud upload is on. None => auto: enable when a usable
+        # cloud config exists for either provider.
+        if enable_cloud_upload is None:
+            self.enable_cloud_upload = bool(self.cloudinary_config or self.s3_config)
+        else:
+            self.enable_cloud_upload = enable_cloud_upload
 
         # Initialize cloud clients if enabled
         self.cloudinary_client = None
         self.s3_client = None
 
-        if enable_cloud_upload:
+        if self.enable_cloud_upload:
             self._init_cloud_clients()
 
         logger.info(f"[SUCCESS] ImageStorage initialized: {self.base_path.absolute()}")
-        logger.info(f"   Cloud upload: {'enabled' if enable_cloud_upload else 'disabled'}")
+        logger.info(f"   Cloud upload: {'enabled' if self.enable_cloud_upload else 'disabled'}")
+
+    @staticmethod
+    def _cloudinary_config_from_env() -> Optional[Dict[str, str]]:
+        """Cloudinary creds from env, or None unless all three are present."""
+        import os
+        cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
+        api_key = os.getenv("CLOUDINARY_API_KEY")
+        api_secret = os.getenv("CLOUDINARY_API_SECRET")
+        if cloud_name and api_key and api_secret:
+            return {"cloud_name": cloud_name, "api_key": api_key, "api_secret": api_secret}
+        return None
+
+    @staticmethod
+    def _s3_config_from_env() -> Optional[Dict[str, str]]:
+        """S3 creds from env, or None unless bucket + keys are present."""
+        import os
+        bucket = os.getenv("AWS_S3_BUCKET") or os.getenv("S3_BUCKET")
+        access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        region = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
+        if bucket and access_key and secret_key:
+            return {
+                "bucket": bucket,
+                "region": region,
+                "access_key": access_key,
+                "secret_key": secret_key,
+            }
+        return None
 
     def _ensure_directories(self) -> None:
         """Create necessary directories if they don't exist."""
