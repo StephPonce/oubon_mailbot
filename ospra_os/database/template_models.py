@@ -8,7 +8,7 @@ Database models for action template marketplace where users can:
 - Track usage and performance
 """
 
-from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -53,7 +53,7 @@ class ActionTemplate(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Ownership (no FK constraint - cross-database reference)
-    creator_id = Column(Integer, nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # T161b: real FK so mappers configure
 
     # Basic Info
     name = Column(String(255), nullable=False)
@@ -145,8 +145,8 @@ class TemplatePurchase(Base):
     __tablename__ = "template_purchases"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    template_id = Column(Integer, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    template_id = Column(Integer, ForeignKey("action_templates.id"), nullable=False, index=True)
 
     # Transaction
     price_paid = Column(Float, default=0)
@@ -173,9 +173,9 @@ class TemplateUsage(Base):
     __tablename__ = "template_usages"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    template_id = Column(Integer, nullable=False, index=True)
-    store_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    template_id = Column(Integer, ForeignKey("action_templates.id"), nullable=False, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
 
     # Configuration used
     variables_used = Column(JSON, default=dict)
@@ -211,9 +211,9 @@ class TemplateReview(Base):
     __tablename__ = "template_reviews"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False, index=True)
-    template_id = Column(Integer, nullable=False, index=True)
-    usage_id = Column(Integer, nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    template_id = Column(Integer, ForeignKey("action_templates.id"), nullable=False, index=True)
+    usage_id = Column(Integer, ForeignKey("template_usages.id"), nullable=True)
 
     # Review content
     rating = Column(Integer, nullable=False)  # 1-5
