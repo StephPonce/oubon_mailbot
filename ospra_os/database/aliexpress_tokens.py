@@ -4,12 +4,16 @@ AliExpress Token Storage in Database
 Stores OAuth tokens in PostgreSQL to survive deployments.
 """
 from sqlalchemy import Column, Integer, String, DateTime, Text, create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta, timezone
 import os
 
-Base = declarative_base()
+# T161: use the SHARED metadata. This module previously created its own
+# declarative_base(), so its table registered on a separate metadata and was
+# NOT created by the app's normal Base.metadata.create_all() on startup — on a
+# fresh DB, saving an AliExpress token would fail with "no such table". Sharing
+# the one Base puts aliexpress_tokens into the metadata create_all() actually uses.
+from ospra_os.database.base import Base
 
 
 class AliExpressToken(Base):
@@ -60,7 +64,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Initialize database tables"""
-    Base.metadata.create_all(bind=engine)
+    # T161: scope to THIS table. Base is now the shared metadata (59+ tables), so
+    # an unscoped create_all() here would try to build the entire schema from this
+    # token module. Only ensure our own table exists.
+    Base.metadata.create_all(bind=engine, tables=[AliExpressToken.__table__])
     print("[SUCCESS] AliExpress token storage initialized")
 
 

@@ -10,12 +10,13 @@ Database models for action template marketplace where users can:
 
 from sqlalchemy import Column, Integer, String, Float, Text, JSON, DateTime, Boolean
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 import enum
 
-# Create Base for template models
-Base = declarative_base()
+# T161: shared metadata — was its own declarative_base(), so action_templates /
+# template_purchases / template_usages / template_reviews were missing from the
+# startup create_all() and wouldn't exist on a fresh DB.
+from ospra_os.database.base import Base
 
 
 class TemplateStatus(str, enum.Enum):

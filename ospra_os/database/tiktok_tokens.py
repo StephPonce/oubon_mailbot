@@ -15,7 +15,6 @@ features. Do not tenantize this without first re-evaluating whether other
 tenants can actually get TikTok API access. See docs/CLEANUP_PASS4.md.
 """
 from sqlalchemy import Column, Integer, String, DateTime, Text, create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta, timezone
 import os
@@ -23,7 +22,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-Base = declarative_base()
+# T161: use the SHARED metadata (was its own declarative_base(), so tiktok_tokens
+# was missing from the startup create_all() and wouldn't exist on a fresh DB).
+from ospra_os.database.base import Base
 
 
 class TikTokToken(Base):
@@ -66,7 +67,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     """Initialize database tables"""
     try:
-        Base.metadata.create_all(bind=engine)
+        # T161: scope to this table — Base is now the shared 59-table metadata.
+        Base.metadata.create_all(bind=engine, tables=[TikTokToken.__table__])
         logger.info("TikTok token storage initialized")
     except Exception as e:
         logger.error(f"Failed to initialize TikTok token storage: {e}")

@@ -6,12 +6,14 @@ Implements hybrid caching strategy for optimal performance and accuracy.
 """
 
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, Index
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict
 import json
 
-Base = declarative_base()
+# T161: shared metadata — was its own declarative_base(), so
+# cached_aliexpress_products / product_search_cache were missing from the
+# startup create_all() and wouldn't exist on a fresh DB.
+from ospra_os.database.base import Base
 
 
 class CachedAliExpressProduct(Base):

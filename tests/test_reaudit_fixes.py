@@ -378,29 +378,29 @@ class TestTokenRoundTripUnmocked:
 
     def test_save_then_load_returns_usable_payload(self, tmp_path, monkeypatch):
         db = tmp_path / "tok.db"
-        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db}")
-        # Fresh import so the module binds to the temp DATABASE_URL.
-        import importlib
+        # T161 moved AliExpressToken onto the shared Base, so importlib.reload()
+        # would re-register the table on the shared metadata and blow up. The
+        # module reads its engine/SessionLocal globals at call time, so rebind
+        # those to the temp DB instead (monkeypatch restores them afterwards).
         import ospra_os.database.aliexpress_tokens as tok
-        importlib.reload(tok)
-        try:
-            tok.init_db()
-            assert tok.save_token("dropship", "at-1", "rt-1", 3600)
-            payload = tok.load_token("dropship")   # must NOT raise TypeError
-            assert payload is not None
-            assert payload["access_token"] == "at-1"
-            assert payload["refresh_token"] == "rt-1"
-            assert payload["is_expired"] is False
-            assert isinstance(payload["needs_refresh"], bool)
+        eng = create_engine(f"sqlite:///{db}")
+        monkeypatch.setattr(tok, "engine", eng)
+        monkeypatch.setattr(tok, "SessionLocal", sessionmaker(bind=eng))
+        tok.init_db()
+        assert tok.save_token("dropship", "at-1", "rt-1", 3600)
+        payload = tok.load_token("dropship")   # must NOT raise TypeError
+        assert payload is not None
+        assert payload["access_token"] == "at-1"
+        assert payload["refresh_token"] == "rt-1"
+        assert payload["is_expired"] is False
+        assert isinstance(payload["needs_refresh"], bool)
 
-            # Expired token: is_expired flips without raising.
-            assert tok.save_token("dropship", "at-2", "rt-2", 1)
-            import time as _t
-            _t.sleep(1.1)
-            payload = tok.load_token("dropship")
-            assert payload["is_expired"] is True
-        finally:
-            importlib.reload(tok)  # restore module state for other tests
+        # Expired token: is_expired flips without raising.
+        assert tok.save_token("dropship", "at-2", "rt-2", 1)
+        import time as _t
+        _t.sleep(1.1)
+        payload = tok.load_token("dropship")
+        assert payload["is_expired"] is True
 
 
 class TestAbsenceGating:

@@ -246,6 +246,7 @@ def _import_all_models():
         'template_models',
         'amazon_models',
         'aliexpress_tokens',
+        'tiktok_tokens',  # T161: was never imported here, so its table never registered
         'cached_products',
         'enhanced_image_cache',  # Enhanced image caching for Stability AI
     ]
