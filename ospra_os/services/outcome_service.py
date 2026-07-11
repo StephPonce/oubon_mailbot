@@ -557,23 +557,70 @@ class OutcomeService:
         margin: float
     ):
         """
-        Update NicheLearning statistics.
+        Update NicheLearning statistics on every product outcome.
 
-        Tracks which niches work well for this user.
+        T164 — CLOSES THE SELF-LEARNING LOOP. Discovery scoring reads the learned
+        adjustment via product_discovery._get_learned_niche_adjustment(), which
+        looks up the GLOBAL row:  NicheLearning.niche == niche.lower()  AND
+        user_id IS NULL. Previously this method wrote ONLY a per-user row
+        (user_id=user_id) with the ORIGINAL-case niche — so:
+          1. the global row the reader needs was never created, and
+          2. even a per-user row wouldn't have matched because the reader
+             lower-cases the niche and the writer didn't.
+        The learned niche_score_adjustment was therefore computed, stored, and
+        never read. Outcomes never changed future scores — the loop was severed
+        at this exact seam.
+
+        Fix: normalise the niche to lowercase (matching the reader) and maintain
+        BOTH the per-user row (kept for future personalization) and the GLOBAL
+        (user_id=None) row that discovery actually consumes.
         """
-        # Find or create niche learning record
-        niche_learning = self.db.query(NicheLearning).filter(
-            and_(
-                NicheLearning.user_id == user_id,
-                NicheLearning.niche == niche
+        niche = (niche or "").strip().lower()
+        if not niche:
+            return
+
+        for scope_user_id in (user_id, None):
+            self._apply_niche_outcome(
+                scope_user_id, niche, product_id,
+                outcome_classification, revenue, profit,
             )
-        ).first()
+
+    def _apply_niche_outcome(
+        self,
+        user_id,
+        niche: str,
+        product_id: int,
+        outcome_classification: str,
+        revenue: float,
+        profit: float,
+    ):
+        """Upsert one NicheLearning row. ``user_id=None`` maintains the global
+        row that discovery reads; a real user_id maintains that user's row."""
+        query = self.db.query(NicheLearning).filter(NicheLearning.niche == niche)
+        if user_id is None:
+            query = query.filter(NicheLearning.user_id.is_(None))
+        else:
+            query = query.filter(NicheLearning.user_id == user_id)
+        niche_learning = query.first()
 
         if not niche_learning:
+            # Initialise counters explicitly: SQLAlchemy column defaults (=0)
+            # are only applied at flush/INSERT, so a freshly-constructed row has
+            # None until then — and `None += 1` / `revenue > None` would crash on
+            # the first-ever outcome for a niche (latent in the original code).
             niche_learning = NicheLearning(
                 user_id=user_id,
                 niche=niche,
-                first_product_at=datetime.now()
+                first_product_at=datetime.now(),
+                total_products_deployed=0,
+                successful_products=0,
+                failed_products=0,
+                success_rate=0.0,
+                total_revenue=0.0,
+                total_profit=0.0,
+                average_margin=0.0,
+                best_product_revenue=0.0,
+                niche_score_adjustment=0.0,
             )
             self.db.add(niche_learning)
 
