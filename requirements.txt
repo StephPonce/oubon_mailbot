@@ -28,12 +28,22 @@ google-generativeai>=0.3.2
 
 # Google APIs (Gmail, etc)
 google-api-python-client>=2.114.0
+# Google Ads (ospra_os/advertising/ — 9 import sites). NOT pulled in by any
+# other dep: it was pyproject-only, so ad deployment has been
+# ImportError-disabled in every Render build. Third bite of the T176
+# manifest drift (after cloudinary and posthog/otel).
+google-ads>=25.0.0
 google-auth>=2.27.0
 google-auth-oauthlib>=1.2.0
 google-auth-httplib2>=0.2.0
 
 # Authentication
 python-jose[cryptography]>=3.3.0
+# Fernet credential encryption — 27 import sites. Was only present as a
+# transitive dep of python-jose[cryptography]; too load-bearing to leave
+# implicit. Keep in sync with pyproject.toml. (T176 dependency-manifest
+# reconciliation pass.)
+cryptography>=41.0.0
 # bcrypt is called directly from ospra_os/auth/jwt_auth.py — passlib was
 # removed to avoid its broken self-test on bcrypt 4+ (see the comment in
 # that module). Keep this pin in sync with pyproject.toml so a uv-based
@@ -49,6 +59,9 @@ numpy>=1.26.3
 
 # Utilities
 python-dotenv>=1.0.0
+# Timezone quiet-hours (advertising scheduler). Transitive via pandas until
+# now — pinned explicitly so a pandas upgrade can't silently drop it. (T176)
+pytz>=2024.1
 tenacity>=8.2.3
 cachetools>=5.3.2
 
