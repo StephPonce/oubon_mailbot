@@ -94,6 +94,23 @@ opentelemetry-instrumentation-openai-v2>=2.0.0
 # creds set — product images would die on the next deploy.
 cloudinary>=1.40.0
 
+# T176 drift, second sweep (full pyproject-vs-requirements set-diff found 14
+# undeclared packages; these 4 back live code):
+# - facebook-business: hard import in advertising/meta — without it the entire
+#   advertising router fails to load in prod.
+# - sentry-sdk: observability/error_tracking — error tracking was silently
+#   disabled in every Render build.
+# - Amazon SP-API + PA-API: platforms/amazon.py and the Amazon discovery
+#   connector degrade to disabled without them.
+# Deliberately NOT added: praw (deprecated), rembg/onnxruntime (opt-in image
+# feature, ~200MB build cost — needs a product decision), playwright /
+# apify-client / fake-useragent / jinja2 / slack-sdk / aiosqlite / schedule
+# (zero live imports or dev-only).
+facebook-business>=24.0.0
+sentry-sdk[fastapi,httpx,sqlalchemy]>=2.47.0
+python-amazon-sp-api>=1.9.50
+python-amazon-paapi==5.0.1
+
 # Rate Limiting
 slowapi>=0.1.9
 
