@@ -249,6 +249,7 @@ def _import_all_models():
         'tiktok_tokens',  # T161: was never imported here, so its table never registered
         'cached_products',
         'enhanced_image_cache',  # Enhanced image caching for Stability AI
+        'fulfillment_models',  # T16: idempotency records for auto-fulfillment
     ]
     
     imported = 0

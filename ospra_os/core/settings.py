@@ -93,6 +93,18 @@ class Settings(BaseSettings):
     # everything immediately; this flag keeps it down across restarts).
     ADS_KILL_SWITCH: bool = Field(default=False)
 
+    # Auto-fulfillment safety rails (Section B, T17/T19).
+    # Master kill switch, checked INSIDE the engine (T17) — the dashboard
+    # toggle in data/fulfillment_settings.json must ALSO be on. Default OFF:
+    # money auto-features ship disabled.
+    AUTO_FULFILL_ENABLED: bool = Field(default=False)
+    # Per-order ceiling (USD, customer-facing order total). Orders above this
+    # route to manual review instead of being auto-placed with the supplier.
+    FULFILL_MAX_ORDER_VALUE: float = Field(default=200.0)
+    # Daily cap on auto-placed supplier orders. Anything past it goes to the
+    # manual queue — a runaway webhook storm can't place unlimited orders.
+    FULFILL_MAX_ORDERS_PER_DAY: int = Field(default=50)
+
     # AI Providers
     AI_PROVIDER: str = Field(default="openai")
     OPENAI_API_KEY: Optional[str] = None

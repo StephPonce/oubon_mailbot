@@ -42,9 +42,13 @@ class FulfillmentStatus(str, Enum):
     ORDERED = "ordered"           # Order placed, awaiting shipment
     SHIPPED = "shipped"           # Tracking number received
     DELIVERED = "delivered"       # Delivered to customer
-    FAILED = "failed"             # Fulfillment failed
+    FAILED = "failed"             # Fulfillment failed (supplier call never went out)
     CANCELLED = "cancelled"       # Order cancelled
     MANUAL_REQUIRED = "manual"    # Needs manual intervention
+    # T18: the supplier call went out but the outcome is unknown (timeout after
+    # send, unparseable response). The order MAY exist at the supplier — must
+    # be reviewed by a human and must NEVER be blind-retried.
+    POSSIBLY_PLACED = "possibly_placed"
 
 
 class SupplierType(str, Enum):
@@ -97,9 +101,202 @@ class AutoFulfillmentEngine:
         
         # Fulfillment queue (in production, use Redis/Celery)
         self._fulfillment_queue: List[FulfillmentOrder] = []
-        
+
+        # Section B safety settings (T17/T19)
+        from ospra_os.core.settings import get_settings
+        self.settings = get_settings()
+
         logger.info("[FULFILLMENT] Auto Fulfillment Engine initialized")
         self._log_supplier_status()
+
+    # =========================================================================
+    # SAFETY RAILS (Section B band 2)
+    # =========================================================================
+
+    def _dashboard_auto_fulfill_enabled(self) -> bool:
+        """Read the dashboard toggle (data/fulfillment_settings.json)."""
+        try:
+            settings_file = os.path.join(
+                os.path.dirname(__file__), '..', '..', 'data', 'fulfillment_settings.json'
+            )
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    return bool(json.load(f).get('auto_fulfill_enabled', False))
+        except Exception as e:
+            logger.warning(f"[FULFILLMENT] Could not read dashboard toggle: {e}")
+        return False
+
+    def auto_fulfill_enabled(self) -> bool:
+        """T17: the kill switch the ENGINE itself honors.
+
+        Requires BOTH the env master switch (AUTO_FULFILL_ENABLED, default
+        False) and the dashboard toggle. Previously only one webhook caller
+        checked the toggle — any other path into process_new_order() placed
+        real supplier orders with no gate at all.
+        """
+        return bool(self.settings.AUTO_FULFILL_ENABLED) and self._dashboard_auto_fulfill_enabled()
+
+    @staticmethod
+    def _validate_shipping_address(shipping: Dict[str, Any]) -> Optional[str]:
+        """T19: refuse to auto-place orders with obviously unusable addresses.
+
+        Returns None when valid, else a human-readable reason.
+        """
+        required = {
+            'address1': "street address",
+            'city': "city",
+            'country_code': "country code",
+        }
+        missing = [label for key, label in required.items() if not (shipping.get(key) or '').strip()]
+        name = f"{shipping.get('first_name', '')}{shipping.get('last_name', '')}".strip()
+        if not name and not (shipping.get('name') or '').strip():
+            missing.append("recipient name")
+        # ZIP is required for countries that use it; be conservative and
+        # require it everywhere except the few zipless countries.
+        zipless = {'AE', 'HK', 'IE', 'PA'}
+        if not (shipping.get('zip') or '').strip() and (shipping.get('country_code') or '').upper() not in zipless:
+            missing.append("postal code")
+        if missing:
+            return f"Shipping address missing: {', '.join(missing)}"
+        return None
+
+    @staticmethod
+    def _order_value(shopify_order: Dict[str, Any]) -> float:
+        """Customer-facing order total, for the T19 value ceiling."""
+        total = shopify_order.get('total_price')
+        if total is not None:
+            try:
+                return float(total)
+            except (TypeError, ValueError):
+                pass
+        value = 0.0
+        for item in shopify_order.get('line_items', []):
+            try:
+                value += float(item.get('price', 0)) * int(item.get('quantity', 1))
+            except (TypeError, ValueError):
+                continue
+        return value
+
+    def _count_todays_auto_orders(self) -> Optional[int]:
+        """T19: how many supplier orders were auto-placed (or possibly placed)
+        today. Returns None when the DB is unavailable (callers fail closed)."""
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.fulfillment.models import FulfillmentRecord
+
+            db = SessionLocal()
+            try:
+                start_of_day = datetime.now(timezone.utc).replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ).replace(tzinfo=None)
+                return db.query(FulfillmentRecord).filter(
+                    FulfillmentRecord.created_at >= start_of_day,
+                    FulfillmentRecord.status.in_((
+                        FulfillmentStatus.PROCESSING.value,
+                        FulfillmentStatus.ORDERED.value,
+                        FulfillmentStatus.POSSIBLY_PLACED.value,
+                    )),
+                ).count()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"[FULFILLMENT] Daily-cap count unavailable: {e}")
+            return None
+
+    def _claim_line_item(
+        self,
+        order_id: str,
+        order_number: str,
+        line_item_id: str,
+        product_id,
+        product_name: str,
+        quantity: int,
+        order_value: float,
+        supplier_type: str,
+        shipping_address: Dict[str, Any],
+    ) -> Optional[str]:
+        """T16: atomically claim a line item before placing the supplier order.
+
+        Inserts a PROCESSING FulfillmentRecord whose UNIQUE idempotency_key is
+        ``{order_id}:{line_item_id}``. Returns the key on success. Returns
+        None when the row already exists (webhook retry / duplicate delivery)
+        or when the DB is unavailable — in both cases the caller must NOT
+        place a supplier order.
+        """
+        key = f"{order_id}:{line_item_id}"
+        try:
+            from sqlalchemy.exc import IntegrityError
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.fulfillment.models import FulfillmentRecord
+
+            db = SessionLocal()
+            try:
+                record = FulfillmentRecord(
+                    idempotency_key=key,
+                    shopify_order_id=str(order_id),
+                    shopify_order_number=str(order_number),
+                    line_item_id=str(line_item_id),
+                    product_id=str(product_id),
+                    product_name=product_name,
+                    quantity=quantity,
+                    order_value=order_value,
+                    supplier_type=supplier_type,
+                    status=FulfillmentStatus.PROCESSING.value,
+                    shipping_address=shipping_address,
+                )
+                db.add(record)
+                db.commit()
+                return key
+            except IntegrityError:
+                db.rollback()
+                existing = db.query(FulfillmentRecord).filter_by(idempotency_key=key).first()
+                logger.warning(
+                    f"[FULFILLMENT] Duplicate delivery for {key} "
+                    f"(existing status: {existing.status if existing else 'unknown'}) — skipping"
+                )
+                return None
+            finally:
+                db.close()
+        except Exception as e:
+            # DB unavailable → we cannot guarantee idempotency → do not place.
+            logger.error(f"[FULFILLMENT] Cannot claim {key} (DB unavailable: {e}) — refusing to place")
+            return None
+
+    def _update_claim(self, key: str, status: str, supplier_order_id: Optional[str] = None,
+                      error_message: Optional[str] = None):
+        """Update the claimed record with the supplier-call outcome."""
+        try:
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.fulfillment.models import FulfillmentRecord
+
+            db = SessionLocal()
+            try:
+                record = db.query(FulfillmentRecord).filter_by(idempotency_key=key).first()
+                if record:
+                    record.status = status
+                    if supplier_order_id:
+                        record.supplier_order_id = supplier_order_id
+                    if error_message:
+                        record.error_message = error_message
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"[FULFILLMENT] Failed to update claim {key}: {e}")
+
+    def _alert(self, title: str, message: str, metadata: Optional[Dict] = None):
+        """Raise a dashboard notification for events needing human review."""
+        try:
+            from ospra_os.database.product_history import ProductHistoryDB
+            ProductHistoryDB().create_notification(
+                notification_type='fulfillment',
+                title=title,
+                message=message,
+                severity='critical',
+                metadata=metadata or {},
+            )
+        except Exception as e:
+            logger.warning(f"[FULFILLMENT] Failed to create alert: {e}")
     
     def _log_supplier_status(self):
         """Log which suppliers are configured"""
@@ -123,22 +320,90 @@ class AutoFulfillmentEngine:
         try:
             order_id = shopify_order.get('id')
             order_number = shopify_order.get('order_number', shopify_order.get('name', ''))
-            
+
             logger.info(f"[FULFILLMENT] Processing order #{order_number}")
-            
+
+            # T17: the engine itself hard-returns when auto-fulfillment is off.
+            # Previously only one webhook caller checked the toggle; any other
+            # path into this method placed real supplier orders ungated.
+            if not self.auto_fulfill_enabled():
+                logger.info("[FULFILLMENT] Auto-fulfillment disabled — not placing supplier orders")
+                return {
+                    "success": False,
+                    "order_id": str(order_id),
+                    "order_number": str(order_number),
+                    "error": "Auto-fulfillment is disabled",
+                    "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+                }
+
             # Extract shipping address
             shipping = shopify_order.get('shipping_address', {})
             if not shipping:
                 # Fall back to billing address
                 shipping = shopify_order.get('billing_address', {})
-            
+
             if not shipping:
                 return {
                     "success": False,
                     "error": "No shipping address found",
                     "status": FulfillmentStatus.FAILED.value
                 }
-            
+
+            # T19: address must be usable before any supplier order is placed.
+            address_problem = self._validate_shipping_address(shipping)
+            if address_problem:
+                logger.warning(f"[FULFILLMENT] {address_problem} — routing to manual review")
+                return {
+                    "success": False,
+                    "order_id": str(order_id),
+                    "order_number": str(order_number),
+                    "error": address_problem,
+                    "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+                }
+
+            # T19: per-order value ceiling.
+            order_value = self._order_value(shopify_order)
+            max_value = self.settings.FULFILL_MAX_ORDER_VALUE
+            if order_value > max_value:
+                logger.warning(
+                    f"[FULFILLMENT] Order #{order_number} value ${order_value:.2f} exceeds "
+                    f"ceiling ${max_value:.2f} — routing to manual review"
+                )
+                self._alert(
+                    "High-value order needs manual fulfillment",
+                    f"Order #{order_number} (${order_value:.2f}) exceeds the "
+                    f"${max_value:.2f} auto-fulfillment ceiling.",
+                    {"order_id": str(order_id), "order_value": order_value},
+                )
+                return {
+                    "success": False,
+                    "order_id": str(order_id),
+                    "order_number": str(order_number),
+                    "error": f"Order value ${order_value:.2f} exceeds auto-fulfill ceiling",
+                    "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+                }
+
+            # T19: daily auto-order cap. Fail closed if the count is unknown.
+            todays = self._count_todays_auto_orders()
+            if todays is None or todays >= self.settings.FULFILL_MAX_ORDERS_PER_DAY:
+                reason = (
+                    "daily order-count unavailable (DB down)" if todays is None
+                    else f"daily cap of {self.settings.FULFILL_MAX_ORDERS_PER_DAY} auto-orders reached"
+                )
+                logger.warning(f"[FULFILLMENT] {reason} — routing to manual review")
+                self._alert(
+                    "Auto-fulfillment halted",
+                    f"Order #{order_number} routed to manual review: {reason}.",
+                    {"order_id": str(order_id)},
+                )
+                return {
+                    "success": False,
+                    "order_id": str(order_id),
+                    "order_number": str(order_number),
+                    "error": reason,
+                    "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+                }
+
             # Process each line item
             results = []
             for item in shopify_order.get('line_items', []):
@@ -147,7 +412,8 @@ class AutoFulfillmentEngine:
                     order_number=str(order_number),
                     line_item=item,
                     shipping_address=shipping,
-                    customer_email=shopify_order.get('email', '')
+                    customer_email=shopify_order.get('email', ''),
+                    order_value=order_value,
                 )
                 results.append(result)
             
@@ -180,23 +446,28 @@ class AutoFulfillmentEngine:
         order_number: str,
         line_item: Dict[str, Any],
         shipping_address: Dict[str, Any],
-        customer_email: str
+        customer_email: str,
+        order_value: float = 0.0,
     ) -> Dict[str, Any]:
         """
         Fulfill a single line item from an order.
-        
+
         Looks up the supplier info from product metadata and routes to appropriate fulfillment method.
         """
         product_id = line_item.get('product_id')
         variant_id = line_item.get('variant_id')
         quantity = line_item.get('quantity', 1)
         product_name = line_item.get('name', 'Unknown Product')
-        
+        # T16: the idempotency key needs a stable per-line identifier. Shopify
+        # line items always carry an id; fall back to variant/product so a
+        # malformed payload still can't bypass dedup by omitting it.
+        line_item_id = line_item.get('id') or variant_id or product_id
+
         logger.info(f"  Fulfilling: {quantity}x {product_name}")
-        
+
         # Get supplier info from product metafields
         supplier_info = await self._get_supplier_info(product_id)
-        
+
         if not supplier_info:
             logger.warning(f"  No supplier info found for product {product_id}")
             return {
@@ -207,11 +478,11 @@ class AutoFulfillmentEngine:
                 "status": FulfillmentStatus.MANUAL_REQUIRED.value,
                 "action_required": "Add supplier URL to product metafields"
             }
-        
+
         supplier_type = supplier_info.get('type', SupplierType.MANUAL.value)
         supplier_url = supplier_info.get('url', '')
         supplier_sku = supplier_info.get('sku', '')
-        
+
         # Route to appropriate fulfillment method
         if supplier_type == SupplierType.CJ_DROPSHIPPING.value:
             return await self._fulfill_via_cj(
@@ -221,7 +492,10 @@ class AutoFulfillmentEngine:
                 product_name=product_name,
                 supplier_sku=supplier_sku,
                 quantity=quantity,
-                shipping_address=shipping_address
+                shipping_address=shipping_address,
+                line_item_id=str(line_item_id),
+                order_value=order_value,
+                expected_cost=supplier_info.get('cost'),
             )
         
         elif supplier_type == SupplierType.ALIEXPRESS.value:
@@ -307,6 +581,59 @@ class AutoFulfillmentEngine:
     # CJ DROPSHIPPING FULFILLMENT
     # =========================================================================
     
+    async def _cj_api_post(self, url: str, payload: Dict[str, Any]) -> "httpx.Response":
+        """Single seam for CJ POSTs (tests stub this). Raises httpx errors."""
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            return await client.post(
+                url,
+                headers={
+                    'CJ-Access-Token': self.cj_api_key,
+                    'Content-Type': 'application/json'
+                },
+                json=payload,
+            )
+
+    async def _check_cj_variant(
+        self, supplier_sku: str, quantity: int, expected_cost: Optional[float]
+    ) -> Optional[str]:
+        """T19: live stock/price check before placing. Returns None when OK,
+        else the reason to route to manual review. Fails CLOSED: if the check
+        itself errors, we don't place the order."""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    "https://developers.cjdropshipping.com/api2.0/v1/product/variant/queryByVid",
+                    headers={'CJ-Access-Token': self.cj_api_key},
+                    params={"vid": supplier_sku},
+                )
+            data = response.json()
+            if not data.get('result') or not data.get('data'):
+                return f"CJ variant lookup failed: {data.get('message', 'no data')}"
+
+            variant = data['data']
+
+            # Stock — CJ has used a few field names across API revisions.
+            stock = None
+            for field in ('variantStock', 'stockNum', 'inventoryNum', 'storageNum'):
+                if variant.get(field) is not None:
+                    stock = variant[field]
+                    break
+            if stock is not None and int(stock) < quantity:
+                return f"Insufficient CJ stock ({stock} < {quantity})"
+
+            # Price drift — if we know what the product should cost, refuse
+            # silently paying >25% more than expected.
+            if expected_cost:
+                price = variant.get('variantSellPrice') or variant.get('sellPrice')
+                if price is not None and float(price) > float(expected_cost) * 1.25:
+                    return (
+                        f"CJ price ${float(price):.2f} exceeds expected "
+                        f"${float(expected_cost):.2f} by >25%"
+                    )
+            return None
+        except Exception as e:
+            return f"CJ stock/price check errored ({e})"
+
     async def _fulfill_via_cj(
         self,
         order_id: str,
@@ -315,15 +642,24 @@ class AutoFulfillmentEngine:
         product_name: str,
         supplier_sku: str,
         quantity: int,
-        shipping_address: Dict[str, Any]
+        shipping_address: Dict[str, Any],
+        line_item_id: str = "",
+        order_value: float = 0.0,
+        expected_cost: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Fulfill order via CJ Dropshipping API.
-        
-        CJ has a proper API that supports:
-        - Creating orders
-        - Getting tracking numbers
-        - Checking order status
+
+        Safety order of operations (Section B band 2):
+          1. T19 pre-flight: live stock/price check — fail closed to manual.
+          2. T16 claim: atomically insert the idempotency record BEFORE the
+             supplier call. A webhook retry can't claim twice, so it can't
+             order twice. (The old code saved AFTER placing, so a retry that
+             raced or followed a crash double-ordered.)
+          3. T18 outcome discrimination: only report FAILED when we KNOW the
+             order was not created (connect error before send, or CJ said no).
+             A timeout after send or an unparseable response is
+             POSSIBLY_PLACED — alert a human, never blind-retry.
         """
         if not self.cj_api_key:
             return {
@@ -333,82 +669,150 @@ class AutoFulfillmentEngine:
                 "error": "CJ Dropshipping API not configured",
                 "status": FulfillmentStatus.MANUAL_REQUIRED.value
             }
-        
-        try:
-            logger.info(f"  [CJ] Placing order for SKU: {supplier_sku}")
-            
-            # Format address for CJ
-            cj_order = {
-                "orderNumber": f"OSPRA-{order_number}",
-                "shippingName": f"{shipping_address.get('first_name', '')} {shipping_address.get('last_name', '')}".strip(),
-                "shippingCountry": shipping_address.get('country', ''),
-                "shippingCountryCode": shipping_address.get('country_code', ''),
-                "shippingProvince": shipping_address.get('province', ''),
-                "shippingCity": shipping_address.get('city', ''),
-                "shippingAddress": shipping_address.get('address1', ''),
-                "shippingAddress2": shipping_address.get('address2', ''),
-                "shippingZip": shipping_address.get('zip', ''),
-                "shippingPhone": shipping_address.get('phone', ''),
-                "products": [
-                    {
-                        "vid": supplier_sku,
-                        "quantity": quantity
-                    }
-                ]
-            }
-            
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    "https://developers.cjdropshipping.com/api2.0/v1/shopping/order/createOrder",
-                    headers={
-                        'CJ-Access-Token': self.cj_api_key,
-                        'Content-Type': 'application/json'
-                    },
-                    json=cj_order
-                )
-                
-                result = response.json()
-                
-                if result.get('result') == True and result.get('data'):
-                    cj_order_id = result['data'].get('orderId')
-                    logger.info(f"  [CJ] ✅ Order placed: {cj_order_id}")
-                    
-                    # Save to database
-                    await self._save_fulfillment_record(
-                        shopify_order_id=order_id,
-                        shopify_order_number=order_number,
-                        product_id=product_id,
-                        supplier_type=SupplierType.CJ_DROPSHIPPING.value,
-                        supplier_order_id=cj_order_id,
-                        status=FulfillmentStatus.ORDERED.value
-                    )
-                    
-                    return {
-                        "success": True,
-                        "product_id": product_id,
-                        "product_name": product_name,
-                        "supplier": "CJ Dropshipping",
-                        "supplier_order_id": cj_order_id,
-                        "status": FulfillmentStatus.ORDERED.value
-                    }
-                else:
-                    error = result.get('message', 'Unknown CJ API error')
-                    logger.error(f"  [CJ] ❌ Order failed: {error}")
-                    return {
-                        "success": False,
-                        "product_id": product_id,
-                        "product_name": product_name,
-                        "error": error,
-                        "status": FulfillmentStatus.FAILED.value
-                    }
-                    
-        except Exception as e:
-            logger.error(f"  [CJ] Exception: {e}")
+
+        # T19: pre-flight stock/price check (fail closed).
+        preflight_problem = await self._check_cj_variant(supplier_sku, quantity, expected_cost)
+        if preflight_problem:
+            logger.warning(f"  [CJ] Pre-flight failed: {preflight_problem} — manual review")
             return {
                 "success": False,
                 "product_id": product_id,
                 "product_name": product_name,
-                "error": str(e),
+                "error": preflight_problem,
+                "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+            }
+
+        # T16: atomic idempotency claim BEFORE the supplier call.
+        claim_key = self._claim_line_item(
+            order_id=order_id,
+            order_number=order_number,
+            line_item_id=line_item_id,
+            product_id=product_id,
+            product_name=product_name,
+            quantity=quantity,
+            order_value=order_value,
+            supplier_type=SupplierType.CJ_DROPSHIPPING.value,
+            shipping_address=shipping_address,
+        )
+        if claim_key is None:
+            return {
+                "success": False,
+                "product_id": product_id,
+                "product_name": product_name,
+                "error": "Line item already processed (duplicate delivery) or DB unavailable",
+                "status": FulfillmentStatus.MANUAL_REQUIRED.value,
+                "duplicate": True,
+            }
+
+        logger.info(f"  [CJ] Placing order for SKU: {supplier_sku}")
+
+        # Format address for CJ
+        cj_order = {
+            "orderNumber": f"OSPRA-{order_number}-{line_item_id}",
+            "shippingName": f"{shipping_address.get('first_name', '')} {shipping_address.get('last_name', '')}".strip(),
+            "shippingCountry": shipping_address.get('country', ''),
+            "shippingCountryCode": shipping_address.get('country_code', ''),
+            "shippingProvince": shipping_address.get('province', ''),
+            "shippingCity": shipping_address.get('city', ''),
+            "shippingAddress": shipping_address.get('address1', ''),
+            "shippingAddress2": shipping_address.get('address2', ''),
+            "shippingZip": shipping_address.get('zip', ''),
+            "shippingPhone": shipping_address.get('phone', ''),
+            "products": [
+                {
+                    "vid": supplier_sku,
+                    "quantity": quantity
+                }
+            ]
+        }
+
+        # --- the supplier call, with T18 outcome discrimination -------------
+        try:
+            response = await self._cj_api_post(
+                "https://developers.cjdropshipping.com/api2.0/v1/shopping/order/createOrder",
+                cj_order,
+            )
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            # Never reached CJ — safe to call FAILED (retryable).
+            logger.error(f"  [CJ] Connection failed before send: {e}")
+            self._update_claim(claim_key, FulfillmentStatus.FAILED.value,
+                               error_message=f"connect error: {e}")
+            return {
+                "success": False,
+                "product_id": product_id,
+                "product_name": product_name,
+                "error": f"CJ unreachable: {e}",
+                "status": FulfillmentStatus.FAILED.value,
+            }
+        except Exception as e:
+            # Sent (or unknown) — the order MAY exist at CJ. T18: possibly
+            # placed, human review, never blind-retry.
+            logger.error(f"  [CJ] Request failed AFTER send (outcome unknown): {e}")
+            self._update_claim(claim_key, FulfillmentStatus.POSSIBLY_PLACED.value,
+                               error_message=f"post-send failure: {e}")
+            self._alert(
+                "CJ order outcome UNKNOWN — check before retrying",
+                f"Order #{order_number} ({product_name}) may or may not exist at CJ "
+                f"(request failed after send: {e}). Verify in the CJ dashboard "
+                f"(reference OSPRA-{order_number}-{line_item_id}) before any retry.",
+                {"order_id": order_id, "claim_key": claim_key},
+            )
+            return {
+                "success": False,
+                "product_id": product_id,
+                "product_name": product_name,
+                "error": f"CJ call outcome unknown: {e}",
+                "status": FulfillmentStatus.POSSIBLY_PLACED.value,
+            }
+
+        try:
+            result = response.json()
+        except Exception as e:
+            # HTTP round-trip completed but the body is unparseable. The old
+            # code reported FAILED here even though CJ may well have created
+            # the order — with no idempotency that meant a retry double-ordered.
+            logger.error(f"  [CJ] Unparseable response (HTTP {response.status_code}): {e}")
+            self._update_claim(claim_key, FulfillmentStatus.POSSIBLY_PLACED.value,
+                               error_message=f"unparseable response: {e}")
+            self._alert(
+                "CJ order outcome UNKNOWN — unparseable response",
+                f"Order #{order_number} ({product_name}): CJ returned HTTP "
+                f"{response.status_code} with an unparseable body. Verify in the CJ "
+                f"dashboard (reference OSPRA-{order_number}-{line_item_id}) before any retry.",
+                {"order_id": order_id, "claim_key": claim_key},
+            )
+            return {
+                "success": False,
+                "product_id": product_id,
+                "product_name": product_name,
+                "error": "CJ response unparseable — order possibly placed",
+                "status": FulfillmentStatus.POSSIBLY_PLACED.value,
+            }
+
+        if result.get('result') is True and result.get('data'):
+            cj_order_id = result['data'].get('orderId')
+            logger.info(f"  [CJ] ✅ Order placed: {cj_order_id}")
+            self._update_claim(claim_key, FulfillmentStatus.ORDERED.value,
+                               supplier_order_id=cj_order_id)
+            return {
+                "success": True,
+                "product_id": product_id,
+                "product_name": product_name,
+                "supplier": "CJ Dropshipping",
+                "supplier_order_id": cj_order_id,
+                "status": FulfillmentStatus.ORDERED.value
+            }
+        else:
+            # CJ answered and said NO — the one case a clean FAILED is honest.
+            error = result.get('message', 'Unknown CJ API error')
+            logger.error(f"  [CJ] ❌ Order rejected by CJ: {error}")
+            self._update_claim(claim_key, FulfillmentStatus.FAILED.value,
+                               error_message=error)
+            return {
+                "success": False,
+                "product_id": product_id,
+                "product_name": product_name,
+                "error": error,
                 "status": FulfillmentStatus.FAILED.value
             }
     
@@ -631,41 +1035,66 @@ Phone: {shipping_address.get('phone', 'N/A')}
     # =========================================================================
     
     async def _save_fulfillment_record(self, **kwargs):
-        """Save fulfillment record to database"""
+        """Save a fulfillment record.
+
+        Historical note: this used to try importing FulfillmentRecord — which
+        did not exist — so EVERY record went to the JSON fallback. The model is
+        real now (T16), but the manual-fulfillment dashboard queue still reads
+        the JSON file, so manual records are written to BOTH: the JSON queue
+        (operator visibility) and the DB (durable audit trail).
+        """
+        # JSON queue first — this is what /api/fulfillment/queue serves.
         try:
-            from ospra_os.database.connection import SessionLocal
-            from ospra_os.fulfillment.models import FulfillmentRecord
-            
-            db = SessionLocal()
-            try:
-                record = FulfillmentRecord(**kwargs)
-                db.add(record)
-                db.commit()
-                logger.info(f"  Fulfillment record saved")
-            finally:
-                db.close()
-        except ImportError:
-            # Models not yet created - save to JSON as fallback
-            import os
             queue_file = os.path.join(
-                os.path.dirname(__file__), 
+                os.path.dirname(__file__),
                 '..', '..', 'data', 'fulfillment_queue.json'
             )
             os.makedirs(os.path.dirname(queue_file), exist_ok=True)
-            
+
             queue = []
             if os.path.exists(queue_file):
                 with open(queue_file, 'r') as f:
                     queue = json.load(f)
-            
+
             queue.append(kwargs)
-            
+
             with open(queue_file, 'w') as f:
                 json.dump(queue, f, indent=2, default=str)
-            
-            logger.info(f"  Fulfillment record saved to JSON queue")
         except Exception as e:
-            logger.error(f"Failed to save fulfillment record: {e}")
+            logger.error(f"Failed to write JSON fulfillment queue: {e}")
+
+        # Durable DB record (best-effort; duplicates are skipped, not errors).
+        try:
+            from sqlalchemy.exc import IntegrityError
+            from ospra_os.database.connection import SessionLocal
+            from ospra_os.fulfillment.models import FulfillmentRecord
+
+            allowed = {c.name for c in FulfillmentRecord.__table__.columns}
+            data = {}
+            for key, value in kwargs.items():
+                if key == 'shipping_address_raw':
+                    data['shipping_address'] = value
+                elif key in allowed and key not in ('id', 'created_at', 'updated_at'):
+                    data[key] = value
+            if 'shopify_order_id' in data:
+                data.setdefault(
+                    'idempotency_key',
+                    f"{data['shopify_order_id']}:{data.get('product_id', '')}:manual",
+                )
+            else:
+                return  # not enough to key on; JSON queue already has it
+
+            db = SessionLocal()
+            try:
+                db.add(FulfillmentRecord(**data))
+                db.commit()
+                logger.info("  Fulfillment record saved")
+            except IntegrityError:
+                db.rollback()  # already recorded — fine
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Failed to save fulfillment record to DB: {e}")
     
     # =========================================================================
     # TRACKING NUMBER UPDATE
