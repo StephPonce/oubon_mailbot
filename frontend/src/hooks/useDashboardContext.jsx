@@ -17,7 +17,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { api } from '../services/api';
-import { authService } from '../services/auth';
+import { authService, getAccessToken } from '../services/auth';
 
 // WebSocket URL (same host, different path)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -338,6 +338,9 @@ export function DashboardProvider({ children }) {
 
       ws.onopen = () => {
         // console.log('[PLUGIN] Oi WebSocket connected');
+        // T35: the server requires a JWT as the first message — it no longer
+        // accepts a bare user_id (that let anyone subscribe to anyone's alerts).
+        ws.send(JSON.stringify({ type: 'auth', token: getAccessToken() }));
         reconnectAttemptsRef.current = 0; // Reset on successful connection
         setState(prev => ({
           ...prev,

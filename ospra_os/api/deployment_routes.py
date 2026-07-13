@@ -15,7 +15,12 @@ Endpoints:
 import uuid
 import logging
 from typing import Dict, List, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
+
+from ospra_os.security.rate_limiting import (
+    check_sensitive_rate_limit,
+    record_sensitive_attempt,
+)
 from pydantic import BaseModel, Field, HttpUrl
 
 from ospra_os.services.product_deployer import ProductDeployer
@@ -603,31 +608,27 @@ async def bulk_deploy(
 
 
 @router.post("/preview", response_model=PreviewResponse)
-async def preview_deployment(request: PreviewRequest):
+async def preview_deployment(
+    request: PreviewRequest,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+):
     """
     Preview what product would look like when deployed
 
     Generates all content and enhanced images but doesn't deploy to Shopify.
-    Good for admin review before going live.
+    Good for review before going live.
 
     **Cost:** ~$0.02-0.06 (same as deployment)
 
     **Processing time:** ~15-20 seconds
 
-    **Example:**
-    ```json
-    {
-        "product": {
-            "title": "Smart LED Bulb WiFi RGB...",
-            "category": "Smart Lighting",
-            "price": 12.99,
-            "features": ["WiFi", "RGB colors", "Alexa"],
-            "images": ["https://ae01.alicdn.com/..."]
-        },
-        "niche": "smart_home"
-    }
-    ```
+    T40: this was UNAUTHENTICATED and each call burns ~$0.02-0.06 of AI /
+    DALL-E spend — an anonymous cost bomb. Now requires auth and is
+    rate-limited per IP.
     """
+    check_sensitive_rate_limit("deploy_preview", http_request)
+    record_sensitive_attempt("deploy_preview", http_request)
     try:
         logger.info(f"  Preview: {request.product.title[:50]}")
 

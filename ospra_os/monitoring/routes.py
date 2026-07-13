@@ -3,16 +3,37 @@ Health Monitoring API Routes
 All 24 health monitoring endpoints
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from pydantic import BaseModel
 
+from ospra_os.auth.dependencies import require_admin
 from ospra_os.monitoring.health_monitor import health_monitor
 from ospra_os.monitoring.metrics_collector import metrics_collector
 from ospra_os.monitoring.error_tracker import error_tracker
 from ospra_os.monitoring.job_monitor import job_monitor
 
-router = APIRouter(prefix="/api/health", tags=["health"])
+# T32: all 24 monitoring routes were UNAUTHENTICATED — including
+# POST /jobs/{name}/disable|trigger (anyone could stop scheduled jobs or
+# hammer expensive ones) and GET /errors (full stack traces + internals).
+# The whole router is now admin-only. The single public thing is the trivial
+# liveness probe on public_router below (Render's own probe uses /health in
+# main.py and is unaffected).
+router = APIRouter(
+    prefix="/api/health",
+    tags=["health"],
+    dependencies=[Depends(require_admin)],
+)
+
+# Trivial liveness probe — no internals, safe to expose.
+public_router = APIRouter(prefix="/api/health", tags=["health"])
+
+
+@public_router.get("")
+async def liveness():
+    """Public liveness probe: process is up. Nothing else is revealed —
+    service-by-service detail moved behind admin auth (see /detailed)."""
+    return {"status": "ok"}
 
 
 # ================================================================
@@ -31,10 +52,11 @@ class ResolveRequest(BaseModel):
 # SYSTEM HEALTH ENDPOINTS (1-3)
 # ================================================================
 
-@router.get("")
+@router.get("/overview")
 async def get_overall_health():
     """
-    1. GET /api/health
+    1. GET /api/health/overview (T32: was the root path, now admin-only —
+    it enumerates every service's status and error strings)
     Returns: Overall system health status with service details
     """
     from datetime import datetime, timezone  # T87: timezone was missing → NameError on /api/health

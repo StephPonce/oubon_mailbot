@@ -545,12 +545,16 @@ except Exception as e:
 
 # System Health Monitoring router (Health Dashboard & Alerts)
 try:
-    from ospra_os.monitoring.routes import router as health_monitor_router  # type: ignore
+    from ospra_os.monitoring.routes import (
+        router as health_monitor_router,
+        public_router as health_public_router,
+    )  # type: ignore
     _HAS_HEALTH_MONITOR = True
     logger.info("System Health Monitoring router loaded successfully")
 except Exception as e:
     logger.warning(f"System Health Monitoring router not loaded: {e}")
     health_monitor_router = None
+    health_public_router = None
     _HAS_HEALTH_MONITOR = False
 
 # Niche Analysis router (Market Health & Entry Timing)
@@ -1872,7 +1876,8 @@ if _HAS_NOTIFICATIONS and notifications_router:
     app.include_router(notifications_router)  # exposes /api/notifications/*
 
 if _HAS_HEALTH_MONITOR and health_monitor_router:
-    app.include_router(health_monitor_router)  # exposes /api/health/*
+    app.include_router(health_public_router)  # public GET /api/health liveness
+    app.include_router(health_monitor_router)  # admin-only /api/health/* internals
 
 if _HAS_NICHE_ANALYSIS and niche_router:
     app.include_router(niche_router)  # exposes /api/niches/*

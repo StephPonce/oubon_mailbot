@@ -1,5 +1,6 @@
 """Email automation API routes for OspraOS."""
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+import logging
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any
 from ospra_os.core.settings import Settings, get_settings
@@ -97,8 +98,53 @@ async def process_inbox(
         raise HTTPException(status_code=500, detail="Error processing inbox. Please try again.")
 
 
+def _verify_pubsub_oidc(request: Request, settings: Settings) -> None:
+    """T36: verify the Google-signed OIDC token on a Pub/Sub push request.
+
+    Pub/Sub push subscriptions attach a Google-signed JWT in the
+    Authorization header whose audience is whatever we configured on the
+    subscription. Without this check, ANY caller hitting the public webhook
+    URL triggered paid AI calls / auto-replies / refunds.
+
+    Fails CLOSED: if no audience is configured, or the token is missing /
+    invalid / wrong audience / wrong issuer / (optionally) wrong service
+    account, the request is rejected 401/403/500.
+    """
+    audience = settings.GMAIL_PUBSUB_AUDIENCE
+    if not audience:
+        # Misconfiguration is a hard error, NOT an open door.
+        logging.getLogger(__name__).error(
+            "[T36] GMAIL_PUBSUB_AUDIENCE not set — refusing unverifiable Pub/Sub push"
+        )
+        raise HTTPException(status_code=500, detail="Webhook verification not configured")
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+    token = auth_header.split(" ", 1)[1]
+
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+
+        claims = google_id_token.verify_oauth2_token(
+            token, google_requests.Request(), audience
+        )
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"[T36] Pub/Sub OIDC verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid push token")
+
+    if claims.get("iss") not in ("https://accounts.google.com", "accounts.google.com"):
+        raise HTTPException(status_code=401, detail="Invalid token issuer")
+
+    expected_sa = settings.GMAIL_PUBSUB_SERVICE_ACCOUNT
+    if expected_sa and claims.get("email") != expected_sa:
+        raise HTTPException(status_code=403, detail="Untrusted push identity")
+
+
 @router.post("/gmail/pubsub/webhook")
 async def gmail_pubsub_webhook(
+    request: Request,
     background_tasks: BackgroundTasks,
     settings: Settings = Depends(get_settings),
 ):
@@ -108,12 +154,19 @@ async def gmail_pubsub_webhook(
     Google Cloud Pub/Sub calls this endpoint when new emails arrive.
     This triggers automatic email processing in the background.
 
+    T36: the request is authenticated via the Google-signed OIDC token on the
+    Pub/Sub push (see _verify_pubsub_oidc). Configure the subscription with an
+    OIDC token whose audience matches GMAIL_PUBSUB_AUDIENCE.
+
     Setup instructions:
     1. Enable Gmail API push notifications in Google Cloud Console
     2. Create a Pub/Sub topic (e.g., "gmail-notifications")
-    3. Grant Gmail service account publish permissions
-    4. Set up Gmail watch with: POST /api/email-automation/gmail/watch/start
+    3. Create a push subscription with an OIDC token (audience = your webhook URL)
+    4. Set GMAIL_PUBSUB_AUDIENCE (and optionally GMAIL_PUBSUB_SERVICE_ACCOUNT)
+    5. Set up Gmail watch with: POST /api/email-automation/gmail/watch/start
     """
+    _verify_pubsub_oidc(request, settings)
+
     # Process emails in background (don't block webhook response)
     background_tasks.add_task(process_emails_background, settings)
 

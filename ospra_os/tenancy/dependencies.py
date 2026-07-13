@@ -32,10 +32,21 @@ def get_tenant() -> TenantContext:
         def get_profile(tenant: TenantContext = Depends(get_tenant)):
             return {"user_id": tenant.user_id, "tier": tenant.subscription_tier}
 
-    Raises:
-        RuntimeError: If no tenant context is set
+    Section C: when there is NO tenant context (unauthenticated request) this
+    used to leak a bare RuntimeError, which surfaced as a 500. For an auth
+    dependency that reads as "the endpoint is broken" instead of "you must log
+    in", and it masks the fact that the route IS gated. Convert to a proper
+    401 here (routes that Depends(get_tenant) are exactly the ones that
+    require a tenant). The underlying require_tenant() keeps raising
+    RuntimeError for non-HTTP callers (e.g. tenancy/queries.py).
     """
-    return require_tenant()
+    try:
+        return require_tenant()
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
 
 
 def get_optional_tenant() -> Optional[TenantContext]:

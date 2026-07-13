@@ -726,7 +726,9 @@ api = AliExpressProductAPI()
 # Route handlers
 
 @router.get("/feed-names")
-async def get_feed_names():
+async def get_feed_names(
+    tenant: TenantContext = Depends(get_tenant),  # T37: gate like sibling /search
+):
     """
     Get available feed names for the Dropshipping API
 
@@ -739,7 +741,8 @@ async def get_feed_names():
 async def get_hot_products(
     page_size: int = Query(20, ge=1, le=50, description="Number of products to return"),
     category_id: Optional[str] = Query(None, description="Category ID filter"),
-    feed_name: str = Query("DS_Global_topsellers", description="Feed name (use /feed-names to see available feeds)")
+    feed_name: str = Query("DS_Global_topsellers", description="Feed name (use /feed-names to see available feeds)"),
+    tenant: TenantContext = Depends(get_tenant),  # T37: gate like sibling /search
 ):
     """
     Get hot/trending products from AliExpress
@@ -757,7 +760,8 @@ async def get_hot_products(
 
 @router.get("/bestsellers")
 async def get_bestsellers(
-    page_size: int = Query(20, ge=1, le=50, description="Number of products to return")
+    page_size: int = Query(20, ge=1, le=50, description="Number of products to return"),
+    tenant: TenantContext = Depends(get_tenant),  # T37: gate like sibling /search
 ):
     """
     Get bestselling products from AliExpress
@@ -769,7 +773,8 @@ async def get_bestsellers(
 
 @router.get("/details")
 async def get_product_details(
-    product_ids: str = Query(..., description="Comma-separated product IDs")
+    product_ids: str = Query(..., description="Comma-separated product IDs"),
+    tenant: TenantContext = Depends(get_tenant),  # T37: gate like sibling /search
 ):
     """
     Get detailed product information
@@ -898,7 +903,8 @@ async def search_products_affiliate(
 async def get_single_product(
     product_id: str,
     page_size: int = Query(20, ge=1, le=50),
-    page_no: int = Query(1, ge=1)
+    page_no: int = Query(1, ge=1),
+    tenant: TenantContext = Depends(get_tenant),  # T37: gate like sibling /search
 ):
     """
     Get product details by ID using Dropshipping API

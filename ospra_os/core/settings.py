@@ -116,6 +116,13 @@ class Settings(BaseSettings):
     # Gmail Push Notifications (Cloud Pub/Sub)
     GOOGLE_CLOUD_PROJECT_ID: Optional[str] = None  # GCP project ID for Gmail watch
     GMAIL_PUBSUB_TOPIC: str = Field(default="gmail-notifications")
+    # T36: the OIDC audience configured on the Pub/Sub push subscription. The
+    # webhook verifies the Google-signed bearer token has THIS audience and a
+    # google issuer before doing any work. When set, an unauthenticated caller
+    # can no longer trigger paid AI calls / auto-replies / refunds.
+    GMAIL_PUBSUB_AUDIENCE: Optional[str] = None
+    # Optional: restrict to a specific push service-account email.
+    GMAIL_PUBSUB_SERVICE_ACCOUNT: Optional[str] = None
 
     # Alerts & Notifications
     SLACK_WEBHOOK_URL: Optional[str] = None  # Slack webhook for priority alerts

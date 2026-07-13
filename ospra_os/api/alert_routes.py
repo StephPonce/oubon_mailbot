@@ -324,51 +324,15 @@ async def websocket_alerts(websocket: WebSocket):
 # Create a separate router for the WebSocket at a simpler path
 ws_router = APIRouter()
 
+
 @ws_router.websocket("/ws/oi/alerts")
 async def websocket_alerts_root(websocket: WebSocket):
-    """WebSocket endpoint at root path for easier access"""
-    await websocket.accept()
-    
-    user_id = None
-    
-    try:
-        # For now, use a simpler auth approach
-        # In production, validate JWT from query param or first message
-        
-        # Wait for any message to get user_id
-        try:
-            auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
-            user_id = auth_data.get("user_id")
-        except asyncio.TimeoutError:
-            # Use a default/anonymous connection for demo
-            user_id = "anonymous"
-        
-        # Register connection
-        alert_store.add_connection(user_id, websocket)
-        
-        await websocket.send_json({
-            "type": "connected",
-            "message": "Connected to Oi alerts",
-            "unread_count": alert_store.get_unread_count(user_id),
-        })
-        
-        # Keep alive
-        while True:
-            try:
-                data = await websocket.receive_json()
-                
-                if data.get("type") == "ping":
-                    await websocket.send_json({"type": "pong"})
-                    
-            except Exception:
-                break
-    
-    except WebSocketDisconnect:
-        pass
-    
-    finally:
-        if user_id:
-            alert_store.remove_connection(user_id, websocket)
+    """WebSocket endpoint at root path for easier access.
 
-
-import asyncio
+    T35: this used to TRUST a client-supplied user_id (or fall back to
+    "anonymous" after 5s) — any caller could register as any user and
+    receive that user's real-time alerts. It now delegates to the ONE
+    JWT-validated handler above: the first message must be
+    {"type": "auth", "token": <jwt>} and the user_id comes from the token.
+    """
+    await websocket_alerts(websocket)

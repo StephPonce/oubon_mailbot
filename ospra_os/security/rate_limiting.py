@@ -37,6 +37,10 @@ SENSITIVE_LIMITS = {
     "password_reset": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
     "register": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
     "forgot_password": {"max_attempts": 3, "window_seconds": 3600, "lockout_seconds": 3600},
+    # T40: deployment preview burns ~$0.02-0.06 of AI/DALL-E spend per call.
+    # Cap it per IP even for authenticated users so a compromised/greedy
+    # account can't run up an image-gen bill.
+    "deploy_preview": {"max_attempts": 20, "window_seconds": 3600, "lockout_seconds": 600},
 }
 
 

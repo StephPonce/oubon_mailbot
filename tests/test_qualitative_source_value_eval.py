@@ -22,7 +22,11 @@ from ospra_os.evals.qualitative_source_value import (
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    # asyncio.run() creates and tears down a fresh event loop each call, so it
+    # is immune to a prior test (e.g. a TestClient lifespan) leaving the thread
+    # with no current loop — get_event_loop() raised "no current event loop" on
+    # 3.12 when that happened, making these tests order-dependent flaky.
+    return asyncio.run(coro)
 
 
 # ---------------------------------------------------------------------------
