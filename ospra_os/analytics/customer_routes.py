@@ -14,10 +14,46 @@ from ospra_os.analytics.churn_predictor import get_churn_predictor
 from ospra_os.analytics.cohort_analyzer import get_cohort_analyzer
 from ospra_os.analytics.purchase_patterns import get_purchase_pattern_analyzer
 from ospra_os.analytics.customer_sync import create_customer_sync
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import Store, User, get_db
+from ospra_os.tenancy.context import TenantContext
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/customers", tags=["Customer Analytics"])
+# T45: every route here was UNAUTHENTICATED — customer PII (emails, LTV,
+# purchase patterns) readable by anyone, and the Shopify sync triggerable by
+# anyone. Router-level auth gates all of it; the sync endpoints additionally
+# verify store ownership below.
+router = APIRouter(
+    prefix="/api/customers",
+    tags=["Customer Analytics"],
+    dependencies=[Depends(get_current_user)],
+)
+
+
+def _store_shopify_creds(store_id: int, user: User, db) -> tuple:
+    """T45: resolve Shopify credentials SERVER-SIDE from the caller's own store.
+
+    The old sync endpoints took shopify_token as a QUERY PARAM — credentials
+    ended up in access logs, browser history, and proxies, and any caller
+    could trigger syncs with arbitrary creds. Now the caller passes their
+    store_id; we verify ownership and read the encrypted credentials from the
+    Store row.
+    """
+    tenant = TenantContext(tenant_id=user.id, user_id=user.id)
+    if not tenant.can_access_store(store_id, db):
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    store = db.query(Store).filter(Store.id == store_id).first()
+    creds = store.get_credentials() if store else {}
+    shop_url = creds.get("shop_url") or (store.store_url if store else None)
+    access_token = creds.get("access_token")
+    if not shop_url or not access_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Store has no Shopify credentials configured",
+        )
+    return shop_url, access_token
 
 
 # ==================== Mock Data Helper ====================
@@ -437,19 +473,23 @@ async def get_product_affinity():
 
 @router.post("/sync/shopify")
 async def sync_from_shopify(
-    shopify_store: str = Query(..., description="Shopify store URL"),
-    shopify_token: str = Query(..., description="Shopify API token"),
-    full_sync: bool = Query(False, description="Full sync or incremental")
+    store_id: int = Query(..., description="Your store id (credentials are read server-side)"),
+    full_sync: bool = Query(False, description="Full sync or incremental"),
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
-    Sync customers from Shopify
+    Sync customers from Shopify.
 
-    Fetches customers and orders, calculates metrics, saves to database
+    T45: credentials are resolved server-side from the caller's own store —
+    no more shopify_token in the query string.
     """
-    logger.info(f"[REFRESH] POST /api/customers/sync/shopify (store: {shopify_store}, full: {full_sync})")
+    logger.info(f"[REFRESH] POST /api/customers/sync/shopify (store_id: {store_id}, full: {full_sync})")
+
+    shop_url, access_token = _store_shopify_creds(store_id, user, db)
 
     try:
-        sync = create_customer_sync(shopify_store, shopify_token)
+        sync = create_customer_sync(shop_url, access_token)
 
         if full_sync:
             customers = await sync.sync_all_customers(
@@ -477,16 +517,19 @@ async def sync_from_shopify(
 @router.post("/sync/shopify/{customer_id}")
 async def sync_single_customer(
     customer_id: str,
-    shopify_store: str = Query(..., description="Shopify store URL"),
-    shopify_token: str = Query(..., description="Shopify API token")
+    store_id: int = Query(..., description="Your store id (credentials are read server-side)"),
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
-    Sync a single customer from Shopify
+    Sync a single customer from Shopify (T45: server-side credentials).
     """
     logger.info(f"[REFRESH] POST /api/customers/sync/shopify/{customer_id}")
 
+    shop_url, access_token = _store_shopify_creds(store_id, user, db)
+
     try:
-        sync = create_customer_sync(shopify_store, shopify_token)
+        sync = create_customer_sync(shop_url, access_token)
         customer = await sync.sync_single_customer(customer_id, save_to_db=True)
 
         if not customer:

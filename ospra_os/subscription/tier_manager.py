@@ -177,53 +177,11 @@ class TierManager:
             
             return self._normalize_tier(settings.subscription_tier or 'nest')
     
-    async def upgrade_tier(self, user_id: int, new_tier: str, duration_days: int = 30) -> Dict:
-        """Upgrade user to new tier"""
-        warnings.warn(
-            "upgrade_tier is deprecated. Use payment webhook handlers instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        
-        new_tier = self._normalize_tier(new_tier)
-        
-        if new_tier not in TIER_FEATURES:
-            return {"success": False, "error": f"Invalid tier: {new_tier}"}
-        
-        if not self.async_session:
-            return {"success": False, "error": "Database not configured"}
-        
-        from ospra_os.database import UserSettings
-        
-        async with self.async_session() as session:
-            stmt = select(UserSettings).where(UserSettings.user_id == user_id)
-            result = await session.execute(stmt)
-            settings = result.scalar_one_or_none()
-            
-            if not settings:
-                settings = UserSettings(user_id=user_id)
-                session.add(settings)
-            
-            old_tier = settings.subscription_tier or 'nest'
-            settings.subscription_tier = new_tier
-            settings.tier_started_at = datetime.now(timezone.utc)
-            settings.tier_expires_at = datetime.now(timezone.utc) + timedelta(days=duration_days)
-            
-            tier_config = TIER_FEATURES[new_tier]
-            settings.max_stores = tier_config['max_stores']
-            settings.max_products_per_week = tier_config['max_products_per_week']
-            
-            await session.commit()
-            
-            return {
-                "success": True,
-                "tier": new_tier,
-                "old_tier": old_tier,
-                "started_at": settings.tier_started_at.isoformat(),
-                "expires_at": settings.tier_expires_at.isoformat(),
-                "features": tier_config.get('features', []),
-            }
-    
+    # T44: upgrade_tier was DELETED. It was already deprecated, had zero
+    # callers, and set any tier with no payment proof. Tier changes flow
+    # exclusively through verified payment events:
+    # /api/user/upgrade → LemonSqueezy checkout → webhook → dispatch_tier_change.
+
     async def check_tier_limits(self, user_id: int, action: str) -> Dict:
         """Check if user can perform action based on tier limits"""
         tier = await self.get_user_tier(user_id)

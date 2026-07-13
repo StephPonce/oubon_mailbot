@@ -17,7 +17,8 @@ from pydantic import BaseModel
 
 from ospra_os.celery_app import celery_app
 from ospra_os.auth.jwt_auth import get_current_user
-from ospra_os.database import User
+from ospra_os.database import User, get_db
+from ospra_os.tenancy.context import TenantContext
 from ospra_os.observability.posthog_client import capture as posthog_capture, FunnelEvent
 from ospra_os.api.schemas import (
     TaskStatusResponse,
@@ -296,36 +297,34 @@ def get_beat_schedule(
 
 
 # ==================== TASK TRIGGER ENDPOINTS ====================
+#
+# T33: every trigger below used to accept a client-supplied user_id/store_id
+# and act on it — an authenticated user could run discovery, analysis, or
+# daily-brief emails AS ANY OTHER USER, sync any store, and /trigger/send-email
+# accepted arbitrary to/subject/body (an authenticated open mail relay on our
+# domain). All identity now comes from the JWT; store access is verified with
+# the canonical TenantContext.can_access_store ownership check.
 
 @router.post("/trigger/discover-products", response_model=TaskTriggerResponse)
 def trigger_product_discovery(
-    user_id: int,
     user: User = Depends(get_current_user)
 ):
-    """
-    Manually trigger product discovery for a user.
-
-    Args:
-        user_id: User ID to discover products for
-
-    Returns:
-        Task ID for tracking
-    """
+    """Manually trigger product discovery for the CALLING user (T33)."""
     try:
         from ospra_os.tasks.product_tasks import discover_products_for_user
 
-        result = discover_products_for_user.delay(user_id)
+        result = discover_products_for_user.delay(user.id)
 
         posthog_capture(
             user.id,
             FunnelEvent.FIRST_DISCOVERY,
-            properties={"target_user_id": user_id},
+            properties={"target_user_id": user.id},
         )
 
         return {
             "task_id": result.id,
             "status": "queued",
-            "message": f"Product discovery queued for user {user_id}",
+            "message": "Product discovery queued",
             "track_at": f"/api/tasks/status/{result.id}"
         }
     except Exception as e:
@@ -338,17 +337,18 @@ def trigger_product_discovery(
 @router.post("/trigger/sync-store", response_model=TaskTriggerResponse)
 def trigger_store_sync(
     store_id: int,
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
 ):
-    """
-    Manually trigger Shopify store sync.
+    """Manually trigger Shopify store sync.
 
-    Args:
-        store_id: Store ID to sync
-
-    Returns:
-        Task ID for tracking
+    T33: verifies the caller OWNS store_id (TenantContext.can_access_store)
+    before queueing. 404 covers both missing and not-yours.
     """
+    tenant = TenantContext(tenant_id=user.id, user_id=user.id)
+    if not tenant.can_access_store(store_id, db):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Store not found")
     try:
         from ospra_os.tasks.sync_tasks import sync_shopify_products
 
@@ -369,31 +369,25 @@ def trigger_store_sync(
 
 @router.post("/trigger/send-email", response_model=TaskTriggerResponse)
 def trigger_email_send(
-    to: str,
     subject: str,
     body: str,
     user: User = Depends(get_current_user)
 ):
-    """
-    Manually trigger email sending.
+    """Send a test email to YOURSELF.
 
-    Args:
-        to: Recipient email address
-        subject: Email subject
-        body: Email body
-
-    Returns:
-        Task ID for tracking
+    T33: the recipient is always the authenticated user's own address. The
+    old form accepted arbitrary to/subject/body — an authenticated open mail
+    relay that could spam anyone from our domain.
     """
     try:
         from ospra_os.tasks.email_tasks import send_email
 
-        result = send_email.delay(to, subject, body)
+        result = send_email.delay(user.email, subject, body)
 
         return {
             "task_id": result.id,
             "status": "queued",
-            "message": f"Email send queued to {to}",
+            "message": f"Email send queued to {user.email}",
             "track_at": f"/api/tasks/status/{result.id}"
         }
     except Exception as e:
@@ -405,27 +399,18 @@ def trigger_email_send(
 
 @router.post("/trigger/analyze-performance", response_model=TaskTriggerResponse)
 def trigger_performance_analysis(
-    user_id: int,
     user: User = Depends(get_current_user)
 ):
-    """
-    Manually trigger performance analysis for user's products.
-
-    Args:
-        user_id: User ID to analyze
-
-    Returns:
-        Task ID for tracking
-    """
+    """Manually trigger performance analysis for the CALLING user (T33)."""
     try:
         from ospra_os.tasks.analytics_tasks import generate_analytics_report
 
-        result = generate_analytics_report.delay(user_id)
+        result = generate_analytics_report.delay(user.id)
 
         return {
             "task_id": result.id,
             "status": "queued",
-            "message": f"Performance analysis queued for user {user_id}",
+            "message": "Performance analysis queued",
             "track_at": f"/api/tasks/status/{result.id}"
         }
     except Exception as e:
@@ -437,27 +422,18 @@ def trigger_performance_analysis(
 
 @router.post("/trigger/daily-brief", response_model=TaskTriggerResponse)
 def trigger_daily_brief(
-    user_id: int,
     user: User = Depends(get_current_user)
 ):
-    """
-    Manually trigger daily brief email for a user.
-
-    Args:
-        user_id: User ID to send brief to
-
-    Returns:
-        Task ID for tracking
-    """
+    """Manually trigger the daily brief email for the CALLING user (T33)."""
     try:
         from ospra_os.tasks.email_tasks import send_daily_brief_to_user
 
-        result = send_daily_brief_to_user.delay(user_id)
+        result = send_daily_brief_to_user.delay(user.id)
 
         return {
             "task_id": result.id,
             "status": "queued",
-            "message": f"Daily brief queued for user {user_id}",
+            "message": "Daily brief queued",
             "track_at": f"/api/tasks/status/{result.id}"
         }
     except Exception as e:

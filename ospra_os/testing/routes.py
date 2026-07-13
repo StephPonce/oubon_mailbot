@@ -11,13 +11,20 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
 
 from ospra_os.database import get_db  # Use consolidated get_db
+from ospra_os.auth.jwt_auth import get_current_user
 from .ab_test_engine import ABTestEngine, TestType, TestStatus
 from .price_test_manager import PriceTestManager
 from .content_test_manager import ContentTestManager
 from .ad_test_manager import AdTestManager
 
 
+# T47: every management route (create/start/end tests, read results) was
+# UNAUTHENTICATED. They now carry dependencies=AUTH. The three /events/*
+# endpoints (variant assignment, impression, conversion) stay PUBLIC on
+# purpose: they are storefront visitor tracking called from shop pages where
+# no JWT exists. They only write tracking counts for a known test_id.
 router = APIRouter(prefix="/api/abtesting", tags=["A/B Testing"])
+AUTH = [Depends(get_current_user)]
 
 
 # ============================================================================
@@ -151,7 +158,7 @@ def get_ad_manager(db: Session = Depends(get_db)) -> AdTestManager:
 # TEST MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@router.post("/tests", status_code=201)
+@router.post("/tests", status_code=201, dependencies=AUTH)
 def create_test(
     request: CreateTestRequest,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -190,7 +197,7 @@ def create_test(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/tests")
+@router.get("/tests", dependencies=AUTH)
 def list_tests(
     store_id: Optional[str] = Query(None),
     product_id: Optional[str] = Query(None),
@@ -235,7 +242,7 @@ def list_tests(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/tests/{test_id}")
+@router.get("/tests/{test_id}", dependencies=AUTH)
 def get_test(
     test_id: int,
     include_results: bool = Query(True),
@@ -266,7 +273,7 @@ def get_test(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tests/{test_id}/start")
+@router.post("/tests/{test_id}/start", dependencies=AUTH)
 def start_test(
     test_id: int,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -289,7 +296,7 @@ def start_test(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/tests/{test_id}/pause")
+@router.post("/tests/{test_id}/pause", dependencies=AUTH)
 def pause_test(
     test_id: int,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -311,7 +318,7 @@ def pause_test(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/tests/{test_id}/resume")
+@router.post("/tests/{test_id}/resume", dependencies=AUTH)
 def resume_test(
     test_id: int,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -333,7 +340,7 @@ def resume_test(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/tests/{test_id}/end")
+@router.post("/tests/{test_id}/end", dependencies=AUTH)
 def end_test(
     test_id: int,
     request: EndTestRequest,
@@ -368,7 +375,7 @@ def end_test(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tests/{test_id}/results")
+@router.get("/tests/{test_id}/results", dependencies=AUTH)
 def get_test_results(
     test_id: int,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -392,7 +399,7 @@ def get_test_results(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/tests/{test_id}/significance")
+@router.get("/tests/{test_id}/significance", dependencies=AUTH)
 def check_significance(
     test_id: int,
     engine: ABTestEngine = Depends(get_ab_engine)
@@ -421,7 +428,7 @@ def check_significance(
 # SPECIALIZED TEST CREATION ENDPOINTS
 # ============================================================================
 
-@router.post("/tests/price", status_code=201)
+@router.post("/tests/price", status_code=201, dependencies=AUTH)
 def create_price_test(
     request: CreatePriceTestRequest,
     manager: PriceTestManager = Depends(get_price_manager)
@@ -455,7 +462,7 @@ def create_price_test(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tests/title", status_code=201)
+@router.post("/tests/title", status_code=201, dependencies=AUTH)
 def create_title_test(
     request: CreateTitleTestRequest,
     manager: ContentTestManager = Depends(get_content_manager)
@@ -483,7 +490,7 @@ def create_title_test(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tests/description", status_code=201)
+@router.post("/tests/description", status_code=201, dependencies=AUTH)
 def create_description_test(
     request: CreateDescriptionTestRequest,
     manager: ContentTestManager = Depends(get_content_manager)
@@ -511,7 +518,7 @@ def create_description_test(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tests/image", status_code=201)
+@router.post("/tests/image", status_code=201, dependencies=AUTH)
 def create_image_test(
     request: CreateImageTestRequest,
     manager: ContentTestManager = Depends(get_content_manager)
@@ -637,7 +644,7 @@ def record_conversion(
 # RECOMMENDATION ENDPOINTS
 # ============================================================================
 
-@router.get("/recommendations/price")
+@router.get("/recommendations/price", dependencies=AUTH)
 def get_price_recommendations(
     product_id: str,
     current_price: float,

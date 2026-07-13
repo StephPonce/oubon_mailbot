@@ -8,7 +8,7 @@ Endpoints:
 - POST /api/reports/schedules - Create scheduled report
 - GET /api/reports/schedules - List schedules
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
@@ -17,11 +17,21 @@ import logging
 import uuid
 import os
 
+from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.reports.report_engine import get_report_engine
 from ospra_os.reports.renderers.pdf_renderer import create_pdf_renderer
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/reports", tags=["reports"])
+# T46: every route here (generate/download/delete business reports, manage
+# schedules) was UNAUTHENTICATED. Router-level auth gates them all. The
+# report engine itself is not yet tenant-keyed — reports contain the
+# deployment's own business data — so per-owner scoping lands when the engine
+# grows a user_id column; auth is the blocking hole closed here.
+router = APIRouter(
+    prefix="/api/reports",
+    tags=["reports"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # ==================== Request Models ====================

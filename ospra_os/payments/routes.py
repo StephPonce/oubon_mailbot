@@ -4,10 +4,11 @@ LEMONSQUEEZY PAYMENT API ROUTES
 Endpoints for subscription management and webhook handling.
 """
 
-from fastapi import APIRouter, HTTPException, Request, Header, status
-from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
+from typing import Dict, Any, Optional
 from pydantic import BaseModel
 
+from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.core.tiers import SubscriptionTier, get_tier_definition
 from ospra_os.payments.lemonsqueezy import (
     LemonSqueezyClient,
@@ -29,8 +30,12 @@ router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 class CreateCheckoutRequest(BaseModel):
     tier: str  # "flight", "soar", "stratosphere"
-    user_email: str
-    user_id: str
+    # T43: user_email/user_id are IGNORED — identity comes from the JWT.
+    # (They used to be trusted, letting a caller create a checkout whose
+    # webhook would re-tier an arbitrary user_id.) Kept optional so existing
+    # clients that still send them don't get validation errors.
+    user_email: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class ChangeTierRequest(BaseModel):
@@ -38,14 +43,51 @@ class ChangeTierRequest(BaseModel):
     new_tier: str
 
 
+# ==================== OWNERSHIP VERIFICATION (T43) ====================
+
+async def _assert_subscription_owner(
+    client: LemonSqueezyClient, subscription_id: str, current_user: User
+) -> Dict[str, Any]:
+    """Verify the LemonSqueezy subscription belongs to the calling user.
+
+    There is no local subscription↔user table, so ownership is checked
+    against LemonSqueezy itself: the subscription's user_email must match the
+    authenticated user's email. 404 (not 403) so subscription ids can't be
+    enumerated. Fails CLOSED on any lookup problem.
+    """
+    subscription, error = await client.get_subscription(subscription_id)
+    if error or not subscription:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Subscription not found")
+
+    attributes = (subscription.get("data") or {}).get("attributes") or {}
+    sub_email = (attributes.get("user_email") or "").strip().lower()
+    caller_email = (current_user.email or "").strip().lower()
+    if not sub_email or sub_email != caller_email:
+        logger.warning(
+            f"[PAYMENTS] User {current_user.id} attempted to access "
+            f"subscription {subscription_id} they don't own"
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Subscription not found")
+    return subscription
+
+
 # ==================== CHECKOUT ENDPOINTS ====================
 
 @router.post("/checkout")
-async def create_checkout(request: CreateCheckoutRequest):
+async def create_checkout(
+    request: CreateCheckoutRequest,
+    current_user: User = Depends(get_current_user),
+):
     """
     Create a LemonSqueezy checkout session.
-    
+
     Returns a checkout URL to redirect the user to.
+
+    T43: requires auth, and the checkout's custom_data (which the payment
+    webhook later uses to decide WHO gets the tier) comes from the JWT — the
+    client-supplied user_email/user_id are ignored.
     """
     try:
         tier = SubscriptionTier(request.tier)
@@ -54,19 +96,19 @@ async def create_checkout(request: CreateCheckoutRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid tier: {request.tier}. Valid: flight, soar, stratosphere"
         )
-    
+
     if tier == SubscriptionTier.NEST:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Nest tier is free - no checkout needed"
         )
-    
+
     try:
         client = LemonSqueezyClient()
         checkout_url, error = await client.create_checkout(
             tier=tier,
-            user_email=request.user_email,
-            user_id=request.user_id
+            user_email=current_user.email,
+            user_id=str(current_user.id)
         )
         
         if error:
@@ -128,20 +170,16 @@ async def get_direct_checkout_url(tier: str):
 # ==================== SUBSCRIPTION MANAGEMENT ====================
 
 @router.get("/subscription/{subscription_id}")
-async def get_subscription(subscription_id: str):
-    """Get subscription details"""
+async def get_subscription(
+    subscription_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get subscription details (T43: auth + ownership required)."""
     try:
         client = LemonSqueezyClient()
-        subscription, error = await client.get_subscription(subscription_id)
-        
-        if error:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=error
-            )
-        
-        return subscription
-        
+        return await _assert_subscription_owner(client, subscription_id, current_user)
+    except HTTPException:
+        raise
     except RuntimeError as e:
         logger.error(f"Payment service error: {e}")
         raise HTTPException(
@@ -151,10 +189,14 @@ async def get_subscription(subscription_id: str):
 
 
 @router.post("/subscription/{subscription_id}/cancel")
-async def cancel_subscription(subscription_id: str):
-    """Cancel subscription at end of billing period"""
+async def cancel_subscription(
+    subscription_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel subscription at end of billing period (T43: owner only)."""
     try:
         client = LemonSqueezyClient()
+        await _assert_subscription_owner(client, subscription_id, current_user)
         success, error = await client.cancel_subscription(subscription_id)
         
         if error:
@@ -177,10 +219,14 @@ async def cancel_subscription(subscription_id: str):
 
 
 @router.post("/subscription/{subscription_id}/resume")
-async def resume_subscription(subscription_id: str):
-    """Resume a cancelled subscription"""
+async def resume_subscription(
+    subscription_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Resume a cancelled subscription (T43: owner only)."""
     try:
         client = LemonSqueezyClient()
+        await _assert_subscription_owner(client, subscription_id, current_user)
         success, error = await client.resume_subscription(subscription_id)
         
         if error:
@@ -203,8 +249,16 @@ async def resume_subscription(subscription_id: str):
 
 
 @router.post("/subscription/change-tier")
-async def change_subscription_tier(request: ChangeTierRequest):
-    """Change subscription to a different tier"""
+async def change_subscription_tier(
+    request: ChangeTierRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Change subscription to a different tier.
+
+    T43: requires auth AND verified ownership of the subscription. This was
+    fully open — anyone could re-tier any subscription_id, including other
+    paying customers'.
+    """
     try:
         tier = SubscriptionTier(request.new_tier)
     except ValueError:
@@ -212,9 +266,10 @@ async def change_subscription_tier(request: ChangeTierRequest):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid tier: {request.new_tier}"
         )
-    
+
     try:
         client = LemonSqueezyClient()
+        await _assert_subscription_owner(client, request.subscription_id, current_user)
         success, error = await client.change_subscription_tier(
             request.subscription_id,
             tier
@@ -241,10 +296,33 @@ async def change_subscription_tier(request: ChangeTierRequest):
 
 
 @router.get("/customer/{customer_id}/portal")
-async def get_customer_portal(customer_id: str):
-    """Get customer portal URL for self-service billing management"""
+async def get_customer_portal(
+    customer_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get customer portal URL for self-service billing management.
+
+    T43: auth + ownership — the LS customer's email must match the caller
+    (the portal URL grants billing self-service for that customer).
+    """
     try:
         client = LemonSqueezyClient()
+
+        customer, cust_err = await client._request("GET", f"customers/{customer_id}")
+        if cust_err or not customer:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Customer not found")
+        cust_email = (
+            ((customer.get("data") or {}).get("attributes") or {}).get("email") or ""
+        ).strip().lower()
+        if not cust_email or cust_email != (current_user.email or "").strip().lower():
+            logger.warning(
+                f"[PAYMENTS] User {current_user.id} attempted portal access "
+                f"for customer {customer_id} they don't own"
+            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Customer not found")
+
         portal_url, error = await client.get_customer_portal_url(customer_id)
         
         if error:

@@ -79,6 +79,12 @@ dependencies = [
     # silently falls back to ephemeral local disk even with creds set.
     # (boto3 intentionally not added — S3 path unused; add it if we switch.)
     "cloudinary>=1.40.0",
+    # T176 reverse drift: these were requirements.txt-only, so PROD had them
+    # but local uv envs didn't — the reports router (reportlab) silently
+    # failed to load locally and Redis-backed paths degraded. Both manifests
+    # must agree in BOTH directions.
+    "redis>=5.0.1",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]
@@ -93,4 +99,5 @@ dev-dependencies = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "pytest-xdist>=3.8.0",
+    "fakeredis>=2.20.0",  # T176 reverse drift: was requirements.txt-only
 ]

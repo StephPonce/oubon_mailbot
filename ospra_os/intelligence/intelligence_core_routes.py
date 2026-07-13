@@ -35,7 +35,7 @@ from ospra_os.intelligence.unified_context import get_unified_context_builder
 from ospra_os.intelligence.briefing_engine import get_briefing_engine
 from ospra_os.intelligence.grade_reasoning import get_grade_reasoning_engine
 from ospra_os.intelligence.progress_flow import get_progress_tracker, LifecycleStage
-from ospra_os.intelligence.tier_system import get_tier_system, Tier
+from ospra_os.intelligence.tier_system import get_tier_system
 from ospra_os.intelligence.action_executor import get_action_executor, ActionType
 
 router = APIRouter(prefix="/api/intelligence", tags=["Intelligence Core"])
@@ -54,11 +54,6 @@ class ActionExecuteRequest(BaseModel):
     action_type: str
     params: dict
     # SECURITY: user_id removed - extracted from JWT token instead
-
-
-class TierUpgradeRequest(BaseModel):
-    new_tier: str
-    payment_method_id: Optional[str] = None
 
 
 class DiscoverRequest(BaseModel):
@@ -264,15 +259,10 @@ async def check_usage_limit(
     return await tier_system.check_limit(user_id, limit_type, current_usage)
 
 
-@router.post("/tier/upgrade")
-async def upgrade_tier(
-    user_id: int,
-    request: TierUpgradeRequest,
-    db: Session = Depends(get_db)
-):
-    tier_system = get_tier_system(db)
-    tier_enum = Tier(request.new_tier)
-    return await tier_system.upgrade_tier(user_id, tier_enum, request.payment_method_id)
+# T42/T44: the old POST /tier/upgrade route was deleted. It took a
+# client-supplied user_id with NO auth and set the tier with no payment proof
+# — anyone could upgrade anyone. Tier changes are granted ONLY by the verified
+# payment flow: /api/user/upgrade → LemonSqueezy checkout → webhook.
 
 
 # ============================================================================
@@ -280,22 +270,41 @@ async def upgrade_tier(
 # ============================================================================
 
 @router.post("/action/preview")
-async def preview_action(request: ActionPreviewRequest, db: Session = Depends(get_db)):
+async def preview_action(
+    request: ActionPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),  # T42: was unauthenticated
+):
     executor = get_action_executor(db)
     action_type = ActionType(request.action_type)
     return await executor.preview_action(action_type, request.params)
 
 
 @router.post("/action/execute")
-async def execute_action(request: ActionExecuteRequest, db: Session = Depends(get_db)):
+async def execute_action(
+    request: ActionExecuteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """T42: user_id comes from the JWT. (The old code read request.user_id,
+    which the request model no longer even declared — every call 500'd.)"""
     executor = get_action_executor(db)
     action_type = ActionType(request.action_type)
-    return await executor.execute_action(action_type, request.params, request.user_id)
+    return await executor.execute_action(action_type, request.params, current_user.id)
 
 
 @router.post("/action/undo/{action_id}")
-async def undo_action(action_id: int, db: Session = Depends(get_db)):
+async def undo_action(
+    action_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """T42: verify the caller owns the action before undoing it. 404 covers
+    both 'not found' and 'someone else's action' so ids can't be probed."""
     executor = get_action_executor(db)
+    action_log = executor.action_history.get_action(action_id)
+    if not action_log or action_log.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Action not found")
     return await executor.undo_action(action_id)
 
 

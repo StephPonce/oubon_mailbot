@@ -418,7 +418,8 @@ class FederatedLearningService:
     def record_insight_outcome(
         self,
         application_id: int,
-        outcome: str
+        outcome: str,
+        user_id: Optional[int] = None,
     ) -> Optional[InsightApplication]:
         """
         Record the outcome of applying an insight.
@@ -426,11 +427,21 @@ class FederatedLearningService:
         Args:
             application_id: ID of the InsightApplication record
             outcome: "success", "partial", or "failure"
+            user_id: T49 — when provided, the application must BELONG to this
+                user. The route always claimed "only the user who applied the
+                insight can record the outcome" but nothing enforced it: any
+                authenticated user could flip any other tenant's
+                application_id and poison the global insight success rates.
+
+        Returns None when not found OR not owned (callers 404 either way).
         """
 
-        application = self.db.query(InsightApplication).filter(
+        query = self.db.query(InsightApplication).filter(
             InsightApplication.id == application_id
-        ).first()
+        )
+        if user_id is not None:
+            query = query.filter(InsightApplication.user_id == user_id)
+        application = query.first()
 
         if not application:
             return None

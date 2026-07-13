@@ -536,7 +536,8 @@ def record_insight_outcome(
 
         application = service.record_insight_outcome(
             application_id=request.application_id,
-            outcome=request.outcome
+            outcome=request.outcome,
+            user_id=current_user.id,  # T49: enforce the ownership the docstring promised
         )
 
         if not application:
