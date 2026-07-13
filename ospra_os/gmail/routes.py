@@ -1,13 +1,46 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
-import os, json, pathlib
+import os, json, pathlib, hmac as _hmac, hashlib
 from google_auth_oauthlib.flow import Flow
 from datetime import datetime, timezone
+
+from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.database import User
 
 # Allow OAuth over HTTP for local development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 router = APIRouter(prefix="/gmail/auth", tags=["gmail"])
+
+
+# T53: the callback used to attach EVERY connected Gmail account to a
+# hardcoded user_id=1 — in a multi-tenant deployment, whoever connected Gmail
+# had their inbox wired to the first user (and no one else could connect).
+# We now bind the OAuth round-trip to the authenticated user who started it:
+# /start requires auth and drops an HMAC-signed, httponly cookie carrying
+# their id; /callback verifies it and attaches the account to that real user.
+
+def _uid_secret() -> bytes:
+    from ospra_os.auth.jwt_auth import SECRET_KEY
+    return f"gmail-oauth-uid:{SECRET_KEY}".encode()
+
+
+def _sign_uid(user_id: int) -> str:
+    sig = _hmac.new(_uid_secret(), str(user_id).encode(), hashlib.sha256).hexdigest()[:32]
+    return f"{user_id}.{sig}"
+
+
+def _verify_uid(cookie: str | None) -> int | None:
+    if not cookie or "." not in cookie:
+        return None
+    uid_raw, sig = cookie.rsplit(".", 1)
+    expected = _hmac.new(_uid_secret(), uid_raw.encode(), hashlib.sha256).hexdigest()[:32]
+    if not _hmac.compare_digest(expected, sig):
+        return None
+    try:
+        return int(uid_raw)
+    except ValueError:
+        return None
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.modify",
@@ -33,7 +66,7 @@ def _client_config(cred_path: str):
     raise HTTPException(status_code=500, detail="Invalid Google client JSON")
 
 @router.get("/start")
-async def start(request: Request):
+async def start(request: Request, current_user: User = Depends(get_current_user)):
     cred_path, _ = _paths()
     flow = Flow.from_client_config(
         _client_config(cred_path),
@@ -45,6 +78,12 @@ async def start(request: Request):
     )
     resp = RedirectResponse(auth_url, status_code=302)
     resp.set_cookie("gmail_oauth_state", state, httponly=True, secure=True, samesite="lax", max_age=600)
+    # T53: bind this OAuth round-trip to the caller so the callback attaches
+    # the Gmail account to THEM, not a hardcoded user_id=1.
+    resp.set_cookie(
+        "gmail_oauth_uid", _sign_uid(current_user.id),
+        httponly=True, secure=True, samesite="lax", max_age=600,
+    )
     return resp
 
 @router.get("/callback", name="gmail_oauth_callback", response_class=HTMLResponse)
@@ -115,12 +154,25 @@ async def callback(request: Request):
             # Save to database
             session = get_multi_store_session()
             try:
-                # Get or create user (default user_id=1)
-                user = session.query(User).filter(User.id == 1).first()
+                # T53: attach to the authenticated user who started the flow
+                # (carried via the signed gmail_oauth_uid cookie), NEVER a
+                # hardcoded user_id=1. A missing/forged cookie is a hard error
+                # so we can't silently wire someone's inbox to the wrong tenant.
+                bound_uid = _verify_uid(request.cookies.get("gmail_oauth_uid"))
+                if bound_uid is None:
+                    return HTMLResponse(
+                        "<h2>Gmail connection failed</h2>"
+                        "<p>Your session could not be verified. Please start the "
+                        "connection again from your dashboard.</p>",
+                        status_code=400,
+                    )
+                user = session.query(User).filter(User.id == bound_uid).first()
                 if not user:
-                    user = User(id=1, email=email_address, name="Default User", created_at=datetime.now(timezone.utc))
-                    session.add(user)
-                    session.commit()
+                    return HTMLResponse(
+                        "<h2>Gmail connection failed</h2>"
+                        "<p>Account not found. Please sign in again.</p>",
+                        status_code=400,
+                    )
 
                 # Check if Gmail account already exists
                 existing = session.query(UserEmailAccount).filter(

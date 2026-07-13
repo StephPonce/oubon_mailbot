@@ -77,7 +77,10 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 class RegisterRequest(BaseModel):
     """User registration request."""
     email: EmailStr
-    password: str = Field(..., min_length=8, description="Minimum 8 characters")
+    # T52: cap at 128. bcrypt only uses the first 72 bytes, but hashing a
+    # multi-megabyte "password" still costs real CPU — an unauthenticated
+    # attacker could DoS the app by POSTing huge strings. 128 is plenty.
+    password: str = Field(..., min_length=8, max_length=128, description="8-128 characters")
     name: Optional[str] = None
     tier: Optional[str] = "nest"  # Default to nest if not specified
 
@@ -85,7 +88,8 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     """User login request."""
     email: EmailStr
-    password: str
+    # T52: same bcrypt-DoS cap on the unauthenticated login path.
+    password: str = Field(..., max_length=128)
 
 
 class RefreshRequest(BaseModel):
@@ -129,7 +133,8 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     """Reset password request."""
     token: str
-    password: str = Field(..., min_length=8, description="Minimum 8 characters")
+    # T52: bcrypt-DoS cap (this is the endpoint the task called out).
+    password: str = Field(..., min_length=8, max_length=128, description="8-128 characters")
 
 
 # ============================================================================

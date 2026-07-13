@@ -3996,7 +3996,8 @@ async def get_budget_forecast(
 async def get_live_trending_products(
     limit: int = 20,
     sort_by: str = 'velocity',
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),  # T41: auth-gated
 ):
     """
     Get top trending products with real-time momentum indicators
@@ -4049,7 +4050,8 @@ async def get_live_trending_products(
 async def get_biggest_movers(
     direction: str = 'up',
     limit: int = 10,
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),  # T41: auth-gated
 ):
     """
     Get products with biggest rank changes (movers & shakers)
@@ -4099,7 +4101,10 @@ async def get_biggest_movers(
 
 
 @app.get("/api/trends/breakouts")
-async def get_breakout_products(settings: Settings = Depends(get_settings)):
+async def get_breakout_products(
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),  # T41: auth-gated
+):
     """
     Get products with explosive momentum (>50% velocity)
 
@@ -4145,7 +4150,8 @@ async def get_breakout_products(settings: Settings = Depends(get_settings)):
 @app.get("/api/trends/product/{product_id}")
 async def get_product_momentum(
     product_id: str,
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),  # T41: auth-gated
 ):
     """
     Get detailed momentum data for a single product
@@ -4205,7 +4211,8 @@ async def get_product_momentum(
 async def get_momentum_heatmap(
     rows: int = 10,
     cols: int = 5,
-    settings: Settings = Depends(get_settings)
+    settings: Settings = Depends(get_settings),
+    current_user: User = Depends(get_current_user),  # T41: auth-gated
 ):
     """
     Get heat map visualization data
@@ -4259,22 +4266,39 @@ async def get_momentum_heatmap(
 # Replaced by product_timeseries + the lifecycle/anti-saturation grade.
 
 @app.websocket("/ws/trends")
-async def trends_websocket(websocket: WebSocket):
+async def trends_websocket(websocket: WebSocket, token: str = ""):
     """
     WebSocket endpoint for real-time trends updates
 
     Broadcasts momentum updates every 5 seconds to connected clients.
     Clients receive live product momentum data for real-time dashboard updates.
 
+    T41: same auth posture as the REST trends surface — a valid JWT is
+    required, passed as the ``?token=`` query param (the standard way to
+    authenticate a browser WebSocket, which can't set an Authorization
+    header). Without it the socket is closed immediately, so this 5-second
+    broadcast loop can't be opened anonymously as a resource drain.
+
     Connection lifecycle:
-    1. Client connects
-    2. Server sends initial trending data
-    3. Server broadcasts updates every 5 seconds
-    4. Client can disconnect anytime
+    1. Client connects with ?token=<jwt>
+    2. Server validates the token, else closes
+    3. Server sends initial trending data
+    4. Server broadcasts updates every 5 seconds
     """
     import asyncio
     import json
     from datetime import datetime, timezone  # T83: timezone was missing → NameError on every update
+
+    # T41: authenticate BEFORE accepting the long-lived socket.
+    try:
+        from ospra_os.auth.jwt_auth import decode_token
+        payload = decode_token(token)
+        if not (payload.get("sub") or payload.get("user_id")):
+            raise ValueError("no subject in token")
+    except Exception:
+        await websocket.close(code=1008)  # policy violation
+        logger.info("[WS] /ws/trends rejected: missing/invalid token")
+        return
 
     await websocket.accept()
     logger.info("[SUCCESS] WebSocket client connected to /ws/trends")

@@ -9,11 +9,26 @@ Author: OspraOS
 
 import logging
 from fastapi import APIRouter, Depends
+from ospra_os.auth.jwt_auth import get_current_user
 from ospra_os.core.settings import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/trends", tags=["Live Trends"])
+# T41 — AUTH POSTURE DECISION (documented):
+# The live-trends surface (momentum, movers, breakouts, heatmap) is the
+# platform's premium market-intelligence feature and each call drives backend
+# compute (discovery-cache reads + momentum math). The data is AGGREGATE
+# (market-wide, not per-tenant), so there is no IDOR/ownership concern — the
+# right control is authentication, NOT tenant-scoping. Decision: require a
+# logged-in user (any tier); tier-gating is left as a separate PRODUCT call.
+# The frontend already calls these via authService (JWT attached), so this is
+# non-breaking. The duplicate inline @app.get("/api/trends/*") handlers in
+# main.py carry the same gate for defense in depth.
+router = APIRouter(
+    prefix="/api/trends",
+    tags=["Live Trends"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/live")
