@@ -21,11 +21,12 @@ Audit fixes (2026-04):
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 
 from ospra_os.advertising.scheduler import AdScheduler
 from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.auth import require_admin
 from ospra_os.database import AdCampaign, User, get_multi_store_session
 from ospra_os.core.settings import get_settings
 
@@ -49,7 +50,9 @@ class CreateCampaignRequest(BaseModel):
     image_url: Optional[str] = None
     video_id: Optional[str] = None
     platforms: List[str] = ['meta', 'tiktok', 'google']
-    daily_budget: float = 15.0
+    # T24: reject nonsense at the boundary; the scheduler additionally clamps
+    # to settings.ADS_MAX_DAILY_BUDGET (env-configurable) before creating.
+    daily_budget: float = Field(default=15.0, gt=0, le=10_000)
     target_audience: Optional[dict] = None
     auto_launch: bool = False
 
@@ -439,6 +442,49 @@ async def get_campaign_detail(
 
     finally:
         session.close()
+
+
+@router.post("/kill-switch")
+async def trigger_kill_switch(
+    reason: Optional[str] = None,
+    admin=Depends(require_admin),
+):
+    """
+    T24: EMERGENCY STOP — pause every tracked campaign on every platform.
+
+    Admin-only (it acts across all tenants). This pauses everything that is
+    currently active and reports any campaign the platform refused to pause.
+    To keep ads down across restarts, also set ADS_KILL_SWITCH=true in the
+    environment — that flag refuses creations/activations until cleared.
+    """
+    if not ad_scheduler:
+        raise HTTPException(status_code=503, detail="Ad scheduler not available")
+
+    result = await ad_scheduler.pause_all_campaigns(
+        reason=reason or f"manual kill switch by admin {admin.user_id}"
+    )
+
+    # Mirror the pause into every DB row too (including campaigns the
+    # scheduler wasn't tracking), so nothing comes back as 'active'.
+    session = get_multi_store_session()
+    try:
+        session.query(AdCampaign).filter(AdCampaign.status == 'active').update(
+            {
+                AdCampaign.status: 'paused',
+                AdCampaign.pause_reason: f"kill switch: {reason or 'manual'}",
+                AdCampaign.paused_at: datetime.now(timezone.utc),
+            },
+            synchronize_session=False,
+        )
+        session.commit()
+    finally:
+        session.close()
+
+    return {
+        'success': result['failed'] == 0,
+        **result,
+        'note': "Set ADS_KILL_SWITCH=true in the environment to keep ads disabled across restarts.",
+    }
 
 
 @router.get("/scheduler/status")

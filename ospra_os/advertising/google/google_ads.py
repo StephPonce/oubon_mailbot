@@ -142,7 +142,10 @@ class GoogleAdsManager:
 
         ad_group.name = name
         ad_group.campaign = campaign_resource_name
-        ad_group.status = self.client.enums.AdGroupStatusEnum.ENABLED
+        # T25: create PAUSED, matching Meta (AdSet paused) and TikTok (adgroup
+        # DISABLE). ENABLED here meant one accidental campaign-activation put
+        # the whole tree live instantly.
+        ad_group.status = self.client.enums.AdGroupStatusEnum.PAUSED
         ad_group.type_ = self.client.enums.AdGroupTypeEnum.SEARCH_STANDARD
         ad_group.cpc_bid_micros = 1_000_000  # $1 max CPC
 
@@ -160,7 +163,8 @@ class GoogleAdsManager:
         ad_group_ad = operation.create
 
         ad_group_ad.ad_group = ad_group_resource_name
-        ad_group_ad.status = self.client.enums.AdGroupAdStatusEnum.ENABLED
+        # T25: create PAUSED (see _build_ad_group_operation).
+        ad_group_ad.status = self.client.enums.AdGroupAdStatusEnum.PAUSED
 
         # Responsive Search Ad
         rsa = ad_group_ad.ad.responsive_search_ad
@@ -245,6 +249,47 @@ class GoogleAdsManager:
         except Exception as e:
             print(f"Error fetching metrics: {e}")
             return {}
+
+    async def update_campaign_budget(self, campaign_id: str, daily_budget: float) -> bool:
+        """Set the daily budget for a campaign (T22).
+
+        Google keeps the budget on a separate CampaignBudget resource, so this
+        looks it up via GAQL and mutates it. The caller (AdScheduler) must cap
+        ``daily_budget`` BEFORE it reaches here.
+        """
+        try:
+            ga_service = self.client.get_service("GoogleAdsService")
+            query = f"""
+                SELECT campaign.campaign_budget
+                FROM campaign
+                WHERE campaign.resource_name = '{campaign_id}'
+            """
+            response = ga_service.search(customer_id=self.customer_id, query=query)
+
+            budget_resource_name = None
+            for row in response:
+                budget_resource_name = row.campaign.campaign_budget
+                break
+
+            if not budget_resource_name:
+                print(f"Error updating budget: no budget resource for {campaign_id}")
+                return False
+
+            budget_service = self.client.get_service("CampaignBudgetService")
+            budget_operation = self.client.get_type("CampaignBudgetOperation")
+            budget = budget_operation.update
+            budget.resource_name = budget_resource_name
+            budget.amount_micros = int(daily_budget * 1_000_000)
+            budget_operation.update_mask.paths.append("amount_micros")
+
+            budget_service.mutate_campaign_budgets(
+                customer_id=self.customer_id,
+                operations=[budget_operation]
+            )
+            return True
+        except Exception as e:
+            print(f"Error updating campaign budget: {e}")
+            return False
 
     async def pause_campaign(self, campaign_id: str) -> bool:
         """Pause a campaign"""

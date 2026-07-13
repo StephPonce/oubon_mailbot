@@ -213,21 +213,50 @@ class MetaAdsManager:
             return {}
 
     async def pause_campaign(self, campaign_id: str) -> bool:
-        """Pause a campaign"""
+        """Pause a campaign.
+
+        Section B audit: ``campaign.update({...})`` only mutates the local SDK
+        object — without ``remote_update()`` nothing was ever sent to Meta, so
+        the auto-pause protection silently no-opped and "paused" campaigns
+        kept spending. remote_update() is the actual API write.
+        """
         try:
             campaign = Campaign(campaign_id)
             campaign.update({Campaign.Field.status: Campaign.Status.paused})
+            campaign.remote_update()
             return True
         except Exception as e:
             print(f"Error pausing campaign: {e}")
             return False
 
     async def activate_campaign(self, campaign_id: str) -> bool:
-        """Activate a campaign"""
+        """Activate a campaign (see pause_campaign re: remote_update)."""
         try:
             campaign = Campaign(campaign_id)
             campaign.update({Campaign.Field.status: Campaign.Status.active})
+            campaign.remote_update()
             return True
         except Exception as e:
             print(f"Error activating campaign: {e}")
+            return False
+
+    async def update_campaign_budget(self, campaign_id: str, daily_budget: float) -> bool:
+        """Set the daily budget for a campaign (T22).
+
+        Meta keeps daily budget on the AdSet, not the Campaign, so this looks
+        up the campaign's ad sets and updates each. The caller (AdScheduler)
+        is responsible for capping ``daily_budget`` BEFORE it reaches here.
+        """
+        try:
+            campaign = Campaign(campaign_id)
+            ad_sets = campaign.get_ad_sets(fields=[AdSet.Field.id])
+            if not ad_sets:
+                print(f"Error updating budget: no ad sets for campaign {campaign_id}")
+                return False
+            for ad_set in ad_sets:
+                ad_set.update({AdSet.Field.daily_budget: int(daily_budget * 100)})  # cents
+                ad_set.remote_update()
+            return True
+        except Exception as e:
+            print(f"Error updating campaign budget: {e}")
             return False

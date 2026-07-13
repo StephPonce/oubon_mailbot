@@ -23,6 +23,8 @@ from ospra_os.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
+MIN_DAILY_BUDGET = 1.0  # floor so decreases can't hit $0/negative
+
 
 class AdScheduler:
     """
@@ -77,12 +79,81 @@ class AdScheduler:
             logger.warning(f"Creative generator not available: {e}")
             self.creative_generator = None
 
-        # Campaign tracking
+        # Campaign tracking — a cache of AdCampaign DB rows, keyed
+        # f"{platform}_{campaign_id}". T23: this was purely in-memory, so a
+        # restart/deploy wiped it and the hourly auto-pause monitor silently
+        # stopped protecting every live campaign. It is now loaded from the DB
+        # on start() and written back through _persist_campaign().
         self.active_campaigns: Dict[str, Dict] = {}
+
+    def _load_campaigns_from_db(self):
+        """T23: hydrate campaign tracking from the AdCampaign table."""
+        try:
+            from ospra_os.database import AdCampaign, get_multi_store_session
+        except Exception as e:
+            logger.warning(f"Campaign persistence unavailable ({e}); tracking is memory-only")
+            return
+
+        session = get_multi_store_session()
+        try:
+            rows = session.query(AdCampaign).filter(
+                AdCampaign.status.in_(("active", "paused"))
+            ).all()
+            for row in rows:
+                key = f"{row.platform}_{row.campaign_id}"
+                self.active_campaigns[key] = {
+                    'user_id': row.user_id,
+                    'product_id': row.product_id,
+                    'platform': row.platform,
+                    'campaign_id': row.campaign_id,
+                    'daily_budget': row.daily_budget,
+                    'budget_limit': row.budget_limit,
+                    'status': row.status,
+                    'created_at': row.created_at,
+                }
+            logger.info(f"[SUCCESS] Loaded {len(rows)} campaigns from DB into tracking")
+        except Exception as e:
+            logger.error(f"Failed to load campaigns from DB: {e}")
+        finally:
+            session.close()
+
+    def _persist_campaign(self, campaign_key: str):
+        """Write a tracked campaign's mutable state back to its DB row."""
+        data = self.active_campaigns.get(campaign_key)
+        if not data:
+            return
+        try:
+            from ospra_os.database import AdCampaign, get_multi_store_session
+        except Exception:
+            return
+
+        session = get_multi_store_session()
+        try:
+            row = session.query(AdCampaign).filter(
+                AdCampaign.campaign_id == data['campaign_id'],
+                AdCampaign.platform == data['platform'],
+            ).first()
+            if row:
+                row.daily_budget = data['daily_budget']
+                row.status = data['status']
+                if data.get('pause_reason'):
+                    row.pause_reason = data['pause_reason']
+                if data.get('paused_at'):
+                    row.paused_at = data['paused_at']
+                session.commit()
+        except Exception as e:
+            logger.error(f"Failed to persist campaign {campaign_key}: {e}")
+            session.rollback()
+        finally:
+            session.close()
 
     async def start(self):
         """Start the scheduler with all automation jobs."""
         logger.info("[START] Starting Ad Automation Scheduler")
+
+        # T23: recover campaign tracking from the DB so auto-pause/optimization
+        # keep protecting campaigns created before the last restart.
+        self._load_campaigns_from_db()
 
         # Daily performance check at 9 AM
         self.scheduler.add_job(
@@ -156,6 +227,25 @@ class AdScheduler:
         """
         if not platforms:
             platforms = ['meta', 'tiktok', 'google']
+
+        # T24: emergency stop refuses new campaign creation outright.
+        if self.settings.ADS_KILL_SWITCH:
+            logger.warning("[KILL] Ad kill switch is ON — refusing campaign creation")
+            return {
+                'product_id': product_id,
+                'product_name': product_name,
+                'campaigns': {},
+                'status': 'refused_kill_switch',
+            }
+
+        # T24: clamp the requested budget to the hard ceiling no matter what
+        # the caller sent (routes validate too; this protects direct callers).
+        clamped = max(MIN_DAILY_BUDGET, min(daily_budget, self.settings.ADS_MAX_DAILY_BUDGET))
+        if clamped != daily_budget:
+            logger.warning(
+                f"[CAP] Requested daily budget ${daily_budget:.2f} clamped to ${clamped:.2f}"
+            )
+            daily_budget = clamped
 
         logger.info(f" Creating multi-platform campaigns for: {product_name}")
         logger.info(f"[STATS] Platforms: {', '.join(platforms)}")
@@ -361,14 +451,51 @@ class AdScheduler:
 
         return report
 
+    def _cap_budget(self, proposed: float, campaign_data: Dict) -> float:
+        """T21: apply the full cap chain to a proposed daily budget.
+
+        Order: per-campaign budget_limit (DB column, when set) → global
+        per-campaign ceiling (ADS_MAX_DAILY_BUDGET) → floor (MIN_DAILY_BUDGET).
+        """
+        capped = proposed
+        budget_limit = campaign_data.get('budget_limit')
+        if budget_limit is not None:
+            capped = min(capped, budget_limit)
+        capped = min(capped, self.settings.ADS_MAX_DAILY_BUDGET)
+        return max(capped, MIN_DAILY_BUDGET)
+
+    def _account_budget_headroom(self) -> float:
+        """T21: remaining room under the account-wide daily budget cap.
+
+        The sum of daily budgets across ALL active tracked campaigns may not
+        exceed ADS_MAX_ACCOUNT_DAILY_BUDGET.
+        """
+        committed = sum(
+            c['daily_budget'] for c in self.active_campaigns.values()
+            if c['status'] == 'active'
+        )
+        return self.settings.ADS_MAX_ACCOUNT_DAILY_BUDGET - committed
+
     async def optimize_budgets(self):
         """
         Budget optimization job (runs every 6 hours).
 
-        Adjusts budgets based on performance:
-        - High CTR (>2%) → Increase budget by 20%
-        - Low CTR (<0.5%) → Decrease budget by 20%
+        - High CTR (>2%) → increase budget 20%, subject to (T21):
+            * per-campaign budget_limit (DB) and ADS_MAX_DAILY_BUDGET hard caps
+            * account-wide ADS_MAX_ACCOUNT_DAILY_BUDGET cap
+            * one increase per campaign per ADS_BUDGET_INCREASE_COOLDOWN_HOURS
+              (the 6-hourly job would otherwise compound 1.2^4 ≈ +107%/day)
+        - Low CTR (<0.5%) → decrease budget 20% (floored at MIN_DAILY_BUDGET).
+        - T22: the capped value is written to the platform; local/DB state
+          updates ONLY if the platform write succeeds.
+        - Gated by ADS_AUTOMATION_ENABLED and ADS_KILL_SWITCH: increases are
+          skipped when automation is off; decreases (protective) still apply.
         """
+        settings = self.settings
+        if settings.ADS_KILL_SWITCH:
+            logger.warning("[KILL] Ad kill switch is ON — skipping budget optimization")
+            return
+
         logger.info("[PRICE] Running budget optimization...")
 
         optimized_count = 0
@@ -395,25 +522,128 @@ class AdScheduler:
                 new_budget = current_budget
 
                 if ctr >= self.HIGH_CTR_THRESHOLD:
-                    # High performer - increase budget
-                    new_budget = current_budget * (1 + self.BUDGET_ADJUSTMENT_PERCENT)
-                    logger.info(f"[TREND] {platform} {campaign_id}: High CTR {ctr:.2%} → Increase budget ${current_budget:.2f} → ${new_budget:.2f}")
+                    if not settings.ADS_AUTOMATION_ENABLED:
+                        logger.info(
+                            f"[GATED] {platform} {campaign_id}: high CTR but "
+                            "ADS_AUTOMATION_ENABLED is off — no automated increase"
+                        )
+                        continue
+
+                    # T21 throttle: at most one increase per cooldown window.
+                    last_increase = campaign_data.get('last_budget_increase_at')
+                    cooldown = timedelta(hours=settings.ADS_BUDGET_INCREASE_COOLDOWN_HOURS)
+                    if last_increase and datetime.now(timezone.utc) - last_increase < cooldown:
+                        logger.info(
+                            f"[THROTTLE] {platform} {campaign_id}: increase skipped "
+                            f"(cooldown {settings.ADS_BUDGET_INCREASE_COOLDOWN_HOURS}h)"
+                        )
+                        continue
+
+                    proposed = current_budget * (1 + self.BUDGET_ADJUSTMENT_PERCENT)
+                    new_budget = self._cap_budget(proposed, campaign_data)
+
+                    # T21 account-wide cap: the increase may not push the sum of
+                    # active daily budgets past ADS_MAX_ACCOUNT_DAILY_BUDGET.
+                    headroom = self._account_budget_headroom()
+                    if new_budget - current_budget > headroom:
+                        new_budget = self._cap_budget(current_budget + max(headroom, 0), campaign_data)
+                        if new_budget <= current_budget:
+                            logger.warning(
+                                f"[CAP] {platform} {campaign_id}: account daily budget cap "
+                                f"(${settings.ADS_MAX_ACCOUNT_DAILY_BUDGET:.2f}) reached — no increase"
+                            )
+                            continue
+
+                    logger.info(
+                        f"[TREND] {platform} {campaign_id}: High CTR {ctr:.2%} → "
+                        f"${current_budget:.2f} → ${new_budget:.2f} (capped from ${proposed:.2f})"
+                    )
 
                 elif ctr <= self.LOW_CTR_THRESHOLD and spend > current_budget * 0.5:
-                    # Low performer with significant spend - decrease budget
-                    new_budget = current_budget * (1 - self.BUDGET_ADJUSTMENT_PERCENT)
+                    # Low performer with significant spend - decrease budget.
+                    # Protective: allowed even with automation off.
+                    new_budget = max(
+                        current_budget * (1 - self.BUDGET_ADJUSTMENT_PERCENT),
+                        MIN_DAILY_BUDGET,
+                    )
                     logger.info(f"[DECLINE] {platform} {campaign_id}: Low CTR {ctr:.2%} → Decrease budget ${current_budget:.2f} → ${new_budget:.2f}")
 
                 # Apply budget change if different
                 if abs(new_budget - current_budget) > 0.01:
-                    # Update budget on platform (would need platform-specific implementation)
+                    # T22: write the CAPPED value to the platform. Local and DB
+                    # state update only when the platform accepted the change,
+                    # so tracking can't drift from real spend settings.
+                    applied = await self._update_campaign_budget(platform, campaign_id, new_budget)
+                    if not applied:
+                        logger.error(
+                            f"[ERROR] {platform} {campaign_id}: platform rejected budget "
+                            f"update to ${new_budget:.2f}; keeping ${current_budget:.2f}"
+                        )
+                        continue
+
                     campaign_data['daily_budget'] = new_budget
+                    if new_budget > current_budget:
+                        campaign_data['last_budget_increase_at'] = datetime.now(timezone.utc)
+                    self._persist_campaign(campaign_key)
                     optimized_count += 1
 
             except Exception as e:
                 logger.error(f"Error optimizing {platform} campaign {campaign_id}: {e}")
 
         logger.info(f"[SUCCESS] Budget optimization complete: {optimized_count} campaigns adjusted")
+
+    async def _update_campaign_budget(self, platform: str, campaign_id: str, daily_budget: float) -> bool:
+        """T22: write a (pre-capped) daily budget to the ad platform."""
+        try:
+            if platform == 'meta' and self.meta_manager:
+                return await self.meta_manager.update_campaign_budget(campaign_id, daily_budget)
+            elif platform == 'tiktok' and self.tiktok_manager:
+                return await self.tiktok_manager.update_campaign_budget(campaign_id, daily_budget)
+            elif platform == 'google' and self.google_manager:
+                return await self.google_manager.update_campaign_budget(campaign_id, daily_budget)
+        except Exception as e:
+            logger.error(f"Error updating budget for {platform} {campaign_id}: {e}")
+        return False
+
+    async def pause_all_campaigns(self, reason: str = "kill switch") -> Dict:
+        """T24: global kill switch — pause every tracked campaign on every platform.
+
+        Best-effort: attempts every campaign even if some fail, and reports
+        which ones could not be paused so they can be handled manually.
+        """
+        logger.warning(f"[KILL] PAUSING ALL CAMPAIGNS — reason: {reason}")
+
+        paused, failed = [], []
+        for campaign_key, campaign_data in self.active_campaigns.items():
+            if campaign_data['status'] != 'active':
+                continue
+            platform = campaign_data['platform']
+            campaign_id = campaign_data['campaign_id']
+            try:
+                ok = await self._pause_campaign(platform, campaign_id)
+            except Exception as e:
+                logger.error(f"[KILL] error pausing {platform} {campaign_id}: {e}")
+                ok = False
+
+            if ok:
+                campaign_data['status'] = 'paused'
+                campaign_data['pause_reason'] = f"kill switch: {reason}"
+                campaign_data['paused_at'] = datetime.now(timezone.utc)
+                self._persist_campaign(campaign_key)
+                paused.append(campaign_key)
+            else:
+                failed.append(campaign_key)
+
+        result = {
+            'paused': len(paused),
+            'failed': len(failed),
+            'failed_campaigns': failed,
+        }
+        if failed:
+            logger.error(f"[KILL] {len(failed)} campaigns could NOT be paused: {failed}")
+        else:
+            logger.warning(f"[KILL] All {len(paused)} active campaigns paused")
+        return result
 
     async def auto_pause_poor_performers(self):
         """
@@ -468,10 +698,12 @@ class AdScheduler:
                     # Pause campaign on platform
                     await self._pause_campaign(platform, campaign_id)
 
-                    # Update tracking
+                    # Update tracking (and the DB row — T23 — so the pause and
+                    # its reason survive restarts)
                     campaign_data['status'] = 'paused'
                     campaign_data['pause_reason'] = pause_reason
                     campaign_data['paused_at'] = datetime.now(timezone.utc)
+                    self._persist_campaign(campaign_key)
 
                     paused_count += 1
 
@@ -513,6 +745,10 @@ class AdScheduler:
 
     async def activate_campaign(self, platform: str, campaign_id: str) -> bool:
         """Manually activate a paused campaign."""
+        # T24: while the kill switch is on, nothing gets (re)activated.
+        if self.settings.ADS_KILL_SWITCH:
+            logger.warning(f"[KILL] Kill switch ON — refusing activation of {platform} {campaign_id}")
+            return False
         try:
             success = False
 

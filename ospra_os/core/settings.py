@@ -72,6 +72,27 @@ class Settings(BaseSettings):
     QUIET_HOURS_BRAND: Optional[str] = Field(default=None)
     AUTO_REPLY_ENABLED: bool = Field(default=True)
 
+    # Ad-spend safety rails (Section B, T21/T22/T24).
+    # ADS_AUTOMATION_ENABLED gates every automated platform mutation that can
+    # INCREASE spend (budget raises, activations). Protective actions (pauses,
+    # budget decreases) run regardless. Default OFF — standing rule: money
+    # auto-features ship disabled until explicitly enabled in prod.
+    ADS_AUTOMATION_ENABLED: bool = Field(default=False)
+    # Hard per-campaign daily budget ceiling (USD). Applies on creation and to
+    # every optimizer adjustment, in addition to the per-campaign budget_limit
+    # column when that is set.
+    ADS_MAX_DAILY_BUDGET: float = Field(default=100.0)
+    # Account-wide cap: the SUM of daily budgets across all active campaigns
+    # may never exceed this (USD/day). Increases that would breach it are denied.
+    ADS_MAX_ACCOUNT_DAILY_BUDGET: float = Field(default=500.0)
+    # Throttle: at most one optimizer budget increase per campaign per this
+    # many hours (the 6-hourly job would otherwise compound 1.2^4/day ≈ +107%).
+    ADS_BUDGET_INCREASE_COOLDOWN_HOURS: int = Field(default=24)
+    # Emergency stop: when True, all ad automation halts and activations are
+    # refused platform-wide (the POST /api/ads/kill-switch endpoint pauses
+    # everything immediately; this flag keeps it down across restarts).
+    ADS_KILL_SWITCH: bool = Field(default=False)
+
     # AI Providers
     AI_PROVIDER: str = Field(default="openai")
     OPENAI_API_KEY: Optional[str] = None

@@ -291,6 +291,53 @@ class TikTokAdsManager:
             print(f"Error activating campaign: {e}")
             return False
 
+    async def update_campaign_budget(self, campaign_id: str, daily_budget: float) -> bool:
+        """Set the daily budget for a campaign's ad groups (T22).
+
+        TikTok keeps the daily budget on the ad group (BUDGET_MODE_DAY), so
+        this looks up the campaign's ad groups and updates each. The caller
+        (AdScheduler) must cap ``daily_budget`` BEFORE it reaches here.
+        """
+        try:
+            # Find the campaign's ad groups.
+            get_url = f"{self.BASE_URL}/adgroup/get/"
+            get_params = {
+                'advertiser_id': self.advertiser_id,
+                'filtering': '{"campaign_ids": ["%s"]}' % campaign_id,
+                'fields': '["adgroup_id"]',
+            }
+            response = await asyncio.to_thread(
+                requests.get, get_url, headers=self.headers, params=get_params
+            )
+            data = response.json()
+            if data.get('code') != 0:
+                print(f"Error updating budget: adgroup lookup failed: {data.get('message')}")
+                return False
+
+            adgroup_ids = [g['adgroup_id'] for g in data.get('data', {}).get('list', [])]
+            if not adgroup_ids:
+                print(f"Error updating budget: no ad groups for campaign {campaign_id}")
+                return False
+
+            # Update each ad group's budget.
+            update_url = f"{self.BASE_URL}/adgroup/budget/update/"
+            payload = {
+                'advertiser_id': self.advertiser_id,
+                'budgets': [
+                    {'adgroup_id': adgroup_id, 'budget': int(daily_budget * 100)}  # cents
+                    for adgroup_id in adgroup_ids
+                ],
+            }
+            response = await asyncio.to_thread(
+                requests.post, update_url, headers=self.headers, json=payload
+            )
+            data = response.json()
+            return data.get('code') == 0
+
+        except Exception as e:
+            print(f"Error updating campaign budget: {e}")
+            return False
+
     async def upload_video(self, video_file_path: str) -> Optional[str]:
         """
         Upload video to TikTok for use in ads
