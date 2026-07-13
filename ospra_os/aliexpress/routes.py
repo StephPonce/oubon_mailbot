@@ -32,7 +32,7 @@ from typing import Optional
 from datetime import datetime
 from ospra_os.core.settings import Settings, get_settings
 from ospra_os.aliexpress.oauth import AliExpressOAuth
-from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.auth.jwt_auth import get_current_user, require_admin_user
 from ospra_os.database import User
 from ospra_os.database.aliexpress_tokens import (
     save_token as save_platform_token,
@@ -476,7 +476,9 @@ async def check_auth_status(current_user: User = Depends(get_current_user)):
         content={
             "connected": True,
             "status": "Connected",
-            "token": cred["access_token"][:20] + "...",
+            # T48: do NOT echo any of the shared platform token — connection
+            # status doesn't need it, and even a 20-char prefix leaks part of a
+            # secret to every tenant that can hit this status endpoint.
             "time_remaining_seconds": time_remaining,
             "time_remaining_hours": round(time_remaining / 3600, 1),
             "time_remaining_days": round(time_remaining / 86400, 1),
@@ -485,12 +487,16 @@ async def check_auth_status(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/auth/token")
-async def get_access_token(current_user: User = Depends(get_current_user)):
+async def get_access_token(current_user: User = Depends(require_admin_user)):
     """
-    Get the current access token (for internal use by AliExpress connector).
+    Get the current access token.
 
-    Returns the token if valid, otherwise raises 401. JWT-protected — we
-    never hand the platform credential to an anonymous caller.
+    T48: this is the ONE shared PLATFORM AliExpress credential for the whole
+    deployment. It used to be returned to ANY authenticated tenant
+    (get_current_user) — a full-secret leak that would let one customer act as
+    our AliExpress account. No server code calls this over HTTP (the connector
+    reads _load_platform_credential() directly), so it is now admin-only for
+    the rare ops/debug case.
     """
     cred = _load_platform_credential()
     if not cred or cred["is_expired"] or time.time() > cred["expires_at"]:

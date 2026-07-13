@@ -1083,9 +1083,31 @@ from ospra_os.database import User
 
 
 def _is_admin(user: User) -> bool:
-    """Check if user has admin privileges (STRATOSPHERE tier or explicit admin flag)."""
-    user_tier = user.subscription_tier.value if hasattr(user.subscription_tier, 'value') else str(user.subscription_tier)
-    return user_tier.lower() == "stratosphere" or getattr(user, 'is_admin', False)
+    """Check if user has admin privileges.
+
+    T51: this used to treat ``subscription_tier == "stratosphere"`` as admin —
+    so any paying top-tier CUSTOMER could reach /debug (raw API + token status)
+    and /test/order-create-check (which pokes the REAL placeorder endpoint on
+    prod credentials). A paid plan is NOT an admin grant. Now uses the same
+    real admin signal as the rest of the app (core/routes.py,
+    federated/routes.py): an explicit is_admin / is_superuser flag, which is
+    deny-by-default until provisioned.
+    """
+    return bool(getattr(user, 'is_admin', False) or getattr(user, 'is_superuser', False))
+
+
+def _debug_endpoints_enabled() -> bool:
+    """T51: /debug and /test endpoints are OFF in production entirely.
+
+    Even with a correct admin check, a debug endpoint that touches the live
+    placeorder API has no business existing in prod. Gate the whole class off
+    unless ENVIRONMENT is non-prod OR ALLOW_ALIEXPRESS_DEBUG=true is set
+    explicitly.
+    """
+    import os
+    if os.getenv("ALLOW_ALIEXPRESS_DEBUG", "").lower() == "true":
+        return True
+    return os.getenv("ENVIRONMENT", "").lower() not in ("production", "prod")
 
 
 @router.get("/debug/raw-response")
@@ -1096,8 +1118,11 @@ async def debug_raw_response(
     """
     DEBUG: Get raw AliExpress API response to see structure
 
-    SECURITY: Admin-only endpoint. Requires STRATOSPHERE tier or admin privileges.
+    SECURITY: Admin-only endpoint, and disabled entirely in production.
     """
+    # T51: off in prod regardless of who's asking.
+    if not _debug_endpoints_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
     # SECURITY: Admin-only access
     if not _is_admin(current_user):
         raise HTTPException(
@@ -1152,11 +1177,14 @@ async def test_order_create_capability(
     """
     [TEST] TEST: Check if ds.order.create API is accessible
 
-    SECURITY: Admin-only endpoint. Requires STRATOSPHERE tier or admin privileges.
+    SECURITY: Admin-only endpoint, and disabled entirely in production.
 
     This tests whether we have permission to create orders via Dropshipping API.
     DOES NOT place a real order - uses invalid data to check API access.
     """
+    # T51: off in prod regardless of who's asking.
+    if not _debug_endpoints_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
     # SECURITY: Admin-only access
     if not _is_admin(current_user):
         raise HTTPException(

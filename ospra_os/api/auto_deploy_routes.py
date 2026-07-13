@@ -20,15 +20,20 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel, Field
 
-from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.auth.jwt_auth import get_current_user, require_admin_user
 from ospra_os.database import User
 
 logger = logging.getLogger(__name__)
 
-# Initialize router
+# T38: the auto-deployer is a GLOBAL singleton (not per-tenant). enable /
+# disable / criteria / run-now change deployment behavior for the WHOLE
+# platform (the logs even say "by admin"), but the router only required any
+# authenticated user — any customer could switch platform auto-deploy on/off,
+# retune its criteria, or force an immediate run. Admin-only now.
 router = APIRouter(
     prefix="/api/auto-deploy",
-    tags=["Auto-Deployment"]
+    tags=["Auto-Deployment"],
+    dependencies=[Depends(require_admin_user)],
 )
 
 # Global auto-deployer instance (initialized on startup)

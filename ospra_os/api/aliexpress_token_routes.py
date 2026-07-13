@@ -7,10 +7,19 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from datetime import datetime
 from pydantic import BaseModel
 from ospra_os.api.aliexpress_token_refresh import refresh_all_tokens, refresh_dropship_token, refresh_affiliate_token
-from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.auth.jwt_auth import get_current_user, require_admin_user
 from ospra_os.database import User
 
-router = APIRouter(prefix="/api/aliexpress/tokens", tags=["aliexpress-tokens"])
+# T50: every endpoint here manages the ONE shared PLATFORM AliExpress
+# credential — refresh it, overwrite it via manual entry, or dump the
+# environment (/debug/env). With plain get_current_user, any tenant could
+# replace the deployment's AliExpress token or read platform env. The whole
+# router is admin-only.
+router = APIRouter(
+    prefix="/api/aliexpress/tokens",
+    tags=["aliexpress-tokens"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 class TokenEntry(BaseModel):

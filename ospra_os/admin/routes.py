@@ -6,12 +6,19 @@ SECURITY: All admin routes require authentication.
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from ospra_os.core.settings import Settings, get_settings
-from ospra_os.auth.jwt_auth import get_current_user
+from ospra_os.auth.jwt_auth import get_current_user, require_admin_user
 from ospra_os.database import User
 from typing import Dict, Any
 import asyncio
 
-router = APIRouter(prefix="/admin", tags=["Admin Dashboard"])
+# T34: these routes used get_current_user (ANY authenticated user could read
+# the admin dashboard — email stats, discoveries, system status across the
+# deployment). require_admin_user enforces the real admin flag at the router.
+router = APIRouter(
+    prefix="/admin",
+    tags=["Admin Dashboard"],
+    dependencies=[Depends(require_admin_user)],
+)
 
 
 async def get_email_stats(settings: Settings) -> Dict[str, Any]:

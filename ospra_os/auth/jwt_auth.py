@@ -12,8 +12,11 @@ Provides:
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 import hashlib
+import logging
 import os
 import uuid
+
+logger = logging.getLogger(__name__)
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -499,6 +502,25 @@ async def get_current_user(
         # Non-critical error - don't fail auth if last_login update fails
         print(f"[WARNING] Failed to update last_login for user {user.id}: {str(e)}")
 
+    return user
+
+
+async def require_admin_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    """FastAPI dependency: authenticated AND admin (T34).
+
+    Companion to auth.dependencies.require_admin (which works on the
+    TokenPayload/tier system). This one operates on the ``User`` object that
+    ``get_current_user`` returns and uses the same admin signal as the rest of
+    the app — an explicit ``is_admin`` / ``is_superuser`` flag, deny-by-default.
+    """
+    if not (getattr(user, "is_admin", False) or getattr(user, "is_superuser", False)):
+        logger.warning(f"Non-admin user {getattr(user, 'id', '?')} attempted admin route")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
     return user
 
 

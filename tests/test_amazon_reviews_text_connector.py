@@ -16,7 +16,10 @@ from ospra_os.product_research.connectors.apify.amazon_reviews_text import (
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    # asyncio.run() is immune to a prior TestClient test leaving the thread
+    # with no current event loop (get_event_loop() raised on 3.12) — the
+    # ordering-dependent flakiness fixed across the connector test suite.
+    return asyncio.run(coro)
 
 
 # ---------------------------------------------------------------------------
