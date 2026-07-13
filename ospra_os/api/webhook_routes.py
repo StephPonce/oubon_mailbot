@@ -16,7 +16,7 @@ Date: December 2024
 
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks, Header
 from pydantic import BaseModel
 
@@ -80,13 +80,134 @@ async def webhook_configuration_status(current_user: User = Depends(get_current_
 # LEMONSQUEEZY WEBHOOKS (Payments/Subscriptions)
 # =============================================================================
 
+_events_table_ready = False
+
+
+def _ensure_events_table():
+    """Create processed_webhook_events on first use (idempotent, once per
+    process). init_db() also creates it in prod; this covers fresh DBs and
+    test databases that skip the init path — a missing table must not turn
+    every payment webhook into a 503."""
+    global _events_table_ready
+    if _events_table_ready:
+        return
+    from ospra_os.database.base import Base
+    from ospra_os.database.connection import get_engine
+    from ospra_os.database.webhook_event_models import ProcessedWebhookEvent
+
+    Base.metadata.create_all(get_engine(), tables=[ProcessedWebhookEvent.__table__])
+    _events_table_ready = True
+
+
+def _claim_webhook_event(provider: str, body: bytes, event_name: str) -> Optional[str]:
+    """T27: atomically claim a webhook delivery for processing.
+
+    The claim key is a digest of the raw body — a provider retry (or an
+    attacker replaying a captured request) produces the same key and hits the
+    UNIQUE constraint. Returns the key when claimed; None when this exact
+    delivery was already processed (or is being processed) and must NOT be
+    re-applied. Raises HTTPException(503) when the DB is unavailable, so the
+    provider retries later instead of us dropping the event.
+    """
+    import hashlib
+
+    event_key = hashlib.sha256(provider.encode() + b":" + body).hexdigest()
+
+    def _attempt() -> Optional[str]:
+        from sqlalchemy.exc import IntegrityError
+        from ospra_os.database.connection import get_session
+        from ospra_os.database.webhook_event_models import ProcessedWebhookEvent
+
+        session = get_session()
+        try:
+            try:
+                session.add(ProcessedWebhookEvent(
+                    provider=provider,
+                    event_key=event_key,
+                    event_name=event_name,
+                    status="processing",
+                ))
+                session.commit()
+                return event_key
+            except IntegrityError:
+                session.rollback()
+                existing = session.query(ProcessedWebhookEvent).filter_by(
+                    event_key=event_key
+                ).first()
+                if existing and existing.status == "failed":
+                    # A prior attempt failed and we returned 5xx — this IS the
+                    # provider's retry. Reclaim it.
+                    existing.status = "processing"
+                    existing.error_message = None
+                    session.commit()
+                    return event_key
+                logger.warning(
+                    f"[WEBHOOK] Duplicate {provider} delivery "
+                    f"({event_name}, status={existing.status if existing else '?'}) — not re-applying"
+                )
+                return None
+        finally:
+            session.close()
+
+    try:
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        _ensure_events_table()
+        try:
+            return _attempt()
+        except (OperationalError, ProgrammingError):
+            # Missing table on the current engine, or a stale cached engine
+            # whose backing SQLite file was replaced (its writes then fail as
+            # 'readonly'). Dispose the cached engine, recreate the table on a
+            # fresh one, and retry once.
+            from ospra_os.database import connection as _conn
+
+            try:
+                _conn.get_engine().dispose()
+            except Exception:
+                pass
+            _conn.get_engine.cache_clear()
+            global _events_table_ready
+            _events_table_ready = False
+            _ensure_events_table()
+            return _attempt()
+    except HTTPException:
+        raise
+    except Exception as e:
+        # No DB → we can't guarantee idempotency OR durability. 503 makes the
+        # provider retry when we're healthy again.
+        logger.error(f"[WEBHOOK] Cannot claim event (DB unavailable): {e}")
+        raise HTTPException(status_code=503, detail="Temporarily unable to process webhooks")
+
+
+def _finish_webhook_event(event_key: str, ok: bool, error: str = ""):
+    """Mark a claimed event processed, or failed (releasing it for retry)."""
+    try:
+        from datetime import datetime, timezone as _tz
+        from ospra_os.database.connection import get_session
+        from ospra_os.database.webhook_event_models import ProcessedWebhookEvent
+
+        session = get_session()
+        try:
+            row = session.query(ProcessedWebhookEvent).filter_by(event_key=event_key).first()
+            if row:
+                row.status = "processed" if ok else "failed"
+                row.error_message = error or None
+                row.processed_at = datetime.now(_tz.utc).replace(tzinfo=None)
+                session.commit()
+        finally:
+            session.close()
+    except Exception as e:
+        logger.error(f"[WEBHOOK] Failed to finalize event record: {e}")
+
+
 async def upgrade_user_tier(user_id: int, tier: str, db_session=None):
     """
     Upgrade user's subscription tier after successful payment.
     """
     from ospra_os.database.connection import get_session
     from ospra_os.database import User, SubscriptionTier
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     tier_map = {
         "nest": SubscriptionTier.NEST,
@@ -170,71 +291,89 @@ async def lemonsqueezy_subscription(
     """
     try:
         data = json.loads(body)
-        
-        meta = data.get("meta", {})
-        event_name = meta.get("event_name")
-        custom_data = meta.get("custom_data", {})
-        
-        attributes = data.get("data", {}).get("attributes", {})
-        user_email = attributes.get("user_email")
-        status = attributes.get("status")
-        variant_name = attributes.get("variant_name")  # Tier name
-        
-        # Get user_id and tier from custom data (sent during checkout)
-        user_id = custom_data.get("user_id")
-        tier = custom_data.get("tier")
-        
-        logger.info(f"[PAYMENT] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, tier={tier}, status={status}")
-        
-        # Handle different events
-        if event_name == "subscription_created" and status == "active":
-            # New subscription - upgrade user
-            if user_id and tier:
-                _enqueue_tier_change(int(user_id), tier, event_name, data)
-                logger.info(f"[SUCCESS] Scheduled tier upgrade for user {user_id} to {tier}")
-                posthog_capture(
-                    int(user_id),
-                    FunnelEvent.SUBSCRIPTION_STARTED,
-                    properties={"tier": tier, "billing_status": status},
-                )
-            else:
-                logger.warning(f"[WARNING] Missing user_id or tier in custom_data")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON")
 
-        elif event_name == "subscription_updated":
-            if status == "active" and user_id and tier:
-                _enqueue_tier_change(int(user_id), tier, event_name, data)
-            elif status in ["cancelled", "expired", "past_due"]:
-                # Downgrade to free tier
-                if user_id:
-                    _enqueue_tier_change(int(user_id), "nest", event_name, data)
-                    logger.info(f"[DOWNGRADE] User {user_id} subscription {status}")
-                    posthog_capture(
-                        int(user_id),
-                        FunnelEvent.SUBSCRIPTION_CANCELLED,
-                        properties={"tier": tier, "billing_status": status},
-                    )
+    meta = data.get("meta", {})
+    event_name = meta.get("event_name")
+    custom_data = meta.get("custom_data", {})
 
-        elif event_name == "subscription_cancelled":
+    attributes = data.get("data", {}).get("attributes", {})
+    user_email = attributes.get("user_email")
+    status = attributes.get("status")
+    variant_name = attributes.get("variant_name")  # Tier name
+
+    # Get user_id and tier from custom data (sent during checkout)
+    user_id = custom_data.get("user_id")
+    tier = custom_data.get("tier")
+
+    logger.info(f"[PAYMENT] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, tier={tier}, status={status}")
+
+    # T27: claim this delivery. A replay/retry of an already-applied event is
+    # acked with 200 but NOT re-applied (no double tier changes).
+    event_key = _claim_webhook_event("lemonsqueezy", body, event_name or "unknown")
+    if event_key is None:
+        return {"success": True, "event": event_name, "duplicate": True}
+
+    # T27: a tier change that fails to apply/enqueue must NOT be acked with
+    # 200 — mark the claim failed and 5xx so LemonSqueezy retries. The old
+    # code ignored the outcome: customer paid, never upgraded, no retry.
+    applied = True
+
+    # Handle different events
+    if event_name == "subscription_created" and status == "active":
+        # New subscription - upgrade user
+        if user_id and tier:
+            applied = _enqueue_tier_change(int(user_id), tier, event_name, data)
+            logger.info(f"[SUCCESS] Scheduled tier upgrade for user {user_id} to {tier}")
+            posthog_capture(
+                int(user_id),
+                FunnelEvent.SUBSCRIPTION_STARTED,
+                properties={"tier": tier, "billing_status": status},
+            )
+        else:
+            logger.warning(f"[WARNING] Missing user_id or tier in custom_data")
+
+    elif event_name == "subscription_updated":
+        if status == "active" and user_id and tier:
+            applied = _enqueue_tier_change(int(user_id), tier, event_name, data)
+        elif status in ["cancelled", "expired", "past_due"]:
             # Downgrade to free tier
             if user_id:
-                _enqueue_tier_change(int(user_id), "nest", event_name, data)
-                logger.info(f"[DOWNGRADE] User {user_id} subscription cancelled")
+                applied = _enqueue_tier_change(int(user_id), "nest", event_name, data)
+                logger.info(f"[DOWNGRADE] User {user_id} subscription {status}")
                 posthog_capture(
                     int(user_id),
                     FunnelEvent.SUBSCRIPTION_CANCELLED,
-                    properties={"tier": tier, "billing_status": "cancelled"},
+                    properties={"tier": tier, "billing_status": status},
                 )
-        
-        return {
-            "success": True,
-            "event": event_name,
-            "user_id": user_id,
-            "tier": tier,
-            "status": status
-        }
-        
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    elif event_name == "subscription_cancelled":
+        # Downgrade to free tier
+        if user_id:
+            applied = _enqueue_tier_change(int(user_id), "nest", event_name, data)
+            logger.info(f"[DOWNGRADE] User {user_id} subscription cancelled")
+            posthog_capture(
+                int(user_id),
+                FunnelEvent.SUBSCRIPTION_CANCELLED,
+                properties={"tier": tier, "billing_status": "cancelled"},
+            )
+
+    _finish_webhook_event(event_key, ok=applied,
+                          error="" if applied else "tier change could not be applied")
+    if not applied:
+        raise HTTPException(
+            status_code=500,
+            detail="Tier change could not be applied; webhook will be retried",
+        )
+
+    return {
+        "success": True,
+        "event": event_name,
+        "user_id": user_id,
+        "tier": tier,
+        "status": status
+    }
 
 
 @router.post("/lemonsqueezy/order")
@@ -252,44 +391,59 @@ async def lemonsqueezy_order(
     """
     try:
         data = json.loads(body)
-        
-        meta = data.get("meta", {})
-        event_name = meta.get("event_name")
-        custom_data = meta.get("custom_data", {})
-        
-        attributes = data.get("data", {}).get("attributes", {})
-        user_email = attributes.get("user_email")
-        total = attributes.get("total_formatted")
-        status = attributes.get("status")
-        
-        # Get user_id and tier from custom data
-        user_id = custom_data.get("user_id")
-        tier = custom_data.get("tier")
-        
-        logger.info(f"[PRICE] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, total={total}, status={status}")
-        
-        # Handle successful order (one-time or first subscription payment)
-        if event_name == "order_created" and status == "paid":
-            if user_id and tier:
-                _enqueue_tier_change(int(user_id), tier, event_name, data)
-                logger.info(f"[SUCCESS] Order paid - upgrading user {user_id} to {tier}")
-
-        elif event_name == "order_refunded":
-            # Refund - downgrade to free
-            if user_id:
-                _enqueue_tier_change(int(user_id), "nest", event_name, data)
-                logger.warning(f"[REFUND] Order refunded - downgrading user {user_id}")
-        
-        return {
-            "success": True,
-            "event": event_name,
-            "user_id": user_id,
-            "user_email": user_email,
-            "total": total
-        }
-        
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+
+    meta = data.get("meta", {})
+    event_name = meta.get("event_name")
+    custom_data = meta.get("custom_data", {})
+
+    attributes = data.get("data", {}).get("attributes", {})
+    user_email = attributes.get("user_email")
+    total = attributes.get("total_formatted")
+    status = attributes.get("status")
+
+    # Get user_id and tier from custom data
+    user_id = custom_data.get("user_id")
+    tier = custom_data.get("tier")
+
+    logger.info(f"[PRICE] LemonSqueezy {event_name}: user_id={user_id}, email={user_email}, total={total}, status={status}")
+
+    # T27: replay protection + honest failure signaling (see subscription
+    # handler for the full rationale).
+    event_key = _claim_webhook_event("lemonsqueezy", body, event_name or "unknown")
+    if event_key is None:
+        return {"success": True, "event": event_name, "duplicate": True}
+
+    applied = True
+
+    # Handle successful order (one-time or first subscription payment)
+    if event_name == "order_created" and status == "paid":
+        if user_id and tier:
+            applied = _enqueue_tier_change(int(user_id), tier, event_name, data)
+            logger.info(f"[SUCCESS] Order paid - upgrading user {user_id} to {tier}")
+
+    elif event_name == "order_refunded":
+        # Refund - downgrade to free
+        if user_id:
+            applied = _enqueue_tier_change(int(user_id), "nest", event_name, data)
+            logger.warning(f"[REFUND] Order refunded - downgrading user {user_id}")
+
+    _finish_webhook_event(event_key, ok=applied,
+                          error="" if applied else "tier change could not be applied")
+    if not applied:
+        raise HTTPException(
+            status_code=500,
+            detail="Tier change could not be applied; webhook will be retried",
+        )
+
+    return {
+        "success": True,
+        "event": event_name,
+        "user_id": user_id,
+        "user_email": user_email,
+        "total": total
+    }
 
 
 # =============================================================================

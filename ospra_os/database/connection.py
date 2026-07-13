@@ -250,6 +250,7 @@ def _import_all_models():
         'cached_products',
         'enhanced_image_cache',  # Enhanced image caching for Stability AI
         'fulfillment_models',  # T16: idempotency records for auto-fulfillment
+        'webhook_event_models',  # T27: payment-webhook replay protection
     ]
     
     imported = 0

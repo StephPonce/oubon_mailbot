@@ -70,6 +70,18 @@ _WORKER_ID = os.environ.get("PYTEST_XDIST_WORKER", "master")
 TEST_DB_PATH = os.path.join(TEST_DB_DIR, f"test_database_{_WORKER_ID}.db")
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
 
+# Reset the worker's DB file HERE, at import time, before any engine can
+# exist in this process. This used to happen inside the session-scoped
+# ``engine`` fixture — but by then, tests that run earlier in the worker may
+# already hold pooled SQLite connections to this path (via the app's global
+# ``get_engine()`` / ``SessionLocal``). Unlinking the file under an open
+# connection makes every later write through that handle fail with
+# "attempt to write a readonly database" / "no such table" — the
+# order-dependent flakiness that hit test_billing_tier_change and the
+# LemonSqueezy webhook tests depending on which xdist worker they landed on.
+if os.path.exists(TEST_DB_PATH):
+    os.remove(TEST_DB_PATH)
+
 # Provide stable test-only secrets BEFORE importing the app. Without these,
 # pytest.ini's `filterwarnings = error` promotes the app's startup
 # "JWT_SECRET_KEY not set" and "token blacklist in-memory" warnings into
@@ -109,9 +121,9 @@ def engine():
     # Use file-based test database to avoid :memory: per-connection issues
     import atexit
 
-    # Clean up old test database if it exists
-    if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+    # NOTE: the stale-file cleanup happens at conftest import time (top of
+    # this module) — removing it here mid-session would yank the file out
+    # from under connections other tests already opened.
 
     engine = create_engine(
         f"sqlite:///{TEST_DB_PATH}",

@@ -287,6 +287,77 @@ class TemplateService:
 
     # ==================== PURCHASE TEMPLATES ====================
 
+    def _verify_payment_with_processor(self, payment_token: str, expected_amount: float) -> str:
+        """T31: verify a payment server-side with LemonSqueezy before granting.
+
+        The old code trusted the client-supplied token without reading it and
+        fabricated a transaction id — POSTing any string bought any paid
+        template for free.
+
+        ``payment_token`` must be a LemonSqueezy order id from the checkout
+        redirect. We confirm with the processor that the order (1) exists,
+        (2) is paid, (3) covers the template price, (4) belongs to the calling
+        user's email, and (5) hasn't already been spent on another purchase.
+        Fails CLOSED: no API key / processor unreachable → no grant.
+
+        Returns the canonical transaction id to store.
+        """
+        import os
+        import httpx
+
+        api_key = os.getenv("LEMONSQUEEZY_API_KEY")
+        if not api_key:
+            raise ValueError("Payment verification is not configured")
+
+        order_id = (payment_token or "").strip()
+        if not order_id.isdigit():
+            raise ValueError("Invalid payment token")
+
+        try:
+            response = httpx.get(
+                f"https://api.lemonsqueezy.com/v1/orders/{order_id}",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Accept": "application/vnd.api+json",
+                },
+                timeout=15.0,
+            )
+        except Exception as e:
+            raise ValueError(f"Payment verification unavailable: {e}")
+
+        if response.status_code != 200:
+            raise ValueError("Payment not found")
+
+        attributes = (response.json().get("data") or {}).get("attributes") or {}
+
+        if attributes.get("status") != "paid":
+            raise ValueError("Payment is not completed")
+
+        # LemonSqueezy totals are in cents.
+        paid_cents = int(attributes.get("total") or 0)
+        if paid_cents < int(round(expected_amount * 100)):
+            raise ValueError("Payment amount does not match template price")
+
+        # The order must belong to the calling user.
+        from ospra_os.database import User
+
+        user = self.db.query(User).filter(User.id == self.user_id).first()
+        order_email = (attributes.get("user_email") or "").strip().lower()
+        if user is not None and getattr(user, "email", None) and order_email:
+            if order_email != user.email.strip().lower():
+                raise ValueError("Payment belongs to a different account")
+
+        transaction_id = f"ls_order_{order_id}"
+
+        # One processor payment buys exactly one purchase.
+        already_used = self.db.query(TemplatePurchase).filter(
+            TemplatePurchase.transaction_id == transaction_id
+        ).first()
+        if already_used:
+            raise ValueError("This payment was already used")
+
+        return transaction_id
+
     def purchase_template(
         self,
         template_id: int,
@@ -315,9 +386,8 @@ class TemplateService:
         if existing:
             raise ValueError("Already purchased")
 
-        # Process payment (integrate with Stripe/LemonSqueezy)
-        # For now, simulate
-        transaction_id = f"txn_{int(datetime.now(timezone.utc).timestamp())}"
+        # T31: verify with the processor BEFORE granting anything.
+        transaction_id = self._verify_payment_with_processor(payment_token, template.price)
 
         # Calculate split
         creator_amount = template.price * template.revenue_share

@@ -555,3 +555,170 @@ class ShopifyClient:
         except Exception as e:
             print(f"[WARNING]  Could not add to featured collection: {e}")
             return False
+
+    # =========================================================================
+    # ORDER LOOKUP + REFUNDS (Section B band 3, T28)
+    #
+    # SmartReplySystem (email automation) has always called lookup_order /
+    # get_order_status / format_tracking_response / process_refund on this
+    # class — none of which existed, so the FIRST real customer tracking or
+    # refund email raised AttributeError and the refund guardrails ($100 cap,
+    # 15-day window, ownership check) never even ran. These are SYNCHRONOUS
+    # because SmartReplySystem.generate_reply is a sync call path.
+    # =========================================================================
+
+    def _sync_request(self, method: str, path: str, json_body: Optional[Dict] = None,
+                      params: Optional[Dict] = None) -> "httpx.Response":
+        """Single seam for the sync order/refund endpoints (tests stub this)."""
+        with httpx.Client(timeout=30.0) as client:
+            return client.request(
+                method,
+                f"{self.base_url}{path}",
+                headers=self.headers,
+                json=json_body,
+                params=params,
+            )
+
+    def lookup_order(self, order_identifier: str) -> Optional[Dict]:
+        """Find an order by customer-facing number ('#1001' / '1001') or by
+        Shopify order id. Returns the raw order dict, or None."""
+        try:
+            ident = str(order_identifier).strip()
+
+            # Customer-facing order number first (what people put in emails).
+            name = ident if ident.startswith('#') else f"#{ident}"
+            response = self._sync_request(
+                "GET", "/orders.json", params={"name": name, "status": "any"}
+            )
+            if response.status_code == 200:
+                orders = response.json().get('orders', [])
+                if orders:
+                    return orders[0]
+
+            # Fall back to raw order id.
+            if ident.lstrip('#').isdigit():
+                response = self._sync_request(
+                    "GET", f"/orders/{ident.lstrip('#')}.json"
+                )
+                if response.status_code == 200:
+                    return response.json().get('order')
+
+            return None
+        except Exception as e:
+            print(f"[WARNING]  Order lookup failed: {e}")
+            return None
+
+    def get_order_status(self, order_data: Dict) -> Dict:
+        """Distill a raw order into the fields the email templates need."""
+        fulfillments = order_data.get('fulfillments') or []
+        tracking_number = None
+        tracking_url = None
+        carrier = None
+        if fulfillments:
+            latest = fulfillments[-1]
+            tracking_number = latest.get('tracking_number')
+            tracking_url = latest.get('tracking_url')
+            carrier = latest.get('tracking_company')
+
+        return {
+            'order_id': order_data.get('name') or str(order_data.get('id', '')),
+            'created_at': order_data.get('created_at'),
+            'financial_status': order_data.get('financial_status'),
+            'fulfillment_status': order_data.get('fulfillment_status') or 'unfulfilled',
+            'tracking_number': tracking_number,
+            'tracking_url': tracking_url,
+            'carrier': carrier,
+            'total': order_data.get('total_price'),
+        }
+
+    def format_tracking_response(self, order_status: Dict, customer_name: str) -> str:
+        """HTML email body describing the order's shipping state."""
+        order_id = order_status.get('order_id', 'your order')
+
+        if order_status.get('tracking_number'):
+            tracking_line = (
+                f"<p>Your order <strong>{order_id}</strong> is on its way!</p>"
+                f"<p>Tracking number: <strong>{order_status['tracking_number']}</strong>"
+                + (f" ({order_status['carrier']})" if order_status.get('carrier') else "")
+                + "</p>"
+            )
+            if order_status.get('tracking_url'):
+                tracking_line += (
+                    f'<p><a href="{order_status["tracking_url"]}">Track your package here</a></p>'
+                )
+        elif (order_status.get('fulfillment_status') or 'unfulfilled') != 'unfulfilled':
+            tracking_line = (
+                f"<p>Your order <strong>{order_id}</strong> has been processed and "
+                f"is being prepared for shipment. Tracking details will follow shortly.</p>"
+            )
+        else:
+            tracking_line = (
+                f"<p>Your order <strong>{order_id}</strong> is confirmed and being "
+                f"prepared. We'll send tracking information as soon as it ships.</p>"
+            )
+
+        return f"<p>Hi {customer_name},</p>{tracking_line}<p>Thanks for your patience!</p>"
+
+    def process_refund(self, order_id, amount: float, reason: str = "",
+                       notify_customer: bool = False) -> Dict:
+        """Refund an order via Shopify's calculate→create flow.
+
+        Uses /refunds/calculate.json to obtain the refundable transactions so
+        we never refund more than Shopify says is refundable, then posts the
+        refund against the parent transaction.
+        """
+        try:
+            calc_response = self._sync_request(
+                "POST", f"/orders/{order_id}/refunds/calculate.json",
+                json_body={"refund": {"shipping": {"full_refund": False}}},
+            )
+            if calc_response.status_code != 200:
+                return {
+                    "success": False,
+                    "error": f"Refund calculation failed (HTTP {calc_response.status_code})",
+                }
+
+            calculated = calc_response.json().get('refund', {})
+            transactions = calculated.get('transactions') or []
+            if not transactions:
+                return {"success": False, "error": "No refundable transactions on order"}
+
+            # Cap at both the requested amount and what Shopify says is
+            # refundable on the parent transaction.
+            parent = transactions[0]
+            refundable = float(parent.get('maximum_refundable') or parent.get('amount') or 0)
+            refund_amount = min(float(amount), refundable)
+            if refund_amount <= 0:
+                return {"success": False, "error": "Nothing refundable on this order"}
+
+            refund_body = {
+                "refund": {
+                    "note": reason[:255] if reason else "Automated refund",
+                    "notify": notify_customer,
+                    "transactions": [{
+                        "parent_id": parent.get('parent_id') or parent.get('id'),
+                        "amount": f"{refund_amount:.2f}",
+                        "kind": "refund",
+                        "gateway": parent.get('gateway'),
+                    }],
+                }
+            }
+
+            response = self._sync_request(
+                "POST", f"/orders/{order_id}/refunds.json", json_body=refund_body
+            )
+            if response.status_code in (200, 201):
+                refund = response.json().get('refund', {})
+                return {
+                    "success": True,
+                    "refund_id": refund.get('id'),
+                    "amount": refund_amount,
+                }
+            return {
+                "success": False,
+                "error": f"Refund creation failed (HTTP {response.status_code}): "
+                         f"{response.text[:200]}",
+            }
+        except Exception as e:
+            print(f"[WARNING]  Refund failed: {e}")
+            return {"success": False, "error": str(e)}
