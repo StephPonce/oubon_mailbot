@@ -262,24 +262,42 @@ class ApifyClient:
             print(f"[WARNING] Could not check Apify usage: {e}")
             return {'error': str(e), 'can_run_paid_actors': False}
     
+    # Dataset items are fetched in pages of this size (Apify max per request
+    # is 1000). Phase-1 fix: the old code did ONE request with limit=100, so
+    # any run producing more than 100 items silently lost the rest.
+    DATASET_PAGE_SIZE = 1000
+
     async def run_actor(
         self,
         actor_id: str,
         run_input: Dict,
         timeout_secs: int = 300,
-        memory_mbytes: int = 512
+        memory_mbytes: int = 512,
+        max_items: Optional[int] = None,
     ) -> List[Dict]:
         """
         Run an Apify actor and wait for results
-        
+
         Args:
             actor_id: Actor ID (e.g., "junglee/amazon-bestsellers")
             run_input: Input configuration for the actor
             timeout_secs: Max seconds to wait (default 5 minutes)
             memory_mbytes: Memory allocation (higher = faster but more expensive)
-        
+            max_items: Cap on how many dataset items to fetch (None = all).
+                Use a LOW cap while developing to conserve Apify credits.
+
         Returns:
             List of results from the actor
+
+        Phase-1 (TikTok demand spine) fixes:
+          * ``memory`` used to be merged INTO the actor input JSON. Apify reads
+            run options (memory/timeout) from QUERY PARAMS on the run-start
+            request — inside the input it is ignored for provisioning and, on
+            actors with strict input schemas, rejects the run outright. It is
+            now sent as ``?memory=...&timeout=...``.
+          * results were fetched with a single ``limit=100`` request, silently
+            dropping everything past 100. Now paginated until exhausted (or
+            ``max_items``).
         """
         # Circuit breaker: if this actor already hit quota/403 this run, skip it
         # entirely — no retry storms, no further metered starts.
@@ -295,17 +313,19 @@ class ApifyClient:
 
         try:
             async with httpx.AsyncClient(timeout=timeout_secs) as client:
-                # Start the actor run
+                # Start the actor run. Run OPTIONS go in query params; the
+                # body is the actor input alone.
                 run_url = f"{self.base_url}/acts/{actor_id_safe}/runs"
 
                 _apify_run_state["starts"] += 1
                 response = await client.post(
                     run_url,
                     headers=self.headers,
-                    json={
-                        **run_input,
-                        "memory": memory_mbytes
-                    }
+                    params={
+                        "memory": memory_mbytes,
+                        "timeout": timeout_secs,
+                    },
+                    json=run_input,
                 )
 
                 if response.status_code not in [200, 201]:
@@ -317,50 +337,43 @@ class ApifyClient:
                     print(f"[ERROR] Failed to start actor: {response.status_code}")
                     print(f"   Response: {response.text}")
                     return []
-                
+
                 run_data = response.json()['data']
                 run_id = run_data['id']
-                
+
                 print(f"   Run ID: {run_id}")
                 print(f"   Waiting for completion...")
-                
+
                 # Poll for completion
                 status_url = f"{self.base_url}/actor-runs/{run_id}"
-                
+
                 poll_interval = 5
                 max_polls = timeout_secs // poll_interval
-                
+
                 for attempt in range(max_polls):
                     await asyncio.sleep(poll_interval)
-                    
+
                     status_response = await client.get(status_url, headers=self.headers)
                     status_data = status_response.json()['data']
                     status = status_data['status']
-                    
+
                     if status == "SUCCEEDED":
-                        # Get results from dataset
                         dataset_id = status_data['defaultDatasetId']
-                        results_url = f"{self.base_url}/datasets/{dataset_id}/items"
-                        
-                        results_response = await client.get(
-                            results_url,
-                            headers=self.headers,
-                            params={'limit': 100}
+                        results = await self._fetch_dataset_items(
+                            client, dataset_id, max_items=max_items
                         )
-                        
-                        results = results_response.json()
                         print(f"[SUCCESS] Actor completed! Got {len(results)} results")
                         return results
-                    
+
                     elif status in ["FAILED", "ABORTED", "TIMED-OUT"]:
                         print(f"[ERROR] Actor {status}: {actor_id}")
                         return []
-                    
+
                     # Still running
                     elapsed = (attempt + 1) * poll_interval
                     if elapsed % 30 == 0:
                         print(f"   Still running... ({elapsed}s)")
-                
+
                 # Log the run ID so an abandoned-but-still-charging run is
                 # traceable in the Apify console (results may finish later).
                 print(
@@ -369,12 +382,47 @@ class ApifyClient:
                     f"server-side; check the Apify console for its results)"
                 )
                 return []
-                
+
         except Exception as e:
             print(f"[ERROR] Error running actor {actor_id}: {e}")
             import traceback
             traceback.print_exc()
             return []
+
+    async def _fetch_dataset_items(
+        self,
+        client: "httpx.AsyncClient",
+        dataset_id: str,
+        max_items: Optional[int] = None,
+    ) -> List[Dict]:
+        """Fetch ALL items from a run's dataset, paginating past the old
+        100-item ceiling. ``max_items`` caps the total (dev credit hygiene)."""
+        results_url = f"{self.base_url}/datasets/{dataset_id}/items"
+        items: List[Dict] = []
+
+        while True:
+            page_limit = self.DATASET_PAGE_SIZE
+            if max_items is not None:
+                remaining = max_items - len(items)
+                if remaining <= 0:
+                    break
+                page_limit = min(page_limit, remaining)
+
+            response = await client.get(
+                results_url,
+                headers=self.headers,
+                params={"offset": len(items), "limit": page_limit},
+            )
+            page = response.json()
+            if not isinstance(page, list):
+                print(f"   [WARNING] Unexpected dataset response shape: {type(page)}")
+                break
+
+            items.extend(page)
+            if len(page) < page_limit:
+                break  # short page → dataset exhausted
+
+        return items
     
     async def get_amazon_bestsellers(
         self,
