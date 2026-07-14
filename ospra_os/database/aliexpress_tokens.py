@@ -15,6 +15,11 @@ import os
 # the one Base puts aliexpress_tokens into the metadata create_all() actually uses.
 from ospra_os.database.base import Base
 
+# T7: tokens are encrypted at rest with the shared Fernet infra. decrypt_field
+# is legacy-tolerant — a pre-encryption plaintext row decrypts to itself and is
+# re-encrypted on the next save_token(), so no big-bang migration is needed.
+from ospra_os.security.credential_encryption import encrypt_field, decrypt_field
+
 
 class AliExpressToken(Base):
     """Store AliExpress OAuth tokens in database"""
@@ -86,18 +91,22 @@ def save_token(api_type: str, access_token: str, refresh_token: str, expires_in:
         # Check if token already exists
         existing = db.query(AliExpressToken).filter_by(api_type=api_type).first()
 
+        # T7: encrypt before persisting.
+        enc_access = encrypt_field(access_token)
+        enc_refresh = encrypt_field(refresh_token)
+
         if existing:
-            # Update existing token
-            existing.access_token = access_token
-            existing.refresh_token = refresh_token
-            existing.obtained_at = datetime.now(timezone.utc)
+            # Update existing token (naive UTC, matching the column + expiry math)
+            existing.access_token = enc_access
+            existing.refresh_token = enc_refresh
+            existing.obtained_at = datetime.utcnow()
             existing.expires_in = expires_in
         else:
             # Create new token
             token = AliExpressToken(
                 api_type=api_type,
-                access_token=access_token,
-                refresh_token=refresh_token,
+                access_token=enc_access,
+                refresh_token=enc_refresh,
                 expires_in=expires_in
             )
             db.add(token)
@@ -131,10 +140,10 @@ def load_token(api_type: str) -> dict:
         if not token:
             return None
 
-        # Return token data
+        # Return token data (T7: decrypt on read; legacy plaintext passes through)
         return {
-            "access_token": token.access_token,
-            "refresh_token": token.refresh_token,
+            "access_token": decrypt_field(token.access_token),
+            "refresh_token": decrypt_field(token.refresh_token),
             "obtained_at": token.obtained_at.isoformat(),
             "expires_in": token.expires_in,
             "expires_at": token.expires_at.isoformat(),
@@ -169,7 +178,7 @@ def get_token_status() -> dict:
 
         expires_at = datetime.fromisoformat(token_data["expires_at"])
         obtained_at = datetime.fromisoformat(token_data["obtained_at"])
-        now = datetime.now(timezone.utc)
+        now = datetime.utcnow()  # naive, matching the naive expires_at/obtained_at
 
         expires_in_seconds = int((expires_at - now).total_seconds())
         expires_in_days = expires_in_seconds / 86400
@@ -182,7 +191,8 @@ def get_token_status() -> dict:
             "expires_in_days": round(expires_in_days, 1),
             "needs_refresh": token_data["needs_refresh"],
             "has_refresh_token": True,
-            "access_token_preview": token_data["access_token"][:20] + "..."
+            # T7: the access_token_preview (first 20 chars of the raw token)
+            # was removed — status must never echo any part of the secret.
         }
 
     return {

@@ -32,6 +32,31 @@ def _get_encryption():
         return None, None
 
 
+def _fail_closed_if_prod(reason: str):
+    """T9: never silently persist plaintext credentials in production.
+
+    The old set_credentials fell back to storing the raw dict when the
+    encryption module couldn't be imported — a silent data-at-rest exposure.
+    In production that is now a hard error; in dev it's a loud warning.
+    """
+    try:
+        from ospra_os.security.credential_encryption import (
+            _is_production,
+            CredentialEncryptionError,
+        )
+    except ImportError:
+        # Can't even import the guard — treat as prod-unsafe.
+        raise RuntimeError(f"Credential encryption unavailable: {reason}")
+    if _is_production():
+        raise CredentialEncryptionError(
+            f"Refusing to store store credentials unencrypted in production: {reason}"
+        )
+    import logging
+    logging.getLogger(__name__).warning(
+        "Store credentials stored UNENCRYPTED (dev only): %s", reason
+    )
+
+
 class Store(Base):
     """Platform-agnostic store representation"""
     __tablename__ = "stores"
@@ -99,9 +124,13 @@ class Store(Base):
         """
         encrypt_creds, _ = _get_encryption()
         if encrypt_creds:
+            # encrypt_credentials itself raises in prod when the Fernet key is
+            # missing/wrong (fail-closed). This branch handles the key present.
             self.credentials = encrypt_creds(credentials)
         else:
-            # Fallback if encryption not available
+            # T9: encryption module import failed — fail closed in prod, never
+            # silently store the raw dict.
+            _fail_closed_if_prod("credential_encryption import failed")
             self.credentials = credentials
 
     def get_credentials(self) -> dict:

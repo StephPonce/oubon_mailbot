@@ -178,7 +178,12 @@ class WhiteLabelEmailSettings(Base):
     smtp_host = Column(String(255), nullable=True)
     smtp_port = Column(Integer, nullable=True)
     smtp_username = Column(String(255), nullable=True)
-    smtp_password = Column(String(255), nullable=True)  # Encrypted
+    # T10: this column stores the Fernet-ENCRYPTED SMTP password. The comment
+    # used to claim "# Encrypted" while nothing encrypted it. There is no
+    # writer in the codebase yet (dormant white-label SMTP feature); the
+    # set_smtp_password / get_smtp_password helpers below make the invariant
+    # real for whoever wires it up.
+    smtp_password = Column(String(255), nullable=True)  # Fernet-encrypted (use set/get_smtp_password)
     smtp_use_tls = Column(Boolean, default=True)
 
     # Email templates
@@ -196,6 +201,17 @@ class WhiteLabelEmailSettings(Base):
 
     # Relationships
     partner = relationship("WhiteLabelPartner", back_populates="email_settings")
+
+    # T10: encrypted accessors for the SMTP password so the "# encrypted"
+    # invariant is real. decrypt_field is legacy-tolerant (a plaintext value
+    # written before this reads back fine and re-encrypts on next set).
+    def set_smtp_password(self, password: str):
+        from ospra_os.security.credential_encryption import encrypt_field
+        self.smtp_password = encrypt_field(password) if password else password
+
+    def get_smtp_password(self) -> str:
+        from ospra_os.security.credential_encryption import decrypt_field
+        return decrypt_field(self.smtp_password) if self.smtp_password else self.smtp_password
 
 
 class WhiteLabelClient(Base):

@@ -42,7 +42,12 @@ class User(Base):
 
     # AI Preferences
     ai_preference = Column(SQLEnum(AIProvider), default=AIProvider.CLAUDE, nullable=False)
-    custom_ai_keys = Column(JSON, default=dict)  # Encrypted JSON: {"openai": "sk-...", "claude": "sk-..."}
+    # T10: this JSON currently holds only a NON-secret reference prefix
+    # (api_routes stores api_key[:10]+"..."), NOT full keys — the old
+    # "# Encrypted JSON: {openai: sk-...}" comment was false on both counts.
+    # For storing a REAL provider key, use set_ai_key()/get_ai_key() below,
+    # which Fernet-encrypt the individual value.
+    custom_ai_keys = Column(JSON, default=dict)  # provider→value map; real keys via set_ai_key()
 
     # Usage Limits (based on tier)
     monthly_ai_budget = Column(Float, default=10.0)  # USD
@@ -66,6 +71,19 @@ class User(Base):
     email_accounts = relationship("UserEmailAccount", back_populates="user", cascade="all, delete-orphan")
     emails = relationship("Email", back_populates="user", cascade="all, delete-orphan")
     actions = relationship("Action", back_populates="user", cascade="all, delete-orphan")
+
+    def set_ai_key(self, provider: str, api_key: str):
+        """T10: store a REAL provider API key, Fernet-encrypted."""
+        from ospra_os.security.credential_encryption import encrypt_field
+        keys = dict(self.custom_ai_keys or {})
+        keys[provider] = encrypt_field(api_key)
+        self.custom_ai_keys = keys
+
+    def get_ai_key(self, provider: str) -> str:
+        """T10: read back a real provider key (legacy plaintext tolerated)."""
+        from ospra_os.security.credential_encryption import decrypt_field
+        val = (self.custom_ai_keys or {}).get(provider)
+        return decrypt_field(val) if val else val
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', tier='{self.subscription_tier}')>"

@@ -28,6 +28,22 @@ def _get_field_encryption():
         return None, None
 
 
+def _fail_closed_if_prod(reason: str):
+    """T9: never silently persist plaintext Amazon credentials in production."""
+    try:
+        from ospra_os.security.credential_encryption import (
+            _is_production,
+            CredentialEncryptionError,
+        )
+    except ImportError:
+        raise RuntimeError(f"Credential encryption unavailable: {reason}")
+    if _is_production():
+        raise CredentialEncryptionError(
+            f"Refusing to store Amazon credentials unencrypted in production: {reason}"
+        )
+    logger.warning("Amazon credentials stored UNENCRYPTED (dev only): %s", reason)
+
+
 class AmazonMarketplace(str, enum.Enum):
     """Amazon marketplace identifiers"""
     US = "ATVPDKIKX0DER"      # Amazon.com
@@ -139,8 +155,9 @@ class AmazonAccount(Base):
             if aws_secret_key is not None:
                 self.aws_secret_key = encrypt_field(aws_secret_key)
         else:
-            # Fallback if encryption not available
-            logger.warning("Credential encryption not available - storing plain text")
+            # T9: encryption module import failed — fail closed in prod, never
+            # silently store secrets as plain text.
+            _fail_closed_if_prod("credential_encryption import failed")
             if refresh_token is not None:
                 self.refresh_token = refresh_token
             if access_token is not None:
