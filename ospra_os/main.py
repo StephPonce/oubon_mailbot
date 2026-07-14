@@ -453,15 +453,15 @@ except Exception as e:
     shopify_deployment_router = None
     _HAS_SHOPIFY_DEPLOYMENT = False
 
-# Shopify Store Management router (OAuth, store data, real-time sync)
-try:
-    from ospra_os.api.shopify_routes import router as shopify_store_router  # type: ignore
-    _HAS_SHOPIFY_STORES = True
-    logger.info("Shopify Store Management router loaded successfully")
-except Exception as e:
-    logger.warning(f"Shopify Store Management router not loaded: {e}")
-    shopify_store_router = None
-    _HAS_SHOPIFY_STORES = False
+# T14: the in-memory Shopify store router (ospra_os/api/shopify_routes.py) is
+# NO LONGER MOUNTED. It held Shopify access tokens in a process-global plaintext
+# dict (_connected_stores), its GET /stores returned EVERY user's stores to any
+# caller, and its GDPR webhooks were no-op stubs. The DB-backed, tenant-scoped
+# flow (ospra_os/api/shopify_oauth_routes.py at /api/shopify/oauth/*, backed by
+# the encrypted Store model) is the single source of truth — and is what the
+# frontend already uses. Real GDPR webhooks live in api/webhook_routes.py.
+_HAS_SHOPIFY_STORES = False
+shopify_store_router = None
 
 # WooCommerce Store Management router (Universal OAuth - No app registration needed)
 try:

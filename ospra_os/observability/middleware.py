@@ -15,6 +15,23 @@ from .error_tracking import add_breadcrumb
 
 logger = get_logger(__name__)
 
+# T11: only these request headers are safe to attach to Sentry breadcrumbs.
+# Anything carrying credentials (Authorization, Cookie, *-Token, *-Api-Key,
+# *-Secret, X-Signature/Hmac) is redacted so it never reaches a third party.
+_SAFE_HEADER_ALLOWLIST = frozenset({
+    "host", "user-agent", "accept", "accept-encoding", "accept-language",
+    "content-type", "content-length", "referer", "origin", "connection",
+    "x-request-id", "x-forwarded-for", "x-forwarded-proto", "x-real-ip",
+})
+
+
+def _safe_headers(headers) -> dict:
+    """Return only allowlisted headers; everything else is [REDACTED]."""
+    safe = {}
+    for name, value in headers.items():
+        safe[name] = value if name.lower() in _SAFE_HEADER_ALLOWLIST else "[REDACTED]"
+    return safe
+
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
@@ -60,7 +77,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if store_id:
             context["store_id"] = store_id
 
-        # Add request breadcrumb for error tracking
+        # Add request breadcrumb for error tracking.
+        # T11: dict(request.headers) shipped Authorization/Cookie/token headers
+        # to Sentry (a third party) on EVERY exception. Redact to an allowlist
+        # of safe, non-sensitive headers.
         add_breadcrumb(
             message=f"{request.method} {request.url.path}",
             category="http.request",
@@ -68,7 +88,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             data={
                 "method": request.method,
                 "url": str(request.url),
-                "headers": dict(request.headers),
+                "headers": _safe_headers(request.headers),
             }
         )
 

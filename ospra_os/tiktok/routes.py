@@ -3,7 +3,7 @@ TikTok Integration Routes
 Handles OAuth, profile fetching, video listing, and content posting
 """
 
-from fastapi import APIRouter, Query, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Query, Header, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -166,13 +166,28 @@ async def handle_oauth_callback(
         # Fetch user profile info
         user_info = await fetch_user_info(access_token, open_id)
 
-        return TikTokTokenResponse(
-            access_token=access_token,
-            expires_in=token_data.get("expires_in", 0),
-            refresh_token=token_data.get("refresh_token"),
-            user_info=user_info
-        )
+        # T13: persist the token server-side (encrypted, via tiktok_tokens) and
+        # NEVER return it. The old response echoed access_token + refresh_token
+        # straight to the client — anyone completing the flow (or reading logs/
+        # history) walked away with the raw platform token.
+        try:
+            from ospra_os.database.tiktok_tokens import save_token
+            save_token(
+                access_token=access_token,
+                refresh_token=token_data.get("refresh_token"),
+                expires_in=token_data.get("expires_in", 0),
+            )
+        except Exception as save_err:
+            logger.error(f"Failed to persist TikTok token: {save_err}")
 
+        return {
+            "success": True,
+            "message": "TikTok account connected",
+            "user_info": user_info,  # public profile fields only, no token
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"OAuth callback failed: {e}")
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
@@ -184,7 +199,7 @@ async def handle_oauth_callback(
 
 @router.get("/profile", response_model=TikTokProfile)
 async def get_user_profile(
-    authorization: str = Query(..., description="Bearer token", alias="Authorization")
+    authorization: str = Header(..., description="Bearer token", alias="Authorization")
 ):
     """
     Get authenticated user's TikTok profile
@@ -215,7 +230,7 @@ async def get_user_profile(
 # in a future review cycle.
 # @router.get("/videos")
 async def get_user_videos(
-    authorization: str = Query(..., description="Bearer token", alias="Authorization"),
+    authorization: str = Header(..., description="Bearer token", alias="Authorization"),
     max_count: int = Query(20, ge=1, le=50, description="Maximum videos to return")
 ):
     """
@@ -243,7 +258,7 @@ async def get_user_videos(
 
 @router.post("/upload", response_model=VideoUploadResponse)
 async def upload_video(
-    authorization: str = Query(..., description="Bearer token", alias="Authorization"),
+    authorization: str = Header(..., description="Bearer token", alias="Authorization"),
     video: UploadFile = File(..., description="Video file to upload"),
     title: str = Form(..., description="Video caption/title"),
     privacy_level: str = Form("SELF_ONLY", description="Privacy setting")

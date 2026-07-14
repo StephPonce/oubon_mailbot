@@ -3,6 +3,14 @@ Shopify Integration - Production SaaS
 =====================================
 
 ALL stores connect through OAuth. No auto-connect.
+
+DEPRECATED (T14 — security): this module is NO LONGER MOUNTED. It stored
+Shopify access tokens in a process-global plaintext dict (``_connected_stores``)
+and its ``GET /stores`` returned every user's stores to any caller. The
+DB-backed, tenant-scoped flow in ``ospra_os/api/shopify_oauth_routes.py``
+(``/api/shopify/oauth/*``, encrypted Store model) is the single source of
+truth. Do not re-mount this router. Kept only so historical imports don't
+break; delete once the Section G ShopifyClient consolidation lands.
 """
 
 import os

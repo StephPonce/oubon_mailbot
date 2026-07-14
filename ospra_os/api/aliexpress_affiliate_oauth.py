@@ -7,11 +7,14 @@ import httpx
 import time
 import hashlib
 import hmac
+import logging
 import os
 from pathlib import Path
 from datetime import datetime
 from fastapi import APIRouter, Query
 from fastapi.responses import HTMLResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/aliexpress-affiliate", tags=["aliexpress-affiliate"])
 
@@ -175,13 +178,8 @@ async def affiliate_oauth_callback(
             signature = generate_aliexpress_signature_sha256(params, ALIEXPRESS_AFFILIATE_APP_SECRET)
             params["sign"] = signature
 
-            # Also generate MD5 wrapped signature for debugging
-            md5_signature = generate_aliexpress_signature_md5_wrapped(params, ALIEXPRESS_AFFILIATE_APP_SECRET)
-
-            print(f"[SECURE] Signature Debug (Affiliate):")
-            print(f"   SHA256: {signature}")
-            print(f"   MD5 (wrapped): {md5_signature}")
-            print(f"   Parameters: {params}")
+            # T6: no signature/params/token logging (secrets in logs).
+            logger.info("AliExpress affiliate token exchange: submitting authorization code")
 
             # Exchange code for tokens
             response = await client.post(
@@ -190,18 +188,14 @@ async def affiliate_oauth_callback(
                 headers={"Content-Type": "application/x-www-form-urlencoded"}
             )
 
-            # Log response details for debugging
-            print(f" Token Exchange Response (Affiliate):")
-            print(f"   Status Code: {response.status_code}")
-            print(f"   Headers: {dict(response.headers)}")
-            print(f"   Raw Body: {response.text[:500]}")
+            logger.info("AliExpress affiliate token exchange status: %s", response.status_code)
 
             # Try to parse JSON response
             try:
                 token_response = response.json()
-            except Exception as json_error:
-                token_error = f"Failed to parse JSON response. Status: {response.status_code}, Body: {response.text}"
-                print(f"[ERROR] {token_error}")
+            except Exception:
+                token_error = f"Failed to parse token response (HTTP {response.status_code})"
+                logger.error("AliExpress affiliate token parse failed (HTTP %s)", response.status_code)
                 raise Exception(token_error)
 
             # Store tokens if successful
@@ -217,176 +211,56 @@ async def affiliate_oauth_callback(
                 )
 
                 if success:
-                    print(f"[SUCCESS] AliExpress Affiliate tokens saved to database")
+                    logger.info("AliExpress Affiliate tokens saved to database")
                 else:
-                    print(f"[ERROR] Failed to save tokens to database")
-
-                # Also update .env file with new token
-                access_token = token_response.get("access_token")
-                print(f"[SUCCESS] Access Token: {access_token[:20]}...")
+                    token_error = "Failed to save tokens to database"
+                    logger.error(token_error)
             else:
-                token_error = f"Token exchange failed: {response.status_code} - {response.text}"
-                print(f"[ERROR] {token_error}")
+                # T6: never echo response.text.
+                token_error = f"Token exchange failed (HTTP {response.status_code})"
+                logger.error(token_error)
 
     except Exception as e:
-        import traceback
-        token_error = f"Exception during token exchange: {str(e)}\n\nFull traceback:\n{traceback.format_exc()}"
-        print(f"[ERROR] {token_error}")
+        # T6: no traceback dump (params/secrets in frames).
+        token_error = f"Token exchange error: {str(e)[:200]}"
+        logger.error("AliExpress affiliate token exchange exception: %s", str(e)[:200])
 
-    # Display result to user
+    # T6: NEUTRAL result pages. The old success page embedded the full token
+    # JSON, an access-token preview, the app key, AND a copy-to-clipboard of
+    # the raw token + an "update your .env" block echoing the whole token.
+    # Tokens are stored server-side (DB) only; nothing is echoed to the page.
     if token_response and "access_token" in token_response:
-        # Success - show tokens
-        token_json = json.dumps(token_response, indent=2)
-        access_token = token_response.get("access_token", "")
         return HTMLResponse(
-            content=f"""
+            content="""
             <!DOCTYPE html>
             <html>
-            <head>
-                <title>AliExpress Affiliate OAuth - Success</title>
-                <style>
-                    body {{
-                        font-family: Arial, sans-serif;
-                        max-width: 1000px;
-                        margin: 50px auto;
-                        padding: 20px;
-                        background: #f5f5f5;
-                    }}
-                    .success {{
-                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                        color: white;
-                        padding: 30px;
-                        border-radius: 10px;
-                        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-                    }}
-                    h1 {{ margin-top: 0; }}
-                    .token-box {{
-                        background: #263238;
-                        color: #aed581;
-                        padding: 20px;
-                        margin: 20px 0;
-                        font-family: monospace;
-                        font-size: 13px;
-                        border-radius: 5px;
-                        overflow-x: auto;
-                        white-space: pre-wrap;
-                        word-break: break-all;
-                    }}
-                    .info {{
-                        background: rgba(255,255,255,0.2);
-                        padding: 15px;
-                        border-radius: 5px;
-                        margin: 20px 0;
-                    }}
-                    button {{
-                        background: #4CAF50;
-                        color: white;
-                        border: none;
-                        padding: 12px 24px;
-                        font-size: 16px;
-                        cursor: pointer;
-                        border-radius: 5px;
-                        margin: 10px 5px 10px 0;
-                        font-weight: bold;
-                    }}
-                    button:hover {{
-                        background: #45a049;
-                    }}
-                    .highlight {{
-                        background: rgba(255,255,255,0.3);
-                        padding: 2px 6px;
-                        border-radius: 3px;
-                        font-family: monospace;
-                    }}
-                    .env-update {{
-                        background: #fff3cd;
-                        color: #856404;
-                        padding: 15px;
-                        border-radius: 5px;
-                        margin: 20px 0;
-                        border: 2px solid #ffc107;
-                    }}
-                </style>
+            <head><title>AliExpress Affiliate Connected</title>
+                <style>body{font-family:Arial,sans-serif;max-width:600px;margin:60px auto;padding:20px;text-align:center}
+                .card{background:#0d1b2a;color:#fff;padding:40px;border-radius:12px}</style>
             </head>
             <body>
-                <div class="success">
-                    <h1>[LAUNCH] Affiliate OAuth Successful!</h1>
-
-                    <div class="info">
-                        <p><strong>[SUCCESS] Tokens obtained and stored successfully!</strong></p>
-                        <p> Saved to: <span class="highlight">.secrets/aliexpress_affiliate_tokens.json</span></p>
-                        <p> App Key: <span class="highlight">{ALIEXPRESS_AFFILIATE_APP_KEY}</span></p>
-                        <p> Access Token: <span class="highlight">{access_token[:20]}...</span></p>
-                        <p>[REFRESH] Refresh Token: <span class="highlight">{token_response.get('refresh_token', 'N/A')[:20] if token_response.get('refresh_token') else 'N/A'}...</span></p>
-                        <p>[TIMER] Expires In: <span class="highlight">{token_response.get('expires_in', 'N/A')} seconds</span></p>
-                    </div>
-
-                    <div class="env-update">
-                        <p><strong>[WARNING] UPDATE YOUR .env FILE:</strong></p>
-                        <p>Replace the old ALIEXPRESS_ACCESS_TOKEN with:</p>
-                        <code style="display:block; background:#fff; color:#000; padding:10px; margin-top:10px; border-radius:3px;">
-                        ALIEXPRESS_ACCESS_TOKEN={access_token}
-                        </code>
-                    </div>
-
-                    <h3>[FILE] Full Token Response:</h3>
-                    <div class="token-box" id="tokens">{token_json}</div>
-
-                    <button onclick="copyTokens()">[LIST] Copy Full Response</button>
-                    <button onclick="copyAccessToken()"> Copy Access Token</button>
-                    <button onclick="window.close()">[SUCCESS] Done - Close Window</button>
-
-                    <div class="info">
-                        <p>[START] <strong>Next Steps:</strong></p>
-                        <ul>
-                            <li>Update ALIEXPRESS_ACCESS_TOKEN in your .env file</li>
-                            <li>Test with: python3 /tmp/test_affiliate_api.py</li>
-                            <li>Fetch 50 products and verify it works!</li>
-                        </ul>
-                    </div>
+                <div class="card">
+                    <h1>&#10003; AliExpress Affiliate Connected</h1>
+                    <p>Your AliExpress Affiliate account is connected. You can close this window.</p>
                 </div>
-
-                <script>
-                    function copyTokens() {{
-                        const tokens = document.getElementById('tokens').textContent;
-                        navigator.clipboard.writeText(tokens.trim()).then(() => {{
-                            alert('[SUCCESS] Token response copied to clipboard!');
-                        }});
-                    }}
-                    function copyAccessToken() {{
-                        navigator.clipboard.writeText('{access_token}').then(() => {{
-                            alert('[SUCCESS] Access token copied to clipboard!');
-                        }});
-                    }}
-                </script>
             </body>
             </html>
             """
         )
     else:
-        # Failed to get tokens
-        error_msg = token_error or "Unknown error"
         return HTMLResponse(
-            content=f"""
+            content="""
             <!DOCTYPE html>
             <html>
-            <head>
-                <title>AliExpress Affiliate OAuth - Token Exchange Failed</title>
-                <style>
-                    body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }}
-                    .error {{ background: #fee; border: 2px solid #c00; padding: 20px; border-radius: 5px; }}
-                    h1 {{ color: #c00; }}
-                    .code-box {{ background: #f9f9f9; padding: 10px; font-family: monospace; margin: 10px 0; }}
-                </style>
+            <head><title>AliExpress Affiliate Connection Failed</title>
+                <style>body{font-family:Arial,sans-serif;max-width:600px;margin:60px auto;padding:20px;text-align:center}
+                .card{background:#fee;border:2px solid #c00;padding:30px;border-radius:10px}h1{color:#c00}</style>
             </head>
             <body>
-                <div class="error">
-                    <h1>[ERROR] Token Exchange Failed</h1>
-                    <p><strong>Error:</strong> {error_msg}</p>
-                    <p><strong>Authorization Code:</strong></p>
-                    <div class="code-box">{code}</div>
-                    {f'<p><strong>Response:</strong></p><div class="code-box">{json.dumps(token_response, indent=2)}</div>' if token_response else ''}
-                    <p>The authorization code may have expired (codes expire in minutes). Please try authorizing again.</p>
+                <div class="card">
+                    <h1>Connection Failed</h1>
+                    <p>We couldn't complete the AliExpress Affiliate connection. Authorization codes
+                    expire within minutes &mdash; please start the connection again from your dashboard.</p>
                 </div>
             </body>
             </html>

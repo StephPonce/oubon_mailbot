@@ -78,10 +78,15 @@ def migrate_gmail_token():
         ).first()
 
         # Setup encryption
+        # T12: require the key from the environment. The old code generated a
+        # fresh Fernet key and PRINTED it to stdout — a secret in the logs, and
+        # a key that wouldn't match anything the app uses (so the migrated rows
+        # would be undecryptable). Fail loudly instead.
         encryption_key = os.getenv('EMAIL_OAUTH_ENCRYPTION_KEY')
         if not encryption_key:
-            encryption_key = Fernet.generate_key().decode()
-            print(f"[WARNING]  Generated new encryption key. Set EMAIL_OAUTH_ENCRYPTION_KEY={encryption_key}")
+            print("[ERROR] EMAIL_OAUTH_ENCRYPTION_KEY is not set. Refusing to run "
+                  "(never generate/print a key). Set it in the environment and retry.")
+            return
 
         fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
 
