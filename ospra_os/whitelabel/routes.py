@@ -15,7 +15,12 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Request, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from ospra_os.database.db import get_db
+# T4 (unlisted finding): this import path never existed — the module ALWAYS
+# failed to import, so main.py's graceful degradation silently never mounted
+# /api/whitelabel/*. That's also why the admin-key-placeholder was never
+# exploitable in practice: the entire white-label feature was dead. Fixed so
+# the router loads — now gated by the REAL admin dependency below.
+from ospra_os.database import get_db
 from ospra_os.whitelabel.service import WhiteLabelService
 from ospra_os.whitelabel.middleware import get_whitelabel_branding
 
@@ -157,21 +162,11 @@ async def get_partner_from_api_key(
     return partner
 
 
-async def require_admin(
-    # In production, replace with your actual admin auth
-    x_admin_key: str = Header(..., alias="x-admin-key")
-):
-    """
-    Require admin authentication.
-    TODO: Replace with your actual admin authentication logic.
-    """
-    # This is a placeholder - replace with real admin auth
-    if x_admin_key != "admin-key-placeholder":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Admin authentication required"
-        )
-    return True
+# T4: partner-admin endpoints used to gate on a literal
+# `x-admin-key: admin-key-placeholder` header — anyone who read the source (it's
+# in git) had full partner-admin access (create/activate/suspend partners).
+# Delegate to the real DB-backed admin dependency (is_admin/is_superuser flag).
+from ospra_os.auth.jwt_auth import require_admin_user as require_admin  # noqa: E402
 
 
 # ==================== ROUTER ====================

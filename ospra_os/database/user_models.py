@@ -35,6 +35,12 @@ class User(Base):
     # Authentication
     password_hash = Column(String(255), nullable=True)  # Nullable for existing users
 
+    # Admin flag (Section A/C). Deny-by-default: no account is admin until this
+    # is explicitly flipped in the DB. This is the real signal require_admin_user
+    # and the whitelabel/monitoring/token admin gates check — replacing the fake
+    # 'stratosphere == admin' and 'admin-key-placeholder' checks.
+    is_admin = Column(Boolean, default=False, nullable=False)
+
     # Subscription
     subscription_tier = Column(SQLEnum(SubscriptionTier), default=SubscriptionTier.NEST, nullable=False)
     subscription_started = Column(DateTime, default=datetime.utcnow)

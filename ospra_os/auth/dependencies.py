@@ -177,10 +177,26 @@ async def require_admin(
 ) -> TokenPayload:
     """
     Require admin access.
-    
-    Checks for special admin tier.
+
+    Section A/C: the real admin signal is the DB ``users.is_admin`` flag
+    (deny-by-default), not a JWT tier claim. This used to check
+    ``tier == "admin"`` — a value nothing ever set, so it denied everyone AND
+    couldn't be granted without re-minting tokens. Now it loads the caller's
+    row and checks is_admin / is_superuser, matching require_admin_user.
     """
-    if user.tier.lower() != "admin":
+    from ospra_os.database.connection import get_session
+    from ospra_os.database import User
+
+    session = get_session()
+    try:
+        db_user = session.query(User).filter(User.id == user.user_id).first()
+        is_admin = bool(
+            db_user and (getattr(db_user, "is_admin", False) or getattr(db_user, "is_superuser", False))
+        )
+    finally:
+        session.close()
+
+    if not is_admin:
         logger.warning(f"Non-admin user {user.user_id} attempted admin access")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

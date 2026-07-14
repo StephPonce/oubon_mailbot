@@ -55,41 +55,13 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ============================================================================
 
-def _get_jwt_secret() -> str:
-    """Get JWT secret key, requiring it in production."""
-    secret = os.getenv("JWT_SECRET_KEY")
-
-    if secret:
-        return secret
-
-    # Check if we're in production
-    is_production = (
-        os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
-        os.getenv("RENDER", "") == "true" or
-        os.getenv("RAILWAY_ENVIRONMENT", "") != "" or
-        os.getenv("VERCEL", "") == "1"
-    )
-
-    if is_production:
-        raise RuntimeError(
-            "CRITICAL: JWT_SECRET_KEY must be set in production! "
-            "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
-        )
-
-    # Development only - warn and use insecure default
-    import warnings
-    warnings.warn(
-        "JWT_SECRET_KEY not set! Using insecure default for development only. "
-        "Tokens will be invalidated on server restart.",
-        RuntimeWarning
-    )
-    logger.warning(
-        "[WARNING]  JWT_SECRET_KEY not set! Using insecure default. "
-        "Set JWT_SECRET_KEY in .env for production."
-    )
-    return "ospra-dev-jwt-handler-DO-NOT-USE-IN-PRODUCTION"
-
-JWT_SECRET_KEY = _get_jwt_secret()
+# T5: ONE JWT secret loader. This module used to run its own os.getenv +
+# prod-check + a DIFFERENT insecure dev literal
+# ("ospra-dev-jwt-handler-...") than jwt_auth — so in dev a token minted by
+# jwt_auth could not be verified here (different signing key) and vice versa.
+# jwt_auth.SECRET_KEY is the single source of truth and already fails closed
+# in production; import it.
+from ospra_os.auth.jwt_auth import SECRET_KEY as JWT_SECRET_KEY  # noqa: E402
 JWT_ALGORITHM = "HS256"
 
 # Token expiry times — imported from jwt_auth (the single source of truth and

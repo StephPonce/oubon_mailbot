@@ -13,7 +13,7 @@ from starlette.responses import Response
 from sqlalchemy.orm import Session
 
 from ospra_os.whitelabel.service import WhiteLabelService
-from ospra_os.database.db import get_db
+from ospra_os.database import get_db  # T4: ospra_os.database.db never existed
 
 logger = logging.getLogger(__name__)
 

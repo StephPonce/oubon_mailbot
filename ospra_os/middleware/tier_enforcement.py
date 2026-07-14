@@ -237,20 +237,11 @@ class TierEnforcementMiddleware(BaseHTTPMiddleware):
         Never trusts query parameters or headers for user identification.
         This prevents user impersonation attacks.
         """
-        # Get JWT secret - same as jwt_auth.py
-        jwt_secret = os.getenv("JWT_SECRET_KEY")
-        if not jwt_secret:
-            # Check for production
-            is_production = (
-                os.getenv("ENVIRONMENT", "").lower() in ("production", "prod") or
-                os.getenv("RENDER", "") == "true" or
-                os.getenv("RAILWAY_ENVIRONMENT", "") != "" or
-                os.getenv("VERCEL", "") == "1"
-            )
-            if is_production:
-                logger.error("JWT_SECRET_KEY not set in production!")
-                return None
-            jwt_secret = "ospra-dev-secret-DO-NOT-USE-IN-PRODUCTION"
+        # T5: use the ONE canonical JWT secret (jwt_auth.SECRET_KEY), which
+        # already fails closed in production. This module used to re-implement
+        # the loader with its own hardcoded dev literal — a third copy that
+        # could silently diverge from the signing key.
+        from ospra_os.auth.jwt_auth import SECRET_KEY as jwt_secret
 
         # ONLY extract user_id from verified JWT token
         auth_header = request.headers.get('Authorization')
