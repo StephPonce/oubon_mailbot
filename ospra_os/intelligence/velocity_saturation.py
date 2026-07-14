@@ -202,3 +202,46 @@ def velocity_saturation_from_series(
         demand_recent_level=demand_recent_level,
         n_points=n_points,
     )
+
+
+def units_velocity_from_series(
+    sold_series: List[Optional[float]],
+    day_offsets: List[float],
+) -> Optional[Dict]:
+    """TikTok Shop units-sold velocity from CUMULATIVE daily snapshots
+    (Phase 1 of the demand spine).
+
+    ``sold_series`` holds the cumulative sold_count observed each snapshot day
+    (None = not measured that day); ``day_offsets`` are the ACTUAL day offsets
+    (same anti-gap-inflation contract as velocity_saturation_from_series).
+
+    The least-squares slope of a cumulative counter IS the sales rate
+    (units/day); ×7 gives ``units_sold_7d`` — the projected weekly unit sales,
+    directly comparable across products regardless of when they launched.
+
+    Honesty gates (same posture as the rest of this module):
+      * < MIN_SLOPE_POINTS real measurements → None (a 2-point "trend" is
+        noise; it must not move any grade).
+      * slope may be ≤ 0 (scraper corrections, returns) — reported as-is;
+        SCORING treats non-positive velocity as "no boost", never a penalty
+        fabricated from thin data.
+
+    Returns {units_weekly, n_points, last_sold_count, first_sold_count} or None.
+    """
+    pts = [
+        (day_offsets[i], float(v))
+        for i, v in enumerate(sold_series)
+        if v is not None
+    ]
+    if len(pts) < MIN_SLOPE_POINTS:
+        return None
+    if len(day_offsets) != len(sold_series):
+        raise ValueError("sold_series and day_offsets must be the same length")
+
+    daily_slope = linear_slope([p[1] for p in pts], xs=[p[0] for p in pts])
+    return {
+        "units_weekly": round(daily_slope * 7.0, 2),
+        "n_points": len(pts),
+        "first_sold_count": int(pts[0][1]),
+        "last_sold_count": int(pts[-1][1]),
+    }

@@ -78,8 +78,13 @@ class ProductTimeseries(Base):
     meta_advertiser_count = Column(Integer, nullable=True)   # Meta Ad Library density
     aliexpress_orders = Column(Integer, nullable=True)       # recent AE order volume
     google_trends_interest = Column(Float, nullable=True)    # 0-100 Trends interest
-    tiktok_units_sold = Column(Integer, nullable=True)       # TikTok Shop units_sold_7d
-    tiktok_velocity = Column(Float, nullable=True)           # TikTok Shop growth velocity
+    # Phase 1 (demand spine): CUMULATIVE sold_count observed that day from the
+    # TikTok Shop product actor — the slope of consecutive snapshots IS the
+    # sales rate (see intelligence/units_velocity.py). The Partner-API path
+    # that documented this as "units_sold_7d" was OAuth-gated and never wrote
+    # a row in practice, so the semantics change touches no existing data.
+    tiktok_units_sold = Column(Integer, nullable=True)
+    tiktok_velocity = Column(Float, nullable=True)           # derived units/week (≥3 snapshots)
 
     # --- Grade-of-the-day snapshot (for slope + outcome scoreboard). ---
     grade = Column(String(16), nullable=True)
