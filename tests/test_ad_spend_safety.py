@@ -393,6 +393,54 @@ class TestT23Persistence:
         assert row.status == "paused"
         assert "Low CTR" in row.pause_reason
 
+    def _seed_with_last_updated(self, factory, last_updated, budget=50.0):
+        """Insert a campaign with an EXPLICIT last_updated. Set at INSERT time
+        because the model's onupdate would overwrite an old value on any commit."""
+        from ospra_os.database.advertising_models import AdCampaign
+        session = factory()
+        session.add(AdCampaign(
+            user_id=1, campaign_id="camp-1", platform="meta",
+            campaign_name="seeded", daily_budget=budget, budget_limit=80.0,
+            status="active", last_updated=last_updated,
+        ))
+        session.commit()
+        session.close()
+
+    @pytest.mark.asyncio
+    async def test_cooldown_survives_restart(self, scheduler, monkeypatch, db_session_factory):
+        """Review fix (T21 restart-safety): a campaign whose row was updated
+        within the cooldown window is throttled after a reload — the old
+        in-memory-only throttle reset on every deploy, reopening the increase
+        window."""
+        self._seed_with_last_updated(
+            db_session_factory, datetime.now(timezone.utc).replace(tzinfo=None)
+        )
+
+        scheduler.active_campaigns = {}
+        scheduler._load_campaigns_from_db()
+        seeded = scheduler.active_campaigns["meta_camp-1"]["last_budget_increase_at"]
+        assert seeded is not None and seeded.tzinfo is not None  # aware, no crash
+
+        set_metrics(monkeypatch, scheduler, ctr=0.05)  # high CTR wants +20%
+        await scheduler.optimize_budgets()
+
+        # Throttled: no platform write, budget unchanged.
+        assert scheduler.active_campaigns["meta_camp-1"]["daily_budget"] == 50.0
+        assert scheduler._budget_writes == []
+
+    @pytest.mark.asyncio
+    async def test_increase_allowed_when_last_update_is_old(self, scheduler, monkeypatch, db_session_factory):
+        """A campaign not touched within the cooldown window is eligible again."""
+        old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=48)
+        self._seed_with_last_updated(db_session_factory, old)
+
+        scheduler.active_campaigns = {}
+        scheduler._load_campaigns_from_db()
+        set_metrics(monkeypatch, scheduler, ctr=0.05)
+        await scheduler.optimize_budgets()
+
+        assert scheduler.active_campaigns["meta_camp-1"]["daily_budget"] == pytest.approx(60.0)
+
 
 # ---------------------------------------------------------------------------
 # T25 — Google creates the whole tree PAUSED

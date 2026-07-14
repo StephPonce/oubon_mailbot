@@ -338,14 +338,17 @@ class TemplateService:
         if paid_cents < int(round(expected_amount * 100)):
             raise ValueError("Payment amount does not match template price")
 
-        # The order must belong to the calling user.
+        # The order must belong to the calling user. FAIL CLOSED: a missing
+        # order email, a caller with no email, or any mismatch → reject. (The
+        # old form only compared when both emails were present, so an order
+        # with no user_email skipped the ownership check entirely.)
         from ospra_os.database import User
 
         user = self.db.query(User).filter(User.id == self.user_id).first()
+        user_email = (getattr(user, "email", "") or "").strip().lower()
         order_email = (attributes.get("user_email") or "").strip().lower()
-        if user is not None and getattr(user, "email", None) and order_email:
-            if order_email != user.email.strip().lower():
-                raise ValueError("Payment belongs to a different account")
+        if not order_email or not user_email or order_email != user_email:
+            raise ValueError("Payment belongs to a different account")
 
         transaction_id = f"ls_order_{order_id}"
 

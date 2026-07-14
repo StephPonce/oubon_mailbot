@@ -245,6 +245,15 @@ class TestT31PurchaseVerification:
         with pytest.raises(ValueError, match="different account"):
             self._service(session, user).purchase_template(template.id, "12345")
 
+    def test_order_without_email_is_rejected(self, template_env, monkeypatch):
+        """Review fix (fail-closed): an order missing user_email must be
+        REJECTED, not bypass the ownership check."""
+        session, user, template = template_env
+        monkeypatch.setattr("httpx.get", lambda *a, **k: ls_order_response(email=None))
+
+        with pytest.raises(ValueError, match="different account"):
+            self._service(session, user).purchase_template(template.id, "12345")
+
     def test_verified_payment_grants_purchase(self, template_env, monkeypatch):
         session, user, template = template_env
         monkeypatch.setattr("httpx.get", lambda *a, **k: ls_order_response())

@@ -101,6 +101,20 @@ class AdScheduler:
             ).all()
             for row in rows:
                 key = f"{row.platform}_{row.campaign_id}"
+                # T21 restart-safety: the budget-increase cooldown lived only in
+                # memory, so a restart/deploy reopened the increase window and a
+                # high-CTR campaign could be raised again immediately — defeating
+                # the "one increase per cooldown" throttle. Seed it from the row's
+                # last_updated (any budget change / pause touches it) so a
+                # recently-modified campaign stays throttled across restarts.
+                # Conservative on purpose: over-throttling errs toward LESS spend.
+                # last_updated is a naive UTC column; make it aware to match the
+                # aware datetime.now(timezone.utc) the throttle compares against.
+                last_updated = getattr(row, 'last_updated', None)
+                seeded_increase_at = (
+                    last_updated.replace(tzinfo=timezone.utc)
+                    if last_updated is not None else None
+                )
                 self.active_campaigns[key] = {
                     'user_id': row.user_id,
                     'product_id': row.product_id,
@@ -110,6 +124,7 @@ class AdScheduler:
                     'budget_limit': row.budget_limit,
                     'status': row.status,
                     'created_at': row.created_at,
+                    'last_budget_increase_at': seeded_increase_at,
                 }
             logger.info(f"[SUCCESS] Loaded {len(rows)} campaigns from DB into tracking")
         except Exception as e:
