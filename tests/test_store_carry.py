@@ -220,3 +220,56 @@ class TestPersistence:
         product = {"title": "X", "product_id": "tk10"}
         assert persist_store_carry(product, None) is False
         assert load_store_carry_for_product(product) is None
+
+
+class TestDiscoveryCarryPass:
+    """Step 3 wiring: the post-scoring pass measures carry, persists it, and
+    attaches the product→video mapping Phase 2's comments actor needs."""
+
+    def test_top_products_measured_videos_attached(self, monkeypatch):
+        import asyncio
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import StaticPool
+        from ospra_os.database.base import Base
+        from ospra_os.database.product_timeseries import ProductTimeseries
+
+        engine = create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+        Base.metadata.create_all(engine, tables=[ProductTimeseries.__table__])
+        factory = sessionmaker(bind=engine)
+        monkeypatch.setattr(
+            "ospra_os.database.connection.SessionLocal", factory, raising=False
+        )
+        monkeypatch.setattr(
+            "ospra_os.intelligence.store_carry.fetch_store_catalog",
+            fake_fetch_factory({"https://coolgadgets.com": OUBON_STYLE_CATALOG}),
+        )
+
+        from ospra_os.intelligence.product_discovery import ProductDiscoveryEngine
+        from ospra_os.intelligence.store_carry import load_store_carry_for_product
+
+        eng = ProductDiscoveryEngine.__new__(ProductDiscoveryEngine)
+        product = {
+            "title": "A3 LED Light Pad Dimmable Drawing Board",
+            "product_id": "tk77",
+            "oi_score": 80,
+            "winner_provenance": {"sample_url": "https://coolgadgets.com/products/led-pad"},
+        }
+        no_urls = {"title": "Other Thing", "product_id": "tk78", "oi_score": 90}
+
+        asyncio.run(eng._measure_store_carry_for_top([product, no_urls]))
+
+        assert product["store_carry_measured"] == 1
+        assert product["store_carry_stores"] == ["https://coolgadgets.com"]
+        # product→video linkage extracted from the matched store listing
+        assert product["tiktok_video_urls"] == [
+            "https://www.tiktok.com/@artist/video/7301234567890123456"
+        ]
+        # persisted → next scoring pass loads it
+        assert load_store_carry_for_product(product) == 1
+        # no candidate URLs → untouched, nothing fabricated
+        assert "store_carry_measured" not in no_urls
+        assert load_store_carry_for_product(no_urls) is None

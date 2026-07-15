@@ -279,7 +279,7 @@ def extract_tiktok_video_urls(html: str) -> List[str]:
 def product_store_carry(
     product: dict,
     store_urls: Optional[List[str]] = None,
-    fetch: Callable[[str], Optional[List[Dict]]] = fetch_store_catalog,
+    fetch: Optional[Callable[[str], Optional[List[Dict]]]] = None,
     threshold: float = None,
 ) -> Dict:
     """How many distinct candidate stores already sell this product.
@@ -297,6 +297,9 @@ def product_store_carry(
     not masquerade as un-carried.
     """
     threshold = MATCH_THRESHOLD if threshold is None else threshold
+    # Resolved at call time (not def time) so tests and callers can swap the
+    # module-level fetch_store_catalog.
+    fetch = fetch if fetch is not None else fetch_store_catalog
     title = product.get("title") or product.get("product_name") or ""
     urls = store_urls if store_urls is not None else candidate_store_urls(product)
 
