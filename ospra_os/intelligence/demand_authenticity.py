@@ -237,6 +237,22 @@ def signals_from_product(product: Dict[str, Any]) -> Tuple[float, float, int]:
     if ae_rating >= 4.0:
         organic_parts.append(0.4)  # decent verified-buyer rating = weak positive
 
+    # TikTok COMMENT authenticity (Moat P2) — the strongest organic-vs-seeded
+    # signal we have. classify_comments (fed onto product['comment_authenticity']
+    # by the scoring pass) tells us whether the engagement AROUND the product is
+    # real or coordinated-fake. Organic comments are a MEASURED, down-weighted
+    # organic source (real people engaging = weak-but-real demand — comments are
+    # easier to fake than search intent, so they corroborate, they don't
+    # certify). Seeded comments are fake buzz → PROMOTED, and they still count as
+    # a measured organic source that came up empty, which is exactly what lets
+    # the "manufactured" verdict fire (promoted high + organic low + measured).
+    ca = product.get("comment_authenticity") or {}
+    if ca.get("n_comments"):
+        organic_parts.append(_clamp01(float(ca.get("organic_score") or 0.0)) * 0.6)
+        seeded = _clamp01(float(ca.get("seeded_score") or 0.0))
+        if seeded > 0.5:
+            promoted_parts.append(seeded)
+
     # ── PROMOTED (easy to fake) ─────────────────────────────────────────────
     if product.get("winner_source") == "meta_ads" or product.get("meta_winner_match"):
         # Being a Meta-ad "winner" is a strong PROMOTED signal (someone is

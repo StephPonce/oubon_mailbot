@@ -6682,6 +6682,23 @@ class ProductDiscoveryEngine:
             # demand (Google Trends intent, Amazon reviews). See
             # ospra_os/intelligence/demand_authenticity.py docstring.
             if AUTHENTICITY_ENABLED:
+                # Moat P2: fold the seeded-vs-organic COMMENT verdict into the
+                # authenticity signals BEFORE computing the demote. A product
+                # whose comments are coordinated-fake (dup text, throwaway
+                # handles, burst) reads as high promoted / low measured-organic
+                # → "manufactured" → heavy demote; organic comments corroborate
+                # (down-weighted). Best-effort: no comments → no change.
+                if product.get('comment_authenticity') is None:
+                    try:
+                        from ospra_os.intelligence.comment_authenticity import (
+                            load_comment_authenticity_for_product,
+                        )
+                        ca = load_comment_authenticity_for_product(product)
+                        if ca:
+                            product['comment_authenticity'] = ca.to_dict()
+                    except Exception as _ca_err:
+                        logger.debug(f"[COMMENTS] authenticity load skipped: {_ca_err}")
+
                 org, promo, n_org = signals_from_product(product)
                 auth = compute_authenticity(
                     organic_strength=org,
