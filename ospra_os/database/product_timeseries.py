@@ -85,6 +85,11 @@ class ProductTimeseries(Base):
     # a row in practice, so the semantics change touches no existing data.
     tiktok_units_sold = Column(Integer, nullable=True)
     tiktok_velocity = Column(Float, nullable=True)           # derived units/week (≥3 snapshots)
+    # Phase 3 (timing): how many distinct public Shopify catalogs carried this
+    # product that day (store_carry.py). NULL = not measured / unknown — a
+    # product whose candidate stores couldn't be checked must never look
+    # "un-carried". Trends over time = the saturation-timing moat.
+    store_carry_count = Column(Integer, nullable=True)
 
     # --- Grade-of-the-day snapshot (for slope + outcome scoreboard). ---
     grade = Column(String(16), nullable=True)

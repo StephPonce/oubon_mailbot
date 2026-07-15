@@ -1651,6 +1651,16 @@ class ProductDiscoveryEngine:
         # word-overlap path.
         scored_products = self._calculate_scores(all_products, category_niche=niche)
 
+        # ── Phase 3: store-carry measurement for the top-graded products ──
+        # PUBLIC {store}/products.json fetches (no Apify) for the products
+        # worth timing. Persists store_carry_count to product_timeseries —
+        # today's measurement feeds the NEXT scoring pass via
+        # load_store_carry_for_product (same snapshot→trend pattern as the
+        # units-sold spine) — and attaches the TikTok video URLs found on
+        # matched store pages (the product→video mapping Phase 2's comments
+        # actor needs; the scrape itself stays behind LIVE_VERIFIED).
+        await self._measure_store_carry_for_top(scored_products)
+
         # Per-source min_score (Task #31 — confirmed CJ killer May 11).
         # CJ-only products have no AE buyer signals (no AliExpress velocity,
         # no Amazon fuzzy-match, no AE buyer rating). Their OI ceiling is
@@ -1845,7 +1855,7 @@ class ProductDiscoveryEngine:
                     )
                 except asyncio.TimeoutError:
                     logger.warning(
-                        f"   ⏱️ AE DS enrichment timed out — keeping heuristic prices"
+                        "   ⏱️ AE DS enrichment timed out — keeping heuristic prices"
                     )
                 except Exception as exc:
                     logger.warning(f"   AE DS enrichment failed: {exc}")
@@ -2099,7 +2109,7 @@ class ProductDiscoveryEngine:
 
         logger.info(f"   ⏱️ Step 5 took {time.time() - step5_start:.2f}s")
 
-        logger.info(f"\n[SUCCESS] Discovery complete!")
+        logger.info("\n[SUCCESS] Discovery complete!")
         logger.info(f"   Sources: {', '.join(set(data_sources_used))}")
         logger.info(f"   Total: {len(aliexpress_products) + len(cj_products)} -> Unique: {len(all_products)} -> Final: {len(final)}")
         logger.info(f"   ⏱️ TOTAL TIME: {total_time:.2f}s (parallel execution)")
@@ -2473,6 +2483,50 @@ class ProductDiscoveryEngine:
                     / best_data['play_count']
                     if best_data['play_count'] > 0 else 0.0
                 )
+
+    async def _measure_store_carry_for_top(self, scored_products: List[Dict]) -> None:
+        """Phase 3: measure + persist store-carry for the top-graded products.
+
+        Bounded cost: only the top STORE_CARRY_TOP_N by oi_score, only
+        products that actually have candidate store URLs, and catalog fetches
+        share the one-run cache. Sync HTTP runs in a worker thread so the
+        event loop never blocks. Best-effort — never fails discovery.
+        Kill with DISCOVERY_STORE_CARRY_ENABLED=false.
+        """
+        if os.getenv("DISCOVERY_STORE_CARRY_ENABLED", "true").strip().lower() not in {"1", "true", "yes"}:
+            return
+        try:
+            import asyncio
+
+            from ospra_os.intelligence.store_carry import (
+                candidate_store_urls, persist_store_carry, product_store_carry,
+            )
+
+            top_n = int(os.getenv("STORE_CARRY_TOP_N", "10"))
+            ranked = sorted(
+                scored_products, key=lambda p: p.get("oi_score", 0) or 0, reverse=True
+            )[:top_n]
+
+            measured = 0
+            for product in ranked:
+                urls = candidate_store_urls(product)
+                if not urls:
+                    continue
+                carry = await asyncio.to_thread(product_store_carry, product, urls)
+                if carry["store_carry_count"] is not None:
+                    persist_store_carry(product, carry["store_carry_count"])
+                    product["store_carry_measured"] = carry["store_carry_count"]
+                    product["store_carry_stores"] = [
+                        m["store"] for m in carry["carried_by"]
+                    ]
+                    measured += 1
+                if carry["tiktok_video_urls"]:
+                    product["tiktok_video_urls"] = carry["tiktok_video_urls"]
+            if measured:
+                logger.info("[CARRY] measured store-carry for %d/%d top products",
+                            measured, len(ranked))
+        except Exception as e:
+            logger.debug(f"[CARRY] store-carry pass skipped: {e}")
 
     async def _fetch_and_merge_tiktok_shop_units(
         self, products: List[Dict], niche: str
@@ -4371,7 +4425,6 @@ class ProductDiscoveryEngine:
             return products
 
         import re
-        from datetime import datetime as _dt
 
         # Generic words that would flood search and produce false matches.
         STOPWORDS = {
@@ -6752,6 +6805,37 @@ class ProductDiscoveryEngine:
                         product['units_velocity_boost'] = uboost
                 except Exception as _uv_err:
                     logger.debug(f"[UNITS] velocity boost skipped: {_uv_err}")
+
+            # ──────────────────────────────────────────────────────────────
+            # EARLY-ADOPTER / SATURATION TIMING — Phase 3, THE WINDOW
+            # ──────────────────────────────────────────────────────────────
+            # Velocity (Phase 1) says demand is real; store-carry says whether
+            # the market already moved in. RISING units velocity + LOW carry =
+            # the pre-saturation window → bounded boost. RISING velocity +
+            # HIGH carry = window closed → bounded demote (reorders within a
+            # tier; never fabricates a failure). Carry unknown → flag
+            # "unknown", NO adjustment — a product whose stores couldn't be
+            # checked must never masquerade as un-carried. Dormant until
+            # store_carry snapshots exist. Kill with
+            # DISCOVERY_EARLY_ADOPTER_ENABLED=false.
+            if os.getenv("DISCOVERY_EARLY_ADOPTER_ENABLED", "true").strip().lower() in {"1", "true", "yes"}:
+                try:
+                    from ospra_os.intelligence.store_carry import (
+                        early_adopter_signal, load_store_carry_for_product,
+                    )
+                    carry = load_store_carry_for_product(product)
+                    ea = early_adopter_signal(
+                        product.get('units_sold_velocity_7d'),
+                        carry,
+                        cap=float(os.getenv("EARLY_ADOPTER_CAP", "0.15")),
+                    )
+                    product['store_carry_count'] = carry
+                    product['early_adopter_flag'] = ea["flag"]
+                    if ea["multiplier"] != 1.0:
+                        oi_score = oi_score * ea["multiplier"]
+                        product['early_adopter_adjustment'] = round(ea["multiplier"], 3)
+                except Exception as _ea_err:
+                    logger.debug(f"[CARRY] early-adopter signal skipped: {_ea_err}")
 
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:
