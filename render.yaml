@@ -41,6 +41,20 @@ services:
       - key: DEBUG
         value: "false"
 
+      # Moat Phase 2 — organic-vs-seeded authenticity (demote-only grading).
+      # DELIBERATELY NOT SET (defaults off). The seeded-vs-organic COMMENT
+      # classifier is built + proven (tests/test_seeded_vs_organic_grade.py:
+      # seeded 8.2 vs organic 20.5 at equal units-sold), but this flag gates the
+      # WHOLE authenticity layer, which also includes a pre-existing NON-comment
+      # path (Trends/Amazon/TikTok-views normalizers) that is UNTUNED. Enabling
+      # it before the comment feed is live would run only that untuned path.
+      # Flip to "true" ONLY after BOTH: (1) the Apify cap is lifted and comments
+      # actually flow (scripts/verify_tiktok_comments_actor.py confirms shape),
+      # and (2) the product→video linkage that supplies comment video URLs is
+      # wired. Until then the moat is proven but dormant.
+      # - key: DISCOVERY_AUTHENTICITY_ENABLED
+      #   value: "true"
+
       # Database (auto-linked from Render database)
       - key: DATABASE_URL
         fromDatabase:
