@@ -6753,6 +6753,37 @@ class ProductDiscoveryEngine:
                 except Exception as _uv_err:
                     logger.debug(f"[UNITS] velocity boost skipped: {_uv_err}")
 
+            # ──────────────────────────────────────────────────────────────
+            # EARLY-ADOPTER / SATURATION TIMING — Phase 3, THE WINDOW
+            # ──────────────────────────────────────────────────────────────
+            # Velocity (Phase 1) says demand is real; store-carry says whether
+            # the market already moved in. RISING units velocity + LOW carry =
+            # the pre-saturation window → bounded boost. RISING velocity +
+            # HIGH carry = window closed → bounded demote (reorders within a
+            # tier; never fabricates a failure). Carry unknown → flag
+            # "unknown", NO adjustment — a product whose stores couldn't be
+            # checked must never masquerade as un-carried. Dormant until
+            # store_carry snapshots exist. Kill with
+            # DISCOVERY_EARLY_ADOPTER_ENABLED=false.
+            if os.getenv("DISCOVERY_EARLY_ADOPTER_ENABLED", "true").strip().lower() in {"1", "true", "yes"}:
+                try:
+                    from ospra_os.intelligence.store_carry import (
+                        early_adopter_signal, load_store_carry_for_product,
+                    )
+                    carry = load_store_carry_for_product(product)
+                    ea = early_adopter_signal(
+                        product.get('units_sold_velocity_7d'),
+                        carry,
+                        cap=float(os.getenv("EARLY_ADOPTER_CAP", "0.15")),
+                    )
+                    product['store_carry_count'] = carry
+                    product['early_adopter_flag'] = ea["flag"]
+                    if ea["multiplier"] != 1.0:
+                        oi_score = oi_score * ea["multiplier"]
+                        product['early_adopter_adjustment'] = round(ea["multiplier"], 3)
+                except Exception as _ea_err:
+                    logger.debug(f"[CARRY] early-adopter signal skipped: {_ea_err}")
+
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:
                 oi_score = min(oi_score, 45)
