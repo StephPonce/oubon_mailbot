@@ -1161,34 +1161,6 @@ from ospra_os.middleware.security_headers import SecurityHeadersMiddleware
 app.add_middleware(SecurityHeadersMiddleware, enable_hsts=True)
 logger.info("✓ Security headers middleware active (XSS, Clickjacking, HSTS protection)")
 
-#
-# CORS middleware - Restricted to ospra.io + localhost for dev (PHASE 1 SECURITY)
-#
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        # Production domains - Primary ospra.io domain only
-        "https://ospra.io",
-        "https://www.ospra.io",
-        "https://app.ospra.io",
-        # Development - Localhost only (all ports for flexibility)
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "http://127.0.0.1:5176",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Store-ID"],
-)
-logger.info("✓ CORS restricted to ospra.io + localhost (Phase 1 Security)")
-
 # Request Timeout Protection (PHASE 1 SECURITY)
 # Prevents requests from hanging indefinitely by enforcing 30-second timeout
 from ospra_os.middleware.timeout_middleware import TimeoutMiddleware
@@ -1228,6 +1200,48 @@ logger.info("✓ Debug endpoint protection active (blocks /debug/* in production
 from ospra_os.observability.request_tracing import RequestTracingMiddleware
 app.add_middleware(RequestTracingMiddleware)
 logger.info("✓ Request tracing middleware active (X-Request-ID headers)")
+
+#
+# CORS middleware - Restricted to ospra.io + localhost for dev (PHASE 1 SECURITY)
+#
+# MUST BE THE LAST add_middleware CALL IN THIS FILE. Starlette runs the
+# last-added middleware OUTERMOST, and CORS must wrap every other layer so
+# that responses FABRICATED by inner middleware — the rate limiter's 429,
+# TimeoutMiddleware's 504, debug-protection's 403 — still carry
+# Access-Control-Allow-Origin. When CORS sat beneath them, those responses
+# reached the browser without CORS headers, the browser blocked them, and
+# fetch() surfaced an opaque network error (Safari: "Load failed") instead
+# of the real status. That's how prod's first minutes of
+# ENVIRONMENT=production rate limiting broke AI analysis on ospra.io with
+# "Analysis failed: Load failed" — the 429 was invisible. Outermost CORS
+# also answers OPTIONS preflights before the rate limiter sees them, so
+# preflights never burn or trip a user's quota. Regression-locked by
+# tests/test_cors_middleware_order.py.
+#
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        # Production domains - Primary ospra.io domain only
+        "https://ospra.io",
+        "https://www.ospra.io",
+        "https://app.ospra.io",
+        # Development - Localhost only (all ports for flexibility)
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://localhost:5176",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+        "http://127.0.0.1:5176",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Store-ID"],
+)
+logger.info("✓ CORS restricted to ospra.io + localhost (Phase 1 Security, outermost)")
 
 # Mount static files for product images (only if directory exists)
 import os

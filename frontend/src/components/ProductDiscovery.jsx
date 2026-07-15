@@ -1855,8 +1855,13 @@ Free shipping on orders over $50. 30-day hassle-free returns.`;
       // making re-clicks return identical analysis.
       const data = await api.analyzeProduct(product, forceRefresh === true);
 
-      if (!data || data.success === false) {
-        throw new Error(data?.error || 'Analysis failed');
+      // success !== true (not just === false): middleware-fabricated bodies
+      // like the rate limiter's 429 {error, message} have NO success field at
+      // all. The old `=== false` check let them fall through to a misleading
+      // "Claude key not configured" branch. Prefer the human `message`
+      // ("Too many requests. Rate limit: 30/minute...") over the slug.
+      if (!data || data.success !== true) {
+        throw new Error(data?.message || data?.error || 'Analysis failed');
       }
 
       // Task #34: track source + Claude error context.
