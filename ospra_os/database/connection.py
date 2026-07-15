@@ -251,6 +251,8 @@ def _import_all_models():
         'enhanced_image_cache',  # Enhanced image caching for Stability AI
         'fulfillment_models',  # T16: idempotency records for auto-fulfillment
         'webhook_event_models',  # T27: payment-webhook replay protection
+        'product_timeseries',  # Moat P1: daily units-sold snapshots
+        'product_comments',  # Moat P2: per-comment engagement (organic-vs-seeded)
     ]
     
     imported = 0
