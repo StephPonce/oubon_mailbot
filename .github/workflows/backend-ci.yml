@@ -36,7 +36,8 @@ jobs:
     env:
       # Minimum env vars for app to import cleanly
       ENVIRONMENT: test
-      DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
+      TESTING: "true"  # is_test_mode() checks TESTING/ENV, not ENVIRONMENT
+      DATABASE_URL: sqlite:///./ci_test.db  # test-mode allowlist accepts sqlite:/// only
       JWT_SECRET_KEY: ci_test_jwt_key_minimum_32_characters_long__
       SECRET_KEY: ci_test_secret_key_minimum_32_characters_long_
       EMAIL_OAUTH_ENCRYPTION_KEY: ci_test_fernet_key_minimum_32_chars_______
