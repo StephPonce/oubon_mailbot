@@ -8,6 +8,7 @@ on:
       - "ospra_os/**"
       - "tests/**"
       - "pyproject.toml"
+      - "requirements.txt"
       - "uv.lock"
       - "pytest.ini"
       - ".github/workflows/backend-ci.yml"
@@ -16,6 +17,7 @@ on:
       - "ospra_os/**"
       - "tests/**"
       - "pyproject.toml"
+      - "requirements.txt"
       - "uv.lock"
       - "pytest.ini"
       - ".github/workflows/backend-ci.yml"
@@ -56,6 +58,15 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv sync --frozen --no-dev
           uv pip install ruff pytest pytest-asyncio httpx
+
+      - name: Resolve-guard — plain pip must resolve requirements.txt (matches Render)
+        run: |
+          # Render installs with plain pip, which excludes pre-releases from
+          # ranges like >=2.0.0. uv allows them, so a uv-only check misses
+          # pins that break the Render build (e.g. the OTel openai-v2 pin).
+          python -m venv /tmp/resolve-guard
+          /tmp/resolve-guard/bin/pip install --quiet --upgrade pip
+          /tmp/resolve-guard/bin/pip install --dry-run --quiet -r requirements.txt
 
       - name: Lint with ruff
         run: |
