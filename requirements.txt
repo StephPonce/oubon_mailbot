@@ -87,7 +87,7 @@ celery>=5.3.0
 posthog[otel]
 opentelemetry-sdk>=1.20.0
 opentelemetry-instrumentation-anthropic>=0.40.0
-opentelemetry-instrumentation-openai-v2>=2.0.0
+opentelemetry-instrumentation-openai-v2>=2.0.0b0
 
 # Cloud image storage (T160). Without this, ImageStorage logs "Cloudinary
 # not installed" and silently falls back to ephemeral local disk even with
