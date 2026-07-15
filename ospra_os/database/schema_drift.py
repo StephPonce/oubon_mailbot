@@ -27,7 +27,6 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine

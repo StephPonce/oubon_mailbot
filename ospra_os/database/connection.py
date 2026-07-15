@@ -15,6 +15,7 @@ Usage:
         pass
 """
 
+import logging
 import os
 import sys
 from functools import lru_cache
@@ -23,6 +24,8 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+
+logger = logging.getLogger(__name__)
 
 # Get database URL from environment (PostgreSQL required for production)
 # Note: This is read at import time but validated at runtime in get_engine()
@@ -483,7 +486,7 @@ def init_database(database_url: str = None):
         
         print("[DB INIT] ✓ Database initialization complete")
         print(f"[DB INIT]   Tables: {len(final_tables)}")
-        print(f"[DB INIT]   Critical tables: All present")
+        print("[DB INIT]   Critical tables: All present")
         
         return engine
         
@@ -493,7 +496,7 @@ def init_database(database_url: str = None):
         db_logger = logging.getLogger(__name__)
         # Log full traceback to logger (not stdout) for debugging
         db_logger.error(f"[DB INIT] ERROR: {e}\nTraceback: {traceback.format_exc()}")
-        print(f"[DB INIT] ERROR: Database initialization failed. Check logs for details.")
+        print("[DB INIT] ERROR: Database initialization failed. Check logs for details.")
         raise
 
 
