@@ -98,8 +98,7 @@ jobs:
       - name: Check for hardcoded "Oubon" leakage in prompts/policies
         run: |
           # These modules must stay tenant-neutral since Pass 4b (commit a01830a).
-          ! grep -rn "Oubon" ospra_os/email_automation/policies.py \
-              ospra_os/ai/multi_provider_client.py \
-              ospra_os/email_automation/smart_reply.py \
-              ospra_os/email_automation/email_processor.py \
-              | grep -v "DEFAULT_" | grep -v "# " | grep -v '"""'
+          # AST-based: flags Oubon only in runtime string literals, allowing
+          # docstrings/comments and DEFAULT_* constants (the naive grep this
+          # replaces false-positived on docstring body lines).
+          python scripts/check_oubon_leakage.py
