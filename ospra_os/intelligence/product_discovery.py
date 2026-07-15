@@ -837,6 +837,38 @@ class ProductDiscoveryEngine:
             if not _amazon_apify:
                 self.sources_status['amazon'] = '[DISABLED] Apify off by default — using free Amazon RSS'
 
+            # --- TikTok Shop PRODUCT actor (Phase 1 - THE DEMAND SPINE) ------
+            # Product-level soldCount rows -> daily snapshots -> units_sold_7d
+            # velocity -> the grade. ON by default (the core signal the product
+            # is built on; ~$0.16/day at the 100-item cap) but only as a
+            # FALLBACK when the first-party Partner API isn't configured. Kill
+            # with DISCOVERY_TIKTOK_SHOP_PRODUCTS_ENABLED=false; cap with
+            # TIKTOK_SHOP_MAX_ITEMS.
+            self.tiktok_shop_products = None
+            _tts_flag = os.getenv(
+                "DISCOVERY_TIKTOK_SHOP_PRODUCTS_ENABLED", "true"
+            ).strip().lower() in {"1", "true", "yes"}
+            if _tts_flag and self.tiktok_shop_connector is None:
+                try:
+                    from ospra_os.product_research.connectors.apify.tiktok_shop_products import (
+                        TikTokShopProductsScraper,
+                    )
+                    self.tiktok_shop_products = TikTokShopProductsScraper()
+                    self.sources_status['tiktok_shop'] = (
+                        f'[SUCCESS] Connected (Apify {self.tiktok_shop_products.actor_id})'
+                    )
+                    logger.info(
+                        "[SUCCESS] TikTok Shop products scraper loaded (%s)",
+                        self.tiktok_shop_products.actor_id,
+                    )
+                except Exception as exc:
+                    self.sources_status['tiktok_shop'] = f'[ERROR] {exc}'
+                    logger.warning(f"[WARNING] TikTok Shop products init failed: {exc}")
+            elif not _tts_flag:
+                self.sources_status['tiktok_shop'] = (
+                    '[DISABLED] set DISCOVERY_TIKTOK_SHOP_PRODUCTS_ENABLED=true'
+                )
+
             # --- Meta Ad Library: THE KEEP (independent of TikTok/Amazon) ---
             try:
                 from ospra_os.product_research.connectors.apify.meta_ads_library import (
@@ -1408,6 +1440,17 @@ class ProductDiscoveryEngine:
             self._merge_tiktok_engagement_into_products(all_products)
         except Exception as exc:
             logger.warning(f"   TikTok engagement merge failed (non-fatal): {exc}")
+
+        # Phase 1 demand spine: fetch TikTok Shop product rows, snapshot their
+        # cumulative sold counts to product_timeseries, and stamp the matched
+        # TikTok product id onto discovered products so the scoring pass loads
+        # each product's units_sold_7d velocity. Best-effort + guarded on the
+        # scraper being available (needs Apify credits), so it's a no-op in
+        # dev/without credits.
+        try:
+            await self._fetch_and_merge_tiktok_shop_units(all_products, niche)
+        except Exception as exc:
+            logger.warning(f"   TikTok Shop units merge failed (non-fatal): {exc}")
 
         logger.info(f"   -> {len(all_products)} unique products after cross-reference")
         logger.info(f"   ⏱️ Step 3 took {time.time() - step3_start:.2f}s")
@@ -2430,6 +2473,76 @@ class ProductDiscoveryEngine:
                     / best_data['play_count']
                     if best_data['play_count'] > 0 else 0.0
                 )
+
+    async def _fetch_and_merge_tiktok_shop_units(
+        self, products: List[Dict], niche: str
+    ) -> None:
+        """Phase 1 demand spine: fetch TikTok Shop product rows, persist a daily
+        units-sold snapshot, and stamp the matched TikTok product id onto
+        discovered products so scoring can load their units_sold_7d velocity.
+
+        No-op unless the product-actor scraper is configured (needs Apify
+        credits). Fuzzy title match (≥2 shared 4+-char tokens) mirrors the
+        engagement merge's precision/recall trade-off.
+        """
+        scraper = getattr(self, "tiktok_shop_products", None)
+        if not scraper or not products:
+            return
+
+        from ospra_os.intelligence.units_velocity import snapshot_tiktok_products
+
+        # Keyword seeds: the niche plus a few discovered product titles keep the
+        # actor query grounded in what we're actually sourcing.
+        keywords = [niche] + [
+            (p.get("title") or "").strip()
+            for p in products[:4] if p.get("title")
+        ]
+        result = await scraper.fetch_products([k for k in keywords if k])
+        if result.get("status") != "ok":
+            logger.info(
+                "[UNITS] TikTok Shop products unavailable this run (status=%s)",
+                result.get("status"),
+            )
+            return
+
+        shop_products = result["products"]
+        # Persist today's cumulative-sold snapshot for the trajectory history.
+        snapshot_tiktok_products(shop_products, niche=niche)
+
+        # Index shop products by their 4+-char title tokens for fuzzy match.
+        indexed = []
+        for sp in shop_products:
+            toks = {t for t in (sp.title or "").lower().split() if len(t) > 3}
+            if toks:
+                indexed.append((toks, sp))
+
+        matched = 0
+        for product in products:
+            title = (product.get("title") or "").lower()
+            if not title:
+                continue
+            ptoks = {t for t in title.split() if len(t) > 3}
+            best_overlap, best_sp = 0, None
+            for toks, sp in indexed:
+                overlap = len(ptoks & toks)
+                if overlap >= 2 and overlap > best_overlap:
+                    best_overlap, best_sp = overlap, sp
+            if best_sp is not None:
+                # Stamp the TikTok product id as `product_id` so the shared
+                # product_identity_key resolves to this product's snapshots.
+                product.setdefault("tiktok_shop", {})
+                product["tiktok_shop"] = {
+                    "tiktok_product_id": best_sp.tiktok_product_id,
+                    "sold_count": best_sp.sold_count,
+                    "shop_name": best_sp.shop_name,
+                }
+                product["product_id"] = best_sp.tiktok_product_id
+                matched += 1
+
+        logger.info(
+            "[UNITS] TikTok Shop: %d products, %d matched onto discovered set",
+            len(shop_products), matched,
+        )
 
     async def _fetch_tiktok_shop_trends(self, niche: str) -> dict:
         """
@@ -6596,6 +6709,32 @@ class ProductDiscoveryEngine:
                 winner_boost = 1.0 + 0.20 * winner_strength
                 oi_score = oi_score * winner_boost
                 product['winner_strength_boost'] = round(winner_boost, 3)
+
+            # ──────────────────────────────────────────────────────────────
+            # TIKTOK SHOP UNITS-SOLD VELOCITY — Phase 1, THE DEMAND SPINE
+            # ──────────────────────────────────────────────────────────────
+            # The whole point of Phase 1: real units_sold_7d velocity (slope of
+            # this product's daily sold-count snapshots in product_timeseries)
+            # is an ACTUAL weighted input to the grade. A product whose real
+            # units-sold are RISING gets a measurable lift; flat/declining gets
+            # none (never a fabricated penalty). Dormant until ≥3 real snapshots
+            # exist (load returns None), so it can't move grades on thin data.
+            # Kill with DISCOVERY_UNITS_VELOCITY_ENABLED=false.
+            if os.getenv("DISCOVERY_UNITS_VELOCITY_ENABLED", "true").strip().lower() in {"1", "true", "yes"}:
+                try:
+                    from ospra_os.intelligence.units_velocity import (
+                        load_units_velocity_for_product, units_velocity_boost,
+                    )
+                    uv = load_units_velocity_for_product(product)
+                    if uv:
+                        boost_max = float(os.getenv("UNITS_VELOCITY_BOOST_MAX", "0.25"))
+                        uboost = units_velocity_boost(uv, boost_max=boost_max)
+                        oi_score = oi_score * uboost
+                        product['units_sold_velocity_7d'] = uv["units_weekly"]
+                        product['units_sold_last'] = uv["last_sold_count"]
+                        product['units_velocity_boost'] = uboost
+                except Exception as _uv_err:
+                    logger.debug(f"[UNITS] velocity boost skipped: {_uv_err}")
 
             # If product is clearly irrelevant, cap score at 45 (POOR tier)
             if relevance < 25:

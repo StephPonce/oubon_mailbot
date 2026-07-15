@@ -110,26 +110,17 @@ def snapshot_tiktok_products(products: List, niche: Optional[str] = None) -> Dic
     return stats
 
 
-def load_units_velocity(
-    tiktok_product_id: str,
-    days: int = VELOCITY_WINDOW_DAYS,
-    session=None,
-) -> Optional[Dict]:
-    """units_sold_7d velocity for one TikTok Shop product from its snapshot
-    history. None until ≥3 daily measurements exist (thin data must not move
-    grades). Returns {units_weekly, n_points, first/last_sold_count}."""
+def _load_velocity_by_key(key: str, days: int, session=None) -> Optional[Dict]:
+    """units_sold_7d velocity for a pre-computed product_timeseries key. None
+    until ≥3 daily measurements exist (thin data must not move grades)."""
     try:
         from ospra_os.database.connection import SessionLocal
-        from ospra_os.database.product_timeseries import (
-            ProductTimeseries, product_identity_key,
-        )
+        from ospra_os.database.product_timeseries import ProductTimeseries
         from ospra_os.intelligence.velocity_saturation import units_velocity_from_series
     except Exception:
         return None
 
-    key = product_identity_key({"product_id": str(tiktok_product_id)})
     cutoff = datetime.utcnow().date() - timedelta(days=days)
-
     owns_session = session is None
     if owns_session:
         session = SessionLocal()
@@ -158,3 +149,45 @@ def load_units_velocity(
         [r.tiktok_units_sold for r in rows],
         day_offsets=[(r.snapshot_date - day0).days for r in rows],
     )
+
+
+def load_units_velocity(
+    tiktok_product_id: str,
+    days: int = VELOCITY_WINDOW_DAYS,
+    session=None,
+) -> Optional[Dict]:
+    """units_sold_7d velocity for one TikTok Shop product id."""
+    from ospra_os.database.product_timeseries import product_identity_key
+    key = product_identity_key({"product_id": str(tiktok_product_id)})
+    return _load_velocity_by_key(key, days, session=session)
+
+
+def load_units_velocity_for_product(product: dict, days: int = VELOCITY_WINDOW_DAYS,
+                                    session=None) -> Optional[Dict]:
+    """units_sold_7d velocity for a discovered-product dict, keyed by the SAME
+    shared product_identity_key the snapshots used (so a product carrying its
+    TikTok product id as ``product_id`` finds its own history). This is the
+    hook the scoring pass calls to turn real units velocity into grade lift."""
+    from ospra_os.database.product_timeseries import product_identity_key
+    return _load_velocity_by_key(product_identity_key(product), days, session=session)
+
+
+def units_velocity_boost(velocity: Optional[Dict], boost_max: float = 0.25) -> float:
+    """Turn a units-velocity reading into a multiplicative grade boost in
+    [1.0, 1+boost_max].
+
+    Rising real units-sold lifts the grade; flat/declining does NOT lower it
+    (non-positive velocity → 1.0), matching the module's no-fabricated-penalty
+    posture. Strength is the weekly sales GROWTH relative to the current level
+    (units_weekly / max(last_sold_count, floor)), clamped to [0, 1] so a
+    doubling-per-week product hits the full boost and a 10%/week product gets
+    a proportional slice.
+    """
+    if not velocity:
+        return 1.0
+    weekly = velocity.get("units_weekly") or 0.0
+    if weekly <= 0:
+        return 1.0
+    base = max(int(velocity.get("last_sold_count") or 0), 50)  # floor avoids div-by-small
+    rel = min(weekly / base, 1.0)
+    return round(1.0 + boost_max * rel, 4)
