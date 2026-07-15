@@ -143,3 +143,50 @@ def test_snapshot_distinct_products_distinct_rows(session):
     cw.snapshot_timeseries(session, PLUG, "smart_home")
     session.commit()
     assert session.query(ProductTimeseries).count() == 2
+
+
+class TestPerNicheFaultIsolation:
+    """Step 0 of the discovery-reliability spec (fail-if-reverted): one niche
+    crashing at ANY level must never zero out the whole refresh."""
+
+    def test_crashing_niche_does_not_abort_batch(self, monkeypatch):
+        import asyncio
+
+        from ospra_os.tasks import catalog_warm
+
+        monkeypatch.setattr(catalog_warm, "_bootstrap_table", lambda: None)
+        monkeypatch.setattr(catalog_warm, "_niches", lambda: ["n1", "n2", "n3"])
+        warmed = []
+
+        async def fake_warm(niche):
+            if niche == "n2":
+                # raised OUTSIDE warm_niche's internal try/except — the level
+                # that used to abort the entire batch
+                raise RuntimeError("boom in niche 2")
+            warmed.append(niche)
+            return {"niche": niche, "discovered": 5, "new": 5, "seen": 0,
+                    "snapshots": 5, "absences": 0}
+
+        monkeypatch.setattr(catalog_warm, "warm_niche", fake_warm)
+        result = asyncio.run(catalog_warm.run())
+
+        assert warmed == ["n1", "n3"]                      # survivors both ran
+        assert result["discovered"] == 10                   # their output counted
+        by_niche = {r["niche"]: r for r in result["by_niche"]}
+        assert "boom in niche 2" in by_niche["n2"]["error"]
+
+    def test_all_niches_failing_still_alerts(self, monkeypatch):
+        """M6 semantics preserved: every niche dead → discovered=0 (main exits 2)."""
+        import asyncio
+
+        from ospra_os.tasks import catalog_warm
+
+        monkeypatch.setattr(catalog_warm, "_bootstrap_table", lambda: None)
+        monkeypatch.setattr(catalog_warm, "_niches", lambda: ["n1", "n2"])
+
+        async def fake_warm(niche):
+            raise RuntimeError("all dead")
+
+        monkeypatch.setattr(catalog_warm, "warm_niche", fake_warm)
+        result = asyncio.run(catalog_warm.run())
+        assert result["discovered"] == 0

@@ -373,7 +373,20 @@ async def run() -> dict:
     logger.info(f"Catalog warm starting for {len(niches)} niches: {niches}")
     results = []
     for niche in niches:  # serial: discovery is API-heavy; avoid hammering suppliers
-        results.append(await warm_niche(niche))
+        # Per-niche fault isolation at the RUN level. warm_niche already
+        # try/excepts the discovery call, but anything that raised outside
+        # that inner try (session setup, import-time failures, the absence
+        # pass re-raising) aborted the WHOLE batch — one bad niche zeroed
+        # out the refresh for every other niche (July 2026 stale-catalog
+        # incident). One niche's crash must cost exactly one niche.
+        try:
+            results.append(await warm_niche(niche))
+        except Exception as e:
+            logger.error(f"[{niche}] niche run crashed (isolated, continuing): {e}")
+            results.append({
+                "niche": niche, "discovered": 0, "new": 0, "seen": 0,
+                "snapshots": 0, "absences": 0, "error": str(e),
+            })
     total_new = sum(r.get("new", 0) for r in results)
     total_seen = sum(r.get("seen", 0) for r in results)
     total_disc = sum(r.get("discovered", 0) for r in results)
