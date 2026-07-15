@@ -483,16 +483,30 @@ class OspraAPI {
     qs.set('limit', params.limit || 60);
     const url = `${API_BASE_URL}/api/discovery/catalog?${qs.toString()}`;
     try {
-      const response = await fetch(url);
+      // 25s abort: the catalog read is a fast DB query — if it hasn't
+      // answered in 25s the connection is wedged, and hanging the page
+      // is worse than falling through to the on-demand path.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      let response;
+      try {
+        response = await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!response.ok) {
         console.warn('[API] getCatalog HTTP', response.status);
-        return [];
+        return { products: [], freshness: null, freshnessHours: null };
       }
       const data = await response.json();
-      return Array.isArray(data?.products) ? data.products : [];
+      return {
+        products: Array.isArray(data?.products) ? data.products : [],
+        freshness: data?.catalog_freshness ?? null,
+        freshnessHours: data?.catalog_freshness_hours ?? null,
+      };
     } catch (error) {
       console.error('[API] getCatalog error:', error);
-      return [];
+      return { products: [], freshness: null, freshnessHours: null };
     }
   }
 

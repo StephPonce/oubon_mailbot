@@ -28,7 +28,7 @@ PERFORMANCE OPTIMIZATIONS:
 - Instant cache hits for repeat requests
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -709,10 +709,30 @@ async def get_catalog(
             products.append(payload)
 
         total = session.query(DiscoveredProduct).count()
+
+        # Freshness honesty (discovery-reliability step 1): the newest write
+        # for THIS filter scope. last_seen_at is refreshed on every upsert
+        # (upsert_product in catalog_warm), so max(last_seen_at) IS the last
+        # successful catalog refresh — the June/July incident served 16-day-
+        # old rows with nothing telling the UI they were stale.
+        from sqlalchemy import func as _sqlfunc
+        fq = session.query(_sqlfunc.max(DiscoveredProduct.last_seen_at))
+        if niche:
+            fq = fq.filter(DiscoveredProduct.niche == niche)
+        freshest = fq.scalar()
+        freshness_hours = None
+        if freshest is not None:
+            _anchor = freshest if freshest.tzinfo else freshest.replace(tzinfo=timezone.utc)
+            freshness_hours = round(
+                (datetime.now(timezone.utc) - _anchor).total_seconds() / 3600, 1
+            )
+
         return {
             "success": True,
             "count": len(products),
             "total_in_catalog": total,
+            "catalog_freshness": freshest.isoformat() if freshest else None,
+            "catalog_freshness_hours": freshness_hours,
             "products": products,
         }
     except Exception as e:

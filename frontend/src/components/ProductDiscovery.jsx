@@ -2685,6 +2685,9 @@ export function ProductDiscovery() {
   // Populated when the discovery API returns a 503 / structured error.
   // Shape: { error, discovery_error, diagnostics, hint, status } or null.
   const [discoveryError, setDiscoveryError] = useState(null);
+  // Catalog freshness meta (discovery-reliability step 1): {at, hours}.
+  // hours > 48 → stale banner instead of presenting old data as current.
+  const [catalogFreshness, setCatalogFreshness] = useState({ at: null, hours: null });
   // Populated when the backend clamped the requested product count to the
   // caller's tier ceiling. Shape:
   //   { tier, per_request_ceiling, requested, clamped } or null.
@@ -2958,7 +2961,12 @@ export function ProductDiscovery() {
       // catalog is empty (cron not yet run) we fall through to on-demand
       // discovery, so the page behaves exactly as before until it's warmed.
       try {
-        const catalog = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        const catalogRes = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        const catalog = catalogRes.products;
+        setCatalogFreshness({
+          at: catalogRes.freshness,
+          hours: catalogRes.freshnessHours,
+        });
         if (Array.isArray(catalog) && catalog.length > 0) {
           const normalized = catalog.map(p => ({
             ...normalizeProduct(p, p.niche || niche),
@@ -3392,6 +3400,12 @@ export function ProductDiscovery() {
               <span className="text-white/30 text-xs hidden md:block">
                 {products.length > 0 && `${products.length} products`}
               </span>
+              {/* Freshness honesty (step 1): say WHEN the data is from. */}
+              {catalogFreshness.at && (
+                <span className="text-white/30 text-xs hidden md:block">
+                  Data from {new Date(catalogFreshness.at + (catalogFreshness.at.endsWith('Z') ? '' : 'Z')).toLocaleDateString()}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -3428,6 +3442,16 @@ export function ProductDiscovery() {
           )}
         </div>
       </div>
+
+      {/* Stale-data banner (step 1): freshness > 48h means the catalog cron
+          hasn't refreshed — say so instead of presenting old data as now. */}
+      {catalogFreshness.hours != null && catalogFreshness.hours > 48 && products.length > 0 && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm">
+          These products were last refreshed{' '}
+          {Math.round(catalogFreshness.hours / 24)} days ago — market signals
+          (velocity, competition, timing) may have moved since then.
+        </div>
+      )}
 
       {/* Product Grid */}
       {loading ? (
