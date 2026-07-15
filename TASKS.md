@@ -100,6 +100,8 @@ Goal: move discovery from fragile live per-request multi-source scraping to batc
 
 ## In progress
 
+- [ ] **Section G candidate — HybridLearningEngine is a dead duplicate of the live NicheLearning path** (2026-07-15 drift-reconciliation finding). The prod drift audit found `global_learning_weights` and `personal_learning_weights` missing ~all of their Hybrid Learning columns (10 + 15 of the 34 reconciled by migration 005) — i.e. every query the HybridLearningEngine would make against them has 500'd since the tables were first created, and nobody noticed. That confirms the engine has no live traffic; the NicheLearning path is what actually runs. Consolidate in Section G: fold anything worth keeping into NicheLearning, then retire the engine + the two deprecated shim modules noted in #PASS-4d below.
+
 - [x] **#40 — Security: scrub leaked Shopify token + gitleaks pre-commit** (2026-06 session, DONE). A real `shpat_…` Admin token was committed in `docs/DEPLOYMENT_ENV_SETUP.md:115` and `scripts/smoke/multi_store_system.py:80`. Both replaced (docs → placeholder, smoke script → `os.getenv`). Added `gitleaks` hook to `.pre-commit-config.yaml` so secrets can't be committed again. ⚠ OWNER ACTION: rotate the token in Shopify admin — it lives in git history on GitHub.
 
 - [x] **#41 — Security: Amazon routes IDOR fix** (2026-06 session, DONE). 10 endpoints in `api/amazon_routes.py` took attacker-supplied `account_id`/`listing_id` with no auth and no ownership check (get/disconnect account, listings CRUD+publish+sync, orders get+sync, inventory sync, research). Added `get_current_user` to all + `_get_owned_account` / `_get_owned_listing` guards (404 for both missing and foreign IDs — no existence oracle). AST-verified; amazon tests green.

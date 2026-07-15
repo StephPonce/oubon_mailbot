@@ -26,6 +26,10 @@ services:
     buildCommand: |
       pip install --upgrade pip
       pip install -r requirements.txt
+    # Migrations run BEFORE the new release takes traffic; a failure here
+    # reds the deploy while the previous release keeps serving. init_database
+    # re-runs upgrade head at boot (idempotent) as a belt-and-braces check.
+    preDeployCommand: alembic upgrade head
     startCommand: uvicorn ospra_os.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
