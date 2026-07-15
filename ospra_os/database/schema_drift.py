@@ -27,7 +27,6 @@ from __future__ import annotations
 import logging
 import sys
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
@@ -63,6 +62,13 @@ class DriftReport:
     @property
     def has_drift(self) -> bool:
         return any(t.has_drift for t in self.tables)
+
+    @property
+    def blocking(self) -> bool:
+        """Drift that WILL 500 at request time: a model column or whole
+        table absent from the DB. ``extra_in_db`` is informational only
+        (columns dropped from the model but kept for backfill safety)."""
+        return any(t.missing_in_db or t.table_missing for t in self.tables)
 
     def render(self) -> str:
         """Human-readable rendering for logs / CLI / startup banners."""
@@ -176,6 +182,30 @@ def warn_on_drift(engine: Engine | None = None) -> DriftReport:
         logger.warning("\n" + report.render())
     else:
         logger.debug("schema_drift: clean")
+    return report
+
+
+def fail_on_drift(engine: Engine | None = None) -> DriftReport:
+    """
+    Strict deploy-time guard: raise if any model column or table is
+    absent from the live DB.
+
+    Called from ``init_database`` on PostgreSQL AFTER migrations + the
+    create_all backfill have run — at that point, any remaining gap means
+    a model column was added without a migration (the create_all-drift
+    failure mode migration 005 reconciled). Failing here reds the deploy
+    while the previous release keeps serving, instead of shipping a
+    latent 500. ``extra_in_db`` never blocks.
+    """
+    report = detect_drift(engine)
+    if report.blocking:
+        raise RuntimeError(
+            "schema drift would 500 at request time — deploy blocked.\n"
+            + report.render()
+            + "\nAdd an Alembic migration for the missing column(s) and redeploy."
+        )
+    if report.has_drift:
+        logger.warning("\n" + report.render())
     return report
 
 

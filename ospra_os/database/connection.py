@@ -15,6 +15,7 @@ Usage:
         pass
 """
 
+import logging
 import os
 import sys
 from functools import lru_cache
@@ -23,6 +24,8 @@ from contextlib import contextmanager
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+
+logger = logging.getLogger(__name__)
 
 # Get database URL from environment (PostgreSQL required for production)
 # Note: This is read at import time but validated at runtime in get_engine()
@@ -269,11 +272,15 @@ def _import_all_models():
     return Base
 
 
-def _run_alembic_migrations():
+def _run_alembic_migrations(strict: bool = False):
     """
     Run Alembic migrations to upgrade database to latest version.
-    
+
     Returns True if successful, False if Alembic unavailable or failed.
+    With ``strict=True`` (PostgreSQL production), any failure RAISES
+    instead — a half-migrated schema must red the deploy, not silently
+    fall through to create_all (which papers over missing columns; that
+    fallback is how prod drifted 34 columns behind the models).
     """
     try:
         from alembic.config import Config
@@ -286,6 +293,8 @@ def _run_alembic_migrations():
         
         if not os.path.exists(alembic_ini):
             print(f"[DB INIT] alembic.ini not found at {alembic_ini}")
+            if strict:
+                raise RuntimeError(f"alembic.ini not found at {alembic_ini}")
             return False
         
         # Check if any migrations exist
@@ -297,6 +306,8 @@ def _run_alembic_migrations():
         migrations = [f for f in os.listdir(versions_dir) if f.endswith('.py') and not f.startswith('__')]
         if not migrations:
             print("[DB INIT] No Alembic migrations found - using create_all() fallback")
+            if strict:
+                raise RuntimeError("No Alembic migrations found but required in production")
             return False
         
         print(f"[DB INIT] Running Alembic migrations ({len(migrations)} found)...")
@@ -309,9 +320,13 @@ def _run_alembic_migrations():
         
     except ImportError:
         print("[DB INIT] Alembic not installed - using create_all() fallback")
+        if strict:
+            raise RuntimeError("Alembic not installed but required in production")
         return False
     except Exception as e:
         print(f"[DB INIT] Alembic migration failed: {e}")
+        if strict:
+            raise
         return False
 
 
@@ -345,11 +360,16 @@ def init_database(database_url: str = None):
     Initialize database schema on app startup.
     
     Strategy:
-    1. For PostgreSQL: Try Alembic migrations first, fall back to create_all()
-    2. For SQLite: Use create_all() directly (local dev)
-    3. Always verify critical tables exist after initialization
-    
-    Raises RuntimeError if critical tables are missing after init.
+    1. PostgreSQL (production): ALWAYS run Alembic upgrade head (strict —
+       failure raises), then the idempotent create_all backfill for
+       model-only tables, then a strict drift guard that raises if any
+       model column is absent from the live DB. There is NO create_all
+       fallback on migration failure.
+    2. SQLite (local dev / tests): create_all() directly.
+    3. Always verify critical tables exist after initialization.
+
+    Raises RuntimeError if migrations fail, critical tables are missing,
+    or schema drift is detected (PostgreSQL).
     """
     print("[DB INIT] Starting database initialization...")
     
@@ -368,18 +388,53 @@ def init_database(database_url: str = None):
         existing_tables = inspector.get_table_names()
         print(f"[DB INIT] Existing tables: {len(existing_tables)}")
         
-        # Check if schema already exists
+        if db_type == 'postgresql':
+            # Migrations run on EVERY boot, and loudly. The old flow only
+            # tried Alembic when a critical table was missing — since prod's
+            # 4 critical tables always existed, migrations NEVER ran there,
+            # and the on-failure create_all fallback masked it. That's how
+            # prod drifted 34 columns behind the models (reconciled by
+            # migration 005). strict=True: any migration failure raises and
+            # reds the deploy while the previous release keeps serving.
+            _run_alembic_migrations(strict=True)
+
+            # Backfill model-only tables. Alembic migrations only manage the
+            # tables they define; anything added straight to a model
+            # (cached_google_trends, ai_learning_events, ...) still needs the
+            # idempotent create_all — it only CREATEs missing tables, never
+            # ALTERs or DROPs existing ones.
+            try:
+                Base.metadata.create_all(bind=engine)
+                print("[DB INIT] ✓ Backfilled any missing model-only tables")
+            except Exception as backfill_error:
+                logger.warning(
+                    f"[DB INIT] table backfill failed (non-fatal): {backfill_error}"
+                )
+
+            schema_check = verify_database_schema(engine)
+            if not schema_check['all_present']:
+                raise RuntimeError(
+                    f"CRITICAL: Missing tables after init: {schema_check['missing_tables']}"
+                )
+
+            # Drift guard: after migrations + backfill, every model column
+            # must exist in the live DB. A gap here means a column was added
+            # to a model without a migration — the exact class of bug that
+            # produced the 34-column drift. Red the deploy instead of
+            # shipping a latent 500.
+            from ospra_os.database.schema_drift import fail_on_drift
+            fail_on_drift(engine)
+
+            print("[DB INIT] ✓ Schema ready via Alembic (drift check clean)")
+            return engine
+
+        # ------------------------------------------------------------------
+        # SQLite (local dev / tests): create_all builds the full schema from
+        # the current models, so migrations aren't needed to stay in sync.
+        # ------------------------------------------------------------------
         schema_check = verify_database_schema(engine)
         if schema_check['all_present']:
             print(f"[DB INIT] ✓ All {len(CRITICAL_TABLES)} critical tables present - schema OK")
-            # CRITICAL: verify_database_schema only checks the 4 CRITICAL_TABLES.
-            # Returning here without create_all meant ANY table added to a model
-            # AFTER prod was first provisioned (ai_learning_events,
-            # cached_google_trends, product_performance, ...) would NEVER be
-            # created in production — silently breaking the features that need
-            # them. create_all is idempotent: it only CREATES missing tables,
-            # never ALTERs or DROPs existing ones, so this is safe on every boot
-            # and backfills newly-added tables on the next deploy.
             try:
                 Base.metadata.create_all(bind=engine)
                 print("[DB INIT] ✓ Backfilled any missing non-critical tables")
@@ -391,27 +446,6 @@ def init_database(database_url: str = None):
 
         # Schema missing or incomplete - need to create
         print(f"[DB INIT] Missing tables: {schema_check['missing_tables']}")
-        
-        # Try Alembic first (PostgreSQL production)
-        if db_type == 'postgresql':
-            if _run_alembic_migrations():
-                # Verify after Alembic
-                schema_check = verify_database_schema(engine)
-                if schema_check['all_present']:
-                    print("[DB INIT] ✓ Schema ready via Alembic")
-                    # Same backfill as the all-present branch: Alembic only
-                    # creates tables its migrations define, so any model-only
-                    # table (cached_google_trends, ai_learning_events, ...)
-                    # still needs the idempotent create_all to exist.
-                    try:
-                        Base.metadata.create_all(bind=engine)
-                    except Exception as backfill_error:
-                        logger.warning(
-                            f"[DB INIT] post-Alembic table backfill failed (non-fatal): {backfill_error}"
-                        )
-                    return engine
-        
-        # Fall back to create_all() (SQLite or Alembic failed/unavailable)
         print("[DB INIT] Using SQLAlchemy create_all()...")
         try:
             Base.metadata.create_all(bind=engine)
@@ -452,7 +486,7 @@ def init_database(database_url: str = None):
         
         print("[DB INIT] ✓ Database initialization complete")
         print(f"[DB INIT]   Tables: {len(final_tables)}")
-        print(f"[DB INIT]   Critical tables: All present")
+        print("[DB INIT]   Critical tables: All present")
         
         return engine
         
@@ -462,7 +496,7 @@ def init_database(database_url: str = None):
         db_logger = logging.getLogger(__name__)
         # Log full traceback to logger (not stdout) for debugging
         db_logger.error(f"[DB INIT] ERROR: {e}\nTraceback: {traceback.format_exc()}")
-        print(f"[DB INIT] ERROR: Database initialization failed. Check logs for details.")
+        print("[DB INIT] ERROR: Database initialization failed. Check logs for details.")
         raise
 
 
