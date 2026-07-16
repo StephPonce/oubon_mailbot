@@ -142,6 +142,14 @@ class CustomRateLimitMiddleware(BaseHTTPMiddleware):
         if self._should_skip(request):
             return await call_next(request)
 
+        # Resolve who is asking BEFORE reading tier/client-key. _extract_tier
+        # and _get_client_key were designed to read request.state.tier /
+        # request.state.user_id "set by the JWT auth middleware" — but no such
+        # middleware ever existed, so EVERY request (any paid tier) was being
+        # limited as nest/free and keyed by IP (users behind one NAT shared a
+        # single bucket). Hydrate the state from the verified JWT here instead.
+        self._hydrate_identity_from_jwt(request)
+
         # Determine tier and resource type
         tier = self._extract_tier(request)
         resource = self._determine_resource_type(request)
@@ -200,6 +208,49 @@ class CustomRateLimitMiddleware(BaseHTTPMiddleware):
                 }
             )
 
+    def _hydrate_identity_from_jwt(self, request: Request) -> None:
+        """Populate request.state.tier / request.state.user_id from a VERIFIED
+        Bearer token, if not already set by something upstream.
+
+        Uses the same ``decode_token`` as ``get_current_user`` — signature,
+        expiry, and jti-blacklist all enforced — so the tier can't be spoofed
+        (unlike the removed X-User-Tier header). Any failure (no header,
+        garbage, expired, revoked) just leaves the state unset: the request
+        is limited at the anonymous default, and real auth is still enforced
+        by the route dependencies. This must never raise.
+        """
+        if getattr(request.state, "tier", None) and getattr(
+            request.state, "user_id", None
+        ):
+            return  # something upstream already resolved identity
+
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return
+
+        try:
+            # Function-level import: jwt_auth pulls in DB modules; keep this
+            # middleware importable on its own (tests, tooling).
+            from ospra_os.auth.jwt_auth import decode_token
+
+            payload = decode_token(auth_header[7:])
+        except Exception:
+            return  # invalid/expired/revoked token → anonymous limits
+
+        if payload.get("type") != "access":
+            return  # refresh tokens don't confer a tier
+
+        if not getattr(request.state, "tier", None):
+            tier = payload.get("tier")
+            if tier:
+                request.state.tier = str(tier)
+        if not getattr(request.state, "user_id", None):
+            sub = payload.get("sub")
+            if sub:
+                # Also feeds the auth_logger's rate-limit security event,
+                # which reads request.state.user_id.
+                request.state.user_id = str(sub)
+
     def _should_skip(self, request: Request) -> bool:
         """Determine if rate limiting should be skipped."""
         path = request.url.path
@@ -215,13 +266,14 @@ class CustomRateLimitMiddleware(BaseHTTPMiddleware):
         return any(path.startswith(pattern) for pattern in skip_patterns)
 
     def _extract_tier(self, request: Request) -> str:
-        """Extract user tier from request state (set by auth middleware).
+        """Extract user tier from request state.
 
         SECURITY: Tier MUST come from authenticated request state only.
         Never trust client-provided tier headers as they can be spoofed.
         """
-        # SECURITY: Only trust tier from authenticated request state
-        # This is set by the JWT auth middleware after validating the token
+        # SECURITY: Only trust tier from authenticated request state —
+        # populated by _hydrate_identity_from_jwt from a signature-verified
+        # access token (or by any future upstream auth middleware).
         if hasattr(request.state, "tier") and request.state.tier:
             return request.state.tier.lower()
 
