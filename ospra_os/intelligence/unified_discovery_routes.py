@@ -29,7 +29,7 @@ PERFORMANCE OPTIMIZATIONS:
 """
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import logging
@@ -738,6 +738,156 @@ async def get_catalog(
     except Exception as e:
         logger.error(f"[ERROR] catalog read failed: {e}")
         return {"success": False, "error": str(e), "products": [], "count": 0}
+    finally:
+        session.close()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DISCOVERY JOBS — job+poll replacement for the synchronous cold path
+# (discovery-reliability spec, step 2). POST creates (or returns the already-
+# live) job for a niche; a FastAPI BackgroundTask runs the SAME discovery
+# entrypoint the cron uses (catalog_warm.warm_niche → discover_products) and
+# upserts into discovered_catalog — the catalog stays the single source of
+# truth. GET polls status, with lazy orphan recovery for deploy restarts.
+# No Celery, no worker service, no second results store.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DiscoveryJobRequest(BaseModel):
+    niche: str
+    count: int = 20
+
+
+async def _run_discovery_job(job_id: int) -> None:
+    """BackgroundTasks runner. Opens short-lived sessions around the long
+    discovery run so no DB connection is held for 45–95s."""
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.database.discovery_jobs import DONE, ERROR, QUEUED, RUNNING, DiscoveryJob
+
+    session = SessionLocal()
+    try:
+        job = session.query(DiscoveryJob).filter_by(id=job_id).first()
+        if job is None or job.status != QUEUED:
+            return
+        job.status = RUNNING
+        job.started_at = datetime.utcnow()
+        session.commit()
+        niche, count = job.niche, job.count
+    finally:
+        session.close()
+
+    error_text = None
+    result_count = 0
+    try:
+        from ospra_os.tasks.catalog_warm import warm_niche
+        result = await warm_niche(niche, count=count)
+        result_count = result.get("discovered", 0)
+        # Honesty contract (same as /quick's 503): zero products means the
+        # sources failed — report an error, don't pretend an empty success.
+        if result.get("error"):
+            error_text = result["error"]
+        elif result_count == 0:
+            error_text = "No products could be fetched from any source"
+    except Exception as e:
+        logger.error(f"[JOBS] discovery job {job_id} ({niche}) crashed: {e}")
+        error_text = str(e)
+
+    session = SessionLocal()
+    try:
+        job = session.query(DiscoveryJob).filter_by(id=job_id).first()
+        if job is None:
+            return
+        job.status = ERROR if error_text else DONE
+        job.error_text = error_text
+        job.result_count = result_count
+        job.finished_at = datetime.utcnow()
+        session.commit()
+    finally:
+        session.close()
+
+
+@router.post("/jobs")
+async def create_discovery_job(
+    body: DiscoveryJobRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[TokenPayload] = Depends(get_current_user),
+):
+    """Start (or join) the live discovery job for a niche.
+
+    One live job per niche GLOBALLY: if a queued/running job already exists
+    for this niche, it is returned instead of creating another — this is the
+    refresh-spam cost guard (each stacked run used to burn paid AliExpress/
+    Meta/Apify calls concurrently).
+    """
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.database.discovery_jobs import QUEUED, RUNNING, DiscoveryJob
+
+    niche = (body.niche or "").strip()
+    if not niche:
+        raise HTTPException(status_code=422, detail="niche is required")
+
+    # Same tier clamp as /quick — the job must not out-fetch the caller's tier.
+    caller_tier = _tier_from_payload(current_user)
+    count, _clamped = clamp_request_count(body.count, caller_tier)
+
+    session = SessionLocal()
+    try:
+        existing = (
+            session.query(DiscoveryJob)
+            .filter(
+                DiscoveryJob.niche == niche,
+                DiscoveryJob.status.in_([QUEUED, RUNNING]),
+            )
+            .order_by(DiscoveryJob.created_at.desc())
+            .first()
+        )
+        if existing is not None:
+            return {"success": True, "job": existing.as_dict(), "joined_existing": True}
+
+        job = DiscoveryJob(
+            niche=niche,
+            count=count,
+            status=QUEUED,
+            requested_by=(getattr(current_user, "sub", None) or None),
+            created_at=datetime.utcnow(),
+        )
+        session.add(job)
+        session.commit()
+        job_id = job.id
+        payload = job.as_dict()
+    finally:
+        session.close()
+
+    background_tasks.add_task(_run_discovery_job, job_id)
+    return {"success": True, "job": payload, "joined_existing": False}
+
+
+@router.get("/jobs/{job_id}")
+async def get_discovery_job(job_id: int):
+    """Poll a discovery job. Lazy orphan recovery: a job still 'running'
+    >10min after it started was killed by a deploy restart (BackgroundTasks
+    die with the process) — report it as error so the client can retry,
+    instead of polling forever. No reaper process needed."""
+    from ospra_os.database.connection import SessionLocal
+    from ospra_os.database.discovery_jobs import ERROR, ORPHAN_MINUTES, RUNNING, DiscoveryJob
+
+    session = SessionLocal()
+    try:
+        job = session.query(DiscoveryJob).filter_by(id=job_id).first()
+        if job is None:
+            raise HTTPException(status_code=404, detail="job not found")
+
+        if job.status == RUNNING and job.started_at is not None:
+            age_min = (datetime.utcnow() - job.started_at).total_seconds() / 60
+            if age_min > ORPHAN_MINUTES:
+                job.status = ERROR
+                job.error_text = (
+                    f"Job orphaned: still marked running after {int(age_min)}min "
+                    "(likely killed by a deploy restart). Retry to start a new run."
+                )
+                job.finished_at = datetime.utcnow()
+                session.commit()
+
+        return {"success": True, "job": job.as_dict()}
     finally:
         session.close()
 

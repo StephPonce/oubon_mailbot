@@ -233,16 +233,22 @@ def upsert_product(session, product: dict, niche: str) -> str:
     return "seen"
 
 
-async def warm_niche(niche: str) -> dict:
-    """Run discovery for one niche and persist the results."""
+async def warm_niche(niche: str, count: int = None) -> dict:
+    """Run discovery for one niche and persist the results.
+
+    ``count`` overrides COUNT_PER_NICHE — the discovery-jobs runner passes
+    the caller's (tier-clamped) request size; the cron uses the env default.
+    """
     from ospra_os.intelligence.product_discovery import discover_products
 
-    logger.info(f"[{niche}] discovering (count={COUNT_PER_NICHE})...")
+    if count is None:
+        count = COUNT_PER_NICHE
+    logger.info(f"[{niche}] discovering (count={count})...")
     try:
         # include_captions=False: the cron has no reader for Shopify captions —
         # generating them 2x/day x N niches was pure LLM spend (re-audit M11).
         products = await discover_products(
-            niche=niche, count=COUNT_PER_NICHE, include_captions=False
+            niche=niche, count=count, include_captions=False
         )
     except Exception as e:  # one bad niche must not abort the whole run
         logger.error(f"[{niche}] discovery failed: {e}")

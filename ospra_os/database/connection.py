@@ -256,6 +256,8 @@ def _import_all_models():
         'webhook_event_models',  # T27: payment-webhook replay protection
         'product_timeseries',  # Moat P1: daily units-sold snapshots
         'product_comments',  # Moat P2: per-comment engagement (organic-vs-seeded)
+        'discovered_catalog',  # #56: persistent catalog (was only bootstrapped by the cron)
+        'discovery_jobs',  # reliability: job+poll for on-demand discovery
     ]
     
     imported = 0
