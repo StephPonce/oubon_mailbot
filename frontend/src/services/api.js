@@ -449,8 +449,14 @@ class OspraAPI {
         return {
           __error: true,
           status: 0,
-          error: error.message || 'Network error reaching discovery API',
-          hint: 'Backend may be down. Check that uvicorn is running on the configured port.',
+          error: import.meta.env.PROD
+            ? 'Discovery is taking longer than expected or the connection dropped. Retry in a moment.'
+            : (error.message || 'Network error reaching discovery API'),
+          // Dev-only hint — prod users were seeing "check that uvicorn is
+          // running" verbatim on ospra.io (reliability spec step 4).
+          hint: import.meta.env.PROD
+            ? null
+            : 'Backend may be down. Check that uvicorn is running on the configured port.',
           products: []
         };
       } finally {
@@ -483,17 +489,81 @@ class OspraAPI {
     qs.set('limit', params.limit || 60);
     const url = `${API_BASE_URL}/api/discovery/catalog?${qs.toString()}`;
     try {
-      const response = await fetch(url);
+      // 25s abort: the catalog read is a fast DB query — if it hasn't
+      // answered in 25s the connection is wedged, and hanging the page
+      // is worse than falling through to the on-demand path.
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      let response;
+      try {
+        response = await fetch(url, { signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!response.ok) {
         console.warn('[API] getCatalog HTTP', response.status);
-        return [];
+        return { products: [], freshness: null, freshnessHours: null };
       }
       const data = await response.json();
-      return Array.isArray(data?.products) ? data.products : [];
+      return {
+        products: Array.isArray(data?.products) ? data.products : [],
+        freshness: data?.catalog_freshness ?? null,
+        freshnessHours: data?.catalog_freshness_hours ?? null,
+      };
     } catch (error) {
       console.error('[API] getCatalog error:', error);
-      return [];
+      return { products: [], freshness: null, freshnessHours: null };
     }
+  }
+
+  /**
+   * Start (or join) the live discovery job for a niche (reliability spec
+   * step 2/3). Replaces the synchronous 45–95s cold-path request. The
+   * backend enforces one live job per niche, so refresh-spam joins the
+   * existing run instead of stacking paid discovery calls.
+   * @returns {Promise<{job: object, joined_existing: boolean}|null>}
+   */
+  async createDiscoveryJob({ niche, count = 20 }) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/discovery/jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...this.getAuthHeaders() },
+        body: JSON.stringify({ niche, count }),
+      });
+      if (!response.ok) {
+        console.warn('[API] createDiscoveryJob HTTP', response.status);
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[API] createDiscoveryJob error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Poll a discovery job until it leaves queued/running, polling every
+   * `intervalMs` (default 3s) up to `timeoutMs` (default 3min).
+   * @returns {Promise<{status: string, error?: string}>} final job state
+   */
+  async pollDiscoveryJob(jobId, { intervalMs = 3000, timeoutMs = 180000 } = {}) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/discovery/jobs/${jobId}`);
+        if (response.ok) {
+          const data = await response.json();
+          const job = data?.job;
+          if (job && job.status !== 'queued' && job.status !== 'running') {
+            return { status: job.status, error: job.error };
+          }
+        }
+      } catch (error) {
+        console.warn('[API] pollDiscoveryJob error (will retry):', error);
+      }
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+    return { status: 'timeout', error: 'Discovery is still running — check back shortly.' };
   }
 
   /**

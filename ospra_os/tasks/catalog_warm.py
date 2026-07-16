@@ -233,16 +233,22 @@ def upsert_product(session, product: dict, niche: str) -> str:
     return "seen"
 
 
-async def warm_niche(niche: str) -> dict:
-    """Run discovery for one niche and persist the results."""
+async def warm_niche(niche: str, count: int = None) -> dict:
+    """Run discovery for one niche and persist the results.
+
+    ``count`` overrides COUNT_PER_NICHE — the discovery-jobs runner passes
+    the caller's (tier-clamped) request size; the cron uses the env default.
+    """
     from ospra_os.intelligence.product_discovery import discover_products
 
-    logger.info(f"[{niche}] discovering (count={COUNT_PER_NICHE})...")
+    if count is None:
+        count = COUNT_PER_NICHE
+    logger.info(f"[{niche}] discovering (count={count})...")
     try:
         # include_captions=False: the cron has no reader for Shopify captions —
         # generating them 2x/day x N niches was pure LLM spend (re-audit M11).
         products = await discover_products(
-            niche=niche, count=COUNT_PER_NICHE, include_captions=False
+            niche=niche, count=count, include_captions=False
         )
     except Exception as e:  # one bad niche must not abort the whole run
         logger.error(f"[{niche}] discovery failed: {e}")
@@ -373,7 +379,20 @@ async def run() -> dict:
     logger.info(f"Catalog warm starting for {len(niches)} niches: {niches}")
     results = []
     for niche in niches:  # serial: discovery is API-heavy; avoid hammering suppliers
-        results.append(await warm_niche(niche))
+        # Per-niche fault isolation at the RUN level. warm_niche already
+        # try/excepts the discovery call, but anything that raised outside
+        # that inner try (session setup, import-time failures, the absence
+        # pass re-raising) aborted the WHOLE batch — one bad niche zeroed
+        # out the refresh for every other niche (July 2026 stale-catalog
+        # incident). One niche's crash must cost exactly one niche.
+        try:
+            results.append(await warm_niche(niche))
+        except Exception as e:
+            logger.error(f"[{niche}] niche run crashed (isolated, continuing): {e}")
+            results.append({
+                "niche": niche, "discovered": 0, "new": 0, "seen": 0,
+                "snapshots": 0, "absences": 0, "error": str(e),
+            })
     total_new = sum(r.get("new", 0) for r in results)
     total_seen = sum(r.get("seen", 0) for r in results)
     total_disc = sum(r.get("discovered", 0) for r in results)

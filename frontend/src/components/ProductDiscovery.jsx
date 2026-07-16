@@ -2690,6 +2690,11 @@ export function ProductDiscovery() {
   // Populated when the discovery API returns a 503 / structured error.
   // Shape: { error, discovery_error, diagnostics, hint, status } or null.
   const [discoveryError, setDiscoveryError] = useState(null);
+  // Catalog freshness meta (discovery-reliability step 1): {at, hours}.
+  // hours > 48 → stale banner instead of presenting old data as current.
+  const [catalogFreshness, setCatalogFreshness] = useState({ at: null, hours: null });
+  // Live-discovery job progress message (step 3 job+poll cold path).
+  const [discoveryProgress, setDiscoveryProgress] = useState(null);
   // Populated when the backend clamped the requested product count to the
   // caller's tier ceiling. Shape:
   //   { tier, per_request_ceiling, requested, clamped } or null.
@@ -2963,7 +2968,12 @@ export function ProductDiscovery() {
       // catalog is empty (cron not yet run) we fall through to on-demand
       // discovery, so the page behaves exactly as before until it's warmed.
       try {
-        const catalog = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        const catalogRes = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        const catalog = catalogRes.products;
+        setCatalogFreshness({
+          at: catalogRes.freshness,
+          hours: catalogRes.freshnessHours,
+        });
         if (Array.isArray(catalog) && catalog.length > 0) {
           const normalized = catalog.map(p => ({
             ...normalizeProduct(p, p.niche || niche),
@@ -2989,14 +2999,41 @@ export function ProductDiscovery() {
         console.warn('[ProductDiscovery] catalog fetch failed, using on-demand discovery', e);
       }
 
-      // Fetch products (same niche for all filter types).
-      // Initial load fetches 20 to stay under Safari's ~60s fetch timeout.
-      // User can click "Load more" to fetch additional pages up to their
-      // tier ceiling (NEST=10, FLIGHT=25, SOAR=50, STRATOSPHERE=100).
-      // AI image generation is MANUAL CLICK ONLY (Stability ~$0.06/img,
-      // per CLAUDE.md standing rule) — defaults to OFF in api layer.
-      const response = await api.discoverProducts({ niche, count: 20 });
-      console.log('[ProductDiscovery] API Response:', response);
+      // COLD PATH (reliability spec step 3): the old synchronous 45–95s
+      // await api.discoverProducts() died somewhere in the browser/proxy/
+      // middleware timeout chain and surfaced as "Discovery unavailable".
+      // Now: POST a discovery job (idempotent per niche — refresh-spam
+      // joins the live run instead of stacking paid API calls), poll every
+      // 3s up to 3min, then re-read the catalog the job wrote into.
+      setDiscoveryProgress('Running live discovery — usually 60–90s');
+      const jobRes = await api.createDiscoveryJob({ niche, count: 20 });
+      if (!jobRes?.job?.id) {
+        setDiscoveryProgress(null);
+        setDiscoveryError({
+          error: import.meta.env.PROD
+            ? 'Discovery could not start. Retry in a moment.'
+            : 'Discovery job POST failed — is the backend running?',
+        });
+        setProducts([]);
+        return;
+      }
+      const finalState = await api.pollDiscoveryJob(jobRes.job.id);
+      setDiscoveryProgress(null);
+
+      if (finalState.status !== 'done') {
+        setDiscoveryError({
+          error: finalState.error
+            || 'Live discovery failed. Retry in a moment.',
+        });
+        setProducts([]);
+        return;
+      }
+
+      // Job done → the results are IN the catalog (single source of truth).
+      const refreshed = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+      setCatalogFreshness({ at: refreshed.freshness, hours: refreshed.freshnessHours });
+      const response = refreshed.products;
+      console.log('[ProductDiscovery] Post-job catalog:', response.length, 'products');
 
       // Structured error from backend (503 with diagnostics) — surface it to the user.
       if (response && response.__error) {
@@ -3101,6 +3138,7 @@ export function ProductDiscovery() {
       console.error('[ProductDiscovery] Failed to load products:', error);
       setProducts([]);
     } finally {
+      setDiscoveryProgress(null);
       setLoading(false);
     }
   };
@@ -3397,6 +3435,12 @@ export function ProductDiscovery() {
               <span className="text-white/30 text-xs hidden md:block">
                 {products.length > 0 && `${products.length} products`}
               </span>
+              {/* Freshness honesty (step 1): say WHEN the data is from. */}
+              {catalogFreshness.at && (
+                <span className="text-white/30 text-xs hidden md:block">
+                  Data from {new Date(catalogFreshness.at + (catalogFreshness.at.endsWith('Z') ? '' : 'Z')).toLocaleDateString()}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -3434,8 +3478,26 @@ export function ProductDiscovery() {
         </div>
       </div>
 
+      {/* Stale-data banner (step 1): freshness > 48h means the catalog cron
+          hasn't refreshed — say so instead of presenting old data as now. */}
+      {catalogFreshness.hours != null && catalogFreshness.hours > 48 && products.length > 0 && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm">
+          These products were last refreshed{' '}
+          {Math.round(catalogFreshness.hours / 24)} days ago — market signals
+          (velocity, competition, timing) may have moved since then.
+        </div>
+      )}
+
       {/* Product Grid */}
       {loading ? (
+        <>
+        {/* Live-discovery progress (step 3): honest status while the job runs. */}
+        {discoveryProgress && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-200 text-sm flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {discoveryProgress}
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="backdrop-blur-xl bg-white/5 rounded-2xl border border-white/10 overflow-hidden animate-pulse">
@@ -3447,6 +3509,7 @@ export function ProductDiscovery() {
             </div>
           ))}
         </div>
+        </>
       ) : products.length > 0 ? (
         <>
           {/* Supplier / warehouse filter chips (Option A) - only show when there's
