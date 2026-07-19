@@ -1326,11 +1326,17 @@ class ProductDiscoveryEngine:
         # Meta/TikTok-Shop/etc. already nailed it.
         if not skip_keyword_search:
             # AliExpress (#AE): DS hot-products feed is PRIMARY (no tracking_id
-            # needed); affiliate keyword search is the FALLBACK for if/when a
-            # tracking_id exists.
+            # needed); affiliate keyword search is the fallback — at RUNTIME,
+            # inside _fetch_aliexpress_ds, when the feed yields nothing (a
+            # stale env token passes is_available() then dies at call time).
             if self.aliexpress_ds_available:
                 supplier_tasks.append(
-                    self._fetch_aliexpress_ds(niche, count=ali_keywords * ali_per_kw)
+                    self._fetch_aliexpress_ds(
+                        niche,
+                        count=ali_keywords * ali_per_kw,
+                        fallback_keywords=trending_keywords[:ali_keywords],
+                        fallback_per_kw=ali_per_kw,
+                    )
                 )
                 task_labels.append(f"aliexpress_ds:{niche}")
             elif self.aliexpress_available:
@@ -1359,7 +1365,18 @@ class ProductDiscoveryEngine:
                 f"   🚀 Launching {len(supplier_tasks)} parallel supplier queries "
                 f"(per-source timeout: {SUPPLIER_SOURCE_TIMEOUT}s)..."
             )
-            supplier_tasks_timed = [_with_timeout(t, SUPPLIER_SOURCE_TIMEOUT) for t in supplier_tasks]
+            # The aliexpress_ds task may run TWO stages (dead DS feed → affiliate
+            # keyword fallback), so it gets double the per-source budget; every
+            # other source keeps the standard timeout.
+            supplier_tasks_timed = [
+                _with_timeout(
+                    t,
+                    SUPPLIER_SOURCE_TIMEOUT * 2
+                    if (task_labels[i] if i < len(task_labels) else "").startswith("aliexpress_ds")
+                    else SUPPLIER_SOURCE_TIMEOUT,
+                )
+                for i, t in enumerate(supplier_tasks)
+            ]
             results = await asyncio.gather(*supplier_tasks_timed, return_exceptions=True)
 
             for i, result in enumerate(results):
@@ -3419,29 +3436,63 @@ class ProductDiscoveryEngine:
     # later for sharper feeds (follow-up).
     _AE_DS_NICHE_CATEGORY: Dict[str, str] = {}
 
-    async def _fetch_aliexpress_ds(self, niche: str, count: int = 40) -> List[Dict]:
+    async def _fetch_aliexpress_ds(
+        self,
+        niche: str,
+        count: int = 40,
+        fallback_keywords: Optional[List[str]] = None,
+        fallback_per_kw: int = 10,
+    ) -> List[Dict]:
         """PRIMARY AliExpress source (#AE): the DS hot-products feed
         (aliexpress.ds.recommend.feed.get). No affiliate tracking_id required.
         Rows come back normalized to the affiliate-product shape (the DS client
         maps them), so downstream readers are unchanged. The feed is niche-wide,
         so we lean on the STEP-3b niche gate (query="" → niche relevance) to trim.
+
+        Runtime fallback (discovery-reliability Step 0): DS "available" only
+        means a token EXISTS — a stale env token passes that check and then
+        dies at call time (IllegalAccessToken with no refresh_token to heal).
+        That exact failure zeroed out ALL AliExpress sourcing from June 29 to
+        mid-July, because the affiliate keyword search lived behind an `elif`
+        on init-time availability and could never run. So when the DS feed
+        yields NOTHING and the affiliate client is up, we now fall through to
+        the affiliate keyword search at runtime — the path that actually built
+        the June 29 catalog (empty tracking_id tolerated by product.query).
         """
-        if not self.aliexpress_ds_available:
+        products: List[Dict] = []
+        if self.aliexpress_ds_available:
+            try:
+                products = await self.aliexpress_ds.get_hot_products(
+                    page_size=min(int(count), 50),
+                    category_ids=self._AE_DS_NICHE_CATEGORY.get(niche),
+                )
+            except Exception as e:
+                logger.warning(f"[AE-DS] feed fetch failed for niche '{niche}': {e}")
+                products = []
+            for p in products:
+                if isinstance(p, dict):
+                    p.setdefault('niche', niche)
+                    p.setdefault('source', 'aliexpress')
+            # Feed isn't keyword-scoped → filter by NICHE relevance, not query overlap.
+            products = self._filter_supplier_results(products, query="", niche=niche)
+
+        if products:
+            return products
+        if not (self.aliexpress_available and fallback_keywords):
             return []
-        try:
-            products = await self.aliexpress_ds.get_hot_products(
-                page_size=min(int(count), 50),
-                category_ids=self._AE_DS_NICHE_CATEGORY.get(niche),
-            )
-        except Exception as e:
-            logger.warning(f"[AE-DS] feed fetch failed for niche '{niche}': {e}")
-            return []
-        for p in products:
-            if isinstance(p, dict):
-                p.setdefault('niche', niche)
-                p.setdefault('source', 'aliexpress')
-        # Feed isn't keyword-scoped → filter by NICHE relevance, not query overlap.
-        return self._filter_supplier_results(products, query="", niche=niche)
+        logger.warning(
+            f"[AE-DS] feed empty/dead for '{niche}' — falling back to affiliate "
+            f"keyword search ({len(fallback_keywords)} keywords)"
+        )
+        results = await asyncio.gather(
+            *(self._fetch_aliexpress(kw, count=fallback_per_kw) for kw in fallback_keywords),
+            return_exceptions=True,
+        )
+        merged: List[Dict] = []
+        for r in results:
+            if isinstance(r, list):
+                merged.extend(r)
+        return merged
 
     async def _fetch_cj(self, keyword: str, count: int, niche: str = None) -> List[Dict]:
         """Fetch from CJ Dropshipping using smart search with keyword mappings.
