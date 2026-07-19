@@ -50,6 +50,10 @@ Not "scaling dropshippers doing $50k+/mo". The real TAM is merchants on Shopify/
 ## D14 — Tests are the commit gate, not linting (locked Pass 4c)
 `npm run lint` is soft-fail in CI until Pass 5. `uv run pytest` is hard-fail. `ruff check` is hard-fail on the Python side. If a deletion would break a test, the deletion is wrong — don't loosen the test.
 
+## D15 — X/Twitter retired as a sentiment source (locked 2026-07-15, owner call)
+X rarely carries organic product talk; the signal was noise-priced at xAI API cost. Backend default already enforces this: `DISCOVERY_DISABLE_X` unset ⇒ disabled (`product_discovery.py:976`). **Do not re-enable X in discovery or re-add it to the frontend signal display.** xAI/Grok remains available as a general AI provider through the D7 abstraction — this retires the *sentiment source*, not the provider. Sentiment moat (D6) is unchanged: Amazon reviews → AliExpress reviews → CJ proxy, plus Reddit where enabled.
+**Trigger to revisit:** a niche demonstrably lights up with real X product chatter, or X search economics change materially.
+
 ---
 
 ## Proposed / not yet locked

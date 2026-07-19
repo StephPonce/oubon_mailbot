@@ -31,7 +31,7 @@ The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a leg
 
 - **Don't add features the user didn't ask for.** If the user hasn't explicitly requested AI image generation, semantic matching as a default, auto-rating, or any other "enhancement" — DON'T do it on the cold path. Such features are manual-click / opt-in by default. The user explicitly called out AI image gen as a manual-click feature that should run only when explicitly invoked, with caching so cost amortizes across users.
 
-- **Use ALL connected APIs by default, not just one.** Discovery should run social sentiment (X/Twitter, Reddit, Amazon reviews via Apify) IN PARALLEL with sourcing (AliExpress, CJ Dropshipping) and winner-proof signals (Meta Ad Library, TikTok Shop, Amazon Movers, Etsy, Pinterest, Google Trends). Don't make any one API the centerpiece — they're all inputs to the same scoring pipeline. Social sentiment FIRST, sourcing second.
+- **Use ALL connected APIs by default, not just one.** Discovery should run social sentiment (Reddit, Amazon reviews via Apify — X/Twitter retired per D15, do not resurrect) IN PARALLEL with sourcing (AliExpress, CJ Dropshipping) and winner-proof signals (Meta Ad Library, TikTok Shop, Amazon Movers, Etsy, Pinterest, Google Trends). Don't make any one API the centerpiece — they're all inputs to the same scoring pipeline. Social sentiment FIRST, sourcing second.
 
 - **Audit your own work before declaring done.** Read back what you wrote. Trace the data flow. Check that the change doesn't break sibling features or introduce duplicate surfaces. If a tab/route/component already exists for this purpose, EXTEND it instead of creating a new one.
 
@@ -41,6 +41,7 @@ The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a leg
 - **Never delete `ospra_os/email_automation/` files.** Email automation is a core feature even when individual files look orphaned. The active chain is `api/email_automation_routes.py` → `email_automation/email_processor.py` → `gmail_client.py` etc.
 - **Preserve all Oubon references.** They tie real production data to the user's storefront.
 - **Run tests before deleting.** `uv run pytest` (or `bash scripts/run_tests.sh`). If a deletion would break a test, stop and ask.
+- **Env-pasted tokens are bootstrap-only.** Every credential must have an armed refresh path or a loud expiry alert. A static secret is a scheduled outage. (Learned 2026-07: CJ + AliExpress tokens expired on schedule in the cron env; nothing alerted; the catalog silently went 16 days stale.)
 - **Never use computer-use** for this project. The user has explicitly disabled it.
 
 ## Development commands
