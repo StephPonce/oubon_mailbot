@@ -233,11 +233,16 @@ def upsert_product(session, product: dict, niche: str) -> str:
     return "seen"
 
 
-async def warm_niche(niche: str, count: int = None) -> dict:
+async def warm_niche(niche: str, count: int = None, include_absences: bool = True) -> dict:
     """Run discovery for one niche and persist the results.
 
     ``count`` overrides COUNT_PER_NICHE — the discovery-jobs runner passes
     the caller's (tier-clamped) request size; the cron uses the env default.
+    ``include_absences=False`` skips the absence-snapshot pass: a small
+    user-triggered job (tier-clamped as low as 10) is NOT a full niche
+    sweep — marking everything outside its pool "absent today" would poison
+    the moat timeseries with false 'gone' signals. Only the cron's full
+    sweep may assert absence.
     """
     from ospra_os.intelligence.product_discovery import discover_products
 
@@ -291,7 +296,7 @@ async def warm_niche(niche: str, count: int = None) -> dict:
         # not that every product vanished — writing absence rows on outage
         # days would poison the presence data with false "gone" signals.
         absences = 0
-        if products:
+        if products and include_absences:
             try:
                 absences = _snapshot_absent_products(session, niche, seen_keys)
             except Exception as e:

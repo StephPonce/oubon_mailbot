@@ -187,3 +187,148 @@ class TestJobRunner:
         assert job.status == ERROR
         assert "supplier exploded" in job.error_text
         s.close()
+
+
+class TestOrphanHardening:
+    """Deploy-restart corpses must never brick a niche (post-#9 hardening).
+
+    The original orphan check only covered status=running — a job killed
+    while QUEUED (restart in the window between the POST's commit and the
+    BackgroundTask starting) matched the POST's queued/running lookup
+    forever: every user joined a corpse that would never run.
+    """
+
+    def test_stuck_queued_corpse_is_reaped_and_unbricks_the_niche(self, jobs_db):
+        from ospra_os.intelligence.unified_discovery_routes import (
+            DiscoveryJobRequest, create_discovery_job, get_discovery_job,
+        )
+
+        s = jobs_db()
+        s.add(DiscoveryJob(
+            niche="smart_home", count=20, status=QUEUED,
+            created_at=datetime.utcnow() - timedelta(minutes=12),
+        ))
+        s.commit()
+        corpse_id = s.query(DiscoveryJob).first().id
+        s.close()
+
+        bg = _NoopBackground()
+        res = asyncio.run(create_discovery_job(
+            DiscoveryJobRequest(niche="smart_home", count=20), bg, None
+        ))
+        # NOT handed the corpse — a fresh job was created and scheduled.
+        assert res["joined_existing"] is False
+        assert res["job"]["id"] != corpse_id
+        assert len(bg.tasks) == 1
+
+        # The corpse itself now reads as a terminal error.
+        corpse = asyncio.run(get_discovery_job(corpse_id))
+        assert corpse["job"]["status"] == ERROR
+        assert "orphaned" in corpse["job"]["error"]
+
+    def test_stuck_queued_corpse_reaped_via_get_too(self, jobs_db):
+        from ospra_os.intelligence.unified_discovery_routes import get_discovery_job
+
+        s = jobs_db()
+        s.add(DiscoveryJob(
+            niche="smart_home", count=20, status=QUEUED,
+            created_at=datetime.utcnow() - timedelta(minutes=12),
+        ))
+        s.commit()
+        job_id = s.query(DiscoveryJob).first().id
+        s.close()
+
+        res = asyncio.run(get_discovery_job(job_id))
+        assert res["job"]["status"] == ERROR
+
+    def test_fresh_queued_job_is_joined_not_reaped(self, jobs_db):
+        from ospra_os.intelligence.unified_discovery_routes import (
+            DiscoveryJobRequest, create_discovery_job,
+        )
+
+        s = jobs_db()
+        s.add(DiscoveryJob(
+            niche="smart_home", count=20, status=QUEUED,
+            created_at=datetime.utcnow(),
+        ))
+        s.commit()
+        live_id = s.query(DiscoveryJob).first().id
+        s.close()
+
+        bg = _NoopBackground()
+        res = asyncio.run(create_discovery_job(
+            DiscoveryJobRequest(niche="smart_home", count=20), bg, None
+        ))
+        assert res["joined_existing"] is True
+        assert res["job"]["id"] == live_id
+        assert len(bg.tasks) == 0
+
+    def test_running_orphan_reaped_on_post_as_well(self, jobs_db):
+        from ospra_os.intelligence.unified_discovery_routes import (
+            DiscoveryJobRequest, create_discovery_job,
+        )
+
+        s = jobs_db()
+        s.add(DiscoveryJob(
+            niche="smart_home", count=20, status=RUNNING,
+            created_at=datetime.utcnow() - timedelta(minutes=15),
+            started_at=datetime.utcnow() - timedelta(minutes=14),
+        ))
+        s.commit()
+        s.close()
+
+        bg = _NoopBackground()
+        res = asyncio.run(create_discovery_job(
+            DiscoveryJobRequest(niche="smart_home", count=20), bg, None
+        ))
+        assert res["joined_existing"] is False
+        assert len(bg.tasks) == 1
+
+
+class TestRunnerContracts:
+    def test_user_job_skips_absence_pass(self, jobs_db, monkeypatch):
+        """A tier-clamped user job is not a full sweep — the runner must call
+        warm_niche with include_absences=False so small pools can't write
+        false 'gone' timeseries rows for everything they didn't include."""
+        from ospra_os.intelligence import unified_discovery_routes as udr
+        from ospra_os.tasks import catalog_warm as cw
+
+        calls = []
+
+        async def fake_warm(niche, count=None, include_absences=True):
+            calls.append({"niche": niche, "count": count,
+                          "include_absences": include_absences})
+            return {"niche": niche, "discovered": 3, "new": 3, "seen": 0}
+
+        monkeypatch.setattr(cw, "warm_niche", fake_warm)
+
+        s = jobs_db()
+        s.add(DiscoveryJob(niche="smart_home", count=10, status=QUEUED,
+                           created_at=datetime.utcnow()))
+        s.commit()
+        job_id = s.query(DiscoveryJob).first().id
+        s.close()
+
+        asyncio.run(udr._run_discovery_job(job_id))
+
+        assert calls and calls[0]["include_absences"] is False
+        s = jobs_db()
+        assert s.query(DiscoveryJob).first().status == DONE
+
+    def test_requested_by_is_populated_from_user_id(self, jobs_db):
+        """TokenPayload has user_id, not .sub — the column was silently NULL
+        for every authenticated caller."""
+        from types import SimpleNamespace
+
+        from ospra_os.intelligence.unified_discovery_routes import (
+            DiscoveryJobRequest, create_discovery_job,
+        )
+
+        caller = SimpleNamespace(user_id=42, tier="soar")
+        asyncio.run(create_discovery_job(
+            DiscoveryJobRequest(niche="smart_home", count=20),
+            _NoopBackground(), caller,
+        ))
+
+        s = jobs_db()
+        assert s.query(DiscoveryJob).first().requested_by == "42"

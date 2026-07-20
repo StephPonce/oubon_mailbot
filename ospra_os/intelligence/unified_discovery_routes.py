@@ -32,6 +32,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
+import asyncio
 import logging
 import os
 import time
@@ -134,7 +135,6 @@ def _source_diagnostics(engine) -> Dict:
 try:
     from ospra_os.product_research.product_cache import (
         get_product_cache,
-        get_products_with_cache,
         TIER_CACHE_TTL,
         SubscriptionTier  # Import from cache module to avoid SQLAlchemy dependency
     )
@@ -757,6 +757,39 @@ class DiscoveryJobRequest(BaseModel):
     count: int = 20
 
 
+# Serializes the POST check-and-create (single web process). Without it, two
+# simultaneous POSTs — two tabs refreshing at once is exactly the refresh-spam
+# scenario — both find no live job and both create+run one, defeating the
+# one-live-job-per-niche cost guard.
+_job_create_lock = asyncio.Lock()
+
+
+def _reap_if_orphaned(session, job) -> None:
+    """Lazy orphan recovery for BOTH live states. RUNNING >10min after
+    started_at is the documented deploy-restart case; a job stuck QUEUED
+    >10min after created_at is the same restart landing in the window
+    between the POST's commit and the BackgroundTask starting — without
+    this, that corpse matches the POST's queued/running lookup forever and
+    permanently bricks the niche's cold path."""
+    from ospra_os.database.discovery_jobs import ERROR, ORPHAN_MINUTES, QUEUED, RUNNING
+
+    if job.status not in (QUEUED, RUNNING):
+        return
+    anchor = job.started_at if job.status == RUNNING else job.created_at
+    if anchor is None:
+        return
+    age_min = (datetime.utcnow() - anchor).total_seconds() / 60
+    if age_min > ORPHAN_MINUTES:
+        stuck_state = job.status
+        job.status = ERROR
+        job.error_text = (
+            f"Job orphaned: still {stuck_state} after {int(age_min)}min "
+            "(likely killed by a deploy restart). Retry to start a new run."
+        )
+        job.finished_at = datetime.utcnow()
+        session.commit()
+
+
 async def _run_discovery_job(job_id: int) -> None:
     """BackgroundTasks runner. Opens short-lived sessions around the long
     discovery run so no DB connection is held for 45–95s."""
@@ -779,7 +812,12 @@ async def _run_discovery_job(job_id: int) -> None:
     result_count = 0
     try:
         from ospra_os.tasks.catalog_warm import warm_niche
-        result = await warm_niche(niche, count=count)
+        # include_absences=False: a tier-clamped user job (as low as 10
+        # products) is not a full niche sweep — letting it write "absent
+        # today" timeseries rows for everything outside its small pool would
+        # poison the moat data with false 'gone' signals. Only the cron's
+        # full sweep may assert absence.
+        result = await warm_niche(niche, count=count, include_absences=False)
         result_count = result.get("discovered", 0)
         # Honesty contract (same as /quick's 503): zero products means the
         # sources failed — report an error, don't pretend an empty success.
@@ -829,33 +867,41 @@ async def create_discovery_job(
     caller_tier = _tier_from_payload(current_user)
     count, _clamped = clamp_request_count(body.count, caller_tier)
 
-    session = SessionLocal()
-    try:
-        existing = (
-            session.query(DiscoveryJob)
-            .filter(
-                DiscoveryJob.niche == niche,
-                DiscoveryJob.status.in_([QUEUED, RUNNING]),
+    async with _job_create_lock:  # two simultaneous POSTs must not double-run
+        session = SessionLocal()
+        try:
+            existing = (
+                session.query(DiscoveryJob)
+                .filter(
+                    DiscoveryJob.niche == niche,
+                    DiscoveryJob.status.in_([QUEUED, RUNNING]),
+                )
+                .order_by(DiscoveryJob.created_at.desc())
+                .first()
             )
-            .order_by(DiscoveryJob.created_at.desc())
-            .first()
-        )
-        if existing is not None:
-            return {"success": True, "job": existing.as_dict(), "joined_existing": True}
+            if existing is not None:
+                # Reap before joining: a deploy-restart corpse (esp. one stuck
+                # QUEUED, which GET's running-only check never touched) must
+                # not be handed back forever — that bricked the niche.
+                _reap_if_orphaned(session, existing)
+                if existing.status in (QUEUED, RUNNING):
+                    return {"success": True, "job": existing.as_dict(), "joined_existing": True}
 
-        job = DiscoveryJob(
-            niche=niche,
-            count=count,
-            status=QUEUED,
-            requested_by=(getattr(current_user, "sub", None) or None),
-            created_at=datetime.utcnow(),
-        )
-        session.add(job)
-        session.commit()
-        job_id = job.id
-        payload = job.as_dict()
-    finally:
-        session.close()
+            job = DiscoveryJob(
+                niche=niche,
+                count=count,
+                status=QUEUED,
+                # TokenPayload has user_id/email — .sub never existed, so this
+                # column was silently always NULL.
+                requested_by=(str(current_user.user_id) if current_user else None),
+                created_at=datetime.utcnow(),
+            )
+            session.add(job)
+            session.commit()
+            job_id = job.id
+            payload = job.as_dict()
+        finally:
+            session.close()
 
     background_tasks.add_task(_run_discovery_job, job_id)
     return {"success": True, "job": payload, "joined_existing": False}
@@ -868,25 +914,14 @@ async def get_discovery_job(job_id: int):
     die with the process) — report it as error so the client can retry,
     instead of polling forever. No reaper process needed."""
     from ospra_os.database.connection import SessionLocal
-    from ospra_os.database.discovery_jobs import ERROR, ORPHAN_MINUTES, RUNNING, DiscoveryJob
+    from ospra_os.database.discovery_jobs import DiscoveryJob
 
     session = SessionLocal()
     try:
         job = session.query(DiscoveryJob).filter_by(id=job_id).first()
         if job is None:
             raise HTTPException(status_code=404, detail="job not found")
-
-        if job.status == RUNNING and job.started_at is not None:
-            age_min = (datetime.utcnow() - job.started_at).total_seconds() / 60
-            if age_min > ORPHAN_MINUTES:
-                job.status = ERROR
-                job.error_text = (
-                    f"Job orphaned: still marked running after {int(age_min)}min "
-                    "(likely killed by a deploy restart). Retry to start a new run."
-                )
-                job.finished_at = datetime.utcnow()
-                session.commit()
-
+        _reap_if_orphaned(session, job)  # covers stuck-QUEUED too, not just running
         return {"success": True, "job": job.as_dict()}
     finally:
         session.close()
