@@ -124,7 +124,9 @@ export function OiChat() {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
-        content: `Connection error: ${error.message}. Make sure the backend is running on localhost:8000.`,
+        content: import.meta.env.PROD
+          ? 'Connection dropped while talking to Oi. Give it a moment and try again.'
+          : `Connection error: ${error.message}. Make sure the backend is running on localhost:8000.`,
         isUser: false,
         timestamp: new Date(),
       }]);

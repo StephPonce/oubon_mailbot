@@ -11,7 +11,7 @@
  * - All images array shown in detail view
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Search, Package, TrendingUp, Rocket, BarChart3, Tag, Loader2, Filter,
   ArrowRight, Eye, AlertTriangle, AlertCircle, RefreshCw, X, ExternalLink, Brain,
@@ -23,6 +23,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useDashboardContext } from '../hooks/useDashboardContext';
 import { useToast } from '../hooks/useToast';
 import { api, API_BASE_URL } from '../services/api';
+import { visibleSocialSections } from '../lib/discoveryDisplay';
 import { capture, EVENTS } from '../services/analytics';
 import { PageLayout } from './Layout';
 import { AIImageComparison } from './AIImageComparison';
@@ -788,6 +789,11 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
   const redditHasRealData = Array.isArray(reddit) && reddit.length > 0;
   const redditSubsSearched = dataSources?.reddit?.subreddits_searched || [];
 
+  // ── SIGNAL DISPLAY CONTRACT (spec Step 5 / D15) ──────────────────────────
+  // Render only sections the backend queried for THIS row; sources marked
+  // "n/a" collapse into one caption line instead of dead metric cards.
+  const { visible: sectionVisible, notQueried } = visibleSocialSections(product);
+
   // ── HELPERS ──────────────────────────────────────────────────────────────
   const formatRelative = (iso) => {
     if (!iso) return '';
@@ -823,6 +829,7 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
       </div>
 
       {/* ── AMAZON SUB-SECTION (Task #18 - primary signal) ──────────────── */}
+      {sectionVisible.amazon_reviews && (
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -1020,11 +1027,17 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
           </div>
         )}
       </div>
+      )}
 
-      {/* Divider */}
-      <div className="border-t border-white/10" />
+      {/* Divider — only between two rendered sections */}
+      {sectionVisible.amazon_reviews && sectionVisible.twitter && (
+        <div className="border-t border-white/10" />
+      )}
 
-      {/* ── TWITTER SUB-SECTION ─────────────────────────────────────────── */}
+      {/* ── TWITTER SUB-SECTION (renders only when this row carries X data
+             or X was actually queried for it — D15 retired X as a sentiment
+             source, so new rows collapse it into the "not queried" line) ── */}
+      {sectionVisible.twitter && (
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -1204,6 +1217,7 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
           </div>
         )}
       </div>
+      )}
 
       {/* ── ALIEXPRESS BUYER SIGNALS SUB-SECTION (Task #25) ─────────────────
           Surfaces the AE rating + recent_sales + buzz_score data that the
@@ -1438,6 +1452,14 @@ function SocialEvidencePanel({ product, twitterEvidence, redditEvidence, amazonE
         )}
       </div>
       </>
+      )}
+
+      {/* Signal display contract: sources NOT queried for this row get one
+          honest caption line — never an empty metric card (spec Step 5). */}
+      {notQueried.length > 0 && (
+        <p className="text-white/30 text-[11px] italic">
+          Not queried for this product: {notQueried.join(', ')}
+        </p>
       )}
     </div>
   );
@@ -2695,6 +2717,11 @@ export function ProductDiscovery() {
   const [catalogFreshness, setCatalogFreshness] = useState({ at: null, hours: null });
   // Live-discovery job progress message (step 3 job+poll cold path).
   const [discoveryProgress, setDiscoveryProgress] = useState(null);
+  // Monotonic load-run token: the cold path can now poll for up to 3
+  // minutes, so a niche switch mid-poll must invalidate the older run —
+  // otherwise the stale poll paints the previous niche's products over the
+  // new one, clobbers freshness, and kills the newer run's skeleton.
+  const loadSeqRef = useRef(0);
   // Populated when the backend clamped the requested product count to the
   // caller's tier ceiling. Shape:
   //   { tier, per_request_ceiling, requested, clamped } or null.
@@ -2919,9 +2946,11 @@ export function ProductDiscovery() {
   };
 
   const loadProducts = async (nicheOverride = null) => {
+    const seq = ++loadSeqRef.current;  // invalidates any older in-flight run
     setHasMockData(false);
     setHasEstimatedScores(false);
     setDiscoveryError(null);
+    setDiscoveryProgress(null);  // a superseded run's banner must not linger
 
     // Use override niche if provided (from niche chip click), else use current niche
     const niche = nicheOverride || currentNiche;
@@ -2969,6 +2998,7 @@ export function ProductDiscovery() {
       // discovery, so the page behaves exactly as before until it's warmed.
       try {
         const catalogRes = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+        if (seq !== loadSeqRef.current) return;  // superseded by a newer load
         const catalog = catalogRes.products;
         setCatalogFreshness({
           at: catalogRes.freshness,
@@ -3007,6 +3037,7 @@ export function ProductDiscovery() {
       // 3s up to 3min, then re-read the catalog the job wrote into.
       setDiscoveryProgress('Running live discovery — usually 60–90s');
       const jobRes = await api.createDiscoveryJob({ niche, count: 20 });
+      if (seq !== loadSeqRef.current) return;  // user moved on mid-start
       if (!jobRes?.job?.id) {
         setDiscoveryProgress(null);
         setDiscoveryError({
@@ -3019,6 +3050,7 @@ export function ProductDiscovery() {
       }
       const finalState = await api.pollDiscoveryJob(jobRes.job.id);
       setDiscoveryProgress(null);
+      if (seq !== loadSeqRef.current) return;  // user moved on mid-poll
 
       if (finalState.status !== 'done') {
         setDiscoveryError({
@@ -3031,6 +3063,7 @@ export function ProductDiscovery() {
 
       // Job done → the results are IN the catalog (single source of truth).
       const refreshed = await api.getCatalog({ niche, sort: 'score', limit: 60 });
+      if (seq !== loadSeqRef.current) return;  // superseded during re-read
       setCatalogFreshness({ at: refreshed.freshness, hours: refreshed.freshnessHours });
       const response = refreshed.products;
       console.log('[ProductDiscovery] Post-job catalog:', response.length, 'products');
@@ -3136,10 +3169,14 @@ export function ProductDiscovery() {
       }
     } catch (error) {
       console.error('[ProductDiscovery] Failed to load products:', error);
-      setProducts([]);
+      if (seq === loadSeqRef.current) setProducts([]);
     } finally {
-      setDiscoveryProgress(null);
-      setLoading(false);
+      // A superseded run must not clear the newer run's banner/skeleton —
+      // each new run resets progress at entry, so gating on seq is safe.
+      if (seq === loadSeqRef.current) {
+        setDiscoveryProgress(null);
+        setLoading(false);
+      }
     }
   };
   
