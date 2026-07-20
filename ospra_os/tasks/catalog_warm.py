@@ -369,6 +369,29 @@ def _snapshot_absent_products(session, niche: str, seen_keys: set) -> int:
 
 async def run() -> dict:
     _bootstrap_table()
+    # Credential health FIRST (spec Step 6): a disarmed self-healer is a
+    # scheduled outage — say so at the top of every run, at 14 days TO death
+    # instead of 14 days after. The warm still runs (the check must never
+    # cause the outage it prevents); main() turns alerts into a red exit.
+    credential_alerts: list = []
+    try:
+        from ospra_os.core.credential_health import credential_health
+        health = credential_health()
+        credential_alerts = health.get("alerts", [])
+        for alert in credential_alerts:
+            logger.error(f"[ALERT][CREDENTIAL] {alert}")
+        logger.info(
+            "[CRED-HEALTH] cj(present=%s armed=%s) ae_ds(token=%s refresh_seeded=%s "
+            "days_to_expiry=%s) ae_affiliate(configured=%s tracking_id=%s)",
+            health["cj"]["present"], health["cj"]["healer_armed"],
+            health["aliexpress_ds"]["token_source"],
+            health["aliexpress_ds"]["refresh_seeded"],
+            health["aliexpress_ds"]["days_to_expiry"],
+            health["aliexpress_affiliate"]["configured"],
+            health["aliexpress_affiliate"]["tracking_id_set"],
+        )
+    except Exception as e:
+        logger.warning(f"[CRED-HEALTH] check failed (non-fatal): {e}")
     # Reset the per-run Apify circuit breaker / spend counters (cost brief).
     try:
         from ospra_os.product_research.connectors.apify.base_apify import reset_apify_budget
@@ -428,6 +451,7 @@ async def run() -> dict:
         "niches": len(niches), "discovered": total_disc, "new": total_new,
         "seen": total_seen, "snapshots": total_snap,
         "apify": apify_report, "by_niche": results,
+        "credential_alerts": credential_alerts,
     }
 
 
@@ -446,6 +470,18 @@ def main() -> None:
         or (result.get("discovered", 0) > 0 and result.get("snapshots", 0) == 0)
     ):
         sys.exit(2)
+    # Spec Step 6: a load-bearing self-healer is disarmed → the NEXT token
+    # expiry is a scheduled outage. Red the run even though today's warm
+    # succeeded — fail at 14 days TO death, not 14 days after. Exit 3 so the
+    # cron history distinguishes "credential debt" from "sources dead" (2).
+    if result.get("credential_alerts"):
+        logger.error(
+            "[ALERT] Warm completed but %d credential alert(s) are pending "
+            "(see [ALERT][CREDENTIAL] lines above). Exiting non-zero so this "
+            "shows red in Render.",
+            len(result["credential_alerts"]),
+        )
+        sys.exit(3)
 
 
 if __name__ == "__main__":

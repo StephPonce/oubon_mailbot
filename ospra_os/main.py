@@ -1280,11 +1280,21 @@ def health_check_immediate():
         or os.getenv("GIT_COMMIT")
         or "unknown"
     )
+    # Credential health (discovery-reliability Step 6): booleans/day-counts
+    # only — never secret material. Guarded so /health can never break; a
+    # non-empty credentials.alerts list means a token WILL die on schedule.
+    credentials = None
+    try:
+        from ospra_os.core.credential_health import credential_health
+        credentials = credential_health()
+    except Exception:
+        credentials = {"error": "credential health unavailable"}
     return {
         "status": "ok",
         "service": "Ospra Intelligence Platform",
         "version": "2026-01-11",
         "commit": commit[:12],
+        "credentials": credentials,
     }
 
 @app.get("/health/celery")
