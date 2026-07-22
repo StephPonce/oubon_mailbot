@@ -166,6 +166,20 @@ class RecommendationOutcome(Base):
     )
 
 
+# ── Learning-event provenance contract (seed-data purge, 2026-07) ──────────
+# 'historical_sale' rows are SEEDED imports (scripts/seed_learning_from_shopify
+# .py backfilled a year of Shopify history in one batch), not organic
+# platform-attributed outcomes. Migration 008 purged the existing batch
+# (product_performance 2025-12-09 snapshot rows, every historical_sale event,
+# and the seeder-derived global_learning_weights baseline). These constants
+# are the READ-PATH guard: every aggregation that counts sales must use
+# ORGANIC_SALE_EVENT_TYPES, so re-running the seeder can never feed the
+# learning system again. If a new import/backfill event type is ever added,
+# it belongs in SEEDED_EVENT_TYPES — never in the organic tuple.
+SEEDED_EVENT_TYPES = ("historical_sale",)
+ORGANIC_SALE_EVENT_TYPES = ("sale",)
+
+
 class AILearningEvent(Base):
     """
     Individual learning events derived from outcomes.

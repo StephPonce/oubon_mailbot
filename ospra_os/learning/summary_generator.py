@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ospra_os.database import SessionLocal
+from ospra_os.database.performance_models import ORGANIC_SALE_EVENT_TYPES
 from ospra_os.learning.hybrid_learning_engine import LearningEvent
 from ospra_os.learning.summary_models import (
     LearningSummary,
@@ -163,7 +164,7 @@ def _compute_overall_performance(events: List[LearningEvent]) -> Dict[str, Any]:
         details = event.details
         event_type = event.event_type
 
-        if event_type in ["sale", "historical_sale"]:
+        if event_type in ORGANIC_SALE_EVENT_TYPES:
             revenue = details.get("revenue", 0)
             quantity = details.get("quantity", 0)
 
@@ -183,7 +184,7 @@ def _compute_overall_performance(events: List[LearningEvent]) -> Dict[str, Any]:
     best_month = max(sales_by_month.items(), key=lambda x: x[1])[0] if sales_by_month else "N/A"
     best_month_revenue = sales_by_month.get(best_month, 0)
 
-    total_sales = len([e for e in events if e.event_type in ["sale", "historical_sale"]])
+    total_sales = len([e for e in events if e.event_type in ORGANIC_SALE_EVENT_TYPES])
 
     avg_revenue_per_product = total_revenue / len(products_deployed) if products_deployed else 0
 
@@ -214,7 +215,7 @@ def _compute_niche_insights(events: List[LearningEvent], db: Session, user_id: i
         details = event.details
         niche = details.get("niche", "unknown")
 
-        if event.event_type in ["sale", "historical_sale"]:
+        if event.event_type in ORGANIC_SALE_EVENT_TYPES:
             revenue = details.get("revenue", 0)
             quantity = details.get("quantity", 0)
             price = details.get("price", 0)
@@ -280,7 +281,7 @@ def _compute_product_rankings(events: List[LearningEvent]) -> tuple:
         if details.get("niche"):
             product_stats[product_id]["niche"] = details["niche"]
 
-        if event.event_type in ["sale", "historical_sale"]:
+        if event.event_type in ORGANIC_SALE_EVENT_TYPES:
             product_stats[product_id]["revenue"] += details.get("revenue", 0)
             product_stats[product_id]["units"] += details.get("quantity", 0)
 
@@ -321,7 +322,7 @@ def _compute_price_insights(events: List[LearningEvent]) -> Dict[str, Any]:
     }
 
     for event in events:
-        if event.event_type not in ["sale", "historical_sale"]:
+        if event.event_type not in ORGANIC_SALE_EVENT_TYPES:
             continue
 
         details = event.details

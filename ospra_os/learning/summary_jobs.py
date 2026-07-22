@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from ospra_os.database import SessionLocal
+from ospra_os.database.performance_models import ORGANIC_SALE_EVENT_TYPES
 from ospra_os.learning.summary_generator import generate_daily_summaries
 from ospra_os.learning.summary_models import (
     LearningSummary,
@@ -135,7 +136,7 @@ def _update_niche_performance(user_id: int, db: SessionLocal):
     # Get all sales events
     sales = db.query(LearningEvent).filter(
         LearningEvent.user_id == user_id,
-        LearningEvent.event_type.in_(['sale', 'historical_sale'])
+        LearningEvent.event_type.in_(ORGANIC_SALE_EVENT_TYPES)  # provenance guard
     ).all()
 
     # Aggregate by niche
@@ -224,7 +225,7 @@ def _update_product_performance(user_id: int, db: SessionLocal):
             }
 
         # Sale events
-        if event.event_type in ['sale', 'historical_sale']:
+        if event.event_type in ORGANIC_SALE_EVENT_TYPES:
             product_stats[product_id]['total_revenue'] += details.get('revenue', 0)
             product_stats[product_id]['total_units_sold'] += details.get('quantity', details.get('units_sold', 0))
             product_stats[product_id]['prices'].append(details.get('price', 0))
@@ -317,7 +318,7 @@ def _update_time_series(user_id: int, db: SessionLocal):
     for event in events:
         details = event.details
 
-        if event.event_type in ['sale', 'historical_sale']:
+        if event.event_type in ORGANIC_SALE_EVENT_TYPES:
             total_revenue += details.get('revenue', 0)
             total_units += details.get('quantity', details.get('units_sold', 0))
 

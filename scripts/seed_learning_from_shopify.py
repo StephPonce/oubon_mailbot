@@ -3,6 +3,12 @@
 Seed Learning System from Shopify Historical Data
 ==================================================
 
+⚠ QUARANTINED (2026-07, migration 008): the learning read paths now count
+ORGANIC_SALE_EVENT_TYPES only (ospra_os/database/performance_models.py) —
+'historical_sale' events this script writes are ignored by every weight/
+pattern/summary aggregation, and the original December-2025 batch was
+purged. Running it again inserts inert rows. Kept for reference only.
+
 This script populates the learning database with historical Shopify orders and products.
 
 Usage:

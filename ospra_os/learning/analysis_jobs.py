@@ -17,6 +17,7 @@ from collections import defaultdict
 from typing import List, Dict, Any
 
 from ospra_os.database import SessionLocal, User
+from ospra_os.database.performance_models import ORGANIC_SALE_EVENT_TYPES
 from ospra_os.learning.hybrid_learning_engine import (
     LearningEvent,
     GlobalLearningWeights,
@@ -80,7 +81,7 @@ async def calculate_global_patterns():
                 unique_users.add(event.user_id)
 
             # Process sales events
-            if event_type in ["sale", "historical_sale"]:
+            if event_type in ORGANIC_SALE_EVENT_TYPES:  # provenance guard: seeded imports never count
                 niche = details.get("niche", "unknown")
                 price = details.get("price", 0)
                 quantity = details.get("quantity", 0)
@@ -167,7 +168,7 @@ async def calculate_global_patterns():
                     "note": "Accuracy tracking coming soon"
                 },
                 total_users_contributing=len(unique_users),
-                total_sales_analyzed=len([e for e in events if e.event_type in ["sale", "historical_sale"]]),
+                total_sales_analyzed=len([e for e in events if e.event_type in ORGANIC_SALE_EVENT_TYPES]),
                 total_revenue_analyzed=total_revenue
             )
             db.add(global_weights)
@@ -177,7 +178,7 @@ async def calculate_global_patterns():
             global_weights.niche_confidence = niche_confidence
             global_weights.price_confidence = price_confidence
             global_weights.total_users_contributing = len(unique_users)
-            global_weights.total_sales_analyzed = len([e for e in events if e.event_type in ["sale", "historical_sale"]])
+            global_weights.total_sales_analyzed = len([e for e in events if e.event_type in ORGANIC_SALE_EVENT_TYPES])
             global_weights.total_revenue_analyzed = total_revenue
             global_weights.updated_at = datetime.now(timezone.utc)
 
@@ -185,7 +186,7 @@ async def calculate_global_patterns():
 
         logger.info("[SUCCESS] Global patterns calculated:")
         logger.info(f"   Top niches: {', '.join([f'{n}({c:.1%})' for n, c in top_niches])}")
-        logger.info(f"   Total sales: {len([e for e in events if e.event_type in ['sale', 'historical_sale']])}")
+        logger.info(f"   Total sales: {len([e for e in events if e.event_type in ORGANIC_SALE_EVENT_TYPES])}")
         logger.info(f"   Total revenue: ${total_revenue:,.2f}")
         logger.info(f"   Users contributing: {len(unique_users)}")
 
@@ -240,7 +241,7 @@ async def calculate_personal_patterns(user_id: int):
             details = event.details
             event_type = event.event_type
 
-            if event_type in ["sale", "historical_sale"]:
+            if event_type in ORGANIC_SALE_EVENT_TYPES:  # provenance guard: seeded imports never count
                 niche = details.get("niche", "unknown")
                 price = details.get("price", 0)
                 revenue = details.get("revenue", 0)
