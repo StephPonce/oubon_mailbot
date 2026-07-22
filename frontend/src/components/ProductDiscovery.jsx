@@ -2945,7 +2945,7 @@ export function ProductDiscovery() {
     }
   };
 
-  const loadProducts = async (nicheOverride = null) => {
+  const loadProducts = async (nicheOverride = null, { forceLive = false } = {}) => {
     const seq = ++loadSeqRef.current;  // invalidates any older in-flight run
     setHasMockData(false);
     setHasEstimatedScores(false);
@@ -2965,7 +2965,7 @@ export function ProductDiscovery() {
     const cacheKey = `ospra_products_v1:${niche}`;
     let usedCache = false;
     try {
-      const raw = localStorage.getItem(cacheKey);
+      const raw = forceLive ? null : localStorage.getItem(cacheKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         const age = Date.now() - (parsed.savedAt || 0);
@@ -2986,8 +2986,10 @@ export function ProductDiscovery() {
     } catch (e) {
       console.warn('[ProductDiscovery] cache read failed:', e);
     }
-    // Only show skeleton when we didn't have a cache hit
-    if (!usedCache) setLoading(true);
+    // Only show skeleton when we didn't have a cache hit. forceLive keeps the
+    // current grid visible — the progress banner narrates the live run instead
+    // of blanking 60-90s of perfectly good products.
+    if (!usedCache && !forceLive) setLoading(true);
 
     try {
       console.log(`[ProductDiscovery] Loading products for niche: ${niche}`);
@@ -2996,7 +2998,10 @@ export function ProductDiscovery() {
       // proof-age + competition, populated by the catalog_warm cron. When the
       // catalog is empty (cron not yet run) we fall through to on-demand
       // discovery, so the page behaves exactly as before until it's warmed.
-      try {
+      // "New Search" (forceLive) skips this fast-path entirely and goes
+      // straight to a live discovery job; the job writes into the catalog and
+      // the post-job re-read below renders it (single source of truth).
+      if (!forceLive) try {
         const catalogRes = await api.getCatalog({ niche, sort: 'score', limit: 60 });
         if (seq !== loadSeqRef.current) return;  // superseded by a newer load
         const catalog = catalogRes.products;
@@ -3497,6 +3502,24 @@ export function ProductDiscovery() {
                     <span className="sm:hidden">Enhance</span>
                   </>
                 )}
+              </button>
+              {/* New Search: user-triggered live discovery for the current
+                  niche. POST /jobs is idempotent per niche server-side, so
+                  mashing this joins the running job instead of stacking paid
+                  API calls. Grid stays visible; banner narrates progress. */}
+              <button
+                onClick={() => loadProducts(null, { forceLive: true })}
+                disabled={!!discoveryProgress}
+                title="Run a fresh live discovery for this niche (usually 60–90s)"
+                className="px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-medium hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5 transition-all"
+              >
+                {discoveryProgress ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline">New Search</span>
+                <span className="sm:hidden">Search</span>
               </button>
             </div>
           </div>
