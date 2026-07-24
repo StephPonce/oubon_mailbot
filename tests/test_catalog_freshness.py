@@ -85,3 +85,36 @@ class TestCatalogFreshness:
         res = await _get_catalog(niche="ghost_niche")
         assert res["catalog_freshness"] is None
         assert res["catalog_freshness_hours"] is None
+
+
+class TestCatalogTitleDedupe:
+    """AE sellers double-list the same product under different supplier ids —
+    distinct identity keys, identical titles (live: 4 dupe titles in tech's
+    top 10). The read path must serve each title once, best row first."""
+
+    @pytest.mark.asyncio
+    async def test_duplicate_titles_served_once_best_score_wins(self, catalog_db, monkeypatch):
+        from ospra_os.database.discovered_catalog import DiscoveredProduct
+        import ospra_os.database.connection as conn
+
+        s = conn.SessionLocal()
+        for key, title, score in (
+            ("k-dupe-1", "TWS Wireless Earphones", 80.0),
+            ("k-dupe-2", "TWS Wireless Earphones", 40.0),   # same title, other seller
+            ("k-dupe-3", "tws wireless earphones", 30.0),   # case variant
+            ("k-uniq-1", "Magnetic Watch Charger", 60.0),
+        ):
+            s.add(DiscoveredProduct(
+                product_key=key, niche="tech", title=title, score=score,
+                payload={"title": title},
+            ))
+        s.commit()
+        s.close()
+
+        res = await _get_catalog(niche="tech")
+        titles = [(p.get("title") or "").lower() for p in res["products"]]
+        assert titles.count("tws wireless earphones") == 1
+        assert len(res["products"]) == 2
+        # Best-scored copy is the survivor (default sort is score desc).
+        kept = next(p for p in res["products"] if (p.get("title") or "").lower() == "tws wireless earphones")
+        assert kept["catalog_score"] == 80.0

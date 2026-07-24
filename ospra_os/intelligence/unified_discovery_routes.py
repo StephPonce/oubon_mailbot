@@ -691,9 +691,23 @@ async def get_catalog(
         else:
             q = q.order_by(DiscoveredProduct.score.desc())
 
-        rows = q.limit(limit).all()
+        # Display-dedupe by normalized title (2026-07-22): AE sellers double-
+        # list the same item under different supplier ids, so identity-keyed
+        # catalog rows can carry identical titles (observed live: 4 duplicate
+        # titles in tech's top 10). Keep the FIRST row under the active sort
+        # (= best-scored on the default); over-fetch 2x so dedupe doesn't
+        # shrink the page below `limit`.
+        rows = q.limit(limit * 2).all()
         products = []
+        seen_titles = set()
         for r in rows:
+            if len(products) >= limit:
+                break
+            title_key = (r.title or "").strip().lower()
+            if title_key:
+                if title_key in seen_titles:
+                    continue
+                seen_titles.add(title_key)
             payload = dict(r.payload or {})
             payload.update({
                 "catalog_grade": r.grade,
