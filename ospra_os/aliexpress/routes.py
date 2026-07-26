@@ -146,7 +146,14 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
             detail="AliExpress App Secret not configured. Set OUBONSHOP_ALIEXPRESS_APP_SECRET environment variable."
         )
 
-    redirect_uri = f"{settings.base_url}/aliexpress/callback"
+    # Must EXACTLY match the callback registered in the AliExpress console.
+    # Render sets ALIEXPRESS_REDIRECT_URI to the registered value
+    # (/api/aliexpress/callback — the api/aliexpress_oauth.py handler, which
+    # exchanges the code and saves api_type="dropship" + refresh_token).
+    redirect_uri = (
+        os.getenv("ALIEXPRESS_REDIRECT_URI", "").strip()
+        or f"{settings.base_url}/aliexpress/callback"
+    )
 
     return AliExpressOAuth(
         app_key=settings.ALIEXPRESS_API_KEY,
