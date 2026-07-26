@@ -157,8 +157,10 @@ def get_oauth_client(
         # Derive from the live request host (Render terminates TLS, so force
         # https for any non-localhost host). Path must be the one registered:
         # /api/aliexpress/callback (api/aliexpress_oauth.py handler).
-        host = request.headers.get("host", "").strip()
-        if host and not host.startswith(("localhost", "127.0.0.1")):
+        # Security: never trust the raw Host header (host-header injection) —
+        # only accept the known production host.
+        host = request.headers.get("host", "").split(":")[0].strip().lower()
+        if host == "ospra-intelligence-api.onrender.com":
             redirect_uri = f"https://{host}/api/aliexpress/callback"
         else:
             redirect_uri = f"{settings.base_url}/api/aliexpress/callback"
