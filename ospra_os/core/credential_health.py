@@ -90,7 +90,8 @@ def credential_health() -> dict:
         alerts.append(
             "AliExpress DS token has NO stored refresh_token (env bootstrap "
             "token): it will die on expiry and cannot self-heal — visit "
-            "/api/aliexpress/auth/start to seed OAuth. (Affiliate fallback "
+            "/aliexpress/auth/start?key=<AE_OAUTH_SETUP_KEY> to seed OAuth. "
+            "(Affiliate fallback "
             "keeps AE sourcing alive meanwhile.)"
         )
 

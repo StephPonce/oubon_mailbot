@@ -4,7 +4,7 @@ import os
 from datetime import time as time_cls
 from functools import lru_cache
 from typing import Dict, List, Optional
-from pydantic import EmailStr, Field, field_validator
+from pydantic import AliasChoices, EmailStr, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -184,8 +184,20 @@ class Settings(BaseSettings):
     SHOPIFY_MODE: str = Field(default="safe")  # "safe" or "live" mode for deployments
 
     # AliExpress
-    ALIEXPRESS_API_KEY: Optional[str] = None  # App Key
-    ALIEXPRESS_APP_SECRET: Optional[str] = None  # App Secret
+    # App Key — Render's env sets ALIEXPRESS_APP_KEY (AliExpress's own naming);
+    # accept both so the OAuth routes don't 500 on a name mismatch.
+    ALIEXPRESS_API_KEY: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "ALIEXPRESS_API_KEY", "ALIEXPRESS_APP_KEY", "OUBONSHOP_ALIEXPRESS_API_KEY"
+        ),
+    )
+    ALIEXPRESS_APP_SECRET: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices(
+            "ALIEXPRESS_APP_SECRET", "OUBONSHOP_ALIEXPRESS_APP_SECRET"
+        ),
+    )
 
     # Webhook Security (Phase 2A Security)
     SHOPIFY_WEBHOOK_SECRET: Optional[str] = None  # Shopify webhook signature verification
