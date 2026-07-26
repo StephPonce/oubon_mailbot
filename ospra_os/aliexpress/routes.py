@@ -26,7 +26,7 @@ next manual reauth.
 import asyncio
 import os
 import logging
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from fastapi.responses import RedirectResponse, JSONResponse
 from typing import Optional
 from datetime import datetime
@@ -132,7 +132,9 @@ def _load_platform_credential() -> Optional[dict]:
     }
 
 
-def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOAuth:
+def get_oauth_client(
+    request: Request, settings: Settings = Depends(get_settings)
+) -> AliExpressOAuth:
     """Get configured OAuth client."""
     # Validate required settings
     if not settings.ALIEXPRESS_API_KEY:
@@ -150,10 +152,16 @@ def get_oauth_client(settings: Settings = Depends(get_settings)) -> AliExpressOA
     # Render sets ALIEXPRESS_REDIRECT_URI to the registered value
     # (/api/aliexpress/callback — the api/aliexpress_oauth.py handler, which
     # exchanges the code and saves api_type="dropship" + refresh_token).
-    redirect_uri = (
-        os.getenv("ALIEXPRESS_REDIRECT_URI", "").strip()
-        or f"{settings.base_url}/aliexpress/callback"
-    )
+    redirect_uri = os.getenv("ALIEXPRESS_REDIRECT_URI", "").strip()
+    if not redirect_uri:
+        # Derive from the live request host (Render terminates TLS, so force
+        # https for any non-localhost host). Path must be the one registered:
+        # /api/aliexpress/callback (api/aliexpress_oauth.py handler).
+        host = request.headers.get("host", "").strip()
+        if host and not host.startswith(("localhost", "127.0.0.1")):
+            redirect_uri = f"https://{host}/api/aliexpress/callback"
+        else:
+            redirect_uri = f"{settings.base_url}/api/aliexpress/callback"
 
     return AliExpressOAuth(
         app_key=settings.ALIEXPRESS_API_KEY,
