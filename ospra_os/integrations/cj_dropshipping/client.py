@@ -273,6 +273,15 @@ class CJDropshippingClient:
     async def _request_locked(self, endpoint: str, params: dict = None,
                               _auth_retried: bool = False) -> Optional[Dict]:
         """Inner request implementation. Assumes `_request_lock` is held."""
+        # No token yet (CJ_EMAIL/CJ_API_KEY-only deploy): mint one BEFORE the
+        # first request. Without this, aiohttp raises on the None header value
+        # ("Cannot serialize non-str key None") and that exception path never
+        # reaches the 401 self-healer — CJ stays dead despite armed creds.
+        if not self.access_token:
+            if not await self._refresh_access_token():
+                logger.error("[ERROR] CJ has no access token and could not mint one")
+                return None
+
         # Rate limiting
         await self._rate_limit_wait()
 
