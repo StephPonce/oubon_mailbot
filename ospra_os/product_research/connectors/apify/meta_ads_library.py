@@ -233,6 +233,15 @@ class MetaAdsLibraryApify:
             logger.warning("meta_ads_library: actor run failed: %s", exc)
             return {"available": False, "error": str(exc), "keyword": keyword}
 
+        # An Apify outage serves the last good answer from the response cache,
+        # marked stale. Surface that so saturation scoring can weight it at half
+        # instead of dropping the winner-proof signal entirely.
+        from ospra_os.product_research.connectors.apify.response_cache import (
+            is_stale_payload,
+        )
+
+        served_stale = is_stale_payload(results)
+
         if not results:
             return {
                 "available": False,
@@ -267,6 +276,7 @@ class MetaAdsLibraryApify:
             "keyword": keyword,
             "country": country,
             "ad_count": len(ads),
+            "stale": served_stale,
             "ads": ads,
             "advertisers": advertisers,
             "winners": winners,

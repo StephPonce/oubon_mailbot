@@ -442,8 +442,16 @@ def _compute_saturation(product: Dict) -> Dict:
         else:
             sat = 0.10
         signals['meta_advertiser_density'] = round(sat, 3)
-        weighted_sum += sat * 0.25
-        weight_total += 0.25
+        # A STALE reading (served from the response cache during an Apify
+        # outage) still tells us the SHAPE of the market — it just tells us
+        # about an earlier day. Half weight: the score keeps using it, but
+        # confidence lands between "fresh signal" and "no signal at all".
+        meta_weight = 0.125 if product.get('meta_niche_stale') else 0.25
+        signals['meta_advertiser_density_stale'] = bool(
+            product.get('meta_niche_stale')
+        )
+        weighted_sum += sat * meta_weight
+        weight_total += meta_weight
 
     if weight_total == 0:
         # No saturation data at all — return unknown / neutral.
@@ -2991,6 +2999,13 @@ class ProductDiscoveryEngine:
         else:
             direction = 'FALLING'
 
+        # True when ANY sub-query was answered from an expired response cache
+        # (Apify outage). The reading is still usable — it just describes an
+        # earlier day — so scoring weights it at half rather than dropping it.
+        served_stale = any(
+            isinstance(r, dict) and r.get('stale') for r in results
+        )
+
         # Stash structured data on the engine for the scoring pass.
         self._meta_winners_cache = {
             'niche': niche,
@@ -2999,6 +3014,7 @@ class ProductDiscoveryEngine:
             'winners': winners,
             'advertisers': advertisers,
             'ad_count': total_ad_count,
+            'stale': served_stale,
             'fetched_at': datetime.now().isoformat(),
             # Task #9: niche-filter transparency
             'niche_filter': {
@@ -5795,10 +5811,17 @@ class ProductDiscoveryEngine:
         # collected — _compute_saturation then skips this signal.
         meta_cache = getattr(self, "_meta_winners_cache", None) or {}
         meta_niche_advertiser_count = len(meta_cache.get("advertisers") or [])
+        meta_niche_stale = bool(meta_cache.get("stale"))
         if meta_niche_advertiser_count > 0:
             logger.info(
                 f"[meta-saturation] niche has {meta_niche_advertiser_count} "
                 f"active advertisers — feeding into saturation scoring"
+            )
+        if meta_niche_stale and meta_niche_advertiser_count > 0:
+            logger.warning(
+                "[meta-saturation] advertiser count came from STALE cache "
+                "(Apify unavailable) — saturation signal carries reduced "
+                "confidence this run"
             )
         for product in products:
             data_sources = product.get('data_sources', {})
@@ -5808,6 +5831,8 @@ class ProductDiscoveryEngine:
             # Task #9 Phase 2 — direct market-crowding measure.
             if meta_niche_advertiser_count > 0:
                 product['meta_niche_advertiser_count'] = meta_niche_advertiser_count
+                if meta_niche_stale:
+                    product['meta_niche_stale'] = True
 
             # ================================================================
             # RELEVANCE CHECK - Filter off-topic products

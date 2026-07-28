@@ -277,6 +277,70 @@ async def test_tripped_breaker_serves_stale_instead_of_empty(engine, monkeypatch
     base_apify.reset_apify_budget()
 
 
+def test_saturation_halves_weight_for_stale_meta():
+    """A stale Meta reading still describes the market — it just describes last
+    week's. Half weight keeps the score and lands confidence between
+    fresh-signal and no-signal."""
+    from ospra_os.intelligence.product_discovery import _compute_saturation
+
+    fresh = _compute_saturation({"meta_niche_advertiser_count": 10})
+    stale = _compute_saturation(
+        {"meta_niche_advertiser_count": 10, "meta_niche_stale": True}
+    )
+    none_ = _compute_saturation({})
+
+    assert stale["score"] == fresh["score"]
+    assert none_["confidence"] < stale["confidence"] < fresh["confidence"]
+    assert stale["confidence"] == pytest.approx(0.125)
+    assert fresh["confidence"] == pytest.approx(0.25)
+
+
+@pytest.mark.asyncio
+async def test_meta_connector_propagates_stale_flag(monkeypatch):
+    from ospra_os.product_research.connectors.apify.meta_ads_library import (
+        MetaAdsLibraryApify,
+    )
+    from ospra_os.product_research.connectors.apify.response_cache import CACHE_MARKER
+
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    scraper = MetaAdsLibraryApify(api_token="test-token")
+
+    stale_raw = {
+        "ad_archive_id": "1", "page_id": "p1", "page_name": "Acme",
+        "body": "buy now",
+        CACHE_MARKER: {"stale": True, "fetched_at": "2026-07-01T00:00:00"},
+    }
+
+    async def fake_run_actor(**kwargs):
+        return [stale_raw]
+
+    monkeypatch.setattr(scraper.client, "run_actor", fake_run_actor)
+    result = await scraper.search_active_ads(keyword="smart plug")
+    assert result["available"] is True
+    assert result["stale"] is True
+
+
+@pytest.mark.asyncio
+async def test_meta_connector_fresh_payload_is_not_stale(monkeypatch):
+    from ospra_os.product_research.connectors.apify.meta_ads_library import (
+        MetaAdsLibraryApify,
+    )
+
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    scraper = MetaAdsLibraryApify(api_token="test-token")
+
+    async def fake_run_actor(**kwargs):
+        return [{
+            "ad_archive_id": "2", "page_id": "p2", "page_name": "Beta",
+            "body": "shop today",
+        }]
+
+    monkeypatch.setattr(scraper.client, "run_actor", fake_run_actor)
+    result = await scraper.search_active_ads(keyword="smart plug")
+    assert result["available"] is True
+    assert result["stale"] is False
+
+
 def test_budget_report_includes_cache_counters():
     from ospra_os.product_research.connectors.apify.base_apify import (
         get_apify_budget_report, reset_apify_budget,
