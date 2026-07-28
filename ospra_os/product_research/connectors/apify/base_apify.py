@@ -14,6 +14,7 @@ import os
 import asyncio
 import logging
 import httpx
+from datetime import datetime
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 from dotenv import load_dotenv
@@ -39,6 +40,11 @@ def reset_apify_budget() -> None:
     _apify_run_state["starts"] = 0
     _apify_run_state["fails_by_actor"] = {}
     _apify_run_state["tripped"] = set()
+    try:
+        from ospra_os.product_research.connectors.apify import response_cache
+        response_cache.reset_cache_stats()
+    except Exception:
+        pass
 
 
 def apify_actor_tripped(actor_id: str) -> bool:
@@ -57,12 +63,19 @@ def _record_apify_quota_fail(actor_id: str) -> None:
 
 
 def get_apify_budget_report() -> Dict:
-    """Per-run spend proxy: actor-start count drives metered cost."""
-    return {
+    """Per-run spend proxy: actor-start count drives metered cost. The cache
+    counters show how many metered starts the response cache avoided."""
+    report = {
         "actor_starts": _apify_run_state["starts"],
         "quota_failures": dict(_apify_run_state["fails_by_actor"]),
         "tripped_actors": sorted(_apify_run_state["tripped"]),
     }
+    try:
+        from ospra_os.product_research.connectors.apify import response_cache
+        report.update(response_cache.get_cache_stats())
+    except Exception:
+        report.update({"cache_hits": 0, "cache_misses": 0, "stale_served": 0})
+    return report
 
 
 @dataclass
@@ -275,8 +288,64 @@ class ApifyClient:
         memory_mbytes: int = 512,
         max_items: Optional[int] = None,
     ) -> List[Dict]:
+        """Run an Apify actor, served from the response cache when possible.
+
+        Cache policy lives in ``response_cache`` (per-actor TTL; Google Trends
+        deliberately bypassed because trend_warm exists to fetch fresh trends).
+
+        On any live failure we fall back to an EXPIRED entry rather than
+        returning nothing — a stale winner-proof signal beats no signal — and
+        the items carry a marker so scoring downgrades confidence instead of
+        treating the signal as absent.
         """
-        Run an Apify actor and wait for results
+        from ospra_os.product_research.connectors.apify import response_cache
+
+        hit = response_cache.get(actor_id, run_input, max_items)
+        if hit is not None:
+            age_h = (datetime.utcnow() - hit.fetched_at).total_seconds() / 3600.0
+            print(
+                f"[APIFY CACHE] hit {actor_id} "
+                f"({len(hit.items)} items, age {age_h:.1f}h)"
+            )
+            return hit.items
+
+        # Circuit breaker: this actor already hit quota/403 this run. Prefer a
+        # stale answer over nothing — this is the exact outage the cache is for.
+        if apify_actor_tripped(actor_id):
+            stale = response_cache.get(
+                actor_id, run_input, max_items, allow_stale=True
+            )
+            if stale is not None:
+                print(f"[APIFY BREAKER] {actor_id} tripped — serving stale cache")
+                return response_cache.stamp_stale(stale.items, stale.fetched_at)
+            print(f"[APIFY BREAKER] skipping {actor_id} (tripped this run)")
+            return []
+
+        items, ok = await self._run_actor_live(
+            actor_id, run_input, timeout_secs, memory_mbytes, max_items
+        )
+        if ok:
+            # A SUCCEEDED run with zero rows is a real answer ("no ads for this
+            # keyword"), so it is cached too — at the shorter empty TTL.
+            response_cache.put(actor_id, run_input, max_items, items)
+            return items
+
+        stale = response_cache.get(actor_id, run_input, max_items, allow_stale=True)
+        if stale is not None:
+            return response_cache.stamp_stale(stale.items, stale.fetched_at)
+        return items
+
+    async def _run_actor_live(
+        self,
+        actor_id: str,
+        run_input: Dict,
+        timeout_secs: int = 300,
+        memory_mbytes: int = 512,
+        max_items: Optional[int] = None,
+    ) -> tuple:
+        """Live actor run. Returns ``(items, ok)``; ok=False means the run did
+        not succeed (start rejected, FAILED/ABORTED, timeout, or exception).
+        An empty list with ok=True is a legitimate "no results" answer.
 
         Args:
             actor_id: Actor ID (e.g., "junglee/amazon-bestsellers")
@@ -287,7 +356,7 @@ class ApifyClient:
                 Use a LOW cap while developing to conserve Apify credits.
 
         Returns:
-            List of results from the actor
+            ``(items, ok)`` — see summary above.
 
         Phase-1 (TikTok demand spine) fixes:
           * ``memory`` used to be merged INTO the actor input JSON. Apify reads
@@ -299,11 +368,8 @@ class ApifyClient:
             dropping everything past 100. Now paginated until exhausted (or
             ``max_items``).
         """
-        # Circuit breaker: if this actor already hit quota/403 this run, skip it
-        # entirely — no retry storms, no further metered starts.
-        if apify_actor_tripped(actor_id):
-            print(f"[APIFY BREAKER] skipping {actor_id} (tripped this run)")
-            return []
+        # NOTE: the circuit-breaker check lives in run_actor (the caller), so a
+        # tripped actor can still be answered from stale cache instead of [].
 
         # Convert actor ID format for API
         actor_id_safe = actor_id.replace('/', '~')
@@ -336,7 +402,7 @@ class ApifyClient:
                         _record_apify_quota_fail(actor_id)
                     print(f"[ERROR] Failed to start actor: {response.status_code}")
                     print(f"   Response: {response.text}")
-                    return []
+                    return [], False
 
                 run_data = response.json()['data']
                 run_id = run_data['id']
@@ -363,11 +429,11 @@ class ApifyClient:
                             client, dataset_id, max_items=max_items
                         )
                         print(f"[SUCCESS] Actor completed! Got {len(results)} results")
-                        return results
+                        return results, True
 
                     elif status in ["FAILED", "ABORTED", "TIMED-OUT"]:
                         print(f"[ERROR] Actor {status}: {actor_id}")
-                        return []
+                        return [], False
 
                     # Still running
                     elapsed = (attempt + 1) * poll_interval
@@ -381,13 +447,13 @@ class ApifyClient:
                     f"(run_id={run_id}, last status={status} — run continues "
                     f"server-side; check the Apify console for its results)"
                 )
-                return []
+                return [], False
 
         except Exception as e:
             print(f"[ERROR] Error running actor {actor_id}: {e}")
             import traceback
             traceback.print_exc()
-            return []
+            return [], False
 
     async def _fetch_dataset_items(
         self,

@@ -178,3 +178,111 @@ def test_prune_deletes_only_old_rows(engine):
     assert rc.prune(older_than_days=30) == 1
     with Session(engine) as s:
         assert [r.cache_key for r in s.query(ApifyResponseCache).all()] == ["new"]
+
+
+# ---------------------------------------------------------------------------
+# run_actor integration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_actor_second_call_hits_cache(engine, monkeypatch):
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    monkeypatch.setenv("APIFY_CACHE_TTL_HOURS_DEFAULT", "24")
+    rc = _fresh_cache(engine)
+    from ospra_os.product_research.connectors.apify.base_apify import (
+        ApifyClient, reset_apify_budget,
+    )
+
+    reset_apify_budget()
+    client = ApifyClient(api_token="test-token")
+    calls = []
+
+    async def fake_live(actor_id, run_input, timeout_secs, memory_mbytes, max_items):
+        calls.append(actor_id)
+        return [{"ad": "one"}], True
+
+    monkeypatch.setattr(client, "_run_actor_live", fake_live)
+
+    first = await client.run_actor("acme/actor", {"q": "smart plug"})
+    second = await client.run_actor("acme/actor", {"q": "smart plug"})
+
+    assert first == [{"ad": "one"}] and second == [{"ad": "one"}]
+    assert len(calls) == 1, "second call must be served from cache"
+    assert rc.get_cache_stats()["cache_hits"] == 1
+
+
+@pytest.mark.asyncio
+async def test_run_actor_serves_stale_when_live_fails(engine, monkeypatch):
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    monkeypatch.setenv("APIFY_CACHE_TTL_HOURS_DEFAULT", "24")
+    rc = _fresh_cache(engine)
+    from ospra_os.product_research.connectors.apify.base_apify import (
+        ApifyClient, reset_apify_budget,
+    )
+
+    reset_apify_budget()
+    rc.put("acme/actor", {"q": "quota"}, None, [{"ad": "old"}])
+    _age_row(engine, rc.cache_key("acme/actor", {"q": "quota"}, None), hours=200)
+
+    client = ApifyClient(api_token="test-token")
+
+    async def failing_live(actor_id, run_input, timeout_secs, memory_mbytes, max_items):
+        return [], False  # e.g. quota 403
+
+    monkeypatch.setattr(client, "_run_actor_live", failing_live)
+
+    items = await client.run_actor("acme/actor", {"q": "quota"})
+    assert items and items[0]["ad"] == "old"
+    assert items[0][rc.CACHE_MARKER]["stale"] is True
+
+
+@pytest.mark.asyncio
+async def test_successful_empty_result_is_not_replaced_by_stale(engine, monkeypatch):
+    """An actor that SUCCEEDS with no rows is a real answer, not a failure."""
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    _fresh_cache(engine)
+    from ospra_os.product_research.connectors.apify.base_apify import (
+        ApifyClient, reset_apify_budget,
+    )
+
+    reset_apify_budget()
+    client = ApifyClient(api_token="test-token")
+
+    async def empty_ok(actor_id, run_input, timeout_secs, memory_mbytes, max_items):
+        return [], True
+
+    monkeypatch.setattr(client, "_run_actor_live", empty_ok)
+    assert await client.run_actor("acme/actor", {"q": "nothing"}) == []
+
+
+@pytest.mark.asyncio
+async def test_tripped_breaker_serves_stale_instead_of_empty(engine, monkeypatch):
+    monkeypatch.setenv("APIFY_API_TOKEN", "test-token")
+    rc = _fresh_cache(engine)
+    from ospra_os.product_research.connectors.apify import base_apify
+
+    base_apify.reset_apify_budget()
+    rc.put("acme/actor", {"q": "tripped"}, None, [{"ad": "cached"}])
+    _age_row(engine, rc.cache_key("acme/actor", {"q": "tripped"}, None), hours=500)
+
+    base_apify._record_apify_quota_fail("acme/actor")
+    base_apify._record_apify_quota_fail("acme/actor")
+    assert base_apify.apify_actor_tripped("acme/actor")
+
+    client = base_apify.ApifyClient(api_token="test-token")
+    items = await client.run_actor("acme/actor", {"q": "tripped"})
+    assert items and items[0]["ad"] == "cached"
+    assert items[0][rc.CACHE_MARKER]["stale"] is True
+    base_apify.reset_apify_budget()
+
+
+def test_budget_report_includes_cache_counters():
+    from ospra_os.product_research.connectors.apify.base_apify import (
+        get_apify_budget_report, reset_apify_budget,
+    )
+
+    reset_apify_budget()
+    report = get_apify_budget_report()
+    for field in ("cache_hits", "cache_misses", "stale_served"):
+        assert field in report

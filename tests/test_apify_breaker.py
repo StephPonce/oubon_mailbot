@@ -41,5 +41,11 @@ def test_distinct_actors_trip_independently():
 
 def test_spend_report_shape():
     r = base.get_apify_budget_report()
-    assert set(r.keys()) == {"actor_starts", "quota_failures", "tripped_actors"}
+    # Spend proxy + response-cache counters: cache_hits are metered actor
+    # starts the cache avoided, stale_served are outage-survival serves.
+    assert set(r.keys()) == {
+        "actor_starts", "quota_failures", "tripped_actors",
+        "cache_hits", "cache_misses", "stale_served",
+    }
     assert isinstance(r["actor_starts"], int)
+    assert isinstance(r["cache_hits"], int)
