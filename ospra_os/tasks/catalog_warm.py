@@ -51,6 +51,7 @@ def _session():
 def _bootstrap_table() -> None:
     from sqlalchemy import text
 
+    from ospra_os.database.apify_cache_models import ApifyResponseCache
     from ospra_os.database.base import Base
     from ospra_os.database.connection import engine
     from ospra_os.database.discovered_catalog import DiscoveredProduct
@@ -58,7 +59,11 @@ def _bootstrap_table() -> None:
 
     Base.metadata.create_all(
         bind=engine,
-        tables=[DiscoveredProduct.__table__, ProductTimeseries.__table__],
+        tables=[
+            DiscoveredProduct.__table__,
+            ProductTimeseries.__table__,
+            ApifyResponseCache.__table__,
+        ],
     )
     # create_all never ALTERs an existing table (the June init_database lesson),
     # so backfill columns added after the table first shipped. Idempotent.
@@ -403,6 +408,15 @@ async def run() -> dict:
         reset_apify_budget()
     except Exception:
         pass
+    # Retention: keep the response cache from growing without bound. Cheap
+    # DELETE, and never fatal — a failed prune must not stop the warm.
+    try:
+        from ospra_os.product_research.connectors.apify.response_cache import prune
+        pruned = prune()
+        if pruned:
+            logger.info(f"[APIFY CACHE] pruned {pruned} expired rows")
+    except Exception as e:
+        logger.warning(f"[APIFY CACHE] prune skipped: {e}")
     niches = _niches()
     logger.info(f"Catalog warm starting for {len(niches)} niches: {niches}")
     results = []
@@ -437,6 +451,8 @@ async def run() -> dict:
         apify_report = get_apify_budget_report()
         logger.info(
             f"[APIFY SPEND] actor_starts={apify_report.get('actor_starts', 0)} "
+            f"cache_hits={apify_report.get('cache_hits', 0)} "
+            f"stale_served={apify_report.get('stale_served', 0)} "
             f"tripped={apify_report.get('tripped_actors', [])} "
             f"quota_failures={apify_report.get('quota_failures', {})}"
         )
