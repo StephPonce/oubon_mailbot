@@ -142,6 +142,17 @@ def test_db_failure_is_swallowed(engine, monkeypatch):
     rc.put("acme/actor", {"q": "x"}, None, [{"a": 1}])
 
 
+def test_unserialisable_run_input_degrades_to_no_cache(engine):
+    """A run_input json.dumps can't handle must bypass the cache, never raise —
+    the cache may not cause the outage it exists to prevent."""
+    rc = _fresh_cache(engine)
+    circular = {}
+    circular["self"] = circular
+
+    assert rc.get("acme/actor", circular, None) is None
+    rc.put("acme/actor", circular, None, [{"a": 1}])  # must not raise
+
+
 def test_disabled_by_env(engine, monkeypatch):
     monkeypatch.setenv("APIFY_CACHE_ENABLED", "false")
     rc = _fresh_cache(engine)

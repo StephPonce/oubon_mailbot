@@ -78,6 +78,19 @@ def cache_key(actor_id: str, run_input: Dict, max_items: Optional[int]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _safe_cache_key(
+    actor_id: str, run_input: Dict, max_items: Optional[int]
+) -> Optional[str]:
+    """cache_key() but never raises. A run_input that can't be serialised (a
+    circular reference, say) must degrade to "no cache", not take down the
+    actor call that the cache exists to protect."""
+    try:
+        return cache_key(actor_id, run_input, max_items)
+    except Exception as exc:
+        logger.warning("[APIFY CACHE] un-keyable run_input (%s) — bypassing cache", exc)
+        return None
+
+
 def ttl_for(actor_id: str, *, empty: bool = False) -> Optional[timedelta]:
     """Per-actor TTL, env-overridable. None means bypass (never cache)."""
     trends_actor = os.getenv("APIFY_GOOGLE_TRENDS_ACTOR", "apify/google-trends-scraper")
@@ -109,7 +122,9 @@ def get(
     if not cache_enabled() or ttl_for(actor_id) is None:
         return None
 
-    key = cache_key(actor_id, run_input, max_items)
+    key = _safe_cache_key(actor_id, run_input, max_items)
+    if key is None:
+        return None
     try:
         session = _session()
     except Exception as exc:
@@ -179,8 +194,13 @@ def put(
         )
         return
 
-    key = cache_key(actor_id, run_input, max_items)
-    summary = json.dumps(run_input, sort_keys=True, default=str)[:512]
+    key = _safe_cache_key(actor_id, run_input, max_items)
+    if key is None:
+        return
+    try:
+        summary = json.dumps(run_input, sort_keys=True, default=str)[:512]
+    except Exception:
+        summary = f"<unserialisable input for {actor_id}>"[:512]
 
     try:
         session = _session()

@@ -131,8 +131,11 @@ Propagation, one step at a time:
 
 - `meta_ads_library.search_active_ads` sets `stale: True` on its result dict when
   any item carries the marker.
-- `product_discovery._fetch_meta_ads_trends` records it under
-  `data_sources.meta_ads.stale`.
+- `product_discovery._fetch_meta_ads_trends` records it as
+  `_meta_winners_cache['stale']`, and the scoring pass stamps
+  `product['meta_niche_stale']` alongside the existing
+  `meta_niche_advertiser_count`. (There is no `data_sources['meta_ads']` key in
+  this codebase — the advertiser signal travels via `_meta_winners_cache`.)
 - `_compute_saturation` (`product_discovery.py:317`) already derives confidence
   from how much signal weight it could fill: `meta_advertiser_density` contributes
   weight `0.25`. A **stale** Meta signal contributes at **half weight (0.125)** —
@@ -195,7 +198,8 @@ After deploy, one `catalog_warm` run should show:
 
 - `[APIFY CACHE] hit` lines for repeated sub-queries
 - `actor_starts` in the `[APIFY SPEND]` line falling from ~25/run toward ~0–5
-- Products still carrying Meta signal (`data_sources.meta_ads` populated)
+- `cache_hits=` non-zero in the same line
+- Products still carrying the Meta signal (`meta_niche_advertiser_count` > 0)
 
 ## Expected outcome
 
