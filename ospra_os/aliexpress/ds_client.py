@@ -373,14 +373,51 @@ class AliExpressDSClient:
         if not body:
             return []
 
-        # AE's response wrapper has changed shape twice. Try both.
+        # AE uses TWO different envelopes across DS methods and they are not
+        # interchangeable: `resp_result` is a WRAPPER holding resp_code /
+        # resp_msg / result, whereas ds.product.get puts its payload straight
+        # on `result`. The old `resp.get("result") or resp.get("resp_result")`
+        # treated them as alternative names for the same level, so on the
+        # nested shape it read wrapper["products"] -> None and silently
+        # returned [] — which is why this feed reported "empty/dead" on every
+        # niche while ds.product.get (flat envelope) worked fine on the same
+        # token. Three other implementations in this repo navigate the nested
+        # form correctly; this one now matches them.
         resp = body.get("aliexpress_ds_recommend_feed_get_response", {})
-        result = resp.get("result") or resp.get("resp_result") or {}
+        rr = resp.get("resp_result")
+        if isinstance(rr, dict):
+            code = rr.get("resp_code")
+            if code not in (None, 200, "200"):
+                # AE returns business errors INSIDE resp_result with HTTP 200,
+                # so _request's top-level error_response check never sees them.
+                logger.warning(
+                    f"[AE-DS] feed business error resp_code={code} "
+                    f"msg={rr.get('resp_msg')!r} feed={feed_name!r}"
+                )
+                return []
+            result = rr.get("result") or {}
+        else:
+            result = resp.get("result") or {}
+
         raw_products = result.get("products")
         if isinstance(raw_products, dict):
-            raw_products = raw_products.get("product", [])
+            raw_products = (
+                raw_products.get("product")
+                or raw_products.get("traffic_product_d_t_o")
+                or []
+            )
         if not isinstance(raw_products, list):
+            logger.warning(
+                f"[AE-DS] feed parse miss for {feed_name!r}: "
+                f"result keys={list(result)[:8]}"
+            )
             return []
+        # Distinguishes "AE returned nothing" from "we parsed nothing" — the
+        # ambiguity that hid this bug.
+        logger.info(
+            f"[AE-DS] feed {feed_name!r}: AE total={result.get('total_record_count')} "
+            f"parsed={len(raw_products)}"
+        )
 
         out: List[Dict[str, Any]] = []
         for item in raw_products:

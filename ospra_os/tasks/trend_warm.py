@@ -233,6 +233,15 @@ async def warm_via_pytrends(terms: List[str]) -> List[str]:
     return warmed
 
 
+def _apify_warm_enabled() -> bool:
+    """Apify trends warming is OPT-IN. Before enabling, fix the two things that
+    made it pure waste: run_actor's poll budget must exceed the actor's real
+    35-58 min runtime (base_apify.py `max_polls`), and the run options must
+    actually apply — the code asks for memory_mbytes=256/timeout=1200 but the
+    runs provisioned 4096MB/604800s from the actor's own defaults."""
+    return os.getenv("TREND_WARM_APIFY_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+
+
 async def run() -> int:
     _bootstrap_table()
     terms = collect_terms()
@@ -241,18 +250,31 @@ async def run() -> int:
         return 0
     logger.info(f"Warming {len(terms)} terms: {terms}")
 
-    warmed: List[str] = []
-    if os.getenv("APIFY_API_TOKEN"):
-        try:
-            warmed = await warm_via_apify(terms)
-        except Exception as e:
-            logger.error(f"Apify warm failed ({e}); falling back to pytrends.")
-    else:
-        logger.warning("APIFY_API_TOKEN not set — using pytrends fallback only.")
+    # ORDER REVERSED (2026-07-30 spend audit). Apify used to run FIRST and cost
+    # $34.28 of a $45 cycle — 76% — for data that was then thrown away: the
+    # actor takes 35-58 min, run_actor stops polling at ~20 min, discards the
+    # result and returns empty, while Apify keeps running and keeps billing.
+    # 36 of 44 runs exceeded the poll budget. pytrends then silently backfilled
+    # the same terms for free, so the pipeline never noticed. pytrends is now
+    # primary; Apify is opt-in for the terms pytrends couldn't get.
+    warmed: List[str] = await warm_via_pytrends(terms)
 
     missed = [t for t in terms if t.lower() not in set(warmed)]
-    if missed:
-        warmed += await warm_via_pytrends(missed)
+    if missed and _apify_warm_enabled():
+        if os.getenv("APIFY_API_TOKEN"):
+            logger.info(f"Apify warm enabled — {len(missed)} terms pytrends missed.")
+            try:
+                warmed += await warm_via_apify(missed)
+            except Exception as e:
+                logger.error(f"Apify warm failed ({e}).")
+        else:
+            logger.warning("TREND_WARM_APIFY_ENABLED set but APIFY_API_TOKEN is not.")
+    elif missed:
+        logger.info(
+            f"{len(missed)} terms unwarmed; Apify fallback OFF "
+            f"(set TREND_WARM_APIFY_ENABLED=true to enable — see the spend "
+            f"note above before you do)."
+        )
 
     logger.info(f"Warm complete: {len(warmed)}/{len(terms)} terms warmed.")
     # Non-zero exit only if we warmed NOTHING while having terms to warm —

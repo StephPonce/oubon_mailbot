@@ -2570,12 +2570,15 @@ class ProductDiscoveryEngine:
 
         from ospra_os.intelligence.units_velocity import snapshot_tiktok_products
 
-        # Keyword seeds: the niche plus a few discovered product titles keep the
-        # actor query grounded in what we're actually sourcing.
-        keywords = [niche] + [
-            (p.get("title") or "").strip()
-            for p in products[:4] if p.get("title")
-        ]
+        # Keyword seeds MUST be stable across runs. This previously seeded with
+        # four discovered product titles, which change every run — and since the
+        # Apify response cache keys on the actor input, that guaranteed a 100%
+        # cache miss forever. At $0.16/run x 300 runs/month this actor alone
+        # would exceed the entire $45 Apify cap; it reads as $0 today only
+        # because the exhausted cap rejects every start. Stable niche
+        # sub-queries dedupe the two daily runs and are at least as good a
+        # demand probe, since the actor sorts by best_sellers over keywords.
+        keywords = [niche] + sorted(self.NICHE_SUBQUERIES.get(niche.lower(), []))[:4]
         result = await scraper.fetch_products([k for k in keywords if k])
         if result.get("status") != "ok":
             logger.info(

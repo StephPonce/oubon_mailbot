@@ -170,7 +170,12 @@ def get_image_generator():
     global _image_generator
     if _image_generator is None:
         try:
-            from ospra_os.integrations.ai_image_generator import get_image_generator as get_gen
+            # The factory is named get_image_ENHANCER (ai_image_generator.py).
+            # Importing get_image_generator raised ImportError into the broad
+            # except below, so this returned None forever and every caller got
+            # "AI Image Generator not available — set STABILITY_API_KEY", a
+            # message that sent debugging after an irrelevant env var.
+            from ospra_os.integrations.ai_image_generator import get_image_enhancer as get_gen
             _image_generator = get_gen()
             if getattr(_image_generator, 'stability_key', ''):
                 logger.info("[SUCCESS] AI Image Enhancer (Stability) loaded for discovery")
