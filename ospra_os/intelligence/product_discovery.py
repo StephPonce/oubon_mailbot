@@ -7386,6 +7386,23 @@ class ProductDiscoveryEngine:
         if dropped:
             tag = f"query='{query[:24]}'" if has_query else f"niche='{niche}'"
             logger.info(f"   [INTAKE FILTER] dropped {dropped}/{len(products)} off-target results ({tag})")
+
+        # Safety valve the docstring above has always promised but never
+        # implemented. The niche-only path feeds on globally-scoped supplier
+        # feeds (AE DS bestsellers are broad by design), so a strict gate can
+        # legitimately drop 100% of a healthy batch — which then looks exactly
+        # like "[AE-DS] feed empty/dead" and silently triggers the affiliate
+        # fallback. Keep the batch and let the STEP-3b relevance gate (which
+        # scores rather than rejects) do the trimming downstream.
+        # The query path keeps its all-or-nothing behaviour on purpose: a
+        # keyword returning 100% unrelated rows SHOULD contribute nothing.
+        if not has_query and not kept and products:
+            logger.warning(
+                f"   [INTAKE FILTER] niche gate rejected ALL {len(products)} "
+                f"results for niche='{niche}' — keeping the batch for the "
+                f"STEP-3b gate rather than reporting the source dead"
+            )
+            return products
         return kept
 
     # =========================================================================
