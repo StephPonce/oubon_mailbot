@@ -1549,6 +1549,14 @@ async def test_ae_ds(
             )
             return out
 
+        # Which feeds does AE actually accept for this app? An invalid
+        # feed_name returns empty indistinguishably from a genuinely empty
+        # feed, which is what hid the "[AE-DS] feed empty/dead" cause.
+        try:
+            out["valid_feed_names"] = await client.get_feed_names()
+        except Exception as exc:  # diagnostics must never break the probe
+            out["valid_feed_names_error"] = str(exc)
+
         # Sample the configured feed so the operator can see live data
         feed_products = await client.get_hot_products(
             feed_name=feed_name,
@@ -1556,6 +1564,15 @@ async def test_ae_ds(
         )
         out["feed_sample_count"] = len(feed_products)
         out["feed_sample"] = feed_products[:feed_page_size]
+
+        # If AE reports valid names and the configured one isn't among them,
+        # say so outright rather than leaving an empty list to interpret.
+        _valid = out.get("valid_feed_names") or []
+        if _valid and feed_name not in _valid:
+            out["feed_name_warning"] = (
+                f"{feed_name!r} is NOT in AE's list of valid feeds for this app; "
+                f"try one of {_valid[:10]}"
+            )
 
         # If a product_id is provided, fetch its merchant pricing detail
         if product_id:

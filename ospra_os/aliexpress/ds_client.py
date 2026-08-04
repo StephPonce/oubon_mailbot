@@ -340,6 +340,35 @@ class AliExpressDSClient:
     # ------------------------------------------------------------------
     # DS endpoints
     # ------------------------------------------------------------------
+    async def get_feed_names(self) -> List[str]:
+        """Ask AE which recommend-feeds this app may actually query.
+
+        Exists because `feed_name` was a guess: "DS_Global_topsellers" appears
+        nowhere in AE's docs (their example is "DS bestseller"), and this repo
+        used three different names in three places. A wrong name returns an
+        empty feed indistinguishably from a genuinely empty one, so stop
+        guessing and ask.
+        """
+        if not self.is_available():
+            return []
+        body = await self._request("aliexpress.ds.feedname.get", {})
+        if not body:
+            return []
+        resp = body.get("aliexpress_ds_feedname_get_response", {})
+        rr = resp.get("resp_result")
+        result = (rr or {}).get("result") if isinstance(rr, dict) else resp.get("result")
+        result = result or {}
+        promos = result.get("promos") or {}
+        if isinstance(promos, dict):
+            promos = promos.get("promo") or []
+        names = [
+            p.get("promo_name")
+            for p in promos
+            if isinstance(p, dict) and p.get("promo_name")
+        ]
+        logger.info(f"[AE-DS] valid feed names from AE: {names}")
+        return names
+
     async def get_hot_products(
         self,
         feed_name: str = "DS_Global_topsellers",
