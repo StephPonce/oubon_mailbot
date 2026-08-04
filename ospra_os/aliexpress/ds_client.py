@@ -371,7 +371,10 @@ class AliExpressDSClient:
 
     async def get_hot_products(
         self,
-        feed_name: str = "DS_Global_topsellers",
+        # Verified against aliexpress.ds.feedname.get. The old default
+        # "DS_Global_topsellers" is NOT a valid feed for this app — callers
+        # should pass a niche-appropriate name (see _AE_DS_NICHE_FEED).
+        feed_name: str = "DS_ConsumerElectronics_bestsellers",
         page_size: int = 20,
         page_no: int = 1,
         country: str = "US",

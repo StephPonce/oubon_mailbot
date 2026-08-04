@@ -3450,10 +3450,32 @@ class ProductDiscoveryEngine:
         # that found them (AE sometimes returns promoted/loosely-related items).
         return self._filter_supplier_results(products, query=keyword)
 
-    # AliExpress DS feed → AE category_ids. Empty for now (global hot-products
-    # feed); the STEP-3b niche gate trims off-niche items. Populate per niche
-    # later for sharper feeds (follow-up).
+    # AliExpress DS feed → AE category_ids. Empty for now (feed-wide pull);
+    # the STEP-3b niche gate trims off-niche items.
     _AE_DS_NICHE_CATEGORY: Dict[str, str] = {}
+
+    # Niche → AE DS feed name. These names are VERIFIED against
+    # aliexpress.ds.feedname.get for this app (125 valid feeds; probe them with
+    # GET /api/discovery/test-ae-ds). The previous default, "DS_Global_topsellers",
+    # is NOT in that list — it was a guess, and an invalid feed name returns
+    # empty indistinguishably from a genuinely empty feed, which is why every
+    # niche logged "[AE-DS] feed empty/dead" for months. Do not edit these
+    # strings without re-probing: a typo silently reverts to that failure mode.
+    _AE_DS_NICHE_FEED: Dict[str, str] = {
+        "kitchen": "DS_Home&Kitchen_bestsellers",
+        "home_decor": "DS_Home&Kitchen_bestsellers",
+        "beauty": "DS_Beauty_bestsellers",
+        "tech": "DS_ConsumerElectronics_bestsellers",
+        "smart_home": "DS_ConsumerElectronics_bestsellers",
+        "gaming": "DS_ConsumerElectronics_bestsellers",
+        "office": "DS_ConsumerElectronics_bestsellers",
+        "fitness": "DS_Sports&Outdoors_bestsellers",
+        "outdoor": "DS_Sports&Outdoors_bestsellers",
+        "car": "DS_Automobile&Accessories_bestsellers",
+        "pet": "AEB_Fetch_Garden&Tool&Pet&AutoParts_TopSellers_20241210",
+    }
+    # Used when a niche has no mapping — a broad, verified consumer feed.
+    _AE_DS_DEFAULT_FEED = "DS_ConsumerElectronics_bestsellers"
 
     async def _fetch_aliexpress_ds(
         self,
@@ -3481,7 +3503,11 @@ class ProductDiscoveryEngine:
         products: List[Dict] = []
         if self.aliexpress_ds_available:
             try:
+                feed_name = self._AE_DS_NICHE_FEED.get(
+                    (niche or "").lower(), self._AE_DS_DEFAULT_FEED
+                )
                 products = await self.aliexpress_ds.get_hot_products(
+                    feed_name=feed_name,
                     page_size=min(int(count), 50),
                     category_ids=self._AE_DS_NICHE_CATEGORY.get(niche),
                 )

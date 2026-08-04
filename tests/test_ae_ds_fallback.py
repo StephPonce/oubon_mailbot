@@ -23,9 +23,15 @@ class FakeDS:
         self.result = result or []
         self.exc = exc
         self.calls = 0
+        self.feed_names: list = []
 
-    async def get_hot_products(self, page_size, category_ids=None):
+    # Signature must mirror the real AliExpressDSClient.get_hot_products —
+    # a drifted double silently sends every call down the exception path
+    # (TypeError caught by _fetch_aliexpress_ds) and the affiliate fallback
+    # then hides it by returning plausible results.
+    async def get_hot_products(self, feed_name=None, page_size=None, category_ids=None):
         self.calls += 1
+        self.feed_names.append(feed_name)
         if self.exc:
             raise self.exc
         return [dict(p) for p in self.result]
@@ -92,6 +98,10 @@ def test_healthy_ds_feed_never_touches_affiliate():
     ))
     assert [p["product_id"] for p in out] == ["ds1"]
     assert eng.affiliate_calls == []
+    # The niche must select a VERIFIED feed name. "DS_Global_topsellers" is not
+    # a valid feed for this app; an invalid name returns empty exactly like a
+    # dead feed, which is what hid this for months.
+    assert eng.aliexpress_ds.feed_names == ["DS_ConsumerElectronics_bestsellers"]
     # DS products keep the niche/source tagging the downstream readers expect.
     assert out[0]["niche"] == "smart_home"
     assert out[0]["source"] == "aliexpress"
