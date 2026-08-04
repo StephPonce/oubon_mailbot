@@ -3501,7 +3501,21 @@ class ProductDiscoveryEngine:
         the June 29 catalog (empty tracking_id tolerated by product.query).
         """
         products: List[Dict] = []
-        if self.aliexpress_ds_available:
+        # GATED OFF BY DEFAULT (2026-08 regression). The three fixes that made
+        # this feed return data — envelope navigation, verified feed names, and
+        # the intake safety valve — all work: the feed now yields real products.
+        # But DS rows are NOT interchangeable with affiliate rows. cost_price /
+        # suggested_price / profit are computed inside _fetch_aliexpress (the
+        # AFFILIATE path); ds_client._normalise_feed_item emits only the raw AE
+        # fields (target_sale_price, target_original_price). While the feed was
+        # broken, every run silently fell through to the affiliate path and got
+        # priced products. With the feed working, it SUPPRESSES that fallback
+        # and hands the pipeline rows it cannot price — measured live as
+        # AliExpress 9 -> 0 products per niche.
+        # Re-enable only once DS rows run through the same price normalisation
+        # as affiliate rows (extract it out of _fetch_aliexpress and share it).
+        _ds_feed_on = os.getenv("AE_DS_FEED_ENABLED", "").strip().lower() in {"1", "true", "yes"}
+        if self.aliexpress_ds_available and _ds_feed_on:
             try:
                 feed_name = self._AE_DS_NICHE_FEED.get(
                     (niche or "").lower(), self._AE_DS_DEFAULT_FEED

@@ -87,8 +87,28 @@ def test_empty_ds_feed_falls_back_to_affiliate():
     assert len(out) == 1 and out[0]["product_id"] == "aff1"
 
 
-def test_healthy_ds_feed_never_touches_affiliate():
-    """DS produced products → the affiliate fallback must NOT fire (spend guard)."""
+def test_ds_feed_is_gated_off_by_default(monkeypatch):
+    """DS rows carry raw AE fields but no cost_price/suggested_price/profit —
+    those are computed in the AFFILIATE path (_fetch_aliexpress). Until DS rows
+    share that normalisation, a working feed would SUPPRESS the affiliate
+    fallback and hand the pipeline unpriceable rows (measured live: AE 9 -> 0).
+    So the feed stays off unless AE_DS_FEED_ENABLED is set."""
+    monkeypatch.delenv("AE_DS_FEED_ENABLED", raising=False)
+    eng = _engine(
+        ds_available=True, affiliate_available=True,
+        ds=FakeDS(result=[DS_PRODUCT]), affiliate_results=[AFF_PRODUCT],
+    )
+    out = asyncio.run(eng._fetch_aliexpress_ds(
+        "smart_home", count=20, fallback_keywords=["wifi smart plug"], fallback_per_kw=5,
+    ))
+    assert [p["product_id"] for p in out] == ["aff1"], "must use the priced affiliate path"
+    assert eng.aliexpress_ds.calls == 0, "gated off — the feed must not even be called"
+
+
+def test_healthy_ds_feed_never_touches_affiliate(monkeypatch):
+    """DS produced products → the affiliate fallback must NOT fire (spend guard).
+    Only applies when the feed is explicitly enabled."""
+    monkeypatch.setenv("AE_DS_FEED_ENABLED", "true")
     eng = _engine(
         ds_available=True, affiliate_available=True,
         ds=FakeDS(result=[DS_PRODUCT]), affiliate_results=[AFF_PRODUCT],
