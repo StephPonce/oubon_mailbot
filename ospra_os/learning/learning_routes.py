@@ -737,57 +737,22 @@ async def get_recent_learning_events(limit: int = 50):
             db.close()
 
 
-@router.post("/simulate-sale")
-async def simulate_sale(
-    product_id: str,
-    product_name: str,
-    price: float,
-    niche: str = "smart_home"
-):
-    """
-    Simulate a sale for testing the learning pipeline.
-    
-    Creates a learning event as if a sale happened.
-    Use this to test that learning is working before real sales.
-    """
-    db = None
-    try:
-        from ospra_os.database import AILearningEvent
-        
-        db = SessionLocal()
-        event = AILearningEvent(
-            user_id=1,
-            event_type="sale",
-            product_id=product_id,
-            details={
-                "product_name": product_name,
-                "niche": niche,
-                "price": price,
-                "price_point": "under_20" if price < 20 else "20_to_50" if price < 50 else "50_to_100" if price < 100 else "over_100",
-                "quantity": 1,
-                "revenue": price,
-                "source": "simulation",
-                "sale_timestamp": datetime.now(timezone.utc).isoformat()
-            },
-            timestamp=datetime.now(timezone.utc)
-        )
-        db.add(event)
-        db.commit()
-        
-        return {
-            "success": True,
-            "message": f"Simulated sale recorded for {product_name}",
-            "event_id": event.id,
-            "note": "Run /api/learning/trigger-now to process this sale"
-        }
-    except Exception as e:
-        if db:
-            db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to simulate sale. Please try again."
-        )
-    finally:
-        if db:
-            db.close()
+# REMOVED 2026-08: POST /api/learning/simulate-sale
+#
+# This endpoint was UNAUTHENTICATED (this router declares no auth dependency)
+# and wrote AILearningEvent(user_id=1, event_type="sale") — "sale" is in
+# ORGANIC_SALE_EVENT_TYPES (ospra_os/database/performance_models.py), the tuple
+# the provenance guard treats as REAL revenue. So any anonymous caller could
+# inject fabricated sales that the G4 learning aggregations counted as organic
+# outcomes and fed into weight adjustments.
+#
+# That re-opened the exact door migration 008 closed: 008 purged the seeded
+# 'historical_sale' batch precisely so the learning system would be
+# organic-only. The guard keys on event TYPE, not on details["source"], so the
+# "source": "simulation" marker this endpoint set was invisible to it — the
+# rows are indistinguishable from real sales after the fact.
+#
+# If a sale-injection hook is ever needed again it MUST: require
+# get_current_user, write event_type="simulated_sale", and that type must be
+# added to SEEDED_EVENT_TYPES so the aggregations exclude it by construction.
 
