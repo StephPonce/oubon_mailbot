@@ -5,7 +5,8 @@ Endpoints for the AI learning system.
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from ospra_os.auth.jwt_auth import get_current_user
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -14,7 +15,17 @@ from ospra_os.database import SessionLocal
 from ospra_os.learning.hybrid_learning_engine import get_learning_engine
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/learning", tags=["Learning"])
+# SECURITY (2026-08): router-level auth. This router had NO Depends()
+# anywhere. GET /personal/{user_id} exposed any tenant's model weights, GET
+# /events returned all tenants' learning events, and POST /custom-weights,
+# /personal/learn, /feedback and /record-ad-metrics allowed ANONYMOUS WRITES
+# into any user's AI scoring model. Handlers still take user_id from the URL —
+# that must be replaced with the token's user before this is considered done.
+router = APIRouter(
+    prefix="/api/learning",
+    tags=["Learning"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # ==================== REQUEST MODELS ====================

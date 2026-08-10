@@ -4,13 +4,22 @@ Email Analytics API Routes
 FastAPI endpoints for email automation metrics and dashboard statistics.
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
+from ospra_os.auth.jwt_auth import get_current_user
 from typing import List, Dict, Any
 from datetime import datetime, timedelta, timezone
 from ospra_os.analytics.email_analytics import Analytics, EmailMetric
 from ospra_os.core.settings import Settings
 
-router = APIRouter(prefix="/api", tags=["Email Analytics"])
+# SECURITY (2026-08): router-level auth. /api/emails/recent returned
+# customer_email + subject for ALL tenants with no auth and no tenant filter
+# (live: 200). EmailMetric has no user_id column, so this gate is a stopgap —
+# real isolation needs a migration adding user_id + backfill + filtering.
+router = APIRouter(
+    prefix="/api",
+    tags=["Email Analytics"],
+    dependencies=[Depends(get_current_user)],
+)
 
 # Initialize settings
 settings = Settings()

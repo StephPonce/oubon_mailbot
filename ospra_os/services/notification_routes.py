@@ -1,7 +1,8 @@
 """
 API routes for customer notifications
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from ospra_os.auth.jwt_auth import get_current_user
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -13,7 +14,14 @@ from ospra_os.services.notifications import (
     NotificationPriority
 )
 
-router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
+# SECURITY (2026-08): router-level auth. /recent leaked all tenants'
+# customer_email/customer_name, and POST /send was an ANONYMOUS OUTBOUND MAIL
+# RELAY to any address — spam/phishing on this domain's sender reputation.
+router = APIRouter(
+    prefix="/api/notifications",
+    tags=["Notifications"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class NotificationResponse(BaseModel):

@@ -8,6 +8,7 @@ Endpoints for managing Oi's autonomous operation mode.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+from ospra_os.auth.jwt_auth import get_current_user
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 
@@ -20,7 +21,14 @@ from ospra_os.intelligence.auto_pilot import (
 # JWT Authentication
 from ospra_os.auth.dependencies import require_auth, require_tier, TokenPayload
 
-router = APIRouter(prefix="/api/autopilot", tags=["Auto-Pilot"])
+# SECURITY (2026-08): router-level auth. enable/disable/pause, config
+# updates and the aggressive/balanced/conservative presets were ALL callable
+# anonymously — an attacker could switch on autopilot or raise its spend caps.
+router = APIRouter(
+    prefix="/api/autopilot",
+    tags=["Auto-Pilot"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # === Request/Response Models ===
