@@ -46,6 +46,19 @@ logger = logging.getLogger(__name__)
 # CACHE HELPERS
 # ============================================================================
 
+def _is_durable_image_url(url: Optional[str]) -> bool:
+    """Only an absolute http(s) URL survives a deploy.
+
+    Render declares NO disk for this service (render.yaml has no `disk:` block),
+    so `data/images/` is wiped on every deploy. A cached "/static/images/..."
+    path therefore points at a file that no longer exists — and because the DB
+    row survives, the cache reports a HIT, serves a dead URL, and SUPPRESSES
+    regeneration. That is strictly worse than having no cache, so relative
+    paths are never written and never served.
+    """
+    return bool(url) and str(url).startswith(("http://", "https://"))
+
+
 def get_cached_enhanced_image(db: Session, original_url: str) -> Optional[str]:
     """Check if we have a cached enhanced version of this image."""
     if not CACHE_AVAILABLE or not db:
@@ -56,6 +69,19 @@ def get_cached_enhanced_image(db: Session, original_url: str) -> Optional[str]:
             EnhancedImageCache.original_url_hash == url_hash
         ).first()
         if cached:
+            if not _is_durable_image_url(cached.enhanced_url):
+                # Self-heal a poisoned row from before the durability rule:
+                # drop it and report a miss so the image regenerates.
+                logger.warning(
+                    "[CACHE] Dropping non-durable cached image URL "
+                    f"({str(cached.enhanced_url)[:40]!r}) — regenerating"
+                )
+                try:
+                    db.delete(cached)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                return None
             logger.info(f"[CACHE HIT] Found cached enhanced image for {original_url[:50]}...")
             return cached.enhanced_url
     except Exception as e:
@@ -72,6 +98,15 @@ def save_enhanced_image_to_cache(
 ):
     """Save enhanced image to cache (both URL-level and product-level)."""
     if not CACHE_AVAILABLE or not db:
+        return
+    if not _is_durable_image_url(enhanced_url):
+        # A miss is recoverable; a poisoned row is not. Write nothing rather
+        # than persist a pointer into the ephemeral container filesystem.
+        logger.warning(
+            "[CACHE] Refusing to cache non-durable image URL "
+            f"({str(enhanced_url)[:40]!r}) — needs an absolute CDN URL "
+            "(configure CLOUDINARY_* so enhanced images survive deploys)"
+        )
         return
     try:
         url_hash = EnhancedImageCache.hash_url(original_url)

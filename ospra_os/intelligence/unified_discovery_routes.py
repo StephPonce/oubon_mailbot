@@ -30,7 +30,7 @@ PERFORMANCE OPTIMIZATIONS:
 
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 import asyncio
 import logging
@@ -300,7 +300,11 @@ async def enhance_products_with_images(products: List[Dict], max_images: int = 5
 class EnhanceImagesRequest(BaseModel):
     """Request to enhance products with AI images"""
     products: List[dict]
-    max_images: int = 5
+    # HARD CEILING. This was previously uncapped, so a caller could request an
+    # arbitrary number of paid Stability generations in one request. The
+    # per-tier budget (_image_budget_for_tier) still applies on top; this is
+    # the backstop that bounds the worst case regardless of tier resolution.
+    max_images: int = Field(default=5, ge=1, le=12)
 
 
 # ============================================================================
