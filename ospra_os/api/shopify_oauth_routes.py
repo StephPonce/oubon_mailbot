@@ -325,7 +325,15 @@ async def oauth_callback(
             url=f"{get_frontend_url()}/settings/stores?error=configuration_error"
         )
     
-    if hmac:
+    # SECURITY: HMAC verification is MANDATORY. This used to be `if hmac:` —
+    # an attacker simply omitted the parameter and skipped the check entirely.
+    if not hmac:
+        logger.error("[SECURITY] Shopify callback missing required hmac parameter")
+        return RedirectResponse(
+            url=f"{get_frontend_url()}/settings/stores?error=missing_signature"
+        )
+
+    if hmac:  # always true past the guard above — kept for block scope
         # Build query string for HMAC verification (exclude hmac itself)
         query_params = dict(request.query_params)
         received_hmac = query_params.pop("hmac", "")
@@ -363,12 +371,37 @@ async def oauth_callback(
             url=f"{get_frontend_url()}/settings/stores?error=invalid_state"
         )
     user_id = state_data.get("user_id")
-    
+
     # Normalize shop domain
     shop_domain = shop.strip().lower()
     if not shop_domain.endswith(".myshopify.com"):
         shop_domain = f"{shop_domain}.myshopify.com"
-    
+
+    # SECURITY: validate the shop LABEL, not just the suffix.
+    # This value becomes the token-exchange host below, and that request
+    # carries client_secret. An endswith(".myshopify.com") check is NOT
+    # sufficient — "attacker.com/.myshopify.com" and
+    # "attacker.com?z=.myshopify.com" both pass it while the attacker keeps
+    # the host, exfiltrating the app secret. Same alnum guard already used
+    # on /install above.
+    _label = shop_domain[: -len(".myshopify.com")]
+    if not _label or not _label.replace("-", "").replace("_", "").isalnum():
+        logger.error("[SECURITY] Rejected malformed shop domain in OAuth callback")
+        return RedirectResponse(
+            url=f"{get_frontend_url()}/settings/stores?error=invalid_shop"
+        )
+
+    # SECURITY: the callback's shop must match the shop the nonce was minted
+    # for. Without this an attacker can pair their own valid state with a
+    # different shop value.
+    _state_shop = (state_data.get("shop") or "").strip().lower()
+    if _state_shop and _state_shop != shop_domain:
+        logger.error("[SECURITY] shop does not match the shop bound to this state")
+        return RedirectResponse(
+            url=f"{get_frontend_url()}/settings/stores?error=shop_mismatch"
+        )
+
+
     # ==========================================================
     # STEP 3: Exchange code for access token
     # ==========================================================
@@ -667,7 +700,14 @@ async def save_store_credentials(
             
             if existing:
                 # Update existing store
-                existing.credentials = credentials
+                # set_credentials() is the ONLY encrypting path (see
+                # Store.set_credentials in database/store_models.py). Assigning
+                # `.credentials` directly wrote the Shopify access_token and
+                # webhook_secret to the DB in PLAINTEXT — anyone with a backup,
+                # replica or dump had live Admin API tokens for every connected
+                # store. Nothing surfaced it because get_credentials()
+                # short-circuits on a dict.
+                existing.set_credentials(credentials)
                 existing.store_name = store_name
                 existing.status = StoreStatus.ACTIVE
                 existing.is_active = True
@@ -699,13 +739,15 @@ async def save_store_credentials(
                     store_name=store_name,
                     store_url=f"https://{shop_domain}",
                     platform=Platform.SHOPIFY,
-                    credentials=credentials,
                     currency=currency,
                     status=StoreStatus.ACTIVE,
                     is_active=True,
                     created_at=datetime.now(timezone.utc),
                     last_sync=datetime.now(timezone.utc),
                 )
+                # Must go through the encrypting setter — passing credentials=
+                # to the constructor stored the access_token in plaintext.
+                new_store.set_credentials(credentials)
                 db.add(new_store)
                 db.commit()
                 db.refresh(new_store)

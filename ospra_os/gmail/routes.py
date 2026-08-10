@@ -246,7 +246,7 @@ async def callback(request: Request):
         )
 
 @router.get("/status")
-async def status():
+async def status(current_user: User = Depends(get_current_user)):
     _, token_path = _paths()
     ok = os.path.exists(token_path) and os.path.getsize(token_path) > 0
     # SECURITY: Don't expose file paths in production
@@ -259,9 +259,18 @@ async def status():
 
 
 @router.get("/messages")
-async def get_messages(limit: int = 20):
+async def get_messages(
+    limit: int = 20,
+    current_user: User = Depends(get_current_user),
+):
     """
     Fetch recent Gmail messages for dashboard display
+
+    AUTH REQUIRED (added 2026-08). This handler reads the shared Gmail token
+    file and returns real message contents including customer PII. It had no
+    auth dependency, so an anonymous caller could read the production mailbox
+    — it returned 500 rather than data only because the token file is absent
+    from the container, which is luck, not a control.
 
     Returns unread/important messages with:
     - Subject
@@ -346,9 +355,9 @@ async def get_messages(limit: int = 20):
         )
 
 @router.get("/stats")
-async def get_stats():
+async def get_stats(current_user: User = Depends(get_current_user)):
     """
-    Get Gmail statistics for dashboard
+    Get Gmail statistics for dashboard (AUTH REQUIRED — reads the mailbox)
 
     Returns:
     - Total unread count
