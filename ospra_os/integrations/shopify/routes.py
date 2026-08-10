@@ -8,7 +8,7 @@ Author: OspraOS
 Date: December 2025
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -16,7 +16,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/shopify", tags=["shopify"])
+from ospra_os.auth.jwt_auth import get_current_user
+
+# SECURITY (2026-08): router-level auth. Every route here is a store-management
+# operation — deploy, bulk-deploy, DELETE product, PATCH inventory, analytics —
+# and none had any auth dependency. This router is registered BEFORE the legacy
+# @app duplicates in main.py, so it SHADOWS them: adding auth to the main.py
+# copies alone changed nothing, because these handlers are what actually ran.
+# Verified by probing DELETE /api/shopify/products/{id}, which executed the
+# handler ("Deleting product 123") instead of returning 401.
+# No webhook or OAuth-callback routes live here, so a blanket dependency is safe.
+router = APIRouter(
+    prefix="/api/shopify",
+    tags=["shopify"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # ============================================================================

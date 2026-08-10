@@ -189,7 +189,11 @@ except Exception as e:
 
 # JWT Authentication (required for secure endpoints)
 try:
-    from ospra_os.auth.jwt_auth import get_current_user
+    # NOTE: import the STRICT dependency from jwt_auth, never the one
+    # re-exported by `ospra_os.auth` — that one is get_current_user_optional
+    # and returns None instead of raising, so it reads as protection while
+    # gating nothing.
+    from ospra_os.auth.jwt_auth import get_current_user, require_admin_user
     from ospra_os.database import User
     _HAS_JWT_AUTH = True
     logger.info("JWT Authentication loaded successfully")
@@ -197,6 +201,7 @@ except Exception as e:
     logger.warning(f"JWT Authentication not loaded: {e}")
     _HAS_JWT_AUTH = False
     get_current_user = None
+    require_admin_user = None
     User = None
 
 # Authentication router (required for user accounts)
@@ -2099,7 +2104,10 @@ async def detailed_health_check(settings: Settings = Depends(get_settings)):
 # Admin & Testing Endpoints
 # ---------------------------------------------------------------
 @app.post("/api/admin/run-discovery-now")
-async def run_discovery_now(settings: Settings = Depends(get_settings)):
+async def run_discovery_now(
+    current_user: User = Depends(require_admin_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
+):
     """
     Manual trigger for auto-discovery (for testing).
 
@@ -3145,7 +3153,8 @@ async def get_recommendation_analytics(
 @app.post("/api/shopify/deploy")
 async def deploy_to_shopify(
     request: ShopifyDeployRequest,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Deploy a product to Shopify
@@ -3203,7 +3212,8 @@ async def deploy_to_shopify(
 @app.post("/api/shopify/bulk-deploy")
 async def bulk_deploy_to_shopify(
     request: ShopifyBulkDeployRequest,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Deploy multiple products to Shopify
@@ -3305,7 +3315,8 @@ async def list_shopify_products(
 @app.delete("/api/shopify/products/{product_id}")
 async def delete_shopify_product(
     product_id: int,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Delete a product from Shopify
@@ -3438,7 +3449,8 @@ async def generate_affiliate_links(
 @app.post("/api/aliexpress/fulfill-order")
 async def fulfill_order(
     request: AliExpressFulfillRequest,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Fulfill a Shopify order via AliExpress
@@ -3582,7 +3594,8 @@ async def monitor_prices(
 @app.post("/api/meta/create-campaign")
 async def create_meta_campaign(
     request: MetaCampaignRequest,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Create complete Meta ad campaign for a product
@@ -3623,7 +3636,8 @@ async def create_meta_campaign(
 @app.post("/api/meta/bulk-campaigns")
 async def create_bulk_campaigns(
     request: MetaBulkCampaignCreateRequest,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Create campaigns for multiple products
@@ -3729,7 +3743,8 @@ async def update_campaign_status(
 async def update_ad_set_budget(
     ad_set_id: str,
     request: AdSetBudgetUpdate,
-    settings: Settings = Depends(get_settings)
+    current_user: User = Depends(get_current_user),  # SECURITY: was unauthenticated
+    settings: Settings = Depends(get_settings),
 ):
     """
     Update ad set daily budget
