@@ -10,6 +10,68 @@ The user's own storefront is **Oubon Shop** (`oubonshop.com`) — it's the refer
 
 The codebase is one FastAPI app — `ospra_os/main.py`. There is no longer a legacy `app/` directory or root-level `main.py`; both were consolidated during the December 2025 migration (see `docs/archive/T2_MIGRATION_COMPLETE.md`).
 
+### Read `docs/HANDOFF_2026-08.md` first
+
+The August 2026 audit sweep found ~13 silently-disabled features, 20 sites
+emitting fabricated data, and 5 critical security holes. That doc is the current
+source of truth for what is fixed vs open, with file:line and fix instructions.
+
+## Traps in this codebase (hard-won — do not relearn these)
+
+**1. Comments describe INTENT; the code often diverges. Trace the value.**
+Confirmed cases: `_filter_supplier_results`' docstring promised a safety valve
+that was never written; `ds_client._normalise_feed_item` claims it "reuses the
+affiliate shape" (it reuses AliExpress's raw *field names*, not the finished
+product shape — trusting it caused a live regression, AliExpress 9 → 0 products);
+`google_trends_apify.py` says `memory_mbytes=256 # cheaper` while runs actually
+provisioned 4096 MB.
+
+**2. Broad `except Exception` hides renames and wrong shapes.** This is the
+single biggest source of lost time here. A wrong import name, a changed method
+name, or a changed data shape becomes a log line, and the feature reports success
+while doing nothing. When something "doesn't seem to work," suspect a swallowed
+error before suspecting logic.
+
+**3. There are TWO functions named `get_current_user`.**
+`ospra_os/auth/jwt_auth.py:438` raises 401. `ospra_os/auth/dependencies.py:72`
+returns `None` and never rejects — and `ospra_os/auth/__init__.py` re-exports
+**that** one. `from ospra_os.auth import get_current_user` looks like protection
+and is not. **Always import from `ospra_os.auth.jwt_auth`.**
+
+**4. Routers registered earlier SHADOW the legacy `@app` routes in `main.py`.**
+Several endpoints exist twice. Patching the `main.py` copy can change nothing —
+verify which handler actually runs before believing a fix.
+
+**5. Render env vars are PER-SERVICE and `render.yaml` declaring one does not
+mean the dashboard has a value** (all supplier creds are `sync: false`). When a
+cron behaves differently from the API, diff the two environments first.
+`CREDENTIALS_ENCRYPTION_KEY` and `JWT_SECRET_KEY` must be IDENTICAL across
+services — a different Fernet key cannot decrypt existing rows.
+
+**6. Render declares NO disk.** Anything written to `data/` is wiped every
+deploy. Never persist a `/static/...` path as a cache value — that produced a
+cache that returned dead URLs as HITS and suppressed regeneration.
+
+**7. CJ has two different credentials.** `CJ_API_KEY` is the short
+`CJ<id>@api@<hex>` key (the password for `getAccessToken`). The long
+`API@CJ<id>@CJ:eyJ...` JWT is an access token and belongs in `CJ_ACCESS_TOKEN`.
+Swapping them makes CJ return 0 products with no useful error.
+
+## Verification rules (non-negotiable)
+
+- **Verify END-TO-END against production, not at the unit level.** Twice in one
+  session the unit tests passed while production did the wrong thing (the AE-DS
+  regression; the auth fix applied to a shadowed route).
+- To check whether a route is authenticated **without triggering paid work**:
+  `GET` a POST-only route. **405** = route exists and no auth gate ran.
+  **401** = protected.
+- Before claiming a pre-existing test failure is unrelated, prove it — diff
+  against `HEAD` or re-run in isolation. The suite randomizes order, so
+  occasional order-dependent flakes are real.
+- Known pre-existing failure: `tests/test_amazon_reviews_route.py::test_returns_unavailable_when_no_amazon_match`
+  passes only with `DISCOVERY_AMAZON_APIFY_ENABLED=true` (off by default since
+  `77f4ad4`).
+
 ### Important memory files — read these first each session
 
 - `TASKS.md` — current task list (what's pending / in progress / blocked)
