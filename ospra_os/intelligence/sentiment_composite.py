@@ -160,6 +160,33 @@ def aliexpress_buyer_weight(recent_sales: int) -> float:
     return max(0.05, min(1.0, math.log10(1 + recent_sales) / 5.0))
 
 
+def cj_proxy_weight() -> float:
+    """CJ supplier-quality proxy weight — the TERTIARY sentiment tier.
+
+    Fixed and deliberately low: unlike every other input this is STRUCTURAL
+    metadata (warehouse location, image richness, listing popularity), not a
+    buyer voice. It exists so a CJ-only product is gradeable at all rather
+    than being auto-binned as INSUFFICIENT_DATA — see the last-resort branch
+    in product_discovery's sentiment cascade.
+
+    Restored 2026-08 (decision D6): the tier was computed, displayed, and
+    reported in coverage, but the April composite rewrite never re-added the
+    branch and this weight function was never written — so it contributed
+    exactly nothing to the score for months while looking present.
+    """
+    return 0.25
+
+
+def score_from_cj_proxy(proxy_score: float) -> float:
+    """CJ structural quality → 0-100 sentiment, capped at 70.
+
+    The cap encodes that structural metadata can never be as strong as an
+    actual buyer signal: a CJ-only product can look good, but it can never
+    look as validated as one with real review evidence.
+    """
+    return max(0.0, min(70.0, float(proxy_score or 0)))
+
+
 # ---------------------------------------------------------------------------
 # Per-source score normalizers
 # ---------------------------------------------------------------------------

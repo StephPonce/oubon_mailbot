@@ -168,12 +168,22 @@ def test_ae_lifts_sentiment_for_ae_only_product():
 
     assert p['sentiment_available'] is True, \
         "AE-rated product must produce a real sentiment signal"
-    assert p['sentiment_source'] == 'aliexpress_api', (
-        f"Expected sentiment_source='aliexpress_api', got {p['sentiment_source']!r}"
+    # The composite names this input 'aliexpress_buyer' (it is the AE
+    # buyer-RATING fallback, distinct from AE review text). The old
+    # 'aliexpress_api' expectation went stale at the composite rewrite and
+    # left this gate permanently red, which is how it stopped being read.
+    assert p['sentiment_source'] == 'aliexpress_buyer', (
+        f"Expected sentiment_source='aliexpress_buyer', got {p['sentiment_source']!r}"
     )
-    assert 55 < p['sentiment_score'] <= 78, (
-        f"AE sentiment should lift above neutral(55) but be capped at 78. "
-        f"Got {p['sentiment_score']}"
+    # Bound updated to match the current banded curve in
+    # sentiment_composite.score_from_aliexpress_buyer: 4.7-4.8 stars -> base
+    # 75, +5 for >=90% positive = 80. The old <=78 bound predates that
+    # calibration. Upper bound stays below the top bands (88/92) so a
+    # good-but-not-perfect AE product still can't score like a verified
+    # Western-reviewed one.
+    assert 55 < p['sentiment_score'] <= 85, (
+        f"AE sentiment should lift above neutral(55) but stay below the "
+        f"top bands. Got {p['sentiment_score']}"
     )
     assert 'aliexpress_ratings' in p.get('sources_validated', []), \
         "AE ratings must appear in sources_validated when the signal is real"
@@ -249,7 +259,7 @@ def test_ae_outranks_cj_proxy():
         f"AE buyer-rated product should outrank CJ-proxy-only on sentiment. "
         f"AE={ae_scored['sentiment_score']} vs CJ={cj_scored['sentiment_score']}"
     )
-    assert ae_scored['sentiment_source'] == 'aliexpress_api'
+    assert ae_scored['sentiment_source'] == 'aliexpress_buyer'
     assert cj_scored['sentiment_source'] == 'cj_supplier_proxy'
     print(f"[D PASS] AE tier ({ae_scored['sentiment_score']}) outranks "
           f"CJ proxy ({cj_scored['sentiment_score']}).")

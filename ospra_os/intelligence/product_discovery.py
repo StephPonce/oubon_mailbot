@@ -6174,6 +6174,10 @@ class ProductDiscoveryEngine:
             # when Amazon data is ABSENT for a CJ-sourced product.
             # ================================================================
             cj_proxy_score = None
+            # Initialised here as well as inside the is_cj_product block: the
+            # sentiment cascade below reads it, and a non-CJ product would
+            # otherwise hit a NameError if the short-circuit order ever changes.
+            cj_has_signal = False
             product_source = product.get('source') or ''
             is_cj_product = (
                 product_source == 'cj_dropshipping'
@@ -6269,6 +6273,8 @@ class ProductDiscoveryEngine:
                 score_from_reddit_mentions as _reddit_s,
                 score_from_tiktok_engagement as _tiktok_s,
                 score_from_aliexpress_buyer as _ae_buyer_s,
+                cj_proxy_weight as _cj_proxy_w,
+                score_from_cj_proxy as _cj_proxy_s,
             )
             # AE review-text helpers exist (aliexpress_review_weight,
             # score_from_aliexpress_reviews) but aren't called from the
@@ -6368,6 +6374,25 @@ class ProductDiscoveryEngine:
                         score=_ae_buyer_s(ae_rating_pct, ae_rating_stars),
                         weight=_ae_buyer_w(ae_recent_sales) * 0.6,
                     ))
+
+            # CJ supplier-quality proxy — the TERTIARY tier (decision D6).
+            # Last resort: only when no buyer-voice source produced anything.
+            # Restored 2026-08. The proxy was still being computed and shown
+            # in the UI breakdown and coverage row, but the April composite
+            # rewrite dropped its branch, so it contributed nothing to the
+            # score. Consequence: a CJ-only product sat at data_confidence
+            # 0.35 (profit 0.15 + sourcing 0.20) — below the 0.50
+            # INSUFFICIENT_DATA gate — and was therefore UNGRADEABLE no
+            # matter how good it was. That silently biased the whole catalog
+            # toward AliExpress. Re-checking `not sentiment_inputs` here (not
+            # the earlier has_western_sentiment snapshot) keeps AE buyer
+            # ratings winning whenever they are present.
+            if not sentiment_inputs and cj_proxy_score is not None and cj_has_signal:
+                sentiment_inputs.append(SentimentInput(
+                    name='cj_supplier_proxy',
+                    score=_cj_proxy_s(cj_proxy_score),
+                    weight=_cj_proxy_w(),
+                ))
 
             sentiment_result = _compose_sentiment(sentiment_inputs)
 
