@@ -1,12 +1,10 @@
 # Known-unauthenticated state-changing routes (SECURITY DEBT).
 # This list may only SHRINK. tests/test_route_auth_ratchet.py fails when a
-# NEW unauthenticated write route appears, and also when a line here is
-# already fixed — so the count stays truthful.
+# NEW unauthenticated write route appears, and also when a line here has
+# already been fixed — so the count stays truthful.
 # Inspect: uv run python scripts/audit_route_auth.py
 DELETE /api/discovery/cache/clear
 DELETE /api/schedule/{schedule_id}
-DELETE /api/whitelabel/partner/clients/{user_id}
-PATCH /api/stores/{store_id}/status
 POST /api/abtesting/events/conversion
 POST /api/abtesting/events/impression
 POST /api/abtesting/events/variant
@@ -29,8 +27,6 @@ POST /api/jobs/jobs/{job_id}/run
 POST /api/jobs/start
 POST /api/jobs/stop
 POST /api/marketing/generate-angle
-POST /api/marketing/generate-angle
-POST /api/marketing/generate-multiple-angles
 POST /api/marketing/generate-multiple-angles
 POST /api/meta/campaign/{campaign_id}/status
 POST /api/meta/campaigns/{campaign_id}/pause
@@ -43,16 +39,8 @@ POST /api/platforms/{platform}/test
 POST /api/schedule/create
 POST /api/schedule/process
 POST /api/scrape-aliexpress-product
-POST /api/stores
-POST /api/stores/generate-learnings
-POST /api/stores/insights/{learning_id}/apply
-POST /api/stores/insights/{learning_id}/dismiss
 POST /api/tiktok/upload
-POST /api/whitelabel/partner/clients
-POST /api/whitelabel/partner/domain
-POST /api/whitelabel/partner/domain/verify
 POST /api/woocommerce/oauth/callback
 POST /auth/register
 POST /auth/tiktok/test
 POST /auth/token
-PUT /api/whitelabel/partner/branding

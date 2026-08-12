@@ -44,9 +44,15 @@ STRICT_AUTH = {
     "require_tier",
     "verify_admin",
     "get_tenant_context",
+    # Tenant dependencies ARE auth: tenancy/dependencies.py get_tenant()
+    # converts a missing tenant into 401 (it used to leak a 500, which is why
+    # these routes look broken rather than gated in probes).
+    "get_tenant",
+    "get_tenant_db",
+    "require_tenant",
 }
 # Looks like auth, is not: returns None instead of raising.
-FAKE_AUTH = {"get_current_user_optional"}
+FAKE_AUTH = {"get_current_user_optional", "get_optional_tenant"}
 
 STATE_CHANGING = {"POST", "PUT", "PATCH", "DELETE"}
 

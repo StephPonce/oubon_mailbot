@@ -9,12 +9,20 @@ Author: OspraOS
 
 import logging
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from ospra_os.auth.jwt_auth import get_current_user
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/marketing", tags=["Marketing"])
+# SECURITY (2026-08): router-level auth. generate-angle and
+# generate-multiple-angles are metered LLM calls on our keys and were
+# anonymously callable — a free content-generation proxy for anyone.
+router = APIRouter(
+    prefix="/api/marketing",
+    tags=["Marketing"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # ============================================================================

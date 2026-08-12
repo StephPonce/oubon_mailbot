@@ -166,14 +166,26 @@ async def get_partner_from_api_key(
 # `x-admin-key: admin-key-placeholder` header — anyone who read the source (it's
 # in git) had full partner-admin access (create/activate/suspend partners).
 # Delegate to the real DB-backed admin dependency (is_admin/is_superuser flag).
-from ospra_os.auth.jwt_auth import require_admin_user as require_admin  # noqa: E402
+from ospra_os.auth.jwt_auth import (  # noqa: E402
+    get_current_user,
+    require_admin_user as require_admin,
+)
 
 
 # ==================== ROUTER ====================
 
 def get_whitelabel_router() -> APIRouter:
     """Create and configure white-label router"""
-    router = APIRouter(prefix="/api/whitelabel", tags=["white-label"])
+    # SECURITY (2026-08): router-level auth. Admin routes already carried
+    # require_admin, but the PARTNER surface did not — POST/DELETE
+    # /partner/clients, /partner/domain, /partner/domain/verify and PUT
+    # /partner/branding were all anonymously callable, i.e. anyone could create
+    # or delete agency clients and rewrite partner branding.
+    router = APIRouter(
+        prefix="/api/whitelabel",
+        tags=["white-label"],
+        dependencies=[Depends(get_current_user)],
+    )
 
     # ==================== ADMIN ENDPOINTS ====================
 
