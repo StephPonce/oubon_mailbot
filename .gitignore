@@ -58,3 +58,6 @@ htmlcov/
 # SQLite scratch files
 ospra_os.db*
 *.db-journal
+
+# Security ratchet baseline must be tracked (blanket *.txt rule above)
+!tests/data/unauthenticated_routes_baseline.txt
