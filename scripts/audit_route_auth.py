@@ -82,6 +82,27 @@ def _dependency_names(route) -> set[str]:
     return names
 
 
+def _has_security_scheme(route) -> bool:
+    """True when any dependency declares an HTTP security scheme.
+
+    Name matching alone under-reports: factory-style gates like
+    `Depends(require_admin)` or `Depends(require_tier("soar"))` produce inner
+    functions whose names are not in any fixed list, which made this script
+    report protected routes as open. FastAPI records the scheme on the dependant
+    tree, so this catches them regardless of naming.
+    """
+    dependant = getattr(route, "dependant", None)
+    if dependant is None:
+        return False
+    stack = [dependant]
+    while stack:
+        d = stack.pop()
+        if getattr(d, "security_requirements", None):
+            return True
+        stack.extend(getattr(d, "dependencies", []) or [])
+    return False
+
+
 def audit() -> list[dict]:
     from ospra_os.main import app
 
@@ -94,6 +115,19 @@ def audit() -> list[dict]:
         deps = _dependency_names(route)
         strict = sorted(deps & STRICT_AUTH)
         fake = sorted(deps & FAKE_AUTH)
+        # Factory-style gates (require_admin, require_tier("soar"), ...) have
+        # unpredictable inner names but still declare a security scheme.
+        if not strict and _has_security_scheme(route) and not fake:
+            strict = ["<security-scheme>"]
+        # Catch-all for gates named by convention but absent from STRICT_AUTH.
+        if not strict and not fake:
+            byname = sorted(
+                n for n in deps
+                if n.startswith("require_") or n.endswith("_auth")
+                or "current_user" in n or "verify_admin" in n
+            )
+            if byname:
+                strict = byname
         for method in sorted(m for m in methods if m not in {"HEAD", "OPTIONS"}):
             public = path.startswith(PUBLIC_PREFIXES)
             rows.append({

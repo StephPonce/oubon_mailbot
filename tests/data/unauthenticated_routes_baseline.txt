@@ -1,16 +1,15 @@
 # Known-unauthenticated state-changing routes (SECURITY DEBT).
 # This list may only SHRINK. tests/test_route_auth_ratchet.py fails when a
-# NEW unauthenticated write route appears. When you gate one, delete its line.
-# Inspect current state: uv run python scripts/audit_route_auth.py
+# NEW unauthenticated write route appears, and also when a line here is
+# already fixed — so the count stays truthful.
+# Inspect: uv run python scripts/audit_route_auth.py
 DELETE /api/discovery/cache/clear
-DELETE /api/oi/memory
 DELETE /api/schedule/{schedule_id}
 DELETE /api/whitelabel/partner/clients/{user_id}
 PATCH /api/stores/{store_id}/status
 POST /api/abtesting/events/conversion
 POST /api/abtesting/events/impression
 POST /api/abtesting/events/variant
-POST /api/ads/kill-switch
 POST /api/aliexpress/affiliate-links
 POST /api/aliexpress/monitor-prices
 POST /api/aliexpress/search
@@ -23,19 +22,8 @@ POST /api/discovery/enhance-images
 POST /api/discovery/refresh-cj-categories
 POST /api/email-automation/gmail/pubsub/webhook
 POST /api/generate-content
-POST /api/health/alerts/{alert_id}/acknowledge
-POST /api/health/alerts/{alert_id}/resolve
-POST /api/health/errors/{error_id}/acknowledge
-POST /api/health/errors/{error_id}/resolve
-POST /api/health/integrations/{name}/test
-POST /api/health/jobs/{job_name}/disable
-POST /api/health/jobs/{job_name}/enable
-POST /api/health/jobs/{job_name}/trigger
 POST /api/images/compare
-POST /api/intelligence/discover
 POST /api/intelligence/grade/bulk
-POST /api/intelligence/images/banner
-POST /api/intelligence/images/generate
 POST /api/intelligence/progress/product/{product_id}/advance
 POST /api/jobs/jobs/{job_id}/run
 POST /api/jobs/start
@@ -49,12 +37,6 @@ POST /api/meta/campaigns/{campaign_id}/pause
 POST /api/meta/campaigns/{campaign_id}/resume
 POST /api/niches/compare
 POST /api/niches/{niche_id}/analyze
-POST /api/oi/action
-POST /api/oi/chat
-POST /api/oi/conversation/clear
-POST /api/oi/feedback
-POST /api/oi/learn
-POST /api/oi/memory
 POST /api/optimize-price
 POST /api/payments/webhook
 POST /api/platforms/{platform}/test
