@@ -65,6 +65,17 @@ Swapping them makes CJ return 0 products with no useful error.
 - To check whether a route is authenticated **without triggering paid work**:
   `GET` a POST-only route. **405** = route exists and no auth gate ran.
   **401** = protected.
+- **Route auth is enforced by a ratchet.** `uv run python scripts/audit_route_auth.py`
+  lists every route and its gate; `tests/test_route_auth_ratchet.py` fails the
+  build if a new unauthenticated state-changing route appears. The baseline is
+  currently EMPTY — keep it that way. If a route is genuinely public, add its
+  prefix to `PUBLIC_PREFIXES` **with a justification**, don't widen the baseline.
+- Routes are gated FOUR ways here: `get_current_user`, factory gates
+  (`require_admin`, `require_tier("soar")`), HTTP security schemes, and tenant
+  dependencies (`get_tenant` → 401). Don't assume one convention.
+- **Spot-check your own tooling before acting on it.** Two false-positive
+  classes in the route auditor would have caused ~39 pointless "fixes" and a
+  wrong number reported to the owner.
 - Before claiming a pre-existing test failure is unrelated, prove it — diff
   against `HEAD` or re-run in isolation. The suite randomizes order, so
   occasional order-dependent flakes are real.

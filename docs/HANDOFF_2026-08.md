@@ -24,6 +24,26 @@ wrong thing.
 | C2 | Shopify OAuth now stores credentials via `Store.set_credentials()`. Both branches assigned `.credentials` directly, writing `access_token` + `webhook_secret` **in plaintext**. **⚠️ EXISTING ROWS STILL NEED A BACKFILL.** | `0797f3e` |
 | C4 | Shopify OAuth callback: HMAC now mandatory (was `if hmac:` — omit the param, skip the check); shop **label** validated with `.isalnum()` (an `endswith(".myshopify.com")` check is NOT sufficient — `attacker.com?z=.myshopify.com` passes it and receives `client_secret`); state now bound to shop. | `0797f3e` |
 | C1 | Auth on routes that delete products and spend money. | `9945060` |
+| C1 (complete) | **ZERO unauthenticated state-changing routes.** 92 → 0 across four batches. Protected 367 → 518. | `65ca7cc`, `c886039`, `0e468b7`, `710c5f0` |
+| — | **Ratchet test**: `tests/test_route_auth_ratchet.py` fails the build if a new ungated write route appears, and also if the baseline lists a route that is already fixed (so the count cannot rot). Baseline now EMPTY. | `69b1b27` |
+
+**Auditor accuracy — two false-positive classes were found by verifying before
+acting, and both mattered.** (1) Factory gates like `Depends(require_admin)` and
+`require_tier("soar")` produce inner functions with unpredictable names; the
+auditor now also treats a declared HTTP security scheme as proof of auth.
+(2) `Depends(get_tenant)` IS auth — `tenancy/dependencies.py` converts a missing
+tenant into a proper 401. The originally-reported 92 included ~39 already-safe
+routes. **Always spot-check the tool before acting on its output.**
+
+**This codebase gates routes FOUR different ways** — `get_current_user`, factory
+gates (`require_admin`/`require_tier`), security schemes, and tenant
+dependencies. Any audit assuming one convention lies in both directions.
+
+**Deliberately public (allowlisted in `scripts/audit_route_auth.py`, not debt):**
+provider-called webhooks (LemonSqueezy HMAC, Google Pub/Sub, WooCommerce OAuth
+callback), `/auth/token` + `/auth/register` compat aliases (these need RATE
+LIMITING, not auth — see O8), and `/api/abtesting/events/*` (storefront visitors
+are anonymous by definition; gating them would break the measurement).
 
 **C1 detail — read this before touching auth again.** Two layers existed and
 **fixing `main.py` alone did nothing**: `ospra_os/integrations/shopify/routes.py`
