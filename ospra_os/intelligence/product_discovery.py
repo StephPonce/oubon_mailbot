@@ -979,52 +979,16 @@ class ProductDiscoveryEngine:
     
     def _init_sentiment_sources(self):
         """Initialize SENTIMENT sources (social validation)"""
-        # X/Twitter via xAI — SECONDARY / OFF BY DEFAULT (weak corroboration
-        # only, #57). Grok sentiment is paraphrase-prone (see #6), so it's
-        # disabled unless DISCOVERY_DISABLE_X is explicitly false/0/no. Off = it
-        # costs nothing and can't affect grades; the flag keeps it re-enableable.
+        # X/Twitter and Reddit connectors REMOVED (2026-08, owner decision).
+        # X was retired by D15. Reddit never worked: its connector claimed
+        # is_available() unconditionally, then hit Reddit's unauthenticated
+        # JSON endpoint which returns 403, swallowing non-200 into an empty
+        # list — silent zeros that looked like a live source.
+        # Neither feeds the sentiment composite any more. Do not re-add.
         self.xai_twitter = None
         self.xai_available = False
-        _x_enabled = os.getenv("DISCOVERY_DISABLE_X", "").strip().lower() in {"0", "false", "no"}
-        xai_key = os.getenv('XAI_API_KEY')
-        if not _x_enabled:
-            self.sources_status['x_twitter'] = '[DISABLED] off by default (set DISCOVERY_DISABLE_X=false to enable)'
-        elif xai_key:
-            try:
-                from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
-                self.xai_twitter = XAITwitterDiscovery(api_key=xai_key)
-                self.xai_available = self.xai_twitter.is_available()
-                self.sources_status['x_twitter'] = '[SUCCESS] Connected (xAI Grok)' if self.xai_available else '[ERROR] Init failed'
-            except Exception as e:
-                self.sources_status['x_twitter'] = f'[ERROR] {e}'
-        else:
-            self.sources_status['x_twitter'] = '[ERROR] No XAI_API_KEY'
-        
-        # Reddit — SECONDARY / OFF BY DEFAULT (weak corroboration only, #57).
-        # Reddit is a LAGGING indicator (poor for EARLY-winner surfacing, which
-        # is the whole point of the overhaul), so it's disabled unless
-        # DISCOVERY_DISABLE_REDDIT is explicitly false/0/no. Off = costs nothing
-        # and can't affect grades; the flag keeps it re-enableable.
         self.reddit = None
         self.reddit_available = False
-        _reddit_enabled = os.getenv("DISCOVERY_DISABLE_REDDIT", "").strip().lower() in {"0", "false", "no"}
-        if not _reddit_enabled:
-            self.sources_status['reddit'] = '[DISABLED] off by default (set DISCOVERY_DISABLE_REDDIT=false to enable)'
-        else:
-            try:
-                from ospra_os.product_research.connectors.social.reddit import RedditConnector
-                self.reddit = RedditConnector(
-                    client_id=os.getenv("REDDIT_CLIENT_ID"),
-                    client_secret=os.getenv("REDDIT_SECRET"),
-                )
-                self.reddit_available = self.reddit.is_available()
-                if self.reddit_available:
-                    self.sources_status['reddit'] = '[SUCCESS] Connected (public JSON API)'
-                    logger.info("[SUCCESS] Reddit connector loaded (public JSON API)")
-                else:
-                    self.sources_status['reddit'] = '[ERROR] Init failed'
-            except Exception as e:
-                self.sources_status['reddit'] = f'[ERROR] {e}'
 
         # Amazon reviews (via Apify) - primary social signal (Task #18)
         # Amazon aggregate rating × review count is the strongest purchase-intent
