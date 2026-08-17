@@ -2286,7 +2286,7 @@ class DiscoverRequest(BaseModel):
     max_per_niche: int = 3
     top_overall: int = 15
 
-@app.post("/api/discover-multi")
+@app.post("/api/discover-multi", dependencies=[Depends(get_current_user)])
 async def discover_multi_niche(
     request: DiscoverRequest,
     settings: Settings = Depends(get_settings)
@@ -2423,7 +2423,7 @@ async def discover_multi_niche(
 # AI Automation Endpoints (Shopify Deploy, Content, Pricing)
 # ---------------------------------------------------------------
 
-@app.post("/api/deploy-to-shopify")
+@app.post("/api/deploy-to-shopify", dependencies=[Depends(get_current_user)])
 async def deploy_to_shopify(
     product_name: str,
     niche: str,
@@ -2483,7 +2483,7 @@ async def deploy_to_shopify(
         }
 
 
-@app.post("/api/generate-content")
+@app.post("/api/generate-content", dependencies=[Depends(get_current_user)])
 async def generate_product_content(
     product_name: str,
     niche: str,
@@ -2541,7 +2541,7 @@ async def generate_product_content(
         }
 
 
-@app.post("/api/scrape-aliexpress-product")
+@app.post("/api/scrape-aliexpress-product", dependencies=[Depends(get_current_user)])
 async def scrape_aliexpress_product(url: str):
     """
     Scrape product details from AliExpress URL.
@@ -2573,7 +2573,7 @@ async def scrape_aliexpress_product(url: str):
     }
 
 
-@app.post("/api/optimize-price")
+@app.post("/api/optimize-price", dependencies=[Depends(get_current_user)])
 async def optimize_product_price(
     product_name: str,
     aliexpress_cost: float,
@@ -2694,7 +2694,7 @@ class ChatRequest(BaseModel):
         return self.dashboard_context or self.context
 
 
-@app.post("/api/claude/chat")
+@app.post("/api/claude/chat", dependencies=[Depends(get_current_user)])
 async def claude_chat(request: ChatRequest):
     """
     Chat with Claude AI with full dashboard context and conversation history
@@ -2867,7 +2867,7 @@ Provide helpful, actionable advice based on the actual dashboard data shown abov
 # ---------------------------------------------------------------
 # Marketing Angle Generator API
 # ---------------------------------------------------------------
-@app.post("/api/marketing/generate-angle")
+@app.post("/api/marketing/generate-angle", dependencies=[Depends(get_current_user)])
 async def generate_marketing_angle(
     product_name: str,
     product_description: str,
@@ -2924,7 +2924,7 @@ async def generate_marketing_angle(
         }
 
 
-@app.post("/api/marketing/generate-multiple-angles")
+@app.post("/api/marketing/generate-multiple-angles", dependencies=[Depends(get_current_user)])
 async def generate_multiple_angles(
     product_name: str,
     product_description: str,

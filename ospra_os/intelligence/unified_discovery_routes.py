@@ -38,6 +38,10 @@ import os
 import time
 
 from ospra_os.auth.dependencies import get_current_user
+# NOTE: the import above is the OPTIONAL variant — it returns None instead
+# of raising, so it gates nothing. Routes that must reject anonymous
+# callers use require_user (the strict dependency) below.
+from ospra_os.auth.jwt_auth import get_current_user as require_user
 from ospra_os.auth.jwt_handler import TokenPayload
 from ospra_os.core.tiers import (
     SubscriptionTier as TierEnum,
@@ -570,7 +574,10 @@ async def quick_discover(
 
 
 @router.post("/enhance-images")
-async def enhance_images(request: EnhanceImagesRequest):
+async def enhance_images(
+    request: EnhanceImagesRequest,
+    _user=Depends(require_user),  # SECURITY: paid work, was anonymous
+):
     """
     Add AI-generated images to existing products.
     
@@ -1592,6 +1599,7 @@ async def test_ae_ds(
 @router.post("/refresh-cj-categories")
 async def refresh_cj_categories(
     force: bool = Query(False, description="Refresh even if cache is fresh"),
+    _user=Depends(require_user),  # SECURITY: paid work, was anonymous
 ):
     """
     Task #36: pull CJ's live category tree from /product/getCategory,
@@ -1657,7 +1665,8 @@ async def get_cache_status():
 
 @router.post("/cache/warm")
 async def warm_cache(
-    niches: str = Query("smart_home,tech,kitchen", description="Comma-separated niches to warm")
+    niches: str = Query("smart_home,tech,kitchen", description="Comma-separated niches to warm"),
+    _user=Depends(require_user),  # SECURITY: paid work, was anonymous
 ):
     """
     Pre-warm cache with popular niches for instant loads.
@@ -1724,7 +1733,8 @@ async def warm_cache(
 
 @router.delete("/cache/clear")
 async def clear_cache(
-    niche: str = Query(None, description="Clear specific niche or all if not provided")
+    niche: str = Query(None, description="Clear specific niche or all if not provided"),
+    _user=Depends(require_user),  # SECURITY: paid work, was anonymous
 ):
     """Clear product cache (specific niche or all)."""
     try:

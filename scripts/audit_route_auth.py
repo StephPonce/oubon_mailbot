@@ -66,9 +66,19 @@ PUBLIC_PREFIXES = (
     "/static",
     "/generated_images",
     "/api/auth/",          # login/register/refresh — rate-limited instead
+    "/auth/token",         # frontend_compat alias for login
+    "/auth/register",      # frontend_compat alias for signup
     "/webhooks/",          # HMAC-verified
     "/api/webhooks/",      # HMAC-verified
     "/api/public/",
+    # Provider-called endpoints — the caller is a third party, not a user, so
+    # they authenticate by signature/token, not by our JWT.
+    "/api/payments/webhook",                        # LemonSqueezy, HMAC-verified
+    "/api/email-automation/gmail/pubsub/webhook",   # Google Pub/Sub, token-verified
+    "/api/woocommerce/oauth/callback",              # OAuth callback, state-verified
+    # Storefront visitors are anonymous by definition — an A/B impression or
+    # conversion cannot require a login without breaking the measurement.
+    "/api/abtesting/events/",
 )
 
 

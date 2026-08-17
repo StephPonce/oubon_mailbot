@@ -3,44 +3,24 @@
 # NEW unauthenticated write route appears, and also when a line here has
 # already been fixed — so the count stays truthful.
 # Inspect: uv run python scripts/audit_route_auth.py
-DELETE /api/discovery/cache/clear
 DELETE /api/schedule/{schedule_id}
-POST /api/abtesting/events/conversion
-POST /api/abtesting/events/impression
-POST /api/abtesting/events/variant
 POST /api/aliexpress/affiliate-links
 POST /api/aliexpress/monitor-prices
 POST /api/aliexpress/search
 POST /api/aliexpress/sync-inventory
-POST /api/claude/chat
-POST /api/deploy-to-shopify
-POST /api/discover-multi
-POST /api/discovery/cache/warm
-POST /api/discovery/enhance-images
-POST /api/discovery/refresh-cj-categories
-POST /api/email-automation/gmail/pubsub/webhook
-POST /api/generate-content
 POST /api/images/compare
 POST /api/intelligence/grade/bulk
 POST /api/intelligence/progress/product/{product_id}/advance
 POST /api/jobs/jobs/{job_id}/run
 POST /api/jobs/start
 POST /api/jobs/stop
-POST /api/marketing/generate-angle
-POST /api/marketing/generate-multiple-angles
 POST /api/meta/campaign/{campaign_id}/status
 POST /api/meta/campaigns/{campaign_id}/pause
 POST /api/meta/campaigns/{campaign_id}/resume
 POST /api/niches/compare
 POST /api/niches/{niche_id}/analyze
-POST /api/optimize-price
-POST /api/payments/webhook
 POST /api/platforms/{platform}/test
 POST /api/schedule/create
 POST /api/schedule/process
-POST /api/scrape-aliexpress-product
 POST /api/tiktok/upload
-POST /api/woocommerce/oauth/callback
-POST /auth/register
 POST /auth/tiktok/test
-POST /auth/token
