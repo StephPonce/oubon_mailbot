@@ -4,6 +4,7 @@ Handles OAuth, profile fetching, video listing, and content posting
 """
 
 from fastapi import APIRouter, Query, Header, HTTPException, Depends, UploadFile, File, Form
+from ospra_os.auth.jwt_auth import get_current_user
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -256,7 +257,7 @@ async def get_user_videos(
 # Content Posting API
 # ============================================================================
 
-@router.post("/upload", response_model=VideoUploadResponse)
+@router.post("/upload", response_model=VideoUploadResponse, dependencies=[Depends(get_current_user)])
 async def upload_video(
     authorization: str = Header(..., description="Bearer token", alias="Authorization"),
     video: UploadFile = File(..., description="Video file to upload"),

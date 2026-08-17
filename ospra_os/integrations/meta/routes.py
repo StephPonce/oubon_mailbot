@@ -3,12 +3,19 @@ Meta Ads Integration Routes
 REAL API calls only - No mock/demo data
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from ospra_os.auth.jwt_auth import get_current_user
 from pydantic import BaseModel
 from typing import List, Optional
 import os
 
-router = APIRouter(prefix="/api/meta", tags=["Meta Ads"])
+# SECURITY (2026-08): router-level auth. Campaign pause/resume/status
+# control LIVE AD SPEND and were anonymously callable.
+router = APIRouter(
+    prefix="/api/meta",
+    tags=["Meta Ads"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 def get_meta_credentials():

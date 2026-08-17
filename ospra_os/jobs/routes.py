@@ -1,14 +1,21 @@
 """
 API routes for managing background jobs
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from ospra_os.auth.jwt_auth import get_current_user
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
 from ospra_os.jobs.scheduler import get_scheduler
 
-router = APIRouter(prefix="/api/jobs", tags=["Background Jobs"])
+# SECURITY (2026-08): router-level auth. /start, /stop and /jobs/{id}/run
+# let an anonymous caller start, stop and re-run background jobs.
+router = APIRouter(
+    prefix="/api/jobs",
+    tags=["Background Jobs"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 class JobStatus(BaseModel):

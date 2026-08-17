@@ -3,7 +3,8 @@ TikTok OAuth Router
 Handles authorization flow for TikTok API access
 """
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import Depends, APIRouter, Query, HTTPException
+from ospra_os.auth.jwt_auth import get_current_user
 from fastapi.responses import RedirectResponse
 import os
 import logging
@@ -164,7 +165,7 @@ async def tiktok_status():
         }
 
 
-@router.post("/test")
+@router.post("/test", dependencies=[Depends(get_current_user)])
 async def test_tiktok_search():
     """Test TikTok product search"""
 

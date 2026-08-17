@@ -860,7 +860,7 @@ async def legacy_generate(
     return await enhance_image(request, current_user)
 
 
-@router.post("/compare")
+@router.post("/compare", dependencies=[Depends(get_current_user)])
 async def legacy_compare():
     """
     DEPRECATED: Comparison modes removed.

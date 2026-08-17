@@ -1,26 +1,4 @@
 # Known-unauthenticated state-changing routes (SECURITY DEBT).
-# This list may only SHRINK. tests/test_route_auth_ratchet.py fails when a
-# NEW unauthenticated write route appears, and also when a line here has
-# already been fixed — so the count stays truthful.
+# EMPTY = zero known debt. tests/test_route_auth_ratchet.py fails the build
+# if a NEW unauthenticated write route appears.
 # Inspect: uv run python scripts/audit_route_auth.py
-DELETE /api/schedule/{schedule_id}
-POST /api/aliexpress/affiliate-links
-POST /api/aliexpress/monitor-prices
-POST /api/aliexpress/search
-POST /api/aliexpress/sync-inventory
-POST /api/images/compare
-POST /api/intelligence/grade/bulk
-POST /api/intelligence/progress/product/{product_id}/advance
-POST /api/jobs/jobs/{job_id}/run
-POST /api/jobs/start
-POST /api/jobs/stop
-POST /api/meta/campaign/{campaign_id}/status
-POST /api/meta/campaigns/{campaign_id}/pause
-POST /api/meta/campaigns/{campaign_id}/resume
-POST /api/niches/compare
-POST /api/niches/{niche_id}/analyze
-POST /api/platforms/{platform}/test
-POST /api/schedule/create
-POST /api/schedule/process
-POST /api/tiktok/upload
-POST /auth/tiktok/test

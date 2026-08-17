@@ -171,7 +171,7 @@ async def grade_product(product_id: int, db: Session = Depends(get_db)):
     return await engine.calculate_product_grade(product_id)
 
 
-@router.post("/grade/bulk")
+@router.post("/grade/bulk", dependencies=[Depends(get_current_user)])
 async def grade_products_bulk(product_ids: List[int], db: Session = Depends(get_db)):
     engine = get_grade_reasoning_engine(db)
     results = []
@@ -194,7 +194,7 @@ async def get_product_progress(product_id: int, db: Session = Depends(get_db)):
     return await tracker.get_product_progress(product_id)
 
 
-@router.post("/progress/product/{product_id}/advance")
+@router.post("/progress/product/{product_id}/advance", dependencies=[Depends(get_current_user)])
 async def advance_product_stage(
     product_id: int,
     new_stage: str,

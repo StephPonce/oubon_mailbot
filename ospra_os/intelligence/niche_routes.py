@@ -21,7 +21,8 @@ Author: OspraOS
 Date: November 2025
 """
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import Depends, APIRouter, HTTPException, Query, Body
+from ospra_os.auth.jwt_auth import get_current_user
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 import logging
@@ -101,7 +102,7 @@ async def get_niche_analysis(
 
 
 # ===== ENDPOINT 3: TRIGGER MANUAL ANALYSIS =====
-@router.post("/api/niches/{niche_id}/analyze")
+@router.post("/api/niches/{niche_id}/analyze", dependencies=[Depends(get_current_user)])
 async def trigger_niche_analysis(
     niche_id: str,
     request: AnalyzeNicheRequest = Body(...)
@@ -256,7 +257,7 @@ async def get_emerging_niches(
 
 
 # ===== ENDPOINT 9: COMPARE NICHES =====
-@router.post("/api/niches/compare")
+@router.post("/api/niches/compare", dependencies=[Depends(get_current_user)])
 async def compare_niches(request: NicheCompareRequest):
     """
     Side-by-side comparison of multiple niches.

@@ -2206,7 +2206,7 @@ async def get_platforms():
         }
 
 
-@app.post("/api/platforms/{platform}/test")
+@app.post("/api/platforms/{platform}/test", dependencies=[Depends(get_current_user)])
 async def test_platform_credentials(
     platform: str,
     credentials: PlatformCredentials,
@@ -3355,7 +3355,7 @@ async def delete_shopify_product(
         }
 
 
-@app.post("/api/aliexpress/search")
+@app.post("/api/aliexpress/search", dependencies=[Depends(get_current_user)])
 async def search_aliexpress(
     request: AliExpressSearchRequest,
     settings: Settings = Depends(get_settings)
@@ -3402,7 +3402,7 @@ async def search_aliexpress(
         }
 
 
-@app.post("/api/aliexpress/affiliate-links")
+@app.post("/api/aliexpress/affiliate-links", dependencies=[Depends(get_current_user)])
 async def generate_affiliate_links(
     request: AliExpressAffiliateLinkRequest,
     settings: Settings = Depends(get_settings)
@@ -3492,7 +3492,7 @@ async def fulfill_order(
         }
 
 
-@app.post("/api/aliexpress/sync-inventory")
+@app.post("/api/aliexpress/sync-inventory", dependencies=[Depends(get_current_user)])
 async def sync_inventory(
     request: AliExpressSyncRequest,
     settings: Settings = Depends(get_settings)
@@ -3538,7 +3538,7 @@ async def sync_inventory(
         }
 
 
-@app.post("/api/aliexpress/monitor-prices")
+@app.post("/api/aliexpress/monitor-prices", dependencies=[Depends(get_current_user)])
 async def monitor_prices(
     request: AliExpressMonitorPricesRequest,
     settings: Settings = Depends(get_settings)
@@ -3704,7 +3704,7 @@ async def get_campaign_insights(
         }
 
 
-@app.post("/api/meta/campaign/{campaign_id}/status")
+@app.post("/api/meta/campaign/{campaign_id}/status", dependencies=[Depends(get_current_user)])
 async def update_campaign_status(
     campaign_id: str,
     request: CampaignStatusUpdate,
@@ -3781,7 +3781,7 @@ async def update_ad_set_budget(
 # AD SCHEDULING & AUTOMATION
 # 
 
-@app.post("/api/schedule/create")
+@app.post("/api/schedule/create", dependencies=[Depends(get_current_user)])
 async def create_ad_schedule(
     request: ScheduleCreateRequest,
     settings: Settings = Depends(get_settings)
@@ -3899,7 +3899,7 @@ async def get_schedule(
         }
 
 
-@app.delete("/api/schedule/{schedule_id}")
+@app.delete("/api/schedule/{schedule_id}", dependencies=[Depends(get_current_user)])
 async def cancel_schedule(
     schedule_id: str,
     settings: Settings = Depends(get_settings)
@@ -3923,7 +3923,7 @@ async def cancel_schedule(
         }
 
 
-@app.post("/api/schedule/process")
+@app.post("/api/schedule/process", dependencies=[Depends(get_current_user)])
 async def manually_process_schedules(
     settings: Settings = Depends(get_settings)
 ):
