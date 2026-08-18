@@ -47,12 +47,11 @@ except ImportError:
     AmazonBestsellersScraper = None
     HAS_APIFY = False
 
-try:
-    from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
-    HAS_XAI_TWITTER = True
-except ImportError:
-    XAITwitterDiscovery = None
-    HAS_XAI_TWITTER = False
+# X/Twitter removed as a discovery source (2026-08, owner decision; X was
+# already retired by D15). Kept as explicit False so any straggling reference
+# degrades quietly instead of resurrecting the source.
+XAITwitterDiscovery = None
+HAS_XAI_TWITTER = False
 
 # First-party TikTok Shop Partner API connector (task #36). Different from the
 # Apify-based TikTokShopScraper above — this one hits open-api.tiktokglobalshop.com
@@ -268,16 +267,8 @@ class MultiSourceDiscovery:
         self.shopify_competitor = None
         self.aliexpress_scraper = None
 
-        # Try to initialize xAI Twitter discovery
-        try:
-            self.xai_twitter = XAITwitterDiscovery()
-            if self.xai_twitter.is_available():
-                print("[SUCCESS] xAI Twitter Discovery initialized")
-            else:
-                self.xai_twitter = None
-        except Exception as e:
-            print(f"[WARNING]  xAI Twitter init failed: {e}")
-            self.xai_twitter = None
+        # X/Twitter removed 2026-08 — see the module-level note.
+        self.xai_twitter = None
 
         # Initialize cross-reference engine if all required scrapers are available
         # Updated 2025-12-07: Use xAI Twitter instead of Reddit

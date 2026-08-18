@@ -75,53 +75,6 @@ async def test_google_trends():
         return False
 
 
-async def test_xai_twitter():
-    """Test xAI Twitter discovery"""
-    print_header("XAI TWITTER DISCOVERY (Agent Tools API / grok-4.3)")
-    
-    try:
-        from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
-        
-        discovery = XAITwitterDiscovery()
-        
-        if not discovery.is_available():
-            print_result("xAI Connection", False, "XAI_API_KEY not set")
-            return False
-        
-        print_result("xAI Connection", True, f"Connected ({discovery.model})")
-        
-        # Check niches and hashtags
-        niches = discovery.get_all_niches()
-        hashtags = discovery.get_all_hashtags()
-        
-        print_result("Niches Available", True, f"{len(niches)} niches")
-        print_result("Hashtags Available", True, f"{len(hashtags)} hashtags")
-        
-        # Test actual discovery
-        print("\n    Testing live discovery (smart_home)...")
-        products = await discovery.discover_viral_products(
-            niche="smart_home",
-            max_products=3,
-            time_range="24h"
-        )
-        
-        if products:
-            print_result("Viral Discovery", True, f"Found {len(products)} products")
-            for p in products[:2]:
-                print(f"      [HOT] {p.name[:40]}... | Score: {p.viral_score}")
-        else:
-            print_result("Viral Discovery", False, "No products found")
-            
-        return len(products) > 0
-        
-    except ImportError as e:
-        print_result("xAI Import", False, str(e))
-        return False
-    except Exception as e:
-        print_result("xAI Twitter", False, str(e))
-        return False
-
-
 async def test_aliexpress():
     """Test AliExpress connector"""
     print_header("ALIEXPRESS API")
@@ -395,7 +348,6 @@ async def main():
     
     # Test each component
     results['google_trends'] = await test_google_trends()
-    results['xai_twitter'] = await test_xai_twitter()
     results['aliexpress'] = await test_aliexpress()
     results['tiktok'] = await test_tiktok()
     results['apify'] = await test_apify()

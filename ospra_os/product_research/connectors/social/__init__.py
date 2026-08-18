@@ -1,31 +1,18 @@
 """
 Social media platform connectors.
 
-#57: twitter.py (empty stub) deleted and meta.py sunset (organic Graph API is
-dead; Meta signal now comes from the Ad Library actor in the main pipeline).
+HISTORY:
+- twitter.py (empty stub) deleted and meta.py sunset in #57 — Meta's organic
+  Graph API is dead; Meta signal now comes from the Ad Library actor in the
+  main discovery pipeline.
+- reddit.py and xai_twitter.py REMOVED 2026-08 (owner decision; X was already
+  retired by D15). Reddit never actually worked: the connector reported
+  is_available() unconditionally, hit Reddit's unauthenticated JSON endpoint
+  which returns 403, and swallowed non-200 into an empty list — silent zeros
+  that looked like a live source. Do not re-add either without an
+  authenticated client and a test proving it returns real data.
 
 ACTIVE CONNECTORS:
-- RedditConnector: SECONDARY / off by default (DISCOVERY_DISABLE_REDDIT)
-- XAITwitterDiscovery: SECONDARY / off by default (DISCOVERY_DISABLE_X) — weak
-  corroboration only; Grok sentiment is paraphrase-prone.
+- AmazonReviewsConnector (via Apify) — primary sentiment signal
+- YouTubeConnector — free tier, evidence only (not yet in the numeric composite)
 """
-
-from .reddit import RedditConnector
-
-# xAI-powered Twitter discovery — opt-in, off by default (see DISCOVERY_DISABLE_X).
-try:
-    from .xai_twitter import XAITwitterDiscovery, TwitterProduct, discover_twitter_products
-    HAS_XAI_TWITTER = True
-except ImportError:
-    XAITwitterDiscovery = None
-    TwitterProduct = None
-    discover_twitter_products = None
-    HAS_XAI_TWITTER = False
-
-__all__ = [
-    "RedditConnector",
-    "XAITwitterDiscovery",
-    "TwitterProduct",
-    "discover_twitter_products",
-    "HAS_XAI_TWITTER",
-]

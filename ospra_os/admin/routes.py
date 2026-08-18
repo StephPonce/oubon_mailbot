@@ -56,36 +56,6 @@ async def get_product_discoveries(settings: Settings) -> Dict[str, Any]:
     }
 
 
-async def get_reddit_sentiment(settings: Settings) -> Dict[str, Any]:
-    """Get Reddit trending sentiment."""
-    try:
-        from ospra_os.product_research.connectors.social.reddit import RedditConnector
-
-        reddit = RedditConnector(
-            client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-            client_secret=getattr(settings, "REDDIT_SECRET", None)
-        )
-
-        if not reddit.is_available():
-            return {"trending": [], "error": "Reddit not configured"}
-
-        products = await reddit.get_trending(category="smart home", limit=5)
-
-        return {
-            "trending": [
-                {
-                    "name": p.name,
-                    "score": p.trend_score,
-                    "upvotes": p.social_mentions,
-                    "comments": p.social_engagement,
-                    "url": p.url
-                }
-                for p in products[:5]
-            ]
-        }
-    except Exception as e:
-        print(f"[WARNING]  Reddit sentiment error: {e}")
-        return {"trending": [], "error": str(e)}
 
 
 @router.get("/dashboard/data")
@@ -99,24 +69,16 @@ async def get_dashboard_data(
     Returns:
         - Email automation stats
         - Product discoveries with images
-        - Reddit sentiment
         - System status
     """
     # Fetch all data in parallel
-    email_stats, products, reddit = await asyncio.gather(
+    email_stats, products = await asyncio.gather(
         get_email_stats(settings),
         get_product_discoveries(settings),
-        get_reddit_sentiment(settings)
     )
 
     # Check API statuses
-    from ospra_os.product_research.connectors.social.reddit import RedditConnector
     from ospra_os.product_research.connectors.suppliers.aliexpress import AliExpressConnector
-
-    reddit_connector = RedditConnector(
-        client_id=getattr(settings, "REDDIT_CLIENT_ID", None),
-        client_secret=getattr(settings, "REDDIT_SECRET", None)
-    )
 
     aliexpress_connector = AliExpressConnector(
         api_key=getattr(settings, "ALIEXPRESS_API_KEY", None),
@@ -126,9 +88,7 @@ async def get_dashboard_data(
     return {
         "email": email_stats,
         "products": products,
-        "reddit": reddit,
         "status": {
-            "reddit_api": reddit_connector.is_available(),
             "aliexpress_api": aliexpress_connector.is_available(),
             "email_automation": True,  # Always running via scheduler
         }
@@ -151,7 +111,7 @@ async def dashboard_page(current_user: User = Depends(get_current_user)):
     """
     Unified Ospra OS Dashboard.
 
-    Shows email automation, product discoveries, and Reddit sentiment in one view.
+    Shows email automation and product discoveries in one view.
     """
     html_content = """
 <!DOCTYPE html>
@@ -392,12 +352,6 @@ async def dashboard_page(current_user: User = Depends(get_current_user)):
                         <div class="card">
                             <h2>[PLUGIN] API Status</h2>
                             <div class="stat">
-                                <span class="stat-label">Reddit API</span>
-                                <span class="status-badge ${data.status.reddit_api ? 'status-active' : 'status-inactive'}">
-                                    ${data.status.reddit_api ? 'Connected' : 'Disconnected'}
-                                </span>
-                            </div>
-                            <div class="stat">
                                 <span class="stat-label">AliExpress API</span>
                                 <span class="status-badge ${data.status.aliexpress_api ? 'status-active' : 'status-inactive'}">
                                     ${data.status.aliexpress_api ? 'Connected' : 'Pending'}
@@ -414,10 +368,6 @@ async def dashboard_page(current_user: User = Depends(get_current_user)):
                             <div class="stat">
                                 <span class="stat-label">Products Found</span>
                                 <span class="stat-value">${data.products.total || 0}</span>
-                            </div>
-                            <div class="stat">
-                                <span class="stat-label">Reddit Trending</span>
-                                <span class="stat-value">${data.reddit.trending?.length || 0}</span>
                             </div>
                             <div class="stat">
                                 <span class="stat-label">Last Updated</span>
@@ -446,20 +396,6 @@ async def dashboard_page(current_user: User = Depends(get_current_user)):
                         ` : '<p style="color: #666;">No products discovered yet. Try running a search!</p>'}
                     </div>
 
-                    <!-- Reddit Sentiment -->
-                    <div class="card">
-                        <h2>[CHAT] Reddit Community Trending</h2>
-                        ${data.reddit.trending && data.reddit.trending.length > 0 ? `
-                            ${data.reddit.trending.map(item => `
-                                <div class="reddit-item">
-                                    <div class="reddit-title">${item.name}</div>
-                                    <div class="reddit-stats">
-                                         ${item.upvotes} upvotes • [CHAT] ${item.comments} comments • Score: ${item.score?.toFixed(1) || 'N/A'}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        ` : '<p style="color: #666;">No Reddit data available. Check API configuration.</p>'}
-                    </div>
                 `;
 
             } catch (error) {

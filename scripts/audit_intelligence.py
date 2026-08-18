@@ -127,17 +127,6 @@ class IntelligenceAuditor:
             connectors["AliExpress"] = {"status": "FAILED", "error": str(e)}
             print(f"   [ERROR] AliExpress: {e}")
         
-        # 2. xAI/Grok
-        try:
-            from ospra_os.product_research.connectors.social.xai_twitter import XAITwitterDiscovery
-            xai = XAITwitterDiscovery(api_key=os.getenv("XAI_API_KEY"))
-            is_available = xai.is_available()
-            connectors["xAI/Grok"] = {"status": "AVAILABLE" if is_available else "NOT_AVAILABLE", "connector": xai}
-            print(f"   {'[SUCCESS]' if is_available else '[WARNING]'} xAI/Grok: {'Available' if is_available else 'Not available'}")
-        except Exception as e:
-            connectors["xAI/Grok"] = {"status": "FAILED", "error": str(e)}
-            print(f"   [ERROR] xAI/Grok: {e}")
-        
         # 3. CJ Dropshipping
         try:
             from ospra_os.integrations.cj_dropshipping import get_cj_client
@@ -168,19 +157,6 @@ class IntelligenceAuditor:
         except Exception as e:
             connectors["Apify"] = {"status": "FAILED", "error": str(e)}
             print(f"   [ERROR] Apify: {e}")
-        
-        # 6. Reddit
-        try:
-            from ospra_os.product_research.connectors.social.reddit import RedditConnector
-            reddit = RedditConnector(
-                client_id=os.getenv("OUBONSHOP_REDDIT_CLIENT_ID"),
-                client_secret=os.getenv("OUBONSHOP_REDDIT_SECRET")
-            )
-            connectors["Reddit"] = {"status": "INITIALIZED", "connector": reddit}
-            print("   [SUCCESS] Reddit: Connector initialized")
-        except Exception as e:
-            connectors["Reddit"] = {"status": "FAILED", "error": str(e)}
-            print(f"   [ERROR] Reddit: {e}")
         
         # 7. TikTok
         try:
