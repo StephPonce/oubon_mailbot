@@ -60,18 +60,27 @@ function simpleHash(str) {
   return Math.abs(hash).toString(36);
 }
 
+// Render helper: a missing price is "—", never "$NaN" and never an invented
+// number. normalizeProduct now yields null for prices/scores the backend did
+// not supply, so every render site must tolerate null.
+function money(v) {
+  return (v === null || v === undefined || Number.isNaN(v)) ? null : `$${Number(v).toFixed(2)}`;
+}
+
 function normalizeProduct(p, fallbackNiche = 'general') {
   const costPrice = parseFloat(p.cost_price || p.supplier_cost || p.targetSalePrice || p.price || 0);
   
-  let suggestedPrice = parseFloat(p.suggested_price || 0);
-  if (!suggestedPrice && costPrice > 0) {
-    suggestedPrice = costPrice * 2.5;
-  }
-  
-  let profit = parseFloat(p.profit || 0);
-  if (!profit && suggestedPrice > 0 && costPrice > 0) {
-    profit = suggestedPrice - costPrice;
-  }
+  // HONEST PRICING (2026-08). This used to invent suggestedPrice = costPrice *
+  // 2.5 whenever the backend didn't send one — overwriting the backend's
+  // category-aware markup (_suggested_price_for_cost) with a flat guess, and
+  // making profit/margin fiction. If the backend has no price, we show none.
+  const suggestedPriceRaw = parseFloat(p.suggested_price || 0);
+  const suggestedPrice = suggestedPriceRaw > 0 ? suggestedPriceRaw : null;
+
+  const profitRaw = parseFloat(p.profit || 0);
+  const profit = profitRaw
+    ? profitRaw
+    : (suggestedPrice && costPrice > 0 ? suggestedPrice - costPrice : null);
   
   // Collect ALL image URLs from backend
   const mainImage = p.image_url || p.imageUrl || p.image || p.main_image || p.productMainImageUrl || null;
@@ -102,7 +111,10 @@ function normalizeProduct(p, fallbackNiche = 'general') {
   const imageCount = p.image_count || allImages.length;
   
   // Oi Score - the single unified score
-  const oiScore = Math.round(p.oi_score || p.score || p.final_score || p.productScore || p.opportunity_score || 50);
+  // No `|| 50` fallback: an unscored product must read as unscored, not as a
+  // mediocre-but-real 50. The score UI already renders null as "No data".
+  const _rawOi = p.oi_score ?? p.score ?? p.final_score ?? p.productScore ?? p.opportunity_score;
+  const oiScore = (_rawOi === null || _rawOi === undefined || _rawOi === '') ? null : Math.round(_rawOi);
   
   // Supplier link - check flat fields AND nested data_sources.*.url.
   // Backend puts the real clickable URL in different places depending on the source:
@@ -147,9 +159,16 @@ function normalizeProduct(p, fallbackNiche = 'general') {
       ? p.sentiment_score   // may be number OR null (null = "we searched, found nothing")
       : (p.sentimentScore !== undefined ? p.sentimentScore : null);
   const sentimentWeightRedistributed = p.sentiment_weight_redistributed === true;
-  const viralScore = p.viral_score || p.viralScore || 50;
-  const profitMargin = (suggestedPrice > 0 && costPrice > 0) ? Math.round((profit / suggestedPrice) * 100) : 50;
-  const profitScore = p.profit_score || p.profitScore || Math.min(100, profitMargin * 1.5);
+  const viralScore = p.viral_score ?? p.viralScore ?? null;
+  // profitMargin/profitScore were the worst offenders: with the old flat 2.5x
+  // markup the margin was ALWAYS 60, so profitScore was ALWAYS exactly 90 —
+  // every product rendered a full green "Profit Margin 90" bar with
+  // estimated:false. Now both are null unless real prices back them.
+  const profitMargin = (suggestedPrice && costPrice > 0 && profit !== null)
+    ? Math.round((profit / suggestedPrice) * 100)
+    : null;
+  const profitScore = p.profit_score ?? p.profitScore ??
+    (profitMargin !== null ? Math.min(100, profitMargin * 1.5) : null);
   
   // Generate a STABLE product ID based on title + main image (for cache consistency)
   const title = p.title || p.name || p.product_title || 'Untitled Product';
@@ -181,13 +200,15 @@ function normalizeProduct(p, fallbackNiche = 'general') {
     ai_image_url: p.ai_image_url || null,
     all_images: allImages,
     image_count: imageCount,
-    cost_price: parseFloat(costPrice.toFixed(2)),
-    suggested_price: parseFloat(suggestedPrice.toFixed(2)),
-    profit: parseFloat(profit.toFixed(2)),
+    cost_price: costPrice > 0 ? parseFloat(costPrice.toFixed(2)) : null,
+    suggested_price: suggestedPrice !== null ? parseFloat(suggestedPrice.toFixed(2)) : null,
+    profit: profit !== null ? parseFloat(profit.toFixed(2)) : null,
     oi_score: oiScore,
     niche: p.niche || p.category || fallbackNiche,
-    tags: p.tags || [p.niche || p.category || 'trending'],
-    source: p.source || 'aliexpress',
+    tags: p.tags || (p.niche || p.category ? [p.niche || p.category] : []),
+    // Never default the supplier: claiming 'aliexpress' for a product whose
+    // source the backend didn't state mislabels provenance and the buy link.
+    source: p.source || null,
     is_mock: p.is_mock || p.source === 'mock_data',
     supplier_url: supplierUrl,
     // Supplier / warehouse metadata (Option A badges + filter chips)
@@ -459,7 +480,7 @@ const ProductCard = React.memo(function ProductCard({ product, onClick }) {
         <div className={`absolute top-3 right-3 px-3 py-2 rounded-xl bg-gradient-to-br ${getScoreBgColor(product.oi_score)} border backdrop-blur-sm`}>
           <div className="flex items-center gap-1.5">
             <Brain className="w-4 h-4 text-purple-400" />
-            <span className={`text-lg font-bold ${getScoreColor(product.oi_score)}`}>{product.oi_score}</span>
+            <span className={`text-lg font-bold ${getScoreColor(product.oi_score)}`}>{product.oi_score ?? '—'}</span>
           </div>
         </div>
 
@@ -480,9 +501,11 @@ const ProductCard = React.memo(function ProductCard({ product, onClick }) {
         
         {/* Pricing */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-white/50 text-sm line-through">${product.cost_price.toFixed(2)}</span>
-          <span className="text-green-400 font-medium">${product.suggested_price.toFixed(2)}</span>
-          <span className="text-purple-400 font-bold ml-auto">+${product.profit.toFixed(2)}</span>
+          <span className="text-white/50 text-sm line-through">{money(product.cost_price) ?? '—'}</span>
+          <span className="text-green-400 font-medium">{money(product.suggested_price) ?? '—'}</span>
+          {money(product.profit) && (
+            <span className="text-purple-400 font-bold ml-auto">+{money(product.profit)}</span>
+          )}
         </div>
 
         {/* Quick Stats */}
@@ -2063,13 +2086,15 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
                   </div>
                   <div>
                     <p className="text-white/60 text-sm">Oi Score {product.scores_estimated && <span className="text-yellow-400">(Est.)</span>}</p>
-                    <p className={`text-3xl font-bold ${getScoreColor(product.oi_score)}`}>{product.oi_score}</p>
+                    <p className={`text-3xl font-bold ${getScoreColor(product.oi_score)}`}>{product.oi_score ?? '—'}</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-white/40 text-xs">out of 100</p>
                   <p className={`text-sm font-medium ${getScoreColor(product.oi_score)}`}>
-                    {product.oi_score >= 80 ? 'Excellent' : product.oi_score >= 60 ? 'Good' : product.oi_score >= 40 ? 'Fair' : 'Poor'}
+                    {product.oi_score === null || product.oi_score === undefined
+                      ? 'Not scored'
+                      : product.oi_score >= 80 ? 'Excellent' : product.oi_score >= 60 ? 'Good' : product.oi_score >= 40 ? 'Fair' : 'Poor'}
                   </p>
                 </div>
               </div>
@@ -2407,15 +2432,15 @@ ${a.seasonal_factors || 'Year-round demand expected'}`;
           <div className="grid grid-cols-3 gap-4">
             <div className="p-4 rounded-xl bg-white/5 text-center">
               <p className="text-white/40 text-xs mb-1">Supplier Cost</p>
-              <p className="text-white font-bold text-xl">${product.cost_price.toFixed(2)}</p>
+              <p className="text-white font-bold text-xl">{money(product.cost_price) ?? '—'}</p>
             </div>
             <div className="p-4 rounded-xl bg-green-500/10 text-center">
               <p className="text-green-300/60 text-xs mb-1">Sell Price</p>
-              <p className="text-green-400 font-bold text-xl">${product.suggested_price.toFixed(2)}</p>
+              <p className="text-green-400 font-bold text-xl">{money(product.suggested_price) ?? '—'}</p>
             </div>
             <div className="p-4 rounded-xl bg-purple-500/10 text-center">
               <p className="text-purple-300/60 text-xs mb-1">Profit</p>
-              <p className="text-purple-400 font-bold text-xl">+${product.profit.toFixed(2)}</p>
+              <p className="text-purple-400 font-bold text-xl">{money(product.profit) ? `+${money(product.profit)}` : '—'}</p>
             </div>
           </div>
 
@@ -2759,8 +2784,10 @@ export function ProductDiscovery() {
 
     if (filter === 'trending') {
       sortedProducts.sort((a, b) => {
-        const aScore = (a.trend_score || 50) + (a.viral_score || 0);
-        const bScore = (b.trend_score || 50) + (b.viral_score || 0);
+        // No `|| 50`: a product with no trend signal must not outrank a real
+        // low-trend product by borrowing a synthetic mid-tier score.
+        const aScore = (a.trend_score ?? 0) + (a.viral_score ?? 0);
+        const bScore = (b.trend_score ?? 0) + (b.viral_score ?? 0);
         return bScore - aScore;
       });
     } else if (filter === 'recommended') {
@@ -3123,8 +3150,10 @@ export function ProductDiscovery() {
       if (filter === 'trending') {
         // Sort by trend score + viral score (higher = more trending)
         normalizedProducts.sort((a, b) => {
-          const aScore = (a.trend_score || 50) + (a.viral_score || 0);
-          const bScore = (b.trend_score || 50) + (b.viral_score || 0);
+          // No `|| 50`: a product with no trend signal must not outrank a real
+          // low-trend product by borrowing a synthetic mid-tier score.
+          const aScore = (a.trend_score ?? 0) + (a.viral_score ?? 0);
+          const bScore = (b.trend_score ?? 0) + (b.viral_score ?? 0);
           return bScore - aScore;
         });
       } else if (filter === 'recommended') {
