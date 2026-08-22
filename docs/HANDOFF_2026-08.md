@@ -181,7 +181,32 @@ RLS; CVE confirmation against installed versions (heavy dependency drift exists:
 
 ---
 
-## 2. MOCK / FABRICATED DATA — 20 sites, 1 removed
+## 2. MOCK / FABRICATED DATA — COMPLETE (all 20 sites + 3 the audit missed)
+
+Every production fabrication site is removed. Commits: `be6e002` (simulate-sale),
+`f1d6426` (demo products, dead components), `ae3252a` (frontend cards),
+`6407829` (spend caps, revenue charts, domain status, inventory), `6d76226`
+(AI prompt inputs), `c17f41b` (last dead functions), `1710eb6` (random pricing).
+
+**A systematic sweep beat the audit list.** Grepping `random.uniform|randint|
+choice` across `ospra_os/` found 3 sites the list missed — including
+`ai_pricing_generator._rule_based_pricing`, whose random price is written to a
+LIVE Shopify listing. Sweep by pattern, don't trust an inventory.
+
+Two method failures worth not repeating: cutting a function by "next def at the
+same indent" broke the tree twice — once overrunning the end of a class (took
+`get_engine`/`discover_products` with it), once stopping inside a multi-line
+signature. Use explicit start/end line numbers. And `git stash` to compare
+against HEAD collided with the parked "Gemini damage" stash; use
+`git show HEAD:<path>` instead (already in project memory).
+
+Deliberately kept: `static/tiktok_demo.html` (labelled a demo, obvious
+placeholder image), `ai_product_analyzer.test_analyzer()` fixtures (demo
+harness), `tests/` doubles, and documented heuristics like
+`market_share_estimator`'s stated assumptions.
+
+### Historical detail (original inventory)
+
 
 **No test references ANY of these** — the whole purge is test-safe.
 
