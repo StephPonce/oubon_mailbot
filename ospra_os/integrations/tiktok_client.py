@@ -341,7 +341,6 @@ class TikTokClient:
         Returns:
             Estimated price in USD
         """
-        import random
 
         # Normalize category
         category_key = category.lower().replace(" ", "_")
@@ -359,7 +358,11 @@ class TikTokClient:
             multiplier = 0.8
 
         # Random price within range
-        base_price = random.uniform(price_range["min"], price_range["max"])
+        # TikTok video metadata does not contain price. This used to return
+        # random.uniform(min, max) rounded to .99 as "psychological pricing" —
+        # an invented number presented as a product price. Band midpoint,
+        # explicitly an estimate.
+        base_price = (price_range["min"] + price_range["max"]) / 2
         estimated_price = base_price * multiplier
 
         # Round to .99 for psychological pricing

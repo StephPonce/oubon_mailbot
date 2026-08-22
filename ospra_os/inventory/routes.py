@@ -4,7 +4,6 @@ Inventory API Routes - FastAPI endpoints for inventory forecasting
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional
 from datetime import datetime, date, timedelta
-import random
 import logging
 
 from ospra_os.auth.jwt_auth import get_current_user
@@ -105,7 +104,7 @@ async def get_all_inventory(
                 'product_name': product['name'],
                 'sku': product['sku'],
                 'current_stock': product['stock'],
-                'reserved': random.randint(0, 3),
+                'reserved': None,  # was random.randint(0,3) — never invent stock levels
                 'unit_cost': product['cost'],
                 'unit_price': product['price'],
                 'lead_time_days': 7,
@@ -276,7 +275,7 @@ async def get_product_forecast(product_id: str, current_user: User = Depends(get
             'product_name': product['name'],
             'sku': product['sku'],
             'current_stock': product['stock'],
-            'reserved': random.randint(0, 3),
+            'reserved': None,  # was random.randint(0,3) — never invent stock levels
             'unit_cost': product['cost'],
             'unit_price': product['price'],
             'lead_time_days': 7,
@@ -714,7 +713,7 @@ async def save_forecast_snapshots(current_user: User = Depends(get_current_user)
                 'product_name': product['name'],
                 'sku': product['sku'],
                 'current_stock': product['stock'],
-                'reserved': random.randint(0, 3),
+                'reserved': None,  # was random.randint(0,3) — never invent stock levels
                 'unit_cost': product['cost'],
                 'unit_price': product['price'],
                 'lead_time_days': 7,
@@ -904,7 +903,7 @@ async def bulk_reorder_products(request: dict, current_user: User = Depends(get_
                 'product_name': product['name'],
                 'sku': product['sku'],
                 'current_stock': product['stock'],
-                'reserved': random.randint(0, 3),
+                'reserved': None,  # was random.randint(0,3) — never invent stock levels
                 'unit_cost': product['cost'],
                 'unit_price': product['price'],
                 'lead_time_days': 7,
@@ -974,7 +973,7 @@ async def bulk_export_products(request: dict, current_user: User = Depends(get_c
                 'product_name': product['name'],
                 'sku': product['sku'],
                 'current_stock': product['stock'],
-                'reserved': random.randint(0, 3),
+                'reserved': None,  # was random.randint(0,3) — never invent stock levels
                 'unit_cost': product['cost'],
                 'unit_price': product['price'],
                 'lead_time_days': 7,

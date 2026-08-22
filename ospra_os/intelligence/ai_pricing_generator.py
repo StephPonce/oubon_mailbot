@@ -5,7 +5,6 @@ Uses Claude AI to generate realistic pricing based on product type and market re
 
 import os
 import json
-import random
 from typing import Dict, Optional
 import anthropic
 
@@ -181,10 +180,19 @@ Consider:
 
         cost_base, price_min, price_max = price_categories[matched_category]
 
-        # Add variation to make products unique
-        variation = random.uniform(0.85, 1.15)
-        cost = round(cost_base * variation, 2)
-        price = round(random.uniform(price_min, price_max), 2)
+        # DETERMINISTIC, not random (2026-08). This used to apply
+        # random.uniform(0.85, 1.15) to the cost and pick the price with
+        # random.uniform(price_min, price_max) — and the result is written to a
+        # LIVE Shopify listing by integrations/shopify/deployment.py. Two
+        # consequences: the same product priced differently on every run, and a
+        # sale price nobody chose. T59 already nulled rating/orders here for
+        # exactly this reason; this finishes the job.
+        #
+        # The band midpoint is a stated heuristic, not a measurement — callers
+        # should prefer real supplier cost (AliExpress DS enrich_pricing) and
+        # the category-aware markup in product_discovery._suggested_price_for_cost.
+        cost = round(cost_base, 2)
+        price = round((price_min + price_max) / 2, 2)
 
         # Calculate metrics
         profit = price - cost
@@ -202,6 +210,10 @@ Consider:
             "estimated_profit": round(profit, 2),
             "rating": None,
             "orders": None,
+            # Make the provenance explicit so consumers can tell a heuristic
+            # band midpoint from a real supplier-derived price.
+            "price_source": "rule_based_category_heuristic",
+            "is_estimate": True,
         }
 
 
