@@ -410,10 +410,12 @@ def get_whitelabel_router() -> APIRouter:
             service = WhiteLabelService(db)
             results = service.verify_domain(partner.id)
 
+            # `verified` comes straight from the service now — it used to be
+            # derived from two flags the service hardcoded to True.
             return {
                 "success": True,
-                "verified": results["cname_verified"] and results["txt_verified"],
-                "details": results
+                "verified": bool(results.get("verified")),
+                "details": results,
             }
 
         except ValueError as e:

@@ -303,13 +303,15 @@ export function Dashboard() {
                     <div className="bg-white/5 rounded-xl p-3">
                       <p className="text-white/40 mb-1">Daily Actions</p>
                       <p className="text-white font-semibold">
-                        {autopilotStatus.config.max_daily_actions || 10}
+                        {autopilotStatus.config.max_daily_actions ?? '—'}
                       </p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-3">
                       <p className="text-white/40 mb-1">Max Spend</p>
                       <p className="text-white font-semibold">
-                        ${autopilotStatus.config.max_daily_spend || 100}
+                        {autopilotStatus.config.max_daily_spend != null
+                          ? `$${autopilotStatus.config.max_daily_spend}`
+                          : '—'}
                       </p>
                     </div>
                   </div>

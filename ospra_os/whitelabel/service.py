@@ -285,8 +285,20 @@ class WhiteLabelService:
         }
 
     def verify_domain(self, partner_id: int) -> Dict:
-        """Verify domain DNS configuration (mock verification for now)"""
+        """Report DNS/SSL verification status. NOT IMPLEMENTED — never lies.
 
+        This used to return {"cname_verified": True, "txt_verified": True}
+        unconditionally, then COMMIT dns_verified=True, status="active" and
+        ssl_status="active" to the database without performing a single DNS
+        lookup. An agency partner was told their custom domain was verified and
+        SSL provisioned when neither was true — so they would point their own
+        customers at a domain that does not resolve.
+
+        Real implementation needs dnspython: resolve the CNAME and the TXT
+        challenge record, compare against the expected values on wl_domain,
+        and only then mutate status. Until that exists this reports honestly
+        and mutates nothing.
+        """
         wl_domain = self.db.query(WhiteLabelDomain).filter(
             WhiteLabelDomain.partner_id == partner_id
         ).first()
@@ -294,26 +306,21 @@ class WhiteLabelService:
         if not wl_domain:
             raise ValueError("Domain not configured")
 
-        # In production, this would use dnspython to check DNS records
-        # For now, simulate verification
-        results = {
-            "cname_verified": True,  # Mock
-            "txt_verified": True  # Mock
+        logger.warning(
+            "verify_domain called for partner %s but DNS verification is not "
+            "implemented — reporting unverified rather than faking success",
+            partner_id,
+        )
+        return {
+            "verified": False,
+            "cname_verified": None,
+            "txt_verified": None,
+            "reason": "dns_verification_not_implemented",
+            "detail": (
+                "Domain verification requires a real DNS lookup, which is not "
+                "wired up yet. Your domain status is unchanged."
+            ),
         }
-
-        # Update status
-        if results["cname_verified"] and results["txt_verified"]:
-            wl_domain.dns_verified = True
-            wl_domain.dns_verified_at = datetime.now(timezone.utc)
-            wl_domain.status = "active"
-            wl_domain.ssl_status = "active"  # Mock SSL provisioning
-            wl_domain.ssl_provisioned_at = datetime.now(timezone.utc)
-
-        self.db.commit()
-
-        logger.info(f"Verified domain for partner {partner_id}")
-
-        return results
 
     # ==================== CLIENT MANAGEMENT ====================
 

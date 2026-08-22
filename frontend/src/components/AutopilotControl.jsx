@@ -38,19 +38,25 @@ function PresetCard({ preset, active, onApply, disabled }) {
 }
 
 function ConfigSlider({ label, value, min, max, onChange, disabled }) {
+  // value === null means "we could not load your real setting". Showing a
+  // placeholder number here would read as the user's live spend cap — the most
+  // dangerous class of fake data on this page, because someone could act on it.
+  const hasValue = value !== null && value !== undefined;
   return (
     <div className="space-y-2">
       <div className="flex justify-between">
         <span className="text-white/60 text-sm">{label}</span>
-        <span className="text-white font-medium">{value}</span>
+        <span className={hasValue ? "text-white font-medium" : "text-white/40 font-medium"}>
+          {hasValue ? value : '—'}
+        </span>
       </div>
       <input
         type="range"
         min={min}
         max={max}
-        value={value}
+        value={hasValue ? value : min}
         onChange={(e) => onChange(Number(e.target.value))}
-        disabled={disabled}
+        disabled={disabled || !hasValue}
         className="w-full"
       />
     </div>
@@ -66,6 +72,7 @@ export function AutopilotControl() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activePreset, setActivePreset] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   const presets = [
     { id: 'conservative', name: 'Conservative', description: 'Low risk, manual approval for most actions' },
@@ -94,8 +101,12 @@ export function AutopilotControl() {
       ]);
       setStatus(statusRes);
       setConfig(configRes);
+      setLoadError(null);
     } catch (error) {
+      // Do NOT leave config null and fall through to placeholder slider
+      // values: those render as if they were the user's live spend caps.
       console.error('Failed to load autopilot data:', error);
+      setLoadError(error?.message || 'Could not load your autopilot settings.');
     } finally {
       setLoading(false);
     }
@@ -175,6 +186,24 @@ export function AutopilotControl() {
 
   return (
     <PageLayout title="Auto-Pilot Control" subtitle="Configure automated actions and thresholds">
+      {loadError && (
+        <div className="backdrop-blur-xl bg-red-500/10 border border-red-500/30 rounded-2xl p-6 mb-8">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-white font-semibold">Couldn't load your autopilot settings</h3>
+              <p className="text-white/60 text-sm">
+                The limits below are unavailable — they are NOT your live spend caps. {loadError}
+              </p>
+            </div>
+            <button
+              onClick={loadData}
+              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm whitespace-nowrap"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       {!canUseAutopilot && (
         <div className="backdrop-blur-xl bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6 mb-8">
           <div className="flex items-center gap-4">
@@ -240,35 +269,35 @@ export function AutopilotControl() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <ConfigSlider
             label="Confidence Threshold"
-            value={config?.confidence_threshold || 85}
+            value={config?.confidence_threshold ?? null}
             min={50}
             max={100}
             onChange={(v) => updateConfig('confidence_threshold', v)}
-            disabled={!canUseAutopilot}
+            disabled={!canUseAutopilot || !config}
           />
           <ConfigSlider
             label="Max Daily Actions"
-            value={config?.max_daily_actions || 10}
+            value={config?.max_daily_actions ?? null}
             min={1}
             max={50}
             onChange={(v) => updateConfig('max_daily_actions', v)}
-            disabled={!canUseAutopilot}
+            disabled={!canUseAutopilot || !config}
           />
           <ConfigSlider
             label="Max Daily Spend ($)"
-            value={config?.max_daily_spend || 100}
+            value={config?.max_daily_spend ?? null}
             min={10}
             max={1000}
             onChange={(v) => updateConfig('max_daily_spend', v)}
-            disabled={!canUseAutopilot}
+            disabled={!canUseAutopilot || !config}
           />
           <ConfigSlider
             label="Max Single Action ($)"
-            value={config?.max_single_action || 50}
+            value={config?.max_single_action ?? null}
             min={5}
             max={500}
             onChange={(v) => updateConfig('max_single_action', v)}
-            disabled={!canUseAutopilot}
+            disabled={!canUseAutopilot || !config}
           />
         </div>
 

@@ -108,30 +108,20 @@ class AnalyticsEngine:
         prev_start = start_date - (end_date - start_date)
         prev_end = start_date
 
-        # For now, use monthly_revenue as baseline (TODO: improve with historical data)
-        previous_revenue = monthly_revenue * 0.8  # Mock previous period (20% lower)
-
-        # Calculate change percentage
-        if previous_revenue > 0:
-            change_pct = ((total_revenue - previous_revenue) / previous_revenue) * 100
-        else:
-            change_pct = 100.0 if total_revenue > 0 else 0.0
-
-        # Determine trend
-        if change_pct > 5:
-            trend = "up"
-        elif change_pct < -5:
-            trend = "down"
-        else:
-            trend = "neutral"
-
+        # NO PRIOR-PERIOD DATA (2026-08). This used to set
+        # previous_revenue = monthly_revenue * 0.8, which manufactured a
+        # constant +25% growth and an "up" arrow for every store, forever.
+        # Likewise today/week were monthly/30 and monthly/4 relabelled as
+        # actuals. Without historical revenue (see get_revenue_over_time) none
+        # of these can be computed, so they report null and the UI shows "—".
         return {
             "total": round(total_revenue, 2),
-            "today": round(monthly_revenue / 30, 2),  # Mock daily avg
-            "week": round(monthly_revenue / 4, 2),    # Mock weekly avg
+            "today": None,
+            "week": None,
             "month": round(monthly_revenue, 2),
-            "change_percentage": round(change_pct, 2),
-            "trend": trend
+            "change_percentage": None,
+            "trend": "unknown",
+            "note": "prior-period comparison unavailable — historical revenue not connected",
         }
 
     def get_profit_metrics(
@@ -240,7 +230,10 @@ class AnalyticsEngine:
             "total": total_orders,
             "average_order_value": round(aov, 2),
             "conversion_rate": round(avg_conversion, 2),
-            "change_percentage": 10.0  # Mock change (TODO: calculate from historical data)
+            # Was a hardcoded 10.0 — a flat "+10%" shown on every store's order
+            # metrics regardless of reality. Null until historical order data
+            # is connected (Shopify order history is the real source).
+            "change_percentage": None,
         }
 
     def get_ad_performance(
@@ -404,41 +397,24 @@ class AnalyticsEngine:
         Returns:
             List of {date, revenue, orders} for charting
         """
-        start_date, end_date = self.get_date_range(date_range)
-
-        # Generate date range
-        delta = timedelta(days=1) if granularity == 'day' else timedelta(weeks=1)
-
-        results = []
-        current = start_date
-
-        while current <= end_date:
-            # Mock data (TODO: replace with actual historical data)
-            # For now, generate realistic-looking data based on store totals
-            query = self.session.query(Store)
-
-            if store_id:
-                query = query.filter(Store.id == store_id)
-            if user_id:
-                query = query.filter(Store.user_id == user_id)
-
-            stores = query.all()
-            monthly_rev = sum(store.monthly_revenue or 0 for store in stores)
-
-            # Distribute revenue across days with some variance
-            import random
-            daily_rev = (monthly_rev / 30) * random.uniform(0.7, 1.3)
-            daily_orders = int((monthly_rev / 30) / 50)  # Assume $50 AOV
-
-            results.append({
-                "date": current.isoformat(),
-                "revenue": round(daily_rev, 2),
-                "orders": daily_orders
-            })
-
-            current += delta
-
-        return results
+        # HISTORICAL REVENUE IS NOT WIRED UP (2026-08).
+        #
+        # This used to synthesise a chart: it took each store's monthly_revenue,
+        # divided by 30, multiplied by random.uniform(0.7, 1.3) per day, and
+        # derived order counts from an assumed $50 AOV. The result LOOKED like a
+        # real revenue time series — it was rendered in the dashboard and written
+        # to CSV by /api/analytics/export — but every point was invented.
+        #
+        # The honest answer is an empty series plus a reason the caller can show,
+        # matching the shape frontend_compat_routes already uses for
+        # /api/analytics/funnel. Real per-day revenue must come from Shopify
+        # order history (the Shopify integration is connected); wire that in
+        # here rather than restoring the generator.
+        logger.warning(
+            "get_revenue_over_time: historical revenue is not connected — "
+            "returning an empty series instead of synthesised data"
+        )
+        return []
 
     def calculate_kpis(
         self,

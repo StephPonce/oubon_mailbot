@@ -24,35 +24,44 @@ email_alerts = get_email_alerts()
 historical_tracking = get_historical_tracking()
 
 
-# Mock data generator for demonstration
+# FABRICATED INVENTORY REMOVED (2026-08).
+#
+# These two helpers returned five hardcoded products (LED Strip Lights, Phone
+# Holder, USB-C Cable, Smart Plug, Car Mount) with invented SKUs, stock levels
+# and costs, plus 90 days of random.uniform sales history. Ten endpoints served
+# them as if they were the user's real inventory — including
+# POST /alerts/send-test, which EMAILED fabricated restock alerts, and
+# POST /history/snapshot, which PERSISTED the fabrication to the history DB.
+#
+# The real source already exists in this file: shopify_sync.sync_all_products()
+# (see the /sync endpoint below). Endpoints still calling these helpers now
+# raise 501 rather than serve fiction; wire them to the Shopify path to restore
+# them for real.
+
+
+class InventoryNotConnected(HTTPException):
+    """501 with a reason the caller can display."""
+
+    def __init__(self):
+        super().__init__(
+            status_code=501,
+            detail={
+                "error": "inventory_not_connected",
+                "message": (
+                    "Inventory data is not connected to a real store yet. This "
+                    "endpoint previously returned sample products; it no longer "
+                    "invents data. Connect Shopify and use /api/inventory/sync."
+                ),
+            },
+        )
+
+
 def generate_mock_product_data():
-    """Generate mock product data for testing"""
-    products = [
-        {"id": "prod_001", "name": "LED Strip Lights", "sku": "LED-001", "stock": 45, "velocity": 3.2, "cost": 4.50, "price": 15.99},
-        {"id": "prod_002", "name": "Phone Holder", "sku": "PHONE-001", "stock": 23, "velocity": 2.1, "cost": 3.20, "price": 12.99},
-        {"id": "prod_003", "name": "USB-C Cable", "sku": "USB-001", "stock": 0, "velocity": 1.8, "cost": 2.10, "price": 8.99},
-        {"id": "prod_004", "name": "Smart Plug", "sku": "PLUG-001", "stock": 120, "velocity": 1.5, "cost": 5.00, "price": 19.99},
-        {"id": "prod_005", "name": "Car Mount", "sku": "MOUNT-001", "stock": 8, "velocity": 2.5, "cost": 3.80, "price": 14.99},
-    ]
-    return products
+    raise InventoryNotConnected()
 
 
 def generate_mock_sales_history(daily_velocity: float, days: int = 90):
-    """Generate mock sales history"""
-    sales = []
-    base_date = datetime.now() - timedelta(days=days)
-
-    for i in range(days):
-        order_date = base_date + timedelta(days=i)
-        # Add some randomness ±30%
-        quantity = max(1, int(daily_velocity + random.uniform(-daily_velocity*0.3, daily_velocity*0.3)))
-
-        sales.append({
-            'created_at': order_date.isoformat(),
-            'quantity': quantity
-        })
-
-    return sales
+    raise InventoryNotConnected()
 
 
 @router.get("/health")
@@ -133,6 +142,10 @@ async def get_all_inventory(
             "products": forecasts
         }
 
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
@@ -286,6 +299,10 @@ async def get_product_forecast(product_id: str, current_user: User = Depends(get
 
     except HTTPException:
         raise
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
@@ -333,6 +350,10 @@ async def get_inventory_health_summary(current_user: User = Depends(get_current_
             "summary": summary
         }
 
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
@@ -389,6 +410,10 @@ async def get_restock_alerts(urgency: Optional[str] = Query(None), current_user:
             "alerts": alerts
         }
 
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
@@ -436,6 +461,10 @@ async def get_stockout_alerts(current_user: User = Depends(get_current_user)):
             "at_risk_products": at_risk
         }
 
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
@@ -552,6 +581,10 @@ async def test_shopify_connection(current_user: User = Depends(get_current_user)
         result = await shopify_sync.test_connection()
         return result
 
+    except HTTPException:
+        # Never swallow a deliberate status (e.g. the 501 from the
+        # inventory-not-connected guard) into a generic 500.
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="An error occurred. Please try again.")
 
