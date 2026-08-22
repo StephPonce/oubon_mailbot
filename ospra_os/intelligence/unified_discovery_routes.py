@@ -106,11 +106,11 @@ def _cache_tier_from_core(tier: TierEnum):
     except (ValueError, AttributeError):
         return SubscriptionTier.NEST
 
-# When True, empty discovery responses fall back to hardcoded demo products.
-# Default: False. Production MUST NOT silently return fake products — users need
-# honest errors so they can see which data sources are failing and fix them.
-# Set ALLOW_DEMO_FALLBACK=1 only in local dev with no API keys configured.
-ALLOW_DEMO_FALLBACK = os.getenv("ALLOW_DEMO_FALLBACK", "0").lower() in ("1", "true", "yes")
+# ALLOW_DEMO_FALLBACK removed 2026-08 along with _get_demo_products. There is no
+# longer any way — env var included — to make discovery return fabricated
+# products. An empty result yields a 503 with source diagnostics, which is what
+# actually helps: it names which data source failed instead of hiding it behind
+# plausible-looking fake products.
 
 
 def _is_demo_products(products: List[Dict]) -> bool:
@@ -350,9 +350,8 @@ async def quick_discover(
     - Never silently returns demo/mock products.
     - Only real products from live data sources are returned.
     - If all sources fail, returns 503 with diagnostics so the caller knows why.
-    - Demo fallback is only enabled when the operator sets ALLOW_DEMO_FALLBACK=1
-      (for local dev without API keys); the response then carries is_fallback=True
-      so the frontend can display a clear banner.
+    - There is no demo/fake fallback at all: fabricated products are never
+      returned under any configuration.
 
     Tier clamp:
     - `count` is clamped to the caller's per-request ceiling from
@@ -462,29 +461,9 @@ async def quick_discover(
         if not products:
             diagnostics = _source_diagnostics(engine)
 
-            if ALLOW_DEMO_FALLBACK:
-                logger.warning(
-                    f"[DEV FALLBACK] /quick/{niche} - no real products, using demos "
-                    f"(ALLOW_DEMO_FALLBACK=1)"
-                )
-                demo_products = engine._get_demo_products(niche, count)
-                elapsed = time.time() - start_time
-                return {
-                    "success": True,
-                    "niche": niche,
-                    "count": len(demo_products),
-                    "products": demo_products,
-                    "ai_images_generated": False,
-                    "from_cache": False,
-                    "is_fallback": True,
-                    "warning": "Demo products returned — no real sources produced results.",
-                    "discovery_error": discovery_error_msg,
-                    "diagnostics": diagnostics,
-                    "response_time_ms": int(elapsed * 1000),
-                    "tier_meta": tier_meta,
-                }
-
-            # Production path: be honest about failure
+            # Only path: be honest about failure. The demo-fallback branch
+            # that returned fabricated products was removed 2026-08 — nothing,
+            # env var included, may make this endpoint serve invented products.
             logger.error(
                 f"[DISCOVERY FAILED] /quick/{niche} - no real products available. "
                 f"error={discovery_error_msg} diagnostics={diagnostics}"
@@ -499,8 +478,7 @@ async def quick_discover(
                     "hint": (
                         "Check /api/discovery/health for source status. "
                         "Common causes: expired/missing API keys, upstream rate limits, "
-                        "or temporary provider outage. Set ALLOW_DEMO_FALLBACK=1 in .env "
-                        "for local dev without API keys."
+                        "or temporary provider outage."
                     ),
                 },
             )

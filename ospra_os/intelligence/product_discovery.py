@@ -1461,10 +1461,9 @@ class ProductDiscoveryEngine:
             )
 
         if len(all_products) == 0:
-            allow_demo = os.getenv("ALLOW_DEMO_FALLBACK", "0").lower() in ("1", "true", "yes")
-            if allow_demo:
-                logger.warning("[WARNING] No products found from any source - using demo data (ALLOW_DEMO_FALLBACK=1)")
-                return self._get_demo_products(niche, max_products)
+            # Demo-data fallback removed 2026-08: fabricated products that look
+            # real are worse than an empty result. The route surfaces source
+            # diagnostics and a 503 instead.
             logger.warning("[WARNING] No products found from any source - returning empty list (route will surface diagnostics)")
             return []
 
@@ -6882,173 +6881,10 @@ class ProductDiscoveryEngine:
     # DEMO DATA FOR DEVELOPMENT
     # =========================================================================
 
-    def _get_demo_products(self, niche: str, count: int) -> List[Dict]:
-        """
-        Return demo products for development/testing when APIs fail.
-
-        These are realistic sample products to help test the dashboard.
-        """
-        import random
-
-        DEMO_PRODUCTS = {
-            "smart_home": [
-                {"title": "Smart LED Strip Lights RGB WiFi", "cost_price": 8.50, "image_url": "https://ae01.alicdn.com/kf/S1234567890.jpg"},
-                {"title": "WiFi Smart Plug with Energy Monitoring", "cost_price": 6.99, "image_url": "https://ae01.alicdn.com/kf/S1234567891.jpg"},
-                {"title": "Smart Motion Sensor PIR Detector", "cost_price": 5.50, "image_url": "https://ae01.alicdn.com/kf/S1234567892.jpg"},
-                {"title": "WiFi Smart Bulb RGBW Dimmable", "cost_price": 4.99, "image_url": "https://ae01.alicdn.com/kf/S1234567893.jpg"},
-                {"title": "Smart Door Lock Fingerprint Digital", "cost_price": 45.00, "image_url": "https://ae01.alicdn.com/kf/S1234567894.jpg"},
-            ],
-            "kitchen": [
-                {"title": "Electric Milk Frother Handheld", "cost_price": 5.99, "image_url": "https://ae01.alicdn.com/kf/K1234567890.jpg"},
-                {"title": "Silicone Kitchen Utensil Set 12pcs", "cost_price": 12.50, "image_url": "https://ae01.alicdn.com/kf/K1234567891.jpg"},
-                {"title": "Vegetable Chopper Dicer Slicer", "cost_price": 8.99, "image_url": "https://ae01.alicdn.com/kf/K1234567892.jpg"},
-                {"title": "Digital Kitchen Scale 5kg", "cost_price": 7.50, "image_url": "https://ae01.alicdn.com/kf/K1234567893.jpg"},
-                {"title": "Vacuum Food Storage Containers", "cost_price": 15.00, "image_url": "https://ae01.alicdn.com/kf/K1234567894.jpg"},
-            ],
-            "fitness": [
-                {"title": "Resistance Bands Set 5 Levels", "cost_price": 6.50, "image_url": "https://ae01.alicdn.com/kf/F1234567890.jpg"},
-                {"title": "Foam Roller for Muscle Massage", "cost_price": 9.99, "image_url": "https://ae01.alicdn.com/kf/F1234567891.jpg"},
-                {"title": "Jump Rope Speed Skipping Rope", "cost_price": 4.50, "image_url": "https://ae01.alicdn.com/kf/F1234567892.jpg"},
-                {"title": "Yoga Mat Non-Slip 6mm Thick", "cost_price": 11.00, "image_url": "https://ae01.alicdn.com/kf/F1234567893.jpg"},
-                {"title": "Adjustable Dumbbells Set 20kg", "cost_price": 35.00, "image_url": "https://ae01.alicdn.com/kf/F1234567894.jpg"},
-            ],
-            "tech": [
-                {"title": "Wireless Earbuds Bluetooth 5.0", "cost_price": 12.50, "image_url": "https://ae01.alicdn.com/kf/T1234567890.jpg"},
-                {"title": "USB C Hub 7-in-1 Adapter", "cost_price": 15.00, "image_url": "https://ae01.alicdn.com/kf/T1234567891.jpg"},
-                {"title": "Portable Phone Stand Adjustable", "cost_price": 3.99, "image_url": "https://ae01.alicdn.com/kf/T1234567892.jpg"},
-                {"title": "Wireless Charging Pad 15W Fast", "cost_price": 8.50, "image_url": "https://ae01.alicdn.com/kf/T1234567893.jpg"},
-                {"title": "Mini Portable Projector 1080P", "cost_price": 55.00, "image_url": "https://ae01.alicdn.com/kf/T1234567894.jpg"},
-            ],
-            "beauty": [
-                {"title": "LED Face Mask Light Therapy", "cost_price": 25.00, "image_url": "https://ae01.alicdn.com/kf/B1234567890.jpg"},
-                {"title": "Electric Facial Cleansing Brush", "cost_price": 12.00, "image_url": "https://ae01.alicdn.com/kf/B1234567891.jpg"},
-                {"title": "Jade Roller Face Massager", "cost_price": 4.50, "image_url": "https://ae01.alicdn.com/kf/B1234567892.jpg"},
-                {"title": "Hair Straightener Brush Ionic", "cost_price": 18.00, "image_url": "https://ae01.alicdn.com/kf/B1234567893.jpg"},
-                {"title": "Makeup Brush Set 15pcs Professional", "cost_price": 9.99, "image_url": "https://ae01.alicdn.com/kf/B1234567894.jpg"},
-            ],
-            "pet": [
-                {"title": "Automatic Pet Water Fountain", "cost_price": 15.00, "image_url": "https://ae01.alicdn.com/kf/P1234567890.jpg"},
-                {"title": "Interactive Cat Toy Laser Pointer", "cost_price": 6.50, "image_url": "https://ae01.alicdn.com/kf/P1234567891.jpg"},
-                {"title": "Self-Cleaning Dog Brush Slicker", "cost_price": 8.99, "image_url": "https://ae01.alicdn.com/kf/P1234567892.jpg"},
-                {"title": "Pet GPS Tracker Collar", "cost_price": 22.00, "image_url": "https://ae01.alicdn.com/kf/P1234567893.jpg"},
-                {"title": "Automatic Pet Feeder Smart WiFi", "cost_price": 35.00, "image_url": "https://ae01.alicdn.com/kf/P1234567894.jpg"},
-            ],
-        }
-
-        # Get products for niche or default to smart_home
-        niche_products = DEMO_PRODUCTS.get(niche, DEMO_PRODUCTS.get("smart_home", []))
-
-        # Build full product objects
-        demo_list = []
-        for i, base in enumerate(niche_products[:count]):
-            cost = base["cost_price"]
-            suggested = round(cost * 2.5, 2)
-            profit = round(suggested - cost, 2)
-
-            product = {
-                "product_id": f"demo_{niche}_{i}_{int(datetime.now().timestamp())}",
-                "title": base["title"],
-                "title_normalized": self._normalize_title(base["title"]),
-                "cost_price": cost,
-                "supplier_cost": cost,
-                "suggested_price": suggested,
-                "profit": profit,
-                "image_url": base["image_url"],
-                "all_images": [base["image_url"]],
-                "image_count": 1,
-                "source": "demo",
-                "available_on": ["demo_supplier"],
-                "is_mock": True,
-                "niche": niche,
-                "sales_count": random.randint(100, 2000),
-                "trend_score": random.randint(50, 85),
-                "oi_score": random.randint(55, 85),
-                "final_score": random.randint(55, 85),
-                "tier": random.choice(["GOOD", "EXCELLENT"]),
-                "recommendation": "Demo product for testing - connect APIs for real data",
-                "data_sources": {
-                    "demo": {"available": True, "note": "Demo data - APIs not connected"}
-                },
-                "_discovery_metadata": {
-                    "sources_queried": ["demo"],
-                    "discovered_at": datetime.now().isoformat(),
-                    "niche": niche,
-                    "flow": "demo_fallback",
-                    "note": "Demo products - connect CJ/AliExpress APIs for real discovery"
-                },
-                "discovered_at": datetime.now().isoformat()
-            }
-            demo_list.append(product)
-
-        logger.info(f"[DEMO] Returning {len(demo_list)} demo products for {niche}")
-        return demo_list
-
-
-# =============================================================================
-# PRICE FRESHNESS UTILITIES
-# =============================================================================
-
-def check_price_freshness(product: Dict, max_age_hours: float = 2.0) -> Dict:
-    """
-    Check if a product's price data is fresh or stale.
-
-    Args:
-        product: Product dict with price_fetched_at field
-        max_age_hours: Maximum age in hours before price is considered stale
-
-    Returns:
-        Dict with:
-        - is_fresh: bool
-        - age_hours: float
-        - needs_refresh: bool
-        - message: str
-    """
-    price_fetched_at = product.get('price_fetched_at')
-    if not price_fetched_at:
-        return {
-            "is_fresh": False,
-            "age_hours": None,
-            "needs_refresh": True,
-            "message": "Price timestamp not available"
-        }
-
-    try:
-        fetched_time = datetime.fromisoformat(price_fetched_at.replace('Z', '+00:00'))
-        age = datetime.now() - fetched_time.replace(tzinfo=None)
-        age_hours = age.total_seconds() / 3600
-
-        is_fresh = age_hours <= max_age_hours
-
-        return {
-            "is_fresh": is_fresh,
-            "age_hours": round(age_hours, 1),
-            "needs_refresh": not is_fresh,
-            "message": f"Price is {round(age_hours, 1)}h old" + ("" if is_fresh else " - may need refresh")
-        }
-    except Exception as e:
-        logger.warning(f"Error checking price freshness: {e}")
-        return {
-            "is_fresh": False,
-            "age_hours": None,
-            "needs_refresh": True,
-            "message": "Error checking price age"
-        }
-
-
-def add_price_freshness_to_products(products: list, max_age_hours: float = 2.0) -> list:
-    """
-    Add price freshness indicators to a list of products.
-
-    Args:
-        products: List of product dicts
-        max_age_hours: Maximum age before price is stale
-
-    Returns:
-        Products with 'price_freshness' field added
-    """
-    for product in products:
-        product['price_freshness'] = check_price_freshness(product, max_age_hours)
-    return products
+    # _get_demo_products removed 2026-08 — it fabricated products with fake
+    # AliExpress image IDs and random sales_count/trend_score/oi_score. It was
+    # env-gated OFF, but an env var must never be able to make discovery serve
+    # invented data that looks real. Empty + diagnostics is the honest answer.
 
 
 # =============================================================================

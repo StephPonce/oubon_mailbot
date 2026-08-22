@@ -152,32 +152,10 @@ bash scripts/start_g4_celery.sh    # convenience wrapper
 
 ### Top-level layout
 
-```
-ospra_os/                         # the FastAPI app
-├── main.py                       # entry point — registers ~65 routers via include_router
-├── celery_app.py                 # Celery worker config (auto-discovers tasks/)
-├── core/                         # settings, config
-├── intelligence/                 # discovery, scoring, AI analysis (53 files)
-├── api/                          # FastAPI route modules (50 files)
-├── product_research/             # source connectors (Amazon, AliExpress, Reddit, etc.)
-├── integrations/                 # Shopify, CJ, Stability, AI providers
-├── database/                     # SQLAlchemy models, alembic migrations
-├── email_automation/             # PROTECTED — core feature, never delete
-├── gmail/                        # PROTECTED — Gmail OAuth integration
-├── services/                     # product_deployer, image_processor
-├── ai/                           # AI provider abstraction (Claude, GPT-4o, Gemini)
-├── learning/                     # G4 feedback loop (RLHF-style learning)
-├── tasks/                        # Celery tasks
-├── tenancy/                      # multi-tenant isolation (SaaS)
-├── payments/                     # LemonSqueezy billing
-├── auth/                         # JWT, sessions
-└── ...
-frontend/                         # React + Vite dashboard (port 5173)
-scripts/                          # run.sh, init_db.py, test_*.py, etc.
-tests/                            # pytest suite
-docs/                             # live docs (see archive/ for historical)
-alembic/                          # migrations
-```
+Derivable with `ls ospra_os/` — not duplicated here. Two directories are
+PROTECTED and must never be deleted: `ospra_os/email_automation/` and
+`ospra_os/gmail/` (both are core features even when individual files look
+orphaned — see Standing rules).
 
 ### Routing pattern
 
