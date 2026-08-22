@@ -67,6 +67,20 @@ MARKETING_ANGLES_CACHE_TTL = int(os.getenv("MARKETING_ANGLES_CACHE_TTL_SECONDS",
 _marketing_angles_cache: Dict[str, tuple] = {}
 
 
+def _score_or_unknown(v) -> str:
+    """Render a 0-100 score for the prompt, or 'not measured' when absent.
+
+    Never substitutes a default: a fabricated 50 reads to the model as a real
+    measurement and it reasons from it with full confidence.
+    """
+    if v is None or v == "":
+        return "not measured"
+    try:
+        return f"{round(float(v), 1)}/100"
+    except (TypeError, ValueError):
+        return "not measured"
+
+
 def _round_num(v, decimals: int = 2):
     """Deterministic number formatter used in prompt construction."""
     try:
@@ -99,10 +113,13 @@ def _analysis_cache_key(
         'cost_price': _round_num(product.get('cost_price', 0)),
         'suggested_price': _round_num(product.get('suggested_price', 0)),
         'profit': _round_num(product.get('profit', 0)),
-        'oi_score': _round_num(product.get('oi_score', product.get('score', 50)), 1),
-        'demand_score': _round_num(product.get('demand_score', 50), 1),
-        'trend_score': _round_num(product.get('trend_score', 50), 1),
-        'sentiment_score': _round_num(product.get('sentiment_score', 50), 1),
+        # No 50-defaults in the CACHE KEY either: with them, two products whose
+        # scores are genuinely unknown hashed identically and shared one cached
+        # analysis. None keys distinctly from a real 50.
+        'oi_score': product.get('oi_score', product.get('score')),
+        'demand_score': product.get('demand_score'),
+        'trend_score': product.get('trend_score'),
+        'sentiment_score': product.get('sentiment_score'),
         'sales_count': product.get('sales_count', 'Unknown'),
         'rating': product.get('rating', 'Unknown'),
         'source': product.get('source', 'Unknown'),
@@ -579,10 +596,14 @@ def _build_analysis_prompt(
         f"Supplier Cost: ${_round_num(product.get('cost_price', 0)):.2f}\n"
         f"Suggested Retail Price: ${_round_num(product.get('suggested_price', 0)):.2f}\n"
         f"Profit: ${_round_num(product.get('profit', 0)):.2f}\n"
-        f"OI Score: {_round_num(product.get('oi_score', product.get('score', 50)), 1)}/100\n"
-        f"Demand Score: {_round_num(product.get('demand_score', 50), 1)}/100\n"
-        f"Trend Score: {_round_num(product.get('trend_score', 50), 1)}/100\n"
-        f"Sentiment Score: {_round_num(product.get('sentiment_score', 50), 1)}/100\n"
+        # Unmeasured scores say "not measured" rather than defaulting to 50.
+        # Claude was previously TOLD 50 and reasoned from it as a measurement,
+        # producing confident analysis built on a placeholder. The prompt
+        # already did this correctly for Sales Count / Rating ('Unknown').
+        f"OI Score: {_score_or_unknown(product.get('oi_score', product.get('score')))}\n"
+        f"Demand Score: {_score_or_unknown(product.get('demand_score'))}\n"
+        f"Trend Score: {_score_or_unknown(product.get('trend_score'))}\n"
+        f"Sentiment Score: {_score_or_unknown(product.get('sentiment_score'))}\n"
         f"Sales Count: {product.get('sales_count', 'Unknown')}\n"
         f"Rating: {product.get('rating', 'Unknown')}\n"
         f"Source: {product.get('source', 'Unknown')}\n\n"
@@ -827,7 +848,7 @@ def _generate_fallback_analysis(title: str, product: dict) -> dict:
         strengths.append(f"Strong customer satisfaction ({product.get('rating')}/5 rating)")
     if product.get('trend_score', 0) >= 60:
         strengths.append(f"Trending momentum (trend score: {product.get('trend_score')})")
-    if product.get('sentiment_score', 50) >= 65:
+    if (product.get('sentiment_score') or 0) >= 65:
         strengths.append("Positive social sentiment across platforms")
     if len(strengths) < 2:
         strengths.append("Competitive entry price point")
@@ -840,7 +861,7 @@ def _generate_fallback_analysis(title: str, product: dict) -> dict:
         risks.append("Extended shipping times (10-20 days) may impact customer satisfaction")
     if product.get('competition_score', 50) < 40:
         risks.append("High market saturation in this product category")
-    if product.get('sentiment_score', 50) < 45:
+    if product.get('sentiment_score') is not None and product['sentiment_score'] < 45:
         risks.append("Mixed social sentiment suggests quality concerns")
     if len(risks) < 1:
         risks.append("Market conditions subject to seasonal fluctuation")

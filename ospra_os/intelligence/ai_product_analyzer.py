@@ -450,8 +450,12 @@ Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
         # Order count from AliExpress
         orders = int(ali_data.get("orders", 0) or product.get("sales_count") or product.get("orders", 0))
 
-        # Rating
-        rating = float(product.get("rating") or ali_data.get("rating") or 4.0)
+        # Rating — NO 4.0 default. A product with no reviews was previously
+        # handed to the model as "4.0 stars", which it then reasoned from as a
+        # real quality signal. "unknown" is honest and the prompt instructs the
+        # model to lower its confidence when inputs are unknown.
+        _rating_raw = product.get("rating") or ali_data.get("rating")
+        rating = float(_rating_raw) if _rating_raw not in (None, "") else None
 
         # Composite score (now 0-100 from scoring algorithm)
         ospra_score = float(product.get("oi_score") or product.get("score") or product.get("ospra_score") or 50)
@@ -471,8 +475,13 @@ Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
         store_name = store_context.get("store_name", "Your Store")
         store_niche = store_context.get("niche", niche)
         best_sellers = store_context.get("best_sellers", "Not enough data yet")
-        aov = float(store_context.get("avg_order_value", 35.00))
-        conversion_rate = float(store_context.get("conversion_rate", 2.0))
+        # Store economics: no invented $35 AOV / 2% conversion for a store we
+        # have no data on — the model would otherwise write confident
+        # recommendations sized against numbers nobody measured.
+        _aov = store_context.get("avg_order_value")
+        _cr = store_context.get("conversion_rate")
+        aov = float(_aov) if _aov not in (None, "") else None
+        conversion_rate = float(_cr) if _cr not in (None, "") else None
 
         # Build prompt with all the new fields
         prompt = self.COO_ANALYSIS_PROMPT.format(
@@ -493,7 +502,7 @@ Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
             reddit_score=reddit_score,
             reddit_mentions=reddit_mentions,
             supplier_score=supplier_score,
-            rating=rating,
+            rating=(f"{rating}" if rating is not None else "unknown (no reviews)"),
             demand_score=demand_score,
             trend_score_component=trend_score_component,
             sentiment_score=sentiment_score,
@@ -508,8 +517,8 @@ Be a COO, not a chatbot. Make the call based on the ACTUAL data provided."""
             store_name=store_name,
             store_niche=store_niche,
             best_sellers=best_sellers,
-            aov=aov,
-            conversion_rate=conversion_rate,
+            aov=(f"{aov}" if aov is not None else "unknown"),
+            conversion_rate=(f"{conversion_rate}" if conversion_rate is not None else "unknown"),
         )
         
         try:
