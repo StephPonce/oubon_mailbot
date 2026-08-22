@@ -855,7 +855,12 @@ async def _run_discovery_job(job_id: int) -> None:
 async def create_discovery_job(
     body: DiscoveryJobRequest,
     background_tasks: BackgroundTasks,
-    current_user: Optional[TokenPayload] = Depends(get_current_user),
+    # STRICT dependency (2026-08). This used the OPTIONAL get_current_user,
+    # which returns None instead of raising — so anonymous callers reached this
+    # endpoint and could queue full paid discovery runs at NEST tier. The
+    # handler still reads current_user for tier clamping; it is now guaranteed
+    # non-None.
+    current_user: TokenPayload = Depends(require_user),
 ):
     """Start (or join) the live discovery job for a niche.
 

@@ -69,15 +69,22 @@ def tier_has_access(user_tier: str, required_tier: str) -> bool:
 # AUTHENTICATION DEPENDENCIES
 # ============================================================================
 
-async def get_current_user(
+async def get_current_user_optional(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> Optional[TokenPayload]:
     """
-    Get current user from JWT token (optional).
-    
-    Returns None if no valid token provided.
-    Use this for endpoints that work with or without auth.
+    Get current user from JWT token (OPTIONAL — returns None when absent).
+
+    RENAMED 2026-08. This was called `get_current_user`, identical in name to
+    the STRICT dependency in ospra_os/auth/jwt_auth.py that raises 401 — and
+    `ospra_os.auth` re-exported THIS one. So `from ospra_os.auth import
+    get_current_user` produced a dependency that reads as protection and gates
+    nothing; that is why several discovery routes were effectively public.
+
+    Use this ONLY for endpoints that genuinely serve anonymous callers with
+    different behaviour when logged in. If a route must reject anonymous
+    callers, import get_current_user from ospra_os.auth.jwt_auth.
     """
     token = None
     
@@ -273,3 +280,9 @@ FlightUser = Depends(require_tier("flight"))
 SoarUser = Depends(require_tier("soar"))
 StratosphereUser = Depends(require_tier("stratosphere"))
 AdminUser = Depends(require_admin)
+
+
+# Backwards-compatible alias. Deliberately NOT exported from ospra_os.auth —
+# see the rename note above. Anything importing this name should be reviewed:
+# it does not reject anonymous callers.
+get_current_user = get_current_user_optional

@@ -60,6 +60,14 @@ from .jwt_handler import (
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
 
+# SECURITY (2026-08): `get_current_user` re-exported from here is now the STRICT
+# dependency (raises 401), NOT the optional one. Previously this package
+# re-exported auth.dependencies.get_current_user, which returns None and never
+# rejects — so `from ospra_os.auth import get_current_user` looked like
+# protection while gating nothing, and left several discovery routes public.
+# The permissive variant is still available as `get_current_user_optional`.
+from .jwt_auth import get_current_user  # noqa: F401  (strict: raises 401)
+
 from .dependencies import (
     # Main dependencies
     require_auth,
@@ -68,8 +76,8 @@ from .dependencies import (
     require_any_tier,
     require_admin,
     
-    # Optional user
-    get_current_user,
+    # Optional user — explicitly named so nobody mistakes it for the strict one
+    get_current_user_optional,
     
     # Tier helpers
     tier_has_access,
@@ -113,7 +121,8 @@ __all__ = [
     "require_tier",
     "require_any_tier",
     "require_admin",
-    "get_current_user",
+    "get_current_user",           # strict (jwt_auth) — raises 401
+    "get_current_user_optional",   # permissive — returns None
     
     # Tier helpers
     "tier_has_access",
