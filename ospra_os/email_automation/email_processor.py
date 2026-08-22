@@ -305,6 +305,9 @@ class EmailProcessor:
                     # Track analytics
                     response_mode = "ai" if reply_metadata.get("used_ai") else "template"
                     self.analytics.track_email(
+                        # Stamp the tenant owner so /api/emails/recent can scope
+                        # to the caller instead of returning every tenant's PII.
+                        user_id=self.user_id,
                         message_id=message_id,
                         customer_email=from_email,
                         subject=subject,
@@ -336,6 +339,9 @@ class EmailProcessor:
                     print(f"Error sending reply: {e}")
                     # Track failed email
                     self.analytics.track_email(
+                        # Stamp the tenant owner so /api/emails/recent can scope
+                        # to the caller instead of returning every tenant's PII.
+                        user_id=self.user_id,
                         message_id=message_id,
                         customer_email=from_email,
                         subject=subject,

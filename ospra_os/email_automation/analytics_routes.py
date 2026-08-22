@@ -64,7 +64,10 @@ async def get_email_dashboard_stats():
 
 
 @router.get("/emails/recent")
-async def get_recent_emails(limit: int = Query(20, le=100)):
+async def get_recent_emails(
+    limit: int = Query(20, le=100),
+    current_user=Depends(get_current_user),
+):
     """
     Get recent processed emails.
 
@@ -91,9 +94,18 @@ async def get_recent_emails(limit: int = Query(20, le=100)):
 
     # Query recent emails from database
     session = analytics.session
-    recent_metrics = session.query(EmailMetric).order_by(
-        EmailMetric.timestamp.desc()
-    ).limit(limit).all()
+    # TENANT SCOPING (2026-08). This query had no filter at all, so it returned
+    # every tenant's customer_email + subject. Router-level auth narrowed the
+    # audience to logged-in users; this narrows it to the CALLER'S OWN rows.
+    # Rows predating migration 010 have user_id NULL — they are UNOWNED and
+    # deliberately never served, rather than attributing them to whoever asks.
+    recent_metrics = (
+        session.query(EmailMetric)
+        .filter(EmailMetric.user_id == current_user.id)
+        .order_by(EmailMetric.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
 
     emails = []
     for metric in recent_metrics:

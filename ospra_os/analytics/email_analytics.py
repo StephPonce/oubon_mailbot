@@ -17,6 +17,13 @@ class EmailMetric(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
+    # TENANT OWNER (added 2026-08, migration 010). Without this column the
+    # table could not be scoped at all: /api/emails/recent returned every
+    # tenant's customer_email + subject to any caller. Nullable because rows
+    # written before the migration have no known owner — those are treated as
+    # UNOWNED and never served to a tenant (see the read filter).
+    user_id = Column(Integer, index=True, nullable=True)
+
     # Email info
     message_id = Column(String)
     customer_email = Column(String)
@@ -85,6 +92,9 @@ class Analytics:
         subject: str,
         label: str,
         response_mode: str,
+        # Tenant owner. Keyword-only in practice (callers pass by name); rows
+        # written without it are UNOWNED and never served to a tenant.
+        user_id: int = None,
         ai_provider: str = None,
         processing_time_ms: float = 0,
         tokens_used: int = 0,
@@ -99,6 +109,7 @@ class Analytics:
         """Track individual email processing."""
         metric = EmailMetric(
             timestamp=datetime.now(timezone.utc),
+            user_id=user_id,
             message_id=message_id,
             customer_email=customer_email,
             subject=subject,
