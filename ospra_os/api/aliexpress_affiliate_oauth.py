@@ -102,7 +102,28 @@ async def affiliate_oauth_callback(
 
     Callback URL: https://ospra-intelligence.com/api/aliexpress/callback
     App Key: 522382
+
+    SECURITY (2026-08): `state` was accepted and never read. This endpoint
+    writes the deployment-wide AFFILIATE token, so an attacker could plant
+    their own credential and every tenant's affiliate links would attribute
+    commission to them. Now verified with the shared HMAC scheme (600s TTL)
+    from ospra_os/aliexpress/routes.py.
     """
+    from ospra_os.aliexpress.routes import _verify_oauth_state
+
+    if not _verify_oauth_state(state):
+        logger.error(
+            "[SECURITY] AliExpress affiliate OAuth callback rejected: "
+            "missing/invalid/expired state."
+        )
+        return HTMLResponse(
+            content=(
+                "<h2>Authorization rejected</h2>"
+                "<p>This callback did not carry a valid, unexpired state token. "
+                "Start the connection from /aliexpress/auth/start and try again.</p>"
+            ),
+            status_code=400,
+        )
 
     if error:
         return HTMLResponse(

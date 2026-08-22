@@ -127,8 +127,38 @@ async def oauth_callback(
     """
     OAuth callback endpoint for AliExpress Dropshipping API
 
-    Automatically exchanges the authorization code for access tokens
+    Automatically exchanges the authorization code for access tokens.
+
+    SECURITY (2026-08): the `state` parameter used to be accepted and NEVER
+    READ. This endpoint writes the DEPLOYMENT-WIDE dropship token, so an
+    attacker could feed it their own authorization `code` and every tenant's
+    AliExpress sourcing would then run through the attacker's account. The
+    state is now verified with the same HMAC scheme the hardened callback in
+    ospra_os/aliexpress/routes.py uses (shared secret, 600s TTL), so only a
+    state minted by our own /aliexpress/auth/start is accepted.
+
+    The redirect_uri registered in the AliExpress console points here, which is
+    why this handler is kept rather than removed in favour of the other one —
+    changing the registered URI breaks the flow outright (proven earlier: a
+    mismatch returns "Redirect uri does not match the callback url of the APP").
     """
+    # Reuse the hardened verifier rather than reimplementing it — one scheme,
+    # one place to fix. Import locally to avoid a circular import at module load.
+    from ospra_os.aliexpress.routes import _verify_oauth_state
+
+    if not _verify_oauth_state(state):
+        logger.error(
+            "[SECURITY] AliExpress OAuth callback rejected: missing/invalid/"
+            "expired state. Start the flow at /aliexpress/auth/start."
+        )
+        return HTMLResponse(
+            content=(
+                "<h2>Authorization rejected</h2>"
+                "<p>This callback did not carry a valid, unexpired state token. "
+                "Start the connection from /aliexpress/auth/start and try again.</p>"
+            ),
+            status_code=400,
+        )
 
     if error:
         return HTMLResponse(
