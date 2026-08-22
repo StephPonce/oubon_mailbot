@@ -235,11 +235,22 @@ class TikTokShopProductsScraper:
         """Actor input per trakk's documented schema (country_code / keywords /
         maxItems / maxPages / sortBy). Kept as its own method so the
         verification harness and tests pin exactly what we send."""
+        # COST (2026-08): this actor bills PER RESULT (~$0.0016/item), and
+        # maxPages is applied PER KEYWORD. The old formula asked for
+        # max_items // 20 = 5 pages, so 5 keywords x 5 pages produced 278-396
+        # billed results per run (~$0.45) even though maxItems said 100 —
+        # measured against real run charges, not estimated. maxItems only caps
+        # what WE fetch from the dataset; the actor has already produced and
+        # billed for everything it scraped.
+        #
+        # Budget pages against the keyword count so the whole run stays near
+        # max_items: pages_per_keyword = ceil(max_items / (keywords * 20)).
+        per_kw = max(1, -(-max_items // (max(1, len(keywords)) * 20)))
         return {
             "country_code": self.country_code,
             "keywords": keywords,
             "maxItems": max_items,
-            "maxPages": max(1, min(10, max_items // 20 or 1)),
+            "maxPages": min(10, per_kw),
             "sortBy": "best_sellers",
         }
 

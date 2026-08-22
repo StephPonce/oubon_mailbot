@@ -45,6 +45,10 @@ def test_spend_report_shape():
     # starts the cache avoided, stale_served are outage-survival serves.
     assert set(r.keys()) == {
         "actor_starts", "quota_failures", "tripped_actors",
+        # Per-actor starts: a single aggregate count hid WHICH actor was
+        # burning the budget (trakk/tiktok-shop cost 70x per run what the Meta
+        # actor did, invisible in the total).
+        "starts_by_actor",
         "cache_hits", "cache_misses", "stale_served",
     }
     assert isinstance(r["actor_starts"], int)

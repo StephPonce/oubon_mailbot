@@ -32,7 +32,18 @@ logger = logging.getLogger(__name__)
 # State is process-global, which == per-run for the catalog-warm cron (fresh
 # process each run); call reset_apify_budget() at run start to be explicit.
 _APIFY_BREAKER_THRESHOLD = int(os.getenv("APIFY_BREAKER_THRESHOLD", "2"))
-_apify_run_state = {"starts": 0, "fails_by_actor": {}, "tripped": set()}
+_apify_run_state = {"starts": 0, "fails_by_actor": {}, "tripped": set(),
+                    "starts_by_actor": {}}
+
+# HARD PER-RUN START CEILING (2026-08). The circuit breaker only trips on
+# quota/403 FAILURES — it cannot stop an actor that keeps SUCCEEDING while
+# billing per result. That is exactly how trakk/tiktok-shop-search-scraper
+# burned $8.42 in 18 runs: every run succeeded, so nothing tripped.
+#
+# This caps how many times ONE actor may start within a single process (a cron
+# run, or one web-process lifetime). It is a backstop against a loop or a
+# caching regression, not a substitute for either.
+_APIFY_MAX_STARTS_PER_ACTOR = int(os.getenv("APIFY_MAX_STARTS_PER_ACTOR", "12"))
 
 
 def reset_apify_budget() -> None:
@@ -40,6 +51,7 @@ def reset_apify_budget() -> None:
     _apify_run_state["starts"] = 0
     _apify_run_state["fails_by_actor"] = {}
     _apify_run_state["tripped"] = set()
+    _apify_run_state["starts_by_actor"] = {}
     try:
         from ospra_os.product_research.connectors.apify import response_cache
         response_cache.reset_cache_stats()
@@ -69,6 +81,7 @@ def get_apify_budget_report() -> Dict:
         "actor_starts": _apify_run_state["starts"],
         "quota_failures": dict(_apify_run_state["fails_by_actor"]),
         "tripped_actors": sorted(_apify_run_state["tripped"]),
+        "starts_by_actor": dict(_apify_run_state["starts_by_actor"]),
     }
     try:
         from ospra_os.product_research.connectors.apify import response_cache
@@ -321,6 +334,19 @@ class ApifyClient:
             print(f"[APIFY BREAKER] skipping {actor_id} (tripped this run)")
             return []
 
+        _starts = _apify_run_state["starts_by_actor"].get(actor_id, 0)
+        if _starts >= _APIFY_MAX_STARTS_PER_ACTOR:
+            logger.warning(
+                "[APIFY BUDGET] %s hit the per-run start ceiling (%d) — "
+                "refusing further starts this run. Raise "
+                "APIFY_MAX_STARTS_PER_ACTOR only if this is expected.",
+                actor_id, _APIFY_MAX_STARTS_PER_ACTOR,
+            )
+            stale = response_cache.get(actor_id, run_input, max_items, allow_stale=True)
+            if stale is not None:
+                return response_cache.stamp_stale(stale.items, stale.fetched_at)
+            return []
+
         items, ok = await self._run_actor_live(
             actor_id, run_input, timeout_secs, memory_mbytes, max_items
         )
@@ -384,6 +410,8 @@ class ApifyClient:
                 run_url = f"{self.base_url}/acts/{actor_id_safe}/runs"
 
                 _apify_run_state["starts"] += 1
+                _sba = _apify_run_state["starts_by_actor"]
+                _sba[actor_id] = _sba.get(actor_id, 0) + 1
                 response = await client.post(
                     run_url,
                     headers=self.headers,
