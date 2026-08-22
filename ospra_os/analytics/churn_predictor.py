@@ -409,40 +409,7 @@ class ChurnPredictor:
 
     # ==================== Churn Rate Analysis ====================
 
-    async def get_churn_rate_trend(self, periods: int = 12) -> List[Dict]:
-        """
-        Historical churn rate over time
-
-        Args:
-            periods: Number of months to analyze
-
-        Returns:
-            List of period churn rates
-        """
-        logger.info(f"[STATS] Calculating churn rate trend for {periods} periods...")
-
-        # TODO: Calculate from database
-        # For now, return mock data
-
-        trend = []
-        base_rate = 0.08
-
-        for i in range(periods):
-            month_date = datetime.now(timezone.utc) - timedelta(days=30 * (periods - i - 1))
-
-            # Add some variance
-            import random
-            rate = base_rate + random.uniform(-0.03, 0.03)
-            rate = max(0.0, min(1.0, rate))
-
-            trend.append({
-                "period": month_date.strftime("%Y-%m"),
-                "churn_rate": round(rate, 3),
-                "churned_customers": int(rate * 100),  # Mock count
-                "total_customers": 1250 + (i * 50)  # Growing customer base
-            })
-
-        return trend
+    # get_churn_rate_trend removed 2026-08 — synthesised a 12-month churn chart from random.uniform around a 0.08 base with invented customer counts; had zero callers.
 
     async def get_save_rate(self) -> float:
         """

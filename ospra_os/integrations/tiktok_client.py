@@ -227,43 +227,7 @@ class TikTokClient:
             logger.error(f"TikTok video search error: {e}")
             return []  # Return empty list to allow priority chain to continue
 
-    def _get_fallback_videos(self, keyword: str, limit: int) -> List[Dict]:
-        """
-        Generate fallback video data for testing
-
-        Args:
-            keyword: Search keyword
-            limit: Number of videos to generate
-
-        Returns:
-            List of mock video dictionaries
-        """
-        import random
-
-        videos = []
-        for i in range(min(limit, 10)):
-            views = random.randint(100000, 10000000)
-            likes = int(views * random.uniform(0.08, 0.15))
-            comments = int(likes * random.uniform(0.03, 0.08))
-            shares = int(likes * random.uniform(0.02, 0.05))
-
-            engagement_rate = ((likes + comments + shares) / views) * 100
-
-            videos.append({
-                "id": f"tt_{random.randint(7000000000000000000, 7999999999999999999)}",
-                "create_time": int(datetime.now().timestamp()) - random.randint(0, 86400 * 7),
-                "description": f"Check out this amazing {keyword}! #fyp #viral #musthave #{keyword.replace(' ', '')}",
-                "video_url": f"https://www.tiktok.com/@user/video/{random.randint(7000000000000000000, 7999999999999999999)}",
-                "statistics": {
-                    "view_count": views,
-                    "like_count": likes,
-                    "comment_count": comments,
-                    "share_count": shares,
-                },
-                "engagement_rate": round(engagement_rate, 2)
-            })
-
-        return videos
+    # _get_fallback_videos removed 2026-08 — fabricated view/like/comment counts and fake TikTok URLs; had zero callers.
 
     def _extract_product_from_video(self, video: Dict, search_keyword: str) -> Optional[Dict]:
         """

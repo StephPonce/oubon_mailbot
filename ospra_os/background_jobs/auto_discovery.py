@@ -760,65 +760,10 @@ class AutoDiscoveryJob:
             logger.error(f"Auto-deploy failed for product {product['id']}: {e}")
             return {"success": False, "error": str(e)}
 
-    def get_discovery_stats(
-        self,
-        user_id: int = None,
-        days: int = 30
-    ) -> Dict[str, Any]:
-        """
-        Get discovery statistics for user or all users.
-
-        Args:
-            user_id: Specific user ID (None for all users)
-            days: Number of days to analyze
-
-        Returns:
-            dict: Statistics including products found, saved, deployed
-        """
-        try:
-            since_date = datetime.now(timezone.utc) - timedelta(days=days)
-
-            # Query discovery logs
-            # logs = self.db.query(DiscoveryLog).filter(
-            #     DiscoveryLog.created_at >= since_date
-            # )
-            #
-            # if user_id:
-            #     logs = logs.filter(DiscoveryLog.user_id == user_id)
-            #
-            # logs = logs.all()
-
-            # Mock stats
-            stats = {
-                "period_days": days,
-                "total_runs": 15,
-                "successful_runs": 14,
-                "failed_runs": 1,
-                "total_products_found": 245,
-                "total_products_saved": 87,
-                "total_products_deployed": 12,
-                "total_high_priority": 18,
-                "avg_products_per_run": 16.3,
-                "avg_duration_seconds": 45.2
-            }
-
-            if user_id:
-                stats["user_id"] = user_id
-
-            return stats
-
-        except Exception as e:
-            logger.error(f"Failed to get stats: {e}")
-            return {"error": str(e)}
-
-    # ------------------------------------------------------------------
-    # Real DB-backed lookups (previously ``_get_*_mock`` stubs that ran
-    # discovery against fictional users — the scheduler is started in
-    # main.py's deferred startup, so in production it was burning API quota
-    # discovering products for ``user1@example.com``). These return dicts in
-    # the exact shape ``run_discovery_for_user`` already consumes, mapping the
-    # real ``UserSettings`` field names to the keys the flow expects.
-    # ------------------------------------------------------------------
+    # get_discovery_stats removed 2026-08 — returned hardcoded run statistics
+    # (15 runs / 14 successful / 245 products found / 87 saved / 12 deployed /
+    # 45.2s avg) as if measured. Zero callers. The sibling _get_* lookups in
+    # this file were already de-mocked; this one was missed.
 
     def _get_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """Fetch a real user. Returns None if the user doesn't exist."""
