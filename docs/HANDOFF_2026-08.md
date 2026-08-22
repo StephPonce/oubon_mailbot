@@ -58,6 +58,15 @@ route returns **405 if the route exists and no auth gate ran before routing**;
 
 ### OPEN — ranked
 
+**O1. ~~Cross-tenant customer PII~~ — DONE (`ebeec4f`).** Migration 010 adds
+`email_metrics.user_id`; the writer stamps it; `/emails/recent` filters to the
+caller. Pre-010 rows are UNOWNED and served to nobody. 3 tests.
+*Still open in this family:* `FulfillmentRecord`, `DiscoveryJob`,
+`ProductEnhancedImages` and `ProductHistoryDB` have the same missing-owner
+defect — same fix shape (column + migration + filter).
+
+<details><summary>original finding</summary>
+
 **O1. Cross-tenant customer PII, unauthenticated.** `ospra_os/email_automation/analytics_routes.py:57`
 `GET /api/emails/recent` — no auth, no tenant filter, returns `customer_email` +
 `subject`. **Live: 200.** Also `/api/dashboard/emails` (`:19`) and
@@ -75,6 +84,13 @@ without a migration. Same defect in `FulfillmentRecord`
 `tracking_number` with no owner column).
 *Fix:* gate both routers behind auth **today**; then migrations adding `user_id`
 + backfill, then filter.
+</details>
+
+**O2. `/api/learning/*` — router-level auth DONE (`65ca7cc`).** Handlers still
+take `user_id` from the URL, so an authenticated tenant can still read another
+tenant's weights — derive it from the token to finish this.
+
+<details><summary>original finding</summary>
 
 **O2. `/api/learning/*` — zero auth, user_id from the URL.**
 `ospra_os/learning/learning_routes.py` contains **no `Depends()` anywhere**.
@@ -83,6 +99,14 @@ without a migration. Same defect in `FulfillmentRecord`
 - `POST /custom-weights` (`:335`), `/personal/learn` (`:120`), `/feedback` (`:142`), `/record-ad-metrics` (`:370`) — **anonymous writes into any user's AI scoring model**
 *Fix:* router-level `dependencies=[Depends(get_current_user)]`; derive `user_id`
 from the token and **delete every `user_id` path/query/body parameter**.
+</details>
+
+**O3. ~~AliExpress OAuth token planting~~ — DONE (`63c4049`).** Both callbacks now
+verify the HMAC state (600s TTL). Did NOT repoint `redirect_uri`: it must match
+the AliExpress console registration, and a mismatch breaks the flow outright.
+10 tests incl. replay rejection.
+
+<details><summary>original finding</summary>
 
 **O3. AliExpress OAuth token planting.** `ospra_os/api/aliexpress_oauth.py:122`
 and `ospra_os/api/aliexpress_affiliate_oauth.py:95` both accept `state` and
@@ -92,6 +116,7 @@ feeds their own `code` and every tenant's sourcing runs through their account.
 (HMAC state minted `:205`, verified unconditionally `:324`, TTL 600s) but is
 unreachable because `routes.py:151-166` points `redirect_uri` at the unprotected
 callback. *Fix:* repoint `redirect_uri`, or port `_verify_oauth_state` into both.
+</details>
 
 **O4. Email-OAuth cross-tenant attach.** `ospra_os/email_automation/oauth/routes.py:263`
 — state is an unsigned `f"{user_id}:{state}"` (`:130`), split at `:284`.
@@ -101,6 +126,12 @@ callback. *Fix:* repoint `redirect_uri`, or port `_verify_oauth_state` into both
 correctly by the WooCommerce callback, which is the reference implementation:
 `ospra_os/api/woocommerce_routes.py:266`).
 
+**O5. ~~TWO functions named `get_current_user`~~ — DONE (`5eb2d2d`).** The package
+now re-exports the STRICT one; the permissive one is `get_current_user_optional`.
+This exposed and fixed a real hole: `POST /api/discovery/jobs` was anonymous.
+
+<details><summary>original finding</summary>
+
 **O5. TWO functions named `get_current_user`.** `auth/jwt_auth.py:438` raises
 401; `auth/dependencies.py:72` **returns `None` and never rejects**.
 `ospra_os/auth/__init__.py:72` re-exports the **permissive** one. Anything doing
@@ -108,6 +139,7 @@ correctly by the WooCommerce callback, which is the reference implementation:
 why `POST /api/discovery/jobs` and `GET /api/discovery/quick/{niche}` are
 effectively public (`unified_discovery_routes.py:40`).
 *Fix:* rename the optional one to `get_current_user_optional`; re-export the strict one.
+</details>
 
 **O6. Two env vars, two HIGH findings.**
 - `ENVIRONMENT=production` — measured live: `x-ratelimit-limit: 500/minute` is the

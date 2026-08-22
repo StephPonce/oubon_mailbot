@@ -32,11 +32,12 @@ name, or a changed data shape becomes a log line, and the feature reports succes
 while doing nothing. When something "doesn't seem to work," suspect a swallowed
 error before suspecting logic.
 
-**3. There are TWO functions named `get_current_user`.**
-`ospra_os/auth/jwt_auth.py:438` raises 401. `ospra_os/auth/dependencies.py:72`
-returns `None` and never rejects — and `ospra_os/auth/__init__.py` re-exports
-**that** one. `from ospra_os.auth import get_current_user` looks like protection
-and is not. **Always import from `ospra_os.auth.jwt_auth`.**
+**3. ~~TWO functions named `get_current_user`~~ — FIXED 2026-08 (`5eb2d2d`).**
+`ospra_os.auth` now re-exports the STRICT dependency (raises 401); the
+permissive variant is `get_current_user_optional` and is not exported from the
+package. Importing from `ospra_os.auth.jwt_auth` is still the clearest choice,
+but the plain import is no longer a trap. Historical note: the permissive
+variant is why several discovery routes were effectively public.
 
 **4. Routers registered earlier SHADOW the legacy `@app` routes in `main.py`.**
 Several endpoints exist twice. Patching the `main.py` copy can change nothing —
