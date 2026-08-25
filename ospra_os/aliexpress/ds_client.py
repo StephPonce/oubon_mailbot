@@ -474,9 +474,25 @@ class AliExpressDSClient:
         if not product_id or not self.is_available():
             return None
 
-        cached = self._detail_cache.get(str(product_id))
+        pid = str(product_id)
+
+        # L1: in-process dict. Free, and real inside one long-lived web
+        # process — but useless in the cron, which is a fresh process per run.
+        cached = self._detail_cache.get(pid)
         if cached and (time.time() - cached[0]) < self._detail_cache_ttl:
             return cached[1]
+
+        # L2: DB. This is what the cron actually needs. Without it the cron
+        # did ~10 detail calls x 300 niche-runs/month at a ~100% miss rate,
+        # and — worse than the wasted calls — enrich_pricing is a SERIAL loop
+        # inside a 30s wrapper, so a couple of slow calls cancel ALL pricing
+        # and every product silently keeps the inflated heuristic cost basis.
+        from ospra_os.aliexpress import ds_detail_cache
+
+        db_hit = ds_detail_cache.get(pid, country, currency, language)
+        if db_hit is not None:
+            self._detail_cache[pid] = (time.time(), db_hit)
+            return db_hit
 
         body = await self._request(
             "aliexpress.ds.product.get",
@@ -488,16 +504,39 @@ class AliExpressDSClient:
             },
         )
         if not body:
+            # AE unreachable / token expired. Serving a day-old merchant price
+            # beats silently reverting to the heuristic cost basis, which the
+            # code itself calls "too generous". Marked stale so the evidence
+            # panel stays honest.
+            stale = ds_detail_cache.get(
+                pid, country, currency, language, allow_stale=True
+            )
+            if stale is not None:
+                logger.warning(
+                    "[AE-DS] detail unavailable for %s — serving STALE cached "
+                    "merchant price", pid
+                )
+                stale = dict(stale)
+                stale["price_source"] = "aliexpress_ds_api_stale"
+                stale["stale"] = True
+                return stale
             return None
 
         resp = body.get("aliexpress_ds_product_get_response", {})
-        result = resp.get("result") or resp.get("resp_result") or {}
+        # Same envelope trap as the recommend feed: resp_result is a WRAPPER
+        # holding resp_code/resp_msg/result, not an alias for result.
+        rr = resp.get("resp_result")
+        if isinstance(rr, dict):
+            result = rr.get("result") or {}
+        else:
+            result = resp.get("result") or {}
         if not isinstance(result, dict) or not result:
             return None
 
         detail = self._normalise_product_detail(result)
         if detail:
-            self._detail_cache[str(product_id)] = (time.time(), detail)
+            self._detail_cache[pid] = (time.time(), detail)
+            ds_detail_cache.put(pid, country, currency, language, detail)
         return detail
 
     # ------------------------------------------------------------------
