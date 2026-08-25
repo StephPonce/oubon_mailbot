@@ -84,7 +84,7 @@ async def get_global_weights():
 
 
 @router.post("/global/contribute")
-async def contribute_to_global(request: LearnRequest):
+async def contribute_to_global(request: LearnRequest, current_user=Depends(get_current_user)):
     """
     Contribute sales data to Global Brain learning.
     
@@ -96,7 +96,7 @@ async def contribute_to_global(request: LearnRequest):
         engine = get_learning_engine(db)
         
         sales_data = [sale.dict() for sale in request.sales]
-        result = await engine.learn_global(sales_data, request.user_id)
+        result = await engine.learn_global(sales_data, current_user.id)
         
         return result
     finally:
@@ -106,12 +106,24 @@ async def contribute_to_global(request: LearnRequest):
 # ==================== PERSONAL LAYER ENDPOINTS ====================
 
 @router.get("/personal/{user_id}")
-async def get_personal_weights(user_id: int):
+async def get_personal_weights(user_id: int, current_user=Depends(get_current_user)):
     """
-    Get personal learning weights for a user.
-    
+    Get personal learning weights for the AUTHENTICATED user.
+
+    SECURITY (2026-08): `user_id` in the path is IGNORED — the identity comes
+    from the token. It used to be honoured, so any authenticated tenant could
+    read any other tenant's model weights, best niches and price ranges by
+    changing a number in the URL. The path parameter is kept only so existing
+    frontend URLs keep working; a mismatch is logged.
+
     Requires Soar tier or higher.
     """
+    if user_id != current_user.id:
+        logger.warning(
+            "[SECURITY] /learning/personal path user_id=%s ignored; serving "
+            "authenticated user %s", user_id, current_user.id
+        )
+    user_id = current_user.id
     db = SessionLocal()
     try:
         engine = get_learning_engine(db)
@@ -129,7 +141,7 @@ async def get_personal_weights(user_id: int):
 
 
 @router.post("/personal/learn")
-async def learn_personal(request: LearnRequest):
+async def learn_personal(request: LearnRequest, current_user=Depends(get_current_user)):
     """
     Update personal learning layer for a user.
     
@@ -141,7 +153,7 @@ async def learn_personal(request: LearnRequest):
         engine = get_learning_engine(db)
         
         sales_data = [sale.dict() for sale in request.sales]
-        result = await engine.learn_personal(request.user_id, sales_data)
+        result = await engine.learn_personal(current_user.id, sales_data)
         
         return result
     finally:
@@ -151,7 +163,7 @@ async def learn_personal(request: LearnRequest):
 # ==================== FEEDBACK ENDPOINTS ====================
 
 @router.post("/feedback")
-async def record_feedback(request: FeedbackRequest):
+async def record_feedback(request: FeedbackRequest, current_user=Depends(get_current_user)):
     """
     Record user action feedback for learning.
 
@@ -182,7 +194,7 @@ async def record_feedback(request: FeedbackRequest):
     try:
         # Record the feedback event
         event = LearningEvent(
-            user_id=request.user_id,
+            user_id=current_user.id,
             event_type=request.action,
             details={
                 "product_id": request.product_id,
@@ -209,8 +221,8 @@ async def record_feedback(request: FeedbackRequest):
             }]
 
             # Trigger learning cycle
-            await engine.learn_global(sale_data, request.user_id)
-            await engine.learn_personal(request.user_id, sale_data)
+            await engine.learn_global(sale_data, current_user.id)
+            await engine.learn_personal(current_user.id, sale_data)
 
         # PostHog activation funnel (task #38) — fire FIRST_SALE on the
         # `first_sale` action. PostHog dedupes per-user-per-event server-side
@@ -223,7 +235,7 @@ async def record_feedback(request: FeedbackRequest):
                 )
                 details = request.details or {}
                 posthog_capture(
-                    request.user_id,
+                    current_user.id,
                     FunnelEvent.FIRST_SALE,
                     properties={
                         "product_id": request.product_id,
@@ -253,7 +265,7 @@ async def record_feedback(request: FeedbackRequest):
 
 
 @router.get("/insights/{user_id}")
-async def get_learning_insights(user_id: int):
+async def get_learning_insights(user_id: int, current_user=Depends(get_current_user)):
     """
     Get actionable learning insights for a user.
 
@@ -267,6 +279,8 @@ async def get_learning_insights(user_id: int):
     try:
         engine = get_learning_engine(db)
 
+        # SECURITY: path user_id ignored — insights are the caller's own.
+        user_id = current_user.id
         personal = engine.get_personal_weights(user_id)
         global_weights = engine.get_global_weights()
 
@@ -317,7 +331,7 @@ async def get_learning_insights(user_id: int):
 # ==================== SCORING ENDPOINTS ====================
 
 @router.post("/score/adjusted")
-async def get_adjusted_score(request: ScoreRequest):
+async def get_adjusted_score(request: ScoreRequest, current_user=Depends(get_current_user)):
     """
     Get AI-adjusted score for a product.
     
@@ -334,7 +348,7 @@ async def get_adjusted_score(request: ScoreRequest):
             "price": request.price
         }
         
-        result = await engine.get_adjusted_score(product, request.user_id)
+        result = await engine.get_adjusted_score(product, current_user.id)
         
         return result
     finally:
@@ -344,7 +358,7 @@ async def get_adjusted_score(request: ScoreRequest):
 # ==================== STRATOSPHERE ENDPOINTS ====================
 
 @router.post("/custom-weights")
-async def set_custom_weights(request: CustomWeightsRequest):
+async def set_custom_weights(request: CustomWeightsRequest, current_user=Depends(get_current_user)):
     """
     Set custom scoring weights.
     
@@ -363,7 +377,7 @@ async def set_custom_weights(request: CustomWeightsRequest):
     try:
         engine = get_learning_engine(db)
         
-        result = await engine.set_custom_weights(request.user_id, request.weights)
+        result = await engine.set_custom_weights(current_user.id, request.weights)
         
         if not result.get("success"):
             raise HTTPException(
@@ -380,9 +394,9 @@ async def set_custom_weights(request: CustomWeightsRequest):
 
 @router.post("/record-ad-metrics")
 async def record_ad_performance(
-    user_id: int,
     product_id: str,
-    metrics: Dict[str, Any]
+    metrics: Dict[str, Any],
+    current_user=Depends(get_current_user),
 ):
     """
     Record ad performance metrics for a product.
@@ -441,7 +455,11 @@ async def record_ad_performance(
 
         # Create learning event
         event = LearningEvent(
-            user_id=user_id,
+            # SECURITY: identity from the token, never the request. This used
+            # to accept a caller-supplied user_id, so anyone could write ad
+            # performance into ANOTHER tenant's learning model and steer their
+            # product scoring.
+            user_id=current_user.id,
             event_type="ad_performance",
             details={
                 "product_id": product_id,  # Include product_id in details
@@ -484,7 +502,7 @@ async def record_ad_performance(
 # ==================== REPORT ENDPOINTS ====================
 
 @router.get("/report")
-async def get_learning_report(user_id: Optional[int] = None):
+async def get_learning_report(current_user=Depends(get_current_user)):
     """
     Get comprehensive learning report.
     
@@ -494,7 +512,7 @@ async def get_learning_report(user_id: Optional[int] = None):
     db = SessionLocal()
     try:
         engine = get_learning_engine(db)
-        report = await engine.get_learning_report(user_id)
+        report = await engine.get_learning_report(current_user.id)
         return report
     finally:
         db.close()
@@ -557,7 +575,7 @@ async def trigger_global_analysis():
 
 
 @router.post("/analyze/personal/{user_id}")
-async def trigger_personal_analysis(user_id: int):
+async def trigger_personal_analysis(user_id: int, current_user=Depends(get_current_user)):
     """
     Manually trigger personal pattern analysis for a specific user.
 
@@ -567,6 +585,16 @@ async def trigger_personal_analysis(user_id: int):
     Returns:
         Status of the analysis job
     """
+    # SECURITY: the path user_id is IGNORED — analysis always runs for the
+    # authenticated caller. Honouring it let one tenant trigger (and shape)
+    # another tenant's personal model.
+    if user_id != current_user.id:
+        logger.warning(
+            "[SECURITY] /learning/analyze/personal path user_id=%s ignored; "
+            "analysing authenticated user %s", user_id, current_user.id
+        )
+    user_id = current_user.id
+
     try:
         from ospra_os.learning.analysis_jobs import calculate_personal_patterns
 
