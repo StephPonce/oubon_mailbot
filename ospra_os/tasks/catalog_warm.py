@@ -52,6 +52,7 @@ def _bootstrap_table() -> None:
     from sqlalchemy import text
 
     from ospra_os.database.apify_cache_models import ApifyResponseCache
+    from ospra_os.database.qualitative_cache_models import QualitativeReadCache
     from ospra_os.database.base import Base
     from ospra_os.database.connection import engine
     from ospra_os.database.discovered_catalog import DiscoveredProduct
@@ -63,6 +64,7 @@ def _bootstrap_table() -> None:
             DiscoveredProduct.__table__,
             ProductTimeseries.__table__,
             ApifyResponseCache.__table__,
+            QualitativeReadCache.__table__,
         ],
     )
     # create_all never ALTERs an existing table (the June init_database lesson),
@@ -417,6 +419,13 @@ async def run() -> dict:
             logger.info(f"[APIFY CACHE] pruned {pruned} expired rows")
     except Exception as e:
         logger.warning(f"[APIFY CACHE] prune skipped: {e}")
+    try:
+        from ospra_os.intelligence.qualitative_cache import prune as _qprune
+        qpruned = _qprune()
+        if qpruned:
+            logger.info(f"[QUAL CACHE] pruned {qpruned} expired rows")
+    except Exception as e:
+        logger.warning(f"[QUAL CACHE] prune skipped: {e}")
     niches = _niches()
     logger.info(f"Catalog warm starting for {len(niches)} niches: {niches}")
     results = []

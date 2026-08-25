@@ -564,6 +564,34 @@ async def assess_product(product: dict) -> QualitativeAssessment:
             error="no provider available",
         )
 
+    # CACHE READ (2026-08). Placed after the two free short-circuits (no
+    # evidence / no provider) and BEFORE the paid call, so a hit costs a DB
+    # lookup instead of a grok-3 completion. Keyed on model + product identity
+    # + the exact evidence, so a product whose evidence changed re-reads
+    # automatically — no separate invalidation to forget.
+    from ospra_os.database.product_timeseries import product_identity_key
+    from ospra_os.intelligence import qualitative_cache
+
+    _model = f"{provider_name}:{getattr(provider, 'model_name', getattr(provider, 'model', '?'))}"
+    try:
+        _pkey = product_identity_key(product)
+    except Exception:
+        _pkey = str(product.get("product_id") or product.get("title") or "")[:255]
+
+    _cached = qualitative_cache.get(_model, _pkey, evidence)
+    if _cached is not None:
+        logger.info("[QUAL CACHE] hit for %s", _pkey[:48])
+        return QualitativeAssessment(
+            polarity=str(_cached.get("polarity", "unknown")),
+            themes=list(_cached.get("themes") or []),
+            top_wins=list(_cached.get("top_wins") or []),
+            top_objections=list(_cached.get("top_objections") or []),
+            data_gaps=list(_cached.get("data_gaps") or []),
+            recommendation=str(_cached.get("recommendation", "INSUFFICIENT_DATA")),
+            confidence=int(_cached.get("confidence", 0)),
+            provider=_cached.get("provider") or provider_name,
+        )
+
     prompt = _build_prompt(evidence)
 
     try:
@@ -602,7 +630,7 @@ async def assess_product(product: dict) -> QualitativeAssessment:
             error="agent returned non-JSON output",
         )
 
-    return QualitativeAssessment(
+    _assessment = QualitativeAssessment(
         polarity=str(parsed.get("polarity", "unknown")),
         themes=list(parsed.get("themes") or [])[:8],
         top_wins=list(parsed.get("top_wins") or [])[:5],
@@ -612,3 +640,7 @@ async def assess_product(product: dict) -> QualitativeAssessment:
         confidence=int(parsed.get("confidence", 0)),
         provider=provider_name,
     )
+    # Write-through on the SUCCESS path only — every failure path above returns
+    # early, so an outage can never be frozen into the cache for a week.
+    qualitative_cache.put(_model, _pkey, evidence, _assessment.to_dict(), provider_name)
+    return _assessment
