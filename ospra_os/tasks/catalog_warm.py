@@ -54,6 +54,9 @@ def _bootstrap_table() -> None:
     from ospra_os.database.apify_cache_models import ApifyResponseCache
     from ospra_os.database.qualitative_cache_models import QualitativeReadCache
     from ospra_os.database.ae_ds_cache_models import AEDSDetailCache
+    from ospra_os.database.ledger_models import (
+        CalibrationReport, GradeSnapshot, ProductOutcome,
+    )
     from ospra_os.database.base import Base
     from ospra_os.database.connection import engine
     from ospra_os.database.discovered_catalog import DiscoveredProduct
@@ -67,6 +70,9 @@ def _bootstrap_table() -> None:
             ApifyResponseCache.__table__,
             QualitativeReadCache.__table__,
             AEDSDetailCache.__table__,
+            GradeSnapshot.__table__,
+            ProductOutcome.__table__,
+            CalibrationReport.__table__,
         ],
     )
     # create_all never ALTERs an existing table (the June init_database lesson),
@@ -267,6 +273,27 @@ async def warm_niche(niche: str, count: int = None, include_absences: bool = Tru
     except Exception as e:  # one bad niche must not abort the whole run
         logger.error(f"[{niche}] discovery failed: {e}")
         return {"niche": niche, "discovered": 0, "new": 0, "seen": 0, "error": str(e)}
+
+    # F1 LEDGER (D10). Write the immutable prediction record for EVERY product
+    # this run evaluated, before any persistence/filtering below can drop one.
+    # A snapshot's value is that it was written before the outcome was known,
+    # so this happens now and is never revised.
+    try:
+        from ospra_os.intelligence import ledger
+        run_id = ledger.new_run_id()
+        ledger.record_run(
+            products or [],
+            niche=niche,
+            pipeline_run_id=run_id,
+            model_version=os.getenv("OSPRA_MODEL_VERSION"),
+            prompt_version=os.getenv("OSPRA_PROMPT_VERSION"),
+            weights_version=os.getenv("OSPRA_WEIGHTS_VERSION"),
+        )
+    except Exception as e:
+        # Loud, per the spec: the ledger is the moat, and a run that graded
+        # products without recording the prediction has produced un-auditable
+        # output. Surfaced as a niche-level error rather than silently skipped.
+        logger.error(f"[{niche}] LEDGER WRITE FAILED — predictions unrecorded: {e}")
 
     new = seen = 0
     session = _session()
