@@ -30,6 +30,21 @@ from ospra_os.observability.posthog_client import capture as posthog_capture, Fu
 
 logger = logging.getLogger(__name__)
 
+
+def _discovery_product_key(source_product: dict) -> str | None:
+    """The discovery identity for a product being deployed (F1 join key).
+
+    Deliberately never raises: a deploy is a paid, user-visible action and must
+    not fail because a join key could not be computed. A NULL key costs one
+    product's outcome attribution; a raised exception costs the deploy.
+    """
+    try:
+        from ospra_os.database.product_timeseries import product_identity_key
+        return product_identity_key(source_product) or None
+    except Exception as exc:
+        logger.warning("[F1] could not compute product_key for deploy: %s", exc)
+        return None
+
 # Initialize router
 router = APIRouter(
     prefix="/api/deploy",
@@ -444,6 +459,16 @@ async def _record_product_deploy_outcome(
             ),
             source_url=source_product.get("supplier_url"),
             source_product_id=str(source_product.get("product_id") or ""),
+            # F1: the two ids that let an order find its way back to the
+            # prediction. shopify_product_id is what order webhooks arrive
+            # carrying; product_key is the discovery identity that joins to
+            # grade_snapshots. Carrying neither is why outcomes were
+            # un-attributable.
+            shopify_product_id=(
+                str(deploy_result.get("shopify_product_id"))
+                if deploy_result.get("shopify_product_id") else None
+            ),
+            product_key=_discovery_product_key(source_product),
             supplier_cost=cost_price,
             selling_price=suggested_price,
             price=suggested_price,

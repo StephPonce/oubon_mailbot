@@ -310,15 +310,23 @@ async def upsert_product_performance_from_order(
                 if not shopify_product_id:
                     continue
 
-                # Find our internal Product by source_product_id
+                # Join on the SHOPIFY id. This previously filtered
+                # `source_product_id`, which holds the SUPPLIER (AliExpress/CJ)
+                # id — a different id space, so it matched nothing and every
+                # line item fell through the `continue` below. Per-product
+                # sales tracking was silently dead for every order.
                 product = (
                     db.query(Product)
-                    .filter(Product.source_product_id == shopify_product_id)
+                    .filter(Product.shopify_product_id == shopify_product_id)
                     .first()
                 )
                 if not product:
-                    # Order item wasn't from an Ospra-discovered product — skip
-                    # (their data won't help the learning loop)
+                    # Genuinely not an Ospra-deployed product (or deployed
+                    # before migration 014 started recording the id).
+                    logger.debug(
+                        "No Ospra product for Shopify product_id=%s — skipping",
+                        shopify_product_id,
+                    )
                     continue
 
                 quantity = int(item.get('quantity') or 1)

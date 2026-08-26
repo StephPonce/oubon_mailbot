@@ -35,6 +35,7 @@ celery_app = Celery(
         "ospra_os.tasks.learning_tasks",
         "ospra_os.tasks.feedback_tasks",  # G4: Complete Feedback Loop
         "ospra_os.tasks.billing_tasks",  # LemonSqueezy tier changes (retry + dead-letter)
+        "ospra_os.tasks.ledger_tasks",  # F1: prediction→outcome ledger
     ]
 )
 
@@ -205,6 +206,22 @@ celery_app.conf.beat_schedule = {
         "task": "ospra_os.tasks.feedback_tasks.daily_feedback_loop",
         "schedule": crontab(hour=4, minute=0),
         "options": {"queue": "scheduled"},
+    },
+
+    # F1 LEDGER: aggregate what actually happened - Weekly Monday 2 AM UTC.
+    # Runs BEFORE calibration so the correlation reads the week just closed.
+    "f1-aggregate-product-outcomes": {
+        "task": "ospra_os.tasks.ledger_tasks.aggregate_product_outcomes",
+        "schedule": crontab(day_of_week=1, hour=2, minute=0),
+        "options": {"queue": "low_priority"},
+    },
+
+    # F1 LEDGER: did the grade predict the outcome? - Weekly Monday 3 AM UTC.
+    # One hour after aggregation, which is ample for a query-only rollup.
+    "f1-weekly-calibration": {
+        "task": "ospra_os.tasks.ledger_tasks.run_weekly_calibration",
+        "schedule": crontab(day_of_week=1, hour=3, minute=0),
+        "options": {"queue": "low_priority"},
     },
 }
 

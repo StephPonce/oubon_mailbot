@@ -32,7 +32,20 @@ class Product(Base):
     # Source Information
     source_platform = Column(String(100), nullable=True)  # aliexpress, alibaba, dhgate
     source_url = Column(String(1024), nullable=True)
+    # The SUPPLIER's id (AliExpress/CJ). NOT the Shopify id — see
+    # shopify_product_id below; conflating the two silently broke order joins.
     source_product_id = Column(String(255), nullable=True)
+
+    # THE TWO IDS THAT CLOSE THE PREDICTION→OUTCOME LOOP (F1).
+    # Without these, an incoming Shopify order line item cannot be traced back
+    # to the product Ospra graded, so no outcome can ever be attributed to a
+    # prediction. Both were previously missing: the Shopify id lived only
+    # inside a JSON blob on RecommendationOutcome, and the discovery identity
+    # was never carried past discovery at all.
+    shopify_product_id = Column(String(64), nullable=True, index=True)
+    # Discovery identity (database.product_timeseries.product_identity_key) —
+    # the join key to grade_snapshots / product_outcomes / product_timeseries.
+    product_key = Column(String(64), nullable=True, index=True)
 
     # Pricing
     supplier_cost = Column(Float, nullable=True)

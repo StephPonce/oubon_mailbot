@@ -271,15 +271,23 @@ class SalesSyncService:
             Product.store_id == store.id
         ).all()
 
-        # Create lookup dict by platform_product_id for O(1) access
+        # Create lookup dict by Shopify product id for O(1) access.
+        # This previously read `prod.platform_product_id` — a column that
+        # exists on ProductDeployment, NOT on Product — so it raised
+        # AttributeError on the first row and the whole batch sync did nothing.
         product_lookup = {
-            prod.platform_product_id: prod
+            prod.shopify_product_id: prod
             for prod in store_products
-            if prod.platform_product_id
+            if prod.shopify_product_id
         }
 
         # Group orders by product + date
         performance_data = {}  # {(product_id, date): metrics}
+        # Distinct Shopify order ids per (product, date). `orders` used to be
+        # incremented once per LINE ITEM, so a single order containing two
+        # variants of the same product counted as two orders — inflating the
+        # exact metric F1 calibrates grades against.
+        order_ids_seen: dict = {}
 
         for order in orders:
             order_date = datetime.fromisoformat(
@@ -327,7 +335,11 @@ class SalesSyncService:
 
                 # Aggregate metrics
                 data = performance_data[key]
-                data["orders"] += 1
+                seen = order_ids_seen.setdefault(key, set())
+                order_id = str(order.get("id") or "")
+                if order_id not in seen:
+                    seen.add(order_id)
+                    data["orders"] += 1
                 data["units_sold"] += item["quantity"]
 
                 item_price = float(item["price"])
@@ -338,8 +350,10 @@ class SalesSyncService:
                 data["net_revenue"] += item_total  # TODO: Subtract refunds
 
                 # Estimate costs (can be improved with actual cost data)
-                if product.cost:
-                    data["product_cost"] += float(product.cost) * item_quantity
+                # `product.cost` does not exist on Product (the column is
+                # supplier_cost) — this raised AttributeError mid-batch.
+                if product.supplier_cost:
+                    data["product_cost"] += float(product.supplier_cost) * item_quantity
 
                 # Shopify fees (approx 2.9% + $0.30 per transaction)
                 transaction_fee = item_total * 0.029 + 0.30
