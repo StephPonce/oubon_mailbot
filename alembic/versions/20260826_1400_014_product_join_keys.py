@@ -31,15 +31,40 @@ branch_labels = None
 depends_on = None
 
 
+def _products_columns() -> set:
+    return {c["name"] for c in sa.inspect(op.get_bind()).get_columns("products")}
+
+
+def _products_indexes() -> set:
+    return {i["name"] for i in sa.inspect(op.get_bind()).get_indexes("products")}
+
+
 def upgrade() -> None:
-    op.add_column("products", sa.Column("shopify_product_id", sa.String(64), nullable=True))
-    op.add_column("products", sa.Column("product_key", sa.String(64), nullable=True))
-    op.create_index("ix_products_shopify_product_id", "products", ["shopify_product_id"])
-    op.create_index("ix_products_product_key", "products", ["product_key"])
+    # Guarded like 013: several code paths call Base.metadata.create_all, and a
+    # table built that way already carries these columns. An unguarded
+    # add_column would then raise and block the deploy.
+    cols = _products_columns()
+    if "shopify_product_id" not in cols:
+        op.add_column("products", sa.Column("shopify_product_id", sa.String(64), nullable=True))
+    if "product_key" not in cols:
+        op.add_column("products", sa.Column("product_key", sa.String(64), nullable=True))
+
+    idx = _products_indexes()
+    if "ix_products_shopify_product_id" not in idx:
+        op.create_index("ix_products_shopify_product_id", "products", ["shopify_product_id"])
+    if "ix_products_product_key" not in idx:
+        op.create_index("ix_products_product_key", "products", ["product_key"])
 
 
 def downgrade() -> None:
-    op.drop_index("ix_products_product_key", table_name="products")
-    op.drop_index("ix_products_shopify_product_id", table_name="products")
-    op.drop_column("products", "product_key")
-    op.drop_column("products", "shopify_product_id")
+    idx = _products_indexes()
+    if "ix_products_product_key" in idx:
+        op.drop_index("ix_products_product_key", table_name="products")
+    if "ix_products_shopify_product_id" in idx:
+        op.drop_index("ix_products_shopify_product_id", table_name="products")
+
+    cols = _products_columns()
+    if "product_key" in cols:
+        op.drop_column("products", "product_key")
+    if "shopify_product_id" in cols:
+        op.drop_column("products", "shopify_product_id")
