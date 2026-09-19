@@ -13,6 +13,72 @@ wrong thing.
 
 ---
 
+## 0. F1 — PREDICTION→OUTCOME LEDGER — **DONE** (Sept 2026)
+
+The moat (spec `02-OSPRA-FEATURE-SPEC.md` F1, decision D10). Ospra made
+predictions and remembered nothing; it now has a memory and a report card.
+Everything else in the spec's build order depended on this.
+
+**Shipped**
+- `grade_snapshots` — one immutable row per product per grading run: grade,
+  factor breakdown, model/prompt/weights versions, `source_manifest`,
+  `fit_pass` + reasons, `deployed`. Written by `catalog_warm.warm_niche`
+  BEFORE any filtering can drop a product. Fit-gate rejects are logged too.
+- `product_outcomes` — real Shopify sales per `product_key`, plus PROXY
+  outcomes (AE velocity, Trends delta) for UNDEPLOYED products. Proxies are
+  what make the F8 pets paper-trade possible and keep survivorship bias out of
+  the engine's own report card. Correlated separately from real orders.
+- `calibration_reports` — weekly Spearman, logged whether it flatters us or not.
+- Beats: `f1-aggregate-product-outcomes` (Mon 02:00 UTC),
+  `f1-weekly-calibration` (Mon 03:00 UTC, one hour later so it reads the week
+  just closed).
+- Migrations 013 + 014. Both idempotent — see below.
+- 18 tests.
+
+**Immutability is enforced TWICE** — an ORM event listener AND a DB trigger
+(Postgres + SQLite). The ORM guard protects the app; raw SQL walks straight
+past it, so the trigger is what makes append-only a property of the DATABASE.
+Verified against real SQLite: UPDATE and DELETE both abort, row survives.
+
+**Three silent bugs found and fixed along the way.** The spec assumed order
+data was "already flowing" into per-product performance. It never has:
+1. `webhooks/webhook_utils.py` filtered `Product.source_product_id` (the
+   SUPPLIER id) with the SHOPIFY id. Different id spaces → matched nothing →
+   every line item hit a `continue` commented "wasn't from an Ospra-discovered
+   product". Reads as correct, always false.
+2. `services/sales_sync_service.py` read `Product.platform_product_id`, a
+   column that lives on ProductDeployment. AttributeError on row 1, so the
+   6-hourly batch sync did nothing either. Same file read `product.cost`
+   (the column is `supplier_cost`).
+3. `orders` counted LINE ITEMS, so one order with two variants of the same
+   product counted as two — inflating the exact metric calibration uses.
+
+There was also no join to repair: the Shopify id lived only inside a JSON blob
+on `recommendation_outcomes.confidence_breakdown`, no `ProductDeployment` row
+is ever written, and `product_key` was never carried past discovery.
+**Migration 014** adds `products.shopify_product_id` + `products.product_key`,
+both populated at deploy time. Pre-014 rows stay NULL and are SKIPPED by
+aggregation — inventing a key would fabricate the provenance the ledger exists
+to prove.
+
+**Migrations are idempotent on purpose.** `catalog_warm` bootstraps the same
+tables via `create_all` and the Render cron runs on its own schedule,
+independent of the API's `preDeployCommand: alembic upgrade head`. Unguarded,
+(a) whoever loses the race fails the deploy on a coin flip, and (b) — worse —
+a `create_all`-made table has NO TRIGGERS, so production would run a silently
+MUTABLE ledger while every test asserts immutability. 013 installs the triggers
+unconditionally. **009 and 012 have the same unguarded exposure and simply got
+lucky on timing** — worth fixing next time either is touched.
+
+**Not done / next:** nothing writes `ad_spend` into `ProductPerformance`
+(`sales_sync_service.py` hard-codes `0.0`, and `analytics_tasks.check_ad_performance`
+is a stub with its whole body commented out), so `margin_actual` currently
+ignores ad cost. Not a blocker for calibration — Spearman is rank-based and
+`ad_spend` is not an input to it — but it must be closed before any autopilot
+spend decision leans on margin.
+
+---
+
 ## 1. SECURITY
 
 ### DONE
