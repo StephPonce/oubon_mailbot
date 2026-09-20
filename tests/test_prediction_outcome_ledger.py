@@ -7,7 +7,7 @@ guarantee at both layers (ORM and database), plus the properties calibration
 depends on.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import text
@@ -45,7 +45,12 @@ def _product(pid, grade, **extra):
         "title": f"Product {pid}",
         "oi_score": grade,
         "data_sources": {"aliexpress": {"orders": 900}},
-        "data_coverage": {"by_source": {"aliexpress": "real", "amazon": "empty"}},
+        # Exactly the shape product_discovery emits, including the 'n/a' state.
+        "data_coverage": {"by_source": {
+            "aliexpress": "real",
+            "amazon_reviews": "empty",
+            "cj_supplier_proxy": "n/a",
+        }},
     }
     p.update(extra)
     return p
@@ -132,12 +137,21 @@ def test_source_manifest_present_on_every_snapshot(led, engine):
     with Session(engine) as s:
         row = s.query(GradeSnapshot).one()
     assert row.source_manifest and "sources" in row.source_manifest
-    assert row.sources_total == len(ledger.KNOWN_SOURCES)
-    assert row.source_manifest["sources"]["aliexpress"] == "real"
-    # "empty" (asked, nothing there) must not be conflated with "absent"
-    # (never ran) — they mean different things about the market.
-    assert row.source_manifest["sources"]["amazon"] == "empty"
-    assert row.source_manifest["sources"]["cj_dropshipping"] == "absent"
+    sources = row.source_manifest["sources"]
+
+    # All four states must survive into the snapshot as DISTINCT values. This
+    # is the entire point of the manifest: collapsing them is what lets a dead
+    # API look like a quiet market.
+    assert sources["aliexpress"] == "real"      # queried, had data
+    assert sources["amazon_reviews"] == "empty"  # queried, honestly nothing
+    assert sources["cj_supplier_proxy"] == "n/a"  # not applicable to this item
+    assert sources["cj_dropshipping"] == "absent"  # never ran
+
+    # n/a sources are excluded from the denominator — they were never in play,
+    # so counting them would make a well-covered product look starved.
+    assert row.sources_live == 1
+    assert row.sources_total == len([v for v in sources.values() if v != "n/a"])
+    assert row.source_manifest["known"] == len(ledger.KNOWN_SOURCES)
 
 
 def test_ledger_write_failure_is_loud(led, monkeypatch):
@@ -211,3 +225,35 @@ def test_calibration_reports_insufficient_data_honestly(led):
     report = led.compute_calibration(window_days=28, persist=False)
     assert report["notes"]["verdict"] == "insufficient_data"
     assert report["spearman_grade_vs_orders"] is None
+
+
+def test_known_sources_match_what_discovery_actually_emits():
+    """KNOWN_SOURCES must be the real coverage keys, not plausible-looking
+    invented ones. A name that does not match `data_coverage['by_source']`
+    reports 'absent' for a source that actually ran — understating coverage on
+    every snapshot and poisoning the audit this manifest exists to provide.
+
+    Read from product_discovery.py so the two cannot drift apart silently.
+    """
+    import pathlib
+    import re
+
+    src = pathlib.Path("ospra_os/intelligence/product_discovery.py").read_text()
+    emitted = set(re.findall(r"coverage\['([a-z_]+)'\]\s*=", src))
+    assert emitted, "could not parse coverage keys — update this test"
+
+    unknown = emitted - set(ledger.KNOWN_SOURCES)
+    assert not unknown, (
+        f"discovery emits coverage keys the ledger does not know: {sorted(unknown)}. "
+        "Add them to KNOWN_SOURCES."
+    )
+
+
+def test_unknown_coverage_key_is_still_recorded():
+    """A source added to discovery but not yet to KNOWN_SOURCES must still land
+    in the manifest. Dropping it would hide a live source from the audit."""
+    manifest = ledger.build_source_manifest({
+        "data_coverage": {"by_source": {"brand_new_source": "real"}},
+    })
+    assert manifest["sources"]["brand_new_source"] == "real"
+    assert manifest["live"] >= 1

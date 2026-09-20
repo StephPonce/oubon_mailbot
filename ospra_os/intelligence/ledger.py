@@ -22,21 +22,34 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# The 10 data sources the grade is meant to draw on. Recorded per snapshot so a
-# grade computed while half of them were dead is identifiable later — the
-# "silent API failure" flaw (handoff, known engine flaw #3) made auditable.
+# The sources the grade is meant to draw on. These names are NOT invented here —
+# they are exactly the keys `product_discovery` writes into
+# `data_coverage['by_source']` (see the `coverage['...'] = ` block in
+# product_discovery.py). A name that does not match that dict silently reports
+# "absent" for a source that actually ran, which would understate coverage on
+# every snapshot and quietly poison the very audit this manifest exists for.
+#
+# reddit/twitter remain because discovery still emits those keys; both now
+# always resolve to "n/a" (retired per D15 — do not resurrect).
 KNOWN_SOURCES = (
     "aliexpress",
-    "aliexpress_ds",
     "cj_dropshipping",
-    "amazon",
-    "tiktok_shop",
-    "meta_ads",
-    "google_trends",
+    "cj_supplier_proxy",
     "amazon_reviews",
-    "shopify_store_carry",
-    "qualitative_ai",
+    "google_trends",
+    "tiktok",
+    "reddit",
+    "twitter",
 )
+
+# States discovery reports per source, and what each one MEANS. Keeping these
+# distinct is the whole point: a dead API and a genuinely quiet market look
+# identical once they are collapsed together.
+#   real    — queried, returned usable data
+#   empty   — queried, honestly had nothing
+#   n/a     — not applicable to this product (e.g. CJ proxy on an AE-only item)
+#   absent  — never ran: disabled, unconfigured, or it failed
+_LIVE_STATE = "real"
 
 
 def new_run_id() -> str:
@@ -68,25 +81,40 @@ def build_source_manifest(product: Dict[str, Any]) -> Dict[str, Any]:
     coverage = (product.get("data_coverage") or {}).get("by_source") or {}
 
     manifest: Dict[str, str] = {}
+
+    # Discovery's own coverage verdict wins — it is computed at the point the
+    # source was queried and knows things we cannot reconstruct here.
+    for name, state in coverage.items():
+        manifest[str(name)] = str(state)
+
+    # Anything expected but not reported by coverage: fall back to whether a
+    # data_sources block exists. A source discovery never mentioned at all is
+    # "absent" — it did not run.
     for name in KNOWN_SOURCES:
-        if name in coverage:
-            manifest[name] = str(coverage[name])
+        if name in manifest:
             continue
         block = data_sources.get(name)
         if block is None:
             manifest[name] = "absent"
-        elif isinstance(block, dict) and not block:
-            manifest[name] = "empty"
-        elif isinstance(block, dict) and block.get("available") is False:
+        elif isinstance(block, dict) and (
+            not block or block.get("available") is False
+        ):
             manifest[name] = "empty"
         else:
-            manifest[name] = "real"
+            manifest[name] = _LIVE_STATE
 
-    live = sum(1 for v in manifest.values() if v == "real")
+    live = sum(1 for v in manifest.values() if v == _LIVE_STATE)
+    # "total" counts sources that were APPLICABLE to this product — n/a ones
+    # were never in play, so including them would make a well-covered product
+    # look starved. Matches discovery's own `queried` denominator.
+    applicable = sum(1 for v in manifest.values() if v != "n/a")
     return {
         "sources": manifest,
         "live": live,
-        "total": len(KNOWN_SOURCES),
+        "total": applicable,
+        # Kept separately so "we know of 8 sources" and "6 applied to this
+        # product" stay distinguishable in hindsight.
+        "known": len(KNOWN_SOURCES),
     }
 
 
