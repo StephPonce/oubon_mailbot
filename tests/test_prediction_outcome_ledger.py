@@ -7,7 +7,7 @@ guarantee at both layers (ORM and database), plus the properties calibration
 depends on.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -281,3 +281,65 @@ def test_version_env_override_marks_a_separate_cohort(led, engine, monkeypatch):
         row = s.query(GradeSnapshot).filter(
             GradeSnapshot.pipeline_run_id == "run-x").one()
     assert row.weights_version == "experiment-7"
+
+
+def test_calibration_counts_each_product_once_not_once_per_snapshot(led, engine):
+    """PSEUDO-REPLICATION GUARD.
+
+    The catalog cron grades every product twice a day, so a 28-day window holds
+    up to 56 snapshots of the SAME product, all matching the same weekly
+    outcome. Feeding each one in separately inflates n ~50x and makes a noisy
+    correlation look highly confident — a confident number about nothing.
+    """
+    base = datetime.utcnow() - timedelta(days=10)
+    with Session(engine) as s:
+        # Two products, but product A graded 6 times and B only once.
+        for i in range(6):
+            s.add(GradeSnapshot(
+                product_key="prodA", ts=base + timedelta(hours=i * 12),
+                pipeline_run_id=f"run-{i}", grade=9.0, source_manifest={},
+            ))
+        s.add(GradeSnapshot(
+            product_key="prodB", ts=base, pipeline_run_id="run-b",
+            grade=2.0, source_manifest={},
+        ))
+        for key, orders in (("prodA", 50), ("prodB", 1)):
+            s.add(ProductOutcome(
+                product_key=key,
+                period_start=base + timedelta(days=4),
+                period_end=base + timedelta(days=9),
+                orders=orders,
+            ))
+        s.commit()
+
+    report = led.compute_calibration(window_days=28, persist=False)
+
+    # 2 products, not 7 snapshots.
+    assert report["n_products"] == 2
+    assert report["notes"]["n_with_orders"] == 2
+    # The raw snapshot count stays visible, just not mistaken for sample size.
+    assert report["notes"]["n_snapshots_in_window"] == 7
+
+
+def test_calibration_uses_the_earliest_grade_for_a_product(led, engine):
+    """Later re-grades are increasingly informed by the period being scored.
+    Using them would leak hindsight into a number whose only job is to measure
+    foresight."""
+    base = datetime.utcnow() - timedelta(days=10)
+    with Session(engine) as s:
+        s.add(GradeSnapshot(product_key="p", ts=base, pipeline_run_id="first",
+                            grade=3.0, source_manifest={}, deployed=False))
+        # A day later the engine changed its mind — after the fact.
+        s.add(GradeSnapshot(product_key="p", ts=base + timedelta(days=1),
+                            pipeline_run_id="second", grade=9.5,
+                            source_manifest={}, deployed=True))
+        s.commit()
+
+    rows = led.receipts(base - timedelta(days=1), datetime.utcnow())
+    assert len(rows) == 2, "both snapshots must remain in the ledger"
+
+    report = led.compute_calibration(window_days=28, persist=False)
+    assert report["n_products"] == 1
+    # deployed=True belongs to the LATER snapshot; counting it would mean the
+    # revised opinion, not the original prediction, was scored.
+    assert report["n_deployed"] == 0

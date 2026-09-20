@@ -403,14 +403,34 @@ def compute_calibration(
     window_start = window_end - timedelta(days=window_days)
     pairs = receipts(window_start, window_end)
 
+    # ONE POINT PER PRODUCT — not one per snapshot.
+    #
+    # receipts() returns a row per SNAPSHOT, and the catalog cron grades every
+    # product twice a day. Over a 28-day window one product yields up to 56
+    # snapshots, all matching the same weekly outcome. Feeding those in
+    # individually is pseudo-replication: it inflates n ~50x, makes a noisy
+    # correlation look highly confident, and silently over-weights whichever
+    # products happen to appear in more runs.
+    #
+    # The EARLIEST grade in the window is the one used. That is the genuine
+    # prediction — later re-grades of the same product are increasingly
+    # informed by the very period being scored, so preferring them would leak
+    # hindsight into a number whose only job is to measure foresight.
+    earliest: Dict[str, Dict[str, Any]] = {}
+    for row in pairs:
+        if row.get("grade") is None:
+            continue
+        key = row["product_key"]
+        prev = earliest.get(key)
+        if prev is None or row["graded_at"] < prev["graded_at"]:
+            earliest[key] = row
+
     graded_orders: List[Tuple[float, float]] = []
     graded_proxy: List[Tuple[float, float]] = []
     n_deployed = 0
 
-    for row in pairs:
-        grade = row.get("grade")
-        if grade is None:
-            continue
+    for row in earliest.values():
+        grade = row["grade"]
         if row.get("deployed"):
             n_deployed += 1
         for o in row["outcomes"]:
@@ -430,11 +450,14 @@ def compute_calibration(
         "window_end": window_end,
         "spearman_grade_vs_orders": rho_orders,
         "spearman_grade_vs_proxy": rho_proxy,
-        "n_products": len(pairs),
+        # DISTINCT products, not snapshots. Reporting snapshot count here would
+        # advertise a ~50x larger sample than actually exists.
+        "n_products": len(earliest),
         "n_deployed": n_deployed,
         "notes": {
             "n_with_orders": len(graded_orders),
             "n_with_proxy": len(graded_proxy),
+            "n_snapshots_in_window": len(pairs),
             # The launch gate in file 03 requires Spearman >= 0.4. State
             # plainly when there is not yet enough data to say — "insufficient
             # data" is a valid, honest verdict and must not read as a failure.
