@@ -70,6 +70,27 @@ MUTABLE ledger while every test asserts immutability. 013 installs the triggers
 unconditionally. **009 and 012 have the same unguarded exposure and simply got
 lucky on timing** — worth fixing next time either is touched.
 
+**Four bugs found auditing my own F1 work** (all fixed, all would have been
+silent):
+1. `KNOWN_SOURCES` held plausible-sounding names I invented (`tiktok_shop`,
+   `meta_ads`, `amazon`…) instead of the keys discovery actually emits
+   (`tiktok`, `cj_supplier_proxy`, `amazon_reviews`…). 7 of 10 mismatched, and
+   each mismatch recorded a source that RAN as "absent". Trap #1 in CLAUDE.md,
+   committed by me. Now guarded by a test that parses `product_discovery.py`.
+2. Grade versions read from env vars that exist nowhere, so every snapshot
+   stamped NULL — defeating the protection that stops F7's weight change from
+   silently pooling two different engines into one correlation.
+3. `webhook_utils` filed `ProductPerformance.date` with `date.today()`
+   (server-local) while every other writer and the F1 window use UTC. On a
+   non-UTC server the row lands on the wrong day and can fall outside the
+   aggregation window. Surfaced only because the dev machine happened to be
+   behind UTC that hour.
+4. **The worst one:** `compute_calibration` correlated per SNAPSHOT. The cron
+   grades twice daily, so one product contributed up to 56 points to a 28-day
+   Spearman, all sharing one outcome — inflating n ~50x and making noise look
+   confident. The launch gate (Spearman ≥ 0.4) would have been judged against
+   it. Now one point per product, using the earliest grade in the window.
+
 **Not done / next:** nothing writes `ad_spend` into `ProductPerformance`
 (`sales_sync_service.py` hard-codes `0.0`, and `analytics_tasks.check_ad_performance`
 is a stub with its whole body commented out), so `margin_actual` currently
