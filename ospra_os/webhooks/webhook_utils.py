@@ -300,11 +300,17 @@ async def upsert_product_performance_from_order(
         from ospra_os.database.connection import SessionLocal
         from ospra_os.database.performance_models import ProductPerformance
         from ospra_os.database.product_models import Product
-        from datetime import date as _date
+        from datetime import datetime as _datetime
 
         db = SessionLocal()
         try:
-            today = _date.today()
+            # UTC, not date.today(). Every other writer of a date column here
+            # is UTC-based (product_timeseries uses utcnow().date(); the batch
+            # sync derives the date from Shopify's UTC created_at), and the F1
+            # aggregation window is computed from utcnow. A server-local date
+            # files the row under the wrong day whenever the server is not on
+            # UTC — which can push it outside the aggregation window entirely.
+            today = _datetime.utcnow().date()
             for item in line_items:
                 shopify_product_id = str(item.get('product_id') or '')
                 if not shopify_product_id:

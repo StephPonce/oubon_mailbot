@@ -8,7 +8,7 @@ Both failed silently, so per-product sales tracking reported success while
 recording nothing. These tests fail if that regresses.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -85,7 +85,7 @@ def test_real_outcome_rolls_shopify_sales_up_to_the_prediction_key(led, engine):
         s.flush()
         s.add(ProductPerformance(
             product_id=p.id, store_id=1, user_id=1,
-            date=date.today() - timedelta(days=1),
+            date=datetime.utcnow().date() - timedelta(days=1),
             orders=3, units_sold=5, gross_revenue=250.0,
             refunds=10.0, total_cost=90.0, ad_spend=40.0,
         ))
@@ -118,7 +118,7 @@ def test_products_without_a_key_are_skipped_not_guessed(led, engine):
         s.flush()
         s.add(ProductPerformance(
             product_id=p.id, store_id=1, user_id=1,
-            date=date.today() - timedelta(days=1), orders=9, gross_revenue=900.0,
+            date=datetime.utcnow().date() - timedelta(days=1), orders=9, gross_revenue=900.0,
         ))
         s.commit()
 
@@ -143,7 +143,7 @@ def test_undeployed_products_get_proxy_outcomes(led, engine):
         ))
         for i, (orders, trend) in enumerate([(100, 40.0), (170, 61.0)]):
             s.add(ProductTimeseries(
-                product_key=key, snapshot_date=date.today() - timedelta(days=7 - i * 6),
+                product_key=key, snapshot_date=datetime.utcnow().date() - timedelta(days=7 - i * 6),
                 aliexpress_orders=orders, google_trends_interest=trend,
                 signal_count=2,
             ))
@@ -169,7 +169,7 @@ def test_single_timeseries_point_yields_no_proxy(led, engine):
         s.add(GradeSnapshot(product_key=key, ts=datetime.utcnow(),
                             pipeline_run_id="r1", grade=7.0, source_manifest={}))
         s.add(ProductTimeseries(
-            product_key=key, snapshot_date=date.today() - timedelta(days=1),
+            product_key=key, snapshot_date=datetime.utcnow().date() - timedelta(days=1),
             aliexpress_orders=100, google_trends_interest=50.0, signal_count=1,
         ))
         s.commit()
@@ -186,7 +186,7 @@ def test_reaggregation_updates_rather_than_duplicates(led, engine):
                             pipeline_run_id="r1", grade=8.0, source_manifest={}))
         for i, orders in enumerate([10, 40]):
             s.add(ProductTimeseries(
-                product_key=key, snapshot_date=date.today() - timedelta(days=4 - i * 3),
+                product_key=key, snapshot_date=datetime.utcnow().date() - timedelta(days=4 - i * 3),
                 aliexpress_orders=orders, signal_count=1,
             ))
         s.commit()
@@ -209,3 +209,32 @@ def test_aggregation_failure_reports_failure(led, monkeypatch):
     result = ledger_tasks.aggregate_product_outcomes(period_days=7)
     assert result["success"] is False
     assert "db down" in result["error"]
+
+
+def test_date_columns_are_written_in_utc_not_server_local():
+    """Every writer of a date column the F1 window reads must use UTC.
+
+    The aggregation window is computed from utcnow(). A writer using
+    `date.today()` files rows under the server's LOCAL day, so on any non-UTC
+    server the row lands on the wrong date and can fall outside the window
+    entirely — invisible until someone notices outcomes are missing. This bug
+    was live in webhook_utils.py and only surfaced because the test machine
+    happened to be behind UTC at the time.
+    """
+    import pathlib
+    import re
+
+    for rel in ("ospra_os/webhooks/webhook_utils.py",
+                "ospra_os/tasks/catalog_warm.py",
+                "ospra_os/tasks/ledger_tasks.py"):
+        # Code only — a comment explaining the rule must not trip it.
+        code = "\n".join(
+            line for line in pathlib.Path(rel).read_text().splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        # `date.today()` / `_date.today()` — but NOT `utcnow().date()`
+        offenders = re.findall(r"(?<!utcnow\(\)\.)\b_?date\.today\(\)", code)
+        assert not offenders, (
+            f"{rel} uses date.today() (server-local). Use "
+            f"datetime.utcnow().date() — the F1 window is UTC-based."
+        )

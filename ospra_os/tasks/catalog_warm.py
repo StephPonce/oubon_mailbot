@@ -285,9 +285,6 @@ async def warm_niche(niche: str, count: int = None, include_absences: bool = Tru
             products or [],
             niche=niche,
             pipeline_run_id=run_id,
-            model_version=os.getenv("OSPRA_MODEL_VERSION"),
-            prompt_version=os.getenv("OSPRA_PROMPT_VERSION"),
-            weights_version=os.getenv("OSPRA_WEIGHTS_VERSION"),
         )
     except Exception as e:
         # Loud, per the spec: the ledger is the moat, and a run that graded

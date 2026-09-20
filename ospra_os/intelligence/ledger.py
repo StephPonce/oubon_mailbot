@@ -52,6 +52,40 @@ KNOWN_SOURCES = (
 _LIVE_STATE = "real"
 
 
+# ---------------------------------------------------------------------------
+# GRADE VERSIONING
+#
+# A grade is only comparable to another grade produced by the same scoring
+# logic. F7 changes the weights; without a version marker, calibration would
+# silently pool pre-change and post-change scores and report one correlation
+# for two different engines — a confident number about nothing.
+#
+# BUMP `WEIGHTS_VERSION` WHENEVER YOU CHANGE HOW oi_score IS COMPUTED
+# (the multiplier chain in product_discovery.py, ~line 6229-6437). Bump
+# `PROMPT_VERSION` when the grading prompt changes. Deliberately explicit
+# constants rather than a source hash: a hash would also fire on comment edits
+# and reformatting, fragmenting calibration cohorts for no reason.
+#
+# Not derived from the deploy SHA for the same reason — that changes on every
+# deploy and would shatter a 28-day window into unusable slivers.
+WEIGHTS_VERSION = "v1"
+PROMPT_VERSION = "v1"
+MODEL_VERSION = "multiplier-chain-v1"
+
+
+def grade_versions() -> Dict[str, str]:
+    """The (model, prompt, weights) triple stamped onto every snapshot.
+
+    Env overrides exist so an experiment can mark its runs as a separate
+    cohort without a deploy; unset is the normal case.
+    """
+    return {
+        "model_version": os.getenv("OSPRA_MODEL_VERSION") or MODEL_VERSION,
+        "prompt_version": os.getenv("OSPRA_PROMPT_VERSION") or PROMPT_VERSION,
+        "weights_version": os.getenv("OSPRA_WEIGHTS_VERSION") or WEIGHTS_VERSION,
+    }
+
+
 def new_run_id() -> str:
     """Opaque id grouping every snapshot from one pipeline execution."""
     return uuid.uuid4().hex[:16]
@@ -69,9 +103,10 @@ def _session():
 def build_source_manifest(product: Dict[str, Any]) -> Dict[str, Any]:
     """Record which sources actually returned data for THIS product.
 
-    Distinguishes three states, because they mean different things:
+    Distinguishes four states, because they mean different things:
       "real"    — the source returned usable data
       "empty"   — the source was queried and honestly had nothing
+      "n/a"     — not applicable to this product (CJ proxy on an AE-only item)
       "absent"  — the source never ran (disabled, unconfigured, or failed)
 
     Collapsing empty and absent is exactly the mistake that lets a dead API
@@ -164,6 +199,14 @@ def record_run(
 
     from ospra_os.database.ledger_models import GradeSnapshot
     from ospra_os.database.product_timeseries import product_identity_key
+
+    # Unset means "the current engine", not "unknown". A NULL here would make
+    # the snapshot uncomparable to every other snapshot, which is the exact
+    # failure the version columns exist to prevent.
+    _v = grade_versions()
+    model_version = model_version or _v["model_version"]
+    prompt_version = prompt_version or _v["prompt_version"]
+    weights_version = weights_version or _v["weights_version"]
 
     rows: List[GradeSnapshot] = []
     now = datetime.utcnow()

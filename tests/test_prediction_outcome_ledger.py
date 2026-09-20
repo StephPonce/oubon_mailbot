@@ -257,3 +257,27 @@ def test_unknown_coverage_key_is_still_recorded():
     })
     assert manifest["sources"]["brand_new_source"] == "real"
     assert manifest["live"] >= 1
+
+
+def test_snapshots_are_stamped_with_comparable_versions(led, engine):
+    """A NULL version makes a snapshot uncomparable to every other snapshot —
+    exactly what the version columns exist to prevent. Unset env means "the
+    current engine", not "unknown"."""
+    led.record_run([_product("p1", 8.2)], niche="lighting", pipeline_run_id="run-a")
+    with Session(engine) as s:
+        row = s.query(GradeSnapshot).one()
+    assert row.weights_version == ledger.WEIGHTS_VERSION
+    assert row.prompt_version == ledger.PROMPT_VERSION
+    assert row.model_version == ledger.MODEL_VERSION
+    assert None not in (row.weights_version, row.prompt_version, row.model_version)
+
+
+def test_version_env_override_marks_a_separate_cohort(led, engine, monkeypatch):
+    """An experiment must be able to tag its runs without a deploy, so its
+    grades don't pool with production's in the same correlation."""
+    monkeypatch.setenv("OSPRA_WEIGHTS_VERSION", "experiment-7")
+    led.record_run([_product("p1", 8.2)], niche="lighting", pipeline_run_id="run-x")
+    with Session(engine) as s:
+        row = s.query(GradeSnapshot).filter(
+            GradeSnapshot.pipeline_run_id == "run-x").one()
+    assert row.weights_version == "experiment-7"
