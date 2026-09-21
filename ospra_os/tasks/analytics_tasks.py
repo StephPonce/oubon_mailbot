@@ -22,6 +22,103 @@ from ospra_os.database import Product
 logger = logging.getLogger(__name__)
 
 
+
+# A campaign earning back less than this per ad dollar gets flagged for review.
+LOW_ROAS_THRESHOLD = 2.0
+
+
+def _fetch_campaign_metrics(campaign) -> Optional[Dict[str, Any]]:
+    """Live metrics for one campaign, or None if the platform is unreachable.
+
+    None is NOT an empty dict: "we could not ask" and "the campaign spent
+    nothing" are different facts, and conflating them writes a zero over real
+    spend.
+    """
+    import asyncio
+
+    platform = (campaign.platform or "").lower()
+    try:
+        if platform == "meta":
+            from ospra_os.advertising.meta.meta_ads import MetaAdsManager
+            raw = asyncio.run(
+                MetaAdsManager().get_campaign_metrics(campaign.campaign_id)
+            )
+        else:
+            # TikTok/Google managers exist but expose different shapes; wiring
+            # them is a separate change rather than a guess made here.
+            logger.debug("No metrics adapter for platform %r", platform)
+            return None
+    except Exception as exc:
+        logger.warning(
+            "Ad metrics unreachable for %s campaign %s: %s",
+            platform, campaign.campaign_id, exc,
+        )
+        return None
+
+    if not raw:
+        return None
+
+    def _f(key):
+        v = raw.get(key)
+        try:
+            return float(v) if v is not None and v != "" else None
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "impressions": int(_f("impressions") or 0),
+        "clicks": int(_f("clicks") or 0),
+        "spend": _f("spend"),
+    }
+
+
+def _attribute_spend_to_products(db, campaigns) -> int:
+    """Write each campaign's spend onto today's ProductPerformance row.
+
+    Without this the spend sits on AdCampaign where no margin calculation can
+    see it, which is why `sales_sync_service` hard-coded ad_spend to 0.0 and
+    F1's margin_actual has been gross margin wearing a net-margin label.
+
+    Spend is SET, not accumulated: `total_spend` is the campaign's lifetime
+    figure from the platform, so adding it each run would compound daily.
+    """
+    from ospra_os.database.performance_models import ProductPerformance
+
+    today = datetime.utcnow().date()
+    by_product: Dict[int, float] = {}
+    for c in campaigns:
+        if c.product_id is None or not c.total_spend:
+            continue
+        by_product[c.product_id] = by_product.get(c.product_id, 0.0) + float(c.total_spend)
+
+    written = 0
+    for product_id, spend in by_product.items():
+        row = (
+            db.query(ProductPerformance)
+            .filter(
+                ProductPerformance.product_id == product_id,
+                ProductPerformance.date == today,
+            )
+            .first()
+        )
+        if row is None:
+            # No sales row for today yet. Skipped rather than invented: a
+            # performance row conjured from ad spend alone would carry a
+            # fabricated store_id/user_id, and the sales sync will create the
+            # real one.
+            continue
+        row.ad_spend = spend
+        row.total_cost = (
+            (row.product_cost or 0.0) + (row.shipping_cost or 0.0)
+            + (row.platform_fees or 0.0) + spend
+        )
+        row.net_profit = (row.net_revenue or 0.0) - row.total_cost
+        if row.net_revenue:
+            row.profit_margin = (row.net_profit / row.net_revenue) * 100
+        written += 1
+    return written
+
+
 @celery_app.task(
     bind=True,
     base=UserTask,
@@ -31,48 +128,98 @@ logger = logging.getLogger(__name__)
     queue="low_priority"
 )
 def check_ad_performance(self) -> Dict[str, Any]:
-    """
-    Check ad campaign performance across all users.
+    """Pull REAL ad spend from the platforms, attribute it, and flag problems.
 
-    Identifies:
-    - Low ROAS ads (< 2.0)
-    - High spend, low conversion ads
-    - Ads that should be paused
-    - Winning ads that should be scaled
+    This was a stub: the entire body was commented out and it returned
+    ``{"status": "success", "campaigns_checked": 0}`` — reporting success
+    while doing nothing, which is why `ProductPerformance.ad_spend` has never
+    held a real number and F1's `margin_actual` ignores ad cost.
 
-    Scheduled: Daily at 9 AM UTC
+    THIS TASK NEVER SPENDS, PAUSES, OR SCALES. It reads spend and RECORDS a
+    recommendation. Acting on ad budget is a propose-then-approve decision
+    that belongs to the owner, and a scheduled job that could pause or scale
+    campaigns on its own is exactly the thing that must not exist here.
+
+    Scheduled: daily at 9 AM UTC.
     """
+    from ospra_os.database.advertising_models import AdCampaign
+
     logger.info("Starting ad performance check")
 
     try:
-        # TODO: Query all active ad campaigns
-        # campaigns = self.db.query(AdCampaign).filter(
-        #     AdCampaign.status == "active"
-        # ).all()
+        campaigns = (
+            self.db.query(AdCampaign)
+            .filter(AdCampaign.status == "active")
+            .all()
+        )
+        if not campaigns:
+            logger.info("Ad check: no active campaigns")
+            return {
+                "status": "success", "campaigns_checked": 0, "updated": 0,
+                "low_roas_count": 0, "recommendations": 0, "unreachable": 0,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
 
-        low_roas_count = 0
-        recommendations_count = 0
+        updated = low_roas = unreachable = 0
+        recommendations: list = []
 
-        # for campaign in campaigns:
-        #     metrics = self._calculate_ad_metrics(campaign)
-        #
-        #     if metrics.roas < 2.0:
-        #         low_roas_count += 1
-        #         self._send_low_roas_alert(campaign, metrics)
-        #         recommendations_count += 1
+        for campaign in campaigns:
+            metrics = _fetch_campaign_metrics(campaign)
+            if metrics is None:
+                # Could not reach the platform. Leave the stored numbers
+                # alone: a stale real figure beats a fabricated fresh one,
+                # and silently zeroing spend would make every campaign look
+                # free.
+                unreachable += 1
+                continue
 
-        logger.info(f"Ad check complete: {low_roas_count} low ROAS campaigns")
+            spend = metrics.get("spend")
+            campaign.update_metrics(
+                impressions=metrics.get("impressions"),
+                clicks=metrics.get("clicks"),
+                spend=spend,
+            )
+            if spend is not None:
+                campaign.total_spend = float(spend)
+            updated += 1
+
+            roas = campaign.roas or 0.0
+            if spend and float(spend) > 0 and roas < LOW_ROAS_THRESHOLD:
+                low_roas += 1
+                recommendations.append({
+                    "campaign_id": campaign.campaign_id,
+                    "platform": campaign.platform,
+                    "roas": round(roas, 2),
+                    "spend": round(float(spend), 2),
+                    # A recommendation, not an action.
+                    "suggested_action": "review_or_pause",
+                    "reason": f"ROAS {roas:.2f} below {LOW_ROAS_THRESHOLD}",
+                })
+
+        attributed = _attribute_spend_to_products(self.db, campaigns)
+        self.db.commit()
+
+        logger.info(
+            "Ad check complete: %d checked, %d updated, %d unreachable, "
+            "%d low-ROAS, %d product-days attributed",
+            len(campaigns), updated, unreachable, low_roas, attributed,
+        )
 
         return {
             "status": "success",
-            "campaigns_checked": 0,
-            "low_roas_count": low_roas_count,
-            "recommendations": recommendations_count,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "campaigns_checked": len(campaigns),
+            "updated": updated,
+            "unreachable": unreachable,
+            "low_roas_count": low_roas,
+            "recommendations": len(recommendations),
+            "recommendation_detail": recommendations,
+            "product_days_attributed": attributed,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     except Exception as e:
         logger.error(f"Error checking ad performance: {e}")
+        self.db.rollback()
         raise self.retry(exc=e)
 
 

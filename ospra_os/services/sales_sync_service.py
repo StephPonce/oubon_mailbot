@@ -322,7 +322,6 @@ class SalesSyncService:
                         "product_cost": 0.0,
                         "shipping_cost": 0.0,
                         "platform_fees": 0.0,
-                        "ad_spend": 0.0,
                         "total_cost": 0.0,
                         "gross_profit": 0.0,
                         "net_profit": 0.0,
@@ -363,12 +362,27 @@ class SalesSyncService:
         products_updated = 0
 
         for (product_id, perf_date), metrics in performance_data.items():
-            # Calculate derived metrics
+            # AD SPEND IS NOT OURS TO WRITE.
+            #
+            # This sync owns sales, COGS and platform fees; ad spend is owned
+            # by tasks.analytics_tasks.check_ad_performance, which pulls it
+            # from the ad platforms. Previously this dict seeded
+            # "ad_spend": 0.0 and the update loop below setattr'd every key —
+            # so each 6-hourly run silently zeroed whatever real spend had
+            # been recorded, and margins looked like ads were free.
+            existing = self.db.query(ProductPerformance).filter(
+                and_(
+                    ProductPerformance.product_id == product_id,
+                    ProductPerformance.date == perf_date
+                )
+            ).first()
+            preserved_ad_spend = float(getattr(existing, "ad_spend", 0.0) or 0.0)
+
             metrics["total_cost"] = (
                 metrics["product_cost"] +
                 metrics["shipping_cost"] +
                 metrics["platform_fees"] +
-                metrics["ad_spend"]
+                preserved_ad_spend
             )
 
             metrics["gross_profit"] = metrics["gross_revenue"] - metrics["product_cost"]
@@ -379,16 +393,10 @@ class SalesSyncService:
                     (metrics["net_profit"] / metrics["net_revenue"]) * 100
                 )
 
-            # Save or update ProductPerformance
-            existing = self.db.query(ProductPerformance).filter(
-                and_(
-                    ProductPerformance.product_id == product_id,
-                    ProductPerformance.date == perf_date
-                )
-            ).first()
-
+            # Save or update ProductPerformance (looked up above)
             if existing:
-                # Update existing record
+                # Update existing record. `metrics` deliberately contains no
+                # ad_spend key, so the real figure survives this sweep.
                 for key, value in metrics.items():
                     setattr(existing, key, value)
                 existing.synced_at = datetime.now()

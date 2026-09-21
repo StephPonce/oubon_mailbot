@@ -133,6 +133,12 @@ def _real_outcomes(session, period_start, period_end) -> int:
         revenue = a["revenue"]
         # margin_actual only when there was revenue to take a margin ON.
         # A margin of 0.0 on zero revenue is a fabricated data point.
+        #
+        # ad_spend is ALREADY inside `cost` (ProductPerformance.total_cost
+        # includes it — see analytics_tasks._attribute_spend_to_products and
+        # sales_sync_service). It is also stored separately on the outcome for
+        # visibility. Do NOT subtract a["ad_spend"] here as well; that would
+        # double-count ad cost and understate every margin.
         margin_actual = (
             ((revenue - a["cost"] - a["refunds"]) / revenue) * 100.0
             if revenue > 0 else None
