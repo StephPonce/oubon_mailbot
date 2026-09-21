@@ -11,6 +11,8 @@ Key features:
 - Professional tone (no "let's", no emojis, data-driven)
 """
 
+import asyncio
+import os
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -40,7 +42,8 @@ class BriefingEngine:
         if not settings.CLAUDE_API_KEY:
             raise ValueError("CLAUDE_API_KEY not configured")
 
-        self.claude = Anthropic(api_key=settings.CLAUDE_API_KEY)
+        self.claude = Anthropic(api_key=settings.CLAUDE_API_KEY,
+                                timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
         self.model = "claude-sonnet-4-5-20250929"
         self.context_builder = get_unified_context_builder(db)
 
@@ -245,13 +248,17 @@ CORRELATIONS DETECTED:
 Generate a professional executive briefing."""
 
         try:
-            response = self.claude.messages.create(
+            # Sync client in an async method: called directly it blocks the
+            # EVENT LOOP (the whole API) for the duration. to_thread keeps the
+            # wait off the loop; the client's timeout bounds the wait itself.
+            response = await asyncio.to_thread(
+                self.claude.messages.create,
                 model=self.model,
                 max_tokens=1500,
                 system=system_prompt,
                 messages=[
                     {"role": "user", "content": user_prompt}
-                ]
+                ],
             )
 
             # Strip markdown formatting symbols
@@ -304,13 +311,15 @@ NO markdown formatting symbols (no ##, ***, ---, etc.).
 Use plain text with clear paragraph breaks only."""
 
         try:
-            response = self.claude.messages.create(
+            # Same event-loop rule as above.
+            response = await asyncio.to_thread(
+                self.claude.messages.create,
                 model=self.model,
                 max_tokens=1000,
                 system=system_prompt,
                 messages=[
                     {"role": "user", "content": f"{prompt}\n\nContext:\n{json.dumps(context.get(focus_area, {}), indent=2)}"}
-                ]
+                ],
             )
 
             # Strip markdown formatting symbols

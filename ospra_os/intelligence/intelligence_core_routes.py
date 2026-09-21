@@ -14,13 +14,14 @@ Endpoints:
 -  DALL-E Image Generation
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Dict, List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 import logging
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +78,63 @@ class BannerGenerateRequest(BaseModel):
 # BRIEFING ENDPOINTS
 # ============================================================================
 
+# ---------------------------------------------------------------------------
+# Briefing cache (A1). In-process TTL cache keyed per user/store/focus.
+#
+# HONEST LIMITS: process-local, so it resets on deploy and is per-worker under
+# multi-worker uvicorn — the cost of that is one regeneration per worker, not
+# wrong data. A briefing is a point-in-time digest, so a short TTL beats a DB
+# table this feature does not otherwise need.
+# ---------------------------------------------------------------------------
+_BRIEFING_TTL_SECONDS = int(os.getenv("BRIEFING_CACHE_TTL_SECONDS", "900"))
+_briefing_cache: Dict[tuple, tuple] = {}  # key -> (expires_at_ts, payload)
+
+
+def _briefing_cache_get(kind, user_id, store_id, focus=None):
+    key = (kind, user_id, store_id, focus)
+    hit = _briefing_cache.get(key)
+    if not hit:
+        return None
+    expires_at, payload = hit
+    if time.time() > expires_at:
+        _briefing_cache.pop(key, None)
+        return None
+    return payload
+
+
+def _briefing_cache_put(kind, user_id, store_id, payload, focus=None):
+    _briefing_cache[(kind, user_id, store_id, focus)] = (
+        time.time() + _BRIEFING_TTL_SECONDS, payload
+    )
+
+
+async def _generate_and_cache_morning(db, user_id, store_id):
+    """Runs AFTER the response is sent (BackgroundTasks). Failures are logged,
+    never swallowed into a cached error — a miss stays a miss."""
+    try:
+        engine = get_briefing_engine(db)
+        result = await engine.generate_morning_briefing(user_id, store_id)
+        _briefing_cache_put("morning", user_id, store_id, result)
+    except Exception as exc:
+        logger.error(f"Morning briefing generation failed for user {user_id}: {exc}")
+
+
+async def _generate_and_cache_on_demand(db, user_id, store_id, focus):
+    try:
+        engine = get_briefing_engine(db)
+        text = await engine.generate_on_demand_briefing(user_id, store_id, focus)
+        _briefing_cache_put("on-demand", user_id, store_id, {
+            "briefing_text": text,
+            "focus_area": focus,
+            "timestamp": datetime.now().isoformat(),
+        }, focus=focus)
+    except Exception as exc:
+        logger.error(f"On-demand briefing generation failed for user {user_id}: {exc}")
+
+
 @router.get("/briefing/morning")
 async def get_morning_briefing(
+    background_tasks: BackgroundTasks,
     store_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_tier("soar"))  # PHASE 1 SECURITY: Tier check before AI ops
@@ -91,12 +147,29 @@ async def get_morning_briefing(
     """
     # SECURITY: Use authenticated user's ID, not query param
     user_id = current_user.user_id
-    engine = get_briefing_engine(db)
-    return await engine.generate_morning_briefing(user_id, store_id)
+
+    # A1 fix: the AI call is OFF the request path. Generating inline held the
+    # request open for the full Anthropic call (formerly up to 600s). Serve
+    # the cached briefing instantly; on miss/stale, schedule generation AFTER
+    # the response and tell the client to poll. A briefing is a daily digest —
+    # a cached copy minutes old is the product working as intended.
+    cached = _briefing_cache_get("morning", user_id, store_id)
+    if cached is not None:
+        return cached
+
+    background_tasks.add_task(
+        _generate_and_cache_morning, db, user_id, store_id
+    )
+    return {
+        "status": "generating",
+        "detail": "Briefing is being generated. Poll this endpoint again shortly.",
+        "retry_after_seconds": 5,
+    }
 
 
 @router.get("/briefing/on-demand")
 async def get_on_demand_briefing(
+    background_tasks: BackgroundTasks,
     store_id: Optional[int] = Query(None),
     focus: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -110,11 +183,19 @@ async def get_on_demand_briefing(
     """
     # SECURITY: Use authenticated user's ID, not query param
     user_id = current_user.user_id
-    engine = get_briefing_engine(db)
+
+    # A1 fix: same pattern as the morning briefing — never generate inline.
+    cached = _briefing_cache_get("on-demand", user_id, store_id, focus)
+    if cached is not None:
+        return cached
+
+    background_tasks.add_task(
+        _generate_and_cache_on_demand, db, user_id, store_id, focus
+    )
     return {
-        "briefing_text": await engine.generate_on_demand_briefing(user_id, store_id, focus),
-        "focus_area": focus,
-        "timestamp": datetime.now().isoformat()
+        "status": "generating",
+        "detail": "Briefing is being generated. Poll this endpoint again shortly.",
+        "retry_after_seconds": 5,
     }
 
 

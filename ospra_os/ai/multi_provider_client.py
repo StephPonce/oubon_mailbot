@@ -17,6 +17,7 @@ Brand parameterization (Cleanup Pass 4 + Pass 4b SaaS refactor):
   `brand_descriptor`, `support_email`, `website`, and `tracking_url`
   when they construct the client.
 """
+import os
 from typing import Optional, Tuple
 from ospra_os.core.settings import Settings  # Use ospra_os settings for Render compatibility
 from ospra_os.email_automation.policies import (
@@ -173,7 +174,8 @@ SIGNATURE: Always end with "{self.signature}"
         except ImportError:
             raise ImportError("anthropic package not installed. Run: uv pip install anthropic")
 
-        client = Anthropic(api_key=self.settings.claude_api_key)
+        client = Anthropic(api_key=self.settings.claude_api_key,
+                           timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
 
         # Smart context - only include relevant policy sections
         policy_context = self._get_relevant_policy(subject, body)

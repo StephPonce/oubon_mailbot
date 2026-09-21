@@ -10,6 +10,7 @@ Generates a personalized daily brief that includes:
 This is displayed as a dashboard card AND sent as a morning email.
 """
 
+import os
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
@@ -43,7 +44,8 @@ class DailyBriefGenerator:
         self.claude = None
         if settings.CLAUDE_API_KEY:
             try:
-                self.claude = Anthropic(api_key=settings.CLAUDE_API_KEY)
+                self.claude = Anthropic(api_key=settings.CLAUDE_API_KEY,
+                                        timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
                 self.model = "claude-sonnet-4-5-20250929"
             except Exception as e:
                 logger.warning(f"Claude not available for daily brief: {e}")

@@ -9,6 +9,7 @@ Author: OspraOS
 Date: November 2025
 """
 
+import os
 from typing import Dict, Any, Optional
 import json
 import logging
@@ -73,7 +74,8 @@ class ClaudeProvider(AIProvider):
 
         # Initialize Anthropic client
         try:
-            self.client = Anthropic(api_key=api_key)
+            self.client = Anthropic(api_key=api_key,
+                                    timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
             logger.info(f"Initialized Claude provider with model {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize Claude client: {e}")

@@ -264,7 +264,8 @@ class TrendAnalyzer:
         self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         if HAS_ANTHROPIC and self.anthropic_key:
             try:
-                self.claude_client = Anthropic(api_key=self.anthropic_key)
+                self.claude_client = Anthropic(api_key=self.anthropic_key,
+                                               timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
                 logger.info("[SUCCESS] Claude AI initialized for product analysis")
             except Exception as e:
                 logger.warning(f"[WARNING]  Claude AI init failed: {e}")

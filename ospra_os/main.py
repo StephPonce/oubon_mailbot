@@ -2720,7 +2720,8 @@ async def claude_chat(request: ChatRequest):
                 'demo_mode': True
             }
 
-        claude = Anthropic(api_key=api_key)
+        claude = Anthropic(api_key=api_key,
+                           timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
 
         # Build comprehensive context summary
         context_summary = ""

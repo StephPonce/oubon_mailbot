@@ -129,7 +129,8 @@ class ProductContentGenerator:
             logger.warning("[WARNING]  ANTHROPIC_API_KEY not set - content generation disabled")
             self.client = None
         else:
-            self.client = AsyncAnthropic(api_key=self.api_key)
+            self.client = AsyncAnthropic(api_key=self.api_key,
+                                         timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
             logger.info("[SUCCESS] ProductContentGenerator initialized with Claude Sonnet 4.5")
 
         self.model = "claude-sonnet-4-5-20250929"  # Sonnet 4.5 (current)

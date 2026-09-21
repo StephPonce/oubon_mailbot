@@ -92,7 +92,8 @@ class ClaudeProvider(AIProvider):
         try:
             import anthropic
 
-            client = anthropic.Anthropic(api_key=self.api_key)
+            client = anthropic.Anthropic(api_key=self.api_key,
+                                         timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
 
             # Build messages
             messages = [{"role": "user", "content": prompt}]

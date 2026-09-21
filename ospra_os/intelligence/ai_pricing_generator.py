@@ -17,7 +17,8 @@ class AIPricingGenerator:
 
         if api_key:
             try:
-                self.client = anthropic.Anthropic(api_key=api_key)
+                self.client = anthropic.Anthropic(api_key=api_key,
+                                                  timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
                 print("[SUCCESS] AI Pricing Generator initialized with Claude")
             except Exception as e:
                 print(f"[WARNING]  Claude API initialization failed: {e}")

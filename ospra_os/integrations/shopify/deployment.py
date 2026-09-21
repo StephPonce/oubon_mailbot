@@ -22,7 +22,8 @@ class ProductDeploymentService:
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         if anthropic_key:
             try:
-                self.ai_client = Anthropic(api_key=anthropic_key)
+                self.ai_client = Anthropic(api_key=anthropic_key,
+                                           timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
                 print("[SUCCESS] AI-powered deployment enabled (Claude)")
             except Exception as e:
                 print(f"[WARNING]  AI initialization failed: {e}")

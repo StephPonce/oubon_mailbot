@@ -11,7 +11,8 @@ class AdCopyGenerator:
 
     def __init__(self):
         self.client = anthropic.Anthropic(
-            api_key=os.getenv('ANTHROPIC_API_KEY')
+            api_key=os.getenv('ANTHROPIC_API_KEY'),
+            timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")),
         )
 
     async def generate_ad_copy(

@@ -234,7 +234,8 @@ class ModelRouter:
         if claude_key:
             try:
                 import anthropic
-                self.providers["anthropic"] = anthropic.Anthropic(api_key=claude_key)
+                self.providers["anthropic"] = anthropic.Anthropic(
+                    api_key=claude_key, timeout=float(os.getenv("ANTHROPIC_TIMEOUT_SECONDS", "60")))
                 logger.info("[SUCCESS] Anthropic provider initialized")
             except Exception as e:
                 logger.warning(f"Failed to init Anthropic: {e}")
