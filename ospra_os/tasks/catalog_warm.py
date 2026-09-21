@@ -274,6 +274,25 @@ async def warm_niche(niche: str, count: int = None, include_absences: bool = Tru
         logger.error(f"[{niche}] discovery failed: {e}")
         return {"niche": niche, "discovered": 0, "new": 0, "seen": 0, "error": str(e)}
 
+    # F2 FIT GATE (spec 01). Runs BEFORE the ledger write so every snapshot
+    # carries fit_pass + fit_reasons — the spec's "rejections are training
+    # data too", captured immutably at the moment of the decision.
+    #
+    # EVALUATE-ONLY for now: products are stamped, NOT dropped. Filtering what
+    # discovery returns changes priority-#1 behaviour and is the owner's call;
+    # flip FIT_GATE_FILTER=true to enforce.
+    try:
+        from ospra_os.intelligence import fit_gate
+        if fit_gate.fit_gate_enabled():
+            for p in products or []:
+                fit_gate.apply(p)
+            _rejected = sum(1 for p in (products or []) if p.get("fit_pass") is False)
+            logger.info(
+                "[%s] fit gate: %d/%d rejected", niche, _rejected, len(products or []),
+            )
+    except Exception as e:
+        logger.error(f"[{niche}] fit gate failed (products unstamped): {e}")
+
     # F1 LEDGER (D10). Write the immutable prediction record for EVERY product
     # this run evaluated, before any persistence/filtering below can drop one.
     # A snapshot's value is that it was written before the outcome was known,
@@ -291,6 +310,17 @@ async def warm_niche(niche: str, count: int = None, include_absences: bool = Tru
         # products without recording the prediction has produced un-auditable
         # output. Surfaced as a niche-level error rather than silently skipped.
         logger.error(f"[{niche}] LEDGER WRITE FAILED — predictions unrecorded: {e}")
+
+    # Filtering happens AFTER the ledger write, never before: a rejected
+    # product must still be snapshotted or the gate destroys the training data
+    # it exists to produce. This only controls what reaches the CATALOG.
+    if os.getenv("FIT_GATE_FILTER", "false").strip().lower() in {"1", "true", "yes"}:
+        _before = len(products or [])
+        products = [p for p in (products or []) if p.get("fit_pass") is not False]
+        logger.info(
+            "[%s] fit gate FILTERING on — %d/%d survive to catalog",
+            niche, len(products), _before,
+        )
 
     new = seen = 0
     session = _session()
