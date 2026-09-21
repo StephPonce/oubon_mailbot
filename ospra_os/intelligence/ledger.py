@@ -178,6 +178,11 @@ def _factor_breakdown(product: Dict[str, Any]) -> Dict[str, Any]:
         "meta_advertiser_count": product.get("meta_niche_advertiser_count"),
         "score_breakdown": product.get("score_breakdown"),
         "data_confidence": (product.get("data_coverage") or {}).get("confidence"),
+        # F7 v2 factors. Recorded on every snapshot from the day they exist,
+        # so that when weights DO change there is a real before/after to
+        # compare — the spec forbids changing weights without one, and you
+        # cannot have an "after" until you have been recording.
+        "v2_factors": product.get("grading_factors_v2"),
     }
 
 
@@ -207,6 +212,18 @@ def record_run(
     model_version = model_version or _v["model_version"]
     prompt_version = prompt_version or _v["prompt_version"]
     weights_version = weights_version or _v["weights_version"]
+
+    # If F7's v2 weights are live, the grades in this run are NOT comparable
+    # to v1 grades. Say so in the column that exists to prevent exactly that
+    # pooling, rather than leaving every run labelled v1.
+    try:
+        from ospra_os.intelligence.grading_factors import (
+            WEIGHTS_V2_VERSION, grading_v2_enabled,
+        )
+        if grading_v2_enabled() and not os.getenv("OSPRA_WEIGHTS_VERSION"):
+            weights_version = WEIGHTS_V2_VERSION
+    except Exception:
+        pass
 
     rows: List[GradeSnapshot] = []
     now = datetime.utcnow()

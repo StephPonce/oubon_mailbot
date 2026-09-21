@@ -293,6 +293,20 @@ async def warm_niche(niche: str, count: int = None, include_absences: bool = Tru
     except Exception as e:
         logger.error(f"[{niche}] fit gate failed (products unstamped): {e}")
 
+    # F7 GRADING v2 FACTORS. Runs after F2 because two of the four factors
+    # read the fit gate's own checks — deriving them twice is how a gate and
+    # a grade end up disagreeing about the same product.
+    # Recorded always; only APPLIED when GRADING_V2_ENABLED (spec: never
+    # change weights without a before/after calibration comparison).
+    try:
+        from ospra_os.intelligence import grading_factors
+        for p in products or []:
+            grading_factors.stamp(p)
+        if grading_factors.grading_v2_enabled():
+            logger.info("[%s] grading v2 weights APPLIED (weights_version=v2)", niche)
+    except Exception as e:
+        logger.error(f"[{niche}] grading v2 factors failed: {e}")
+
     # F1 LEDGER (D10). Write the immutable prediction record for EVERY product
     # this run evaluated, before any persistence/filtering below can drop one.
     # A snapshot's value is that it was written before the outcome was known,
