@@ -646,11 +646,48 @@ class ProductDiscoveryEngine:
         "outdoor": ["camping lantern LED", "portable water filter", "hiking backpack", "solar power bank", "survival kit emergency"],
         "office": ["desk organizer wood", "monitor stand riser", "ergonomic mouse pad", "cable management", "desk lamp LED"],
         "gaming": ["RGB mousepad large", "gaming headset 7.1", "controller stand PS5", "cable management gaming", "monitor light bar"],
+        # Oubon's lighting niche (spec 01). Queries are deliberately app-free:
+        # G4 rejects app/hub-dependent products anyway, so sourcing them just
+        # burns candidate slots on known rejects. Every query names a physical
+        # power/control trait (USB-C, rechargeable, dimmable, motion sensor)
+        # because supplier titles echo the query — seeding the traits G1/G4
+        # need to verify.
+        "oubon-lighting": [
+            "rechargeable USB-C desk lamp",
+            "dimmable clip-on reading light",
+            "sunset projector lamp",
+            "sunrise alarm clock lamp",
+            "candle warmer lamp",
+            "aroma diffuser night light",
+            "magnetic under-hood work light",
+            "rechargeable headlamp",
+            "solar pathway lights warm white",
+            "portable camping lantern USB-C",
+            "motion sensor closet light rechargeable",
+        ],
     }
 
     # Relevance keywords for filtering off-topic products
     # Products containing ANY of these keywords are considered relevant to the niche
     RELEVANCE_KEYWORDS = {
+        # Oubon lighting (spec 01). Exclude terms per the niche brief: wifi,
+        # tuya, alexa, app, smart hub. NOTE the matcher is SUBSTRING-based
+        # ("kw in title_lower"), so bare "app" would also hit apple/appliance/
+        # applicator — encoded instead as the unambiguous forms app-dependent
+        # listings actually use. G4 remains the authoritative app-dependency
+        # check; these excludes just stop known rejects eating candidate slots.
+        "oubon-lighting": {
+            "include": ["lamp", "light", "lantern", "headlamp", "bulb",
+                        "projector", "nightlight", "night light", "sconce",
+                        "candle warmer", "diffuser", "dimmable", "warm white",
+                        "rechargeable", "usb-c", "usb c", "motion sensor",
+                        "reading light", "work light", "pathway", "sunset",
+                        "sunrise"],
+            "exclude": ["wifi", "wi-fi", "tuya", "alexa", "smart hub",
+                        "app control", "app remote", "smart app", "phone app",
+                        "app required", "zigbee", "google home", "homekit",
+                        "rgb gaming"],
+        },
         "smart_home": {
             "include": ["smart", "wifi", "wireless", "sensor", "led", "light", "bulb", "plug", "switch",
                         "automation", "iot", "zigbee", "bluetooth", "remote", "control", "dimmer",

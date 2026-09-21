@@ -20,7 +20,13 @@ default timeout     = Timeout(connect=5.0, read=600, write=600, pool=600)
 default max_retries = 2
 ```
 
-### A1 — No timeout on 19 of 20 Anthropic calls · **HIGH**
+### ~~A1 — No timeout on 19 of 20 Anthropic calls~~ · **FIXED 2026-09-21** (`fad82ec`)
+
+All 12 client constructions now pass `timeout=ANTHROPIC_TIMEOUT_SECONDS`
+(default 60s). briefing_engine's sync-client-on-the-event-loop calls go through
+`asyncio.to_thread`, and the briefing routes serve a cached copy + background
+generation instead of generating inline. Three source-scan guard tests.
+Original finding kept below for the record.
 
 Only `ospra_os/ml/ai_client.py` sets a timeout. Every other call site inherits
 the SDK default of a **600-second read timeout**, and because the SDK also
