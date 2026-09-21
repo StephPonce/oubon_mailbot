@@ -89,19 +89,27 @@ propagate.
 
 ---
 
+## Shipped since this file was created
+
+- **F2 fit gate** (`91a0da5`) — G1-G8 coherence filter, evaluate-only
+  (FIT_GATE_FILTER off), rejections snapshotted by F1 before any filtering.
+- **F7 grading v2 factors** (`79c1132`) — recorded into every snapshot's
+  factor_breakdown; weights behind GRADING_V2_ENABLED (off) per the spec's
+  no-change-without-calibration rule.
+
 ## Pre-existing, carried forward
 
-### B1 — `ad_spend` is never written to `ProductPerformance` · **HIGH**
+### ~~B1 — `ad_spend` is never written to `ProductPerformance`~~ · **FIXED 2026-09-21** (`5e0966a`)
 
-`services/sales_sync_service.py` hard-codes `"ad_spend": 0.0`, and
-`tasks/analytics_tasks.py::check_ad_performance` is a stub with its entire body
-commented out (lines ~48-62). `MetaAdsManager.get_campaign_metrics`
-(`advertising/meta/meta_ads.py:194`) does fetch real spend, but nothing bridges
-it to `AdCampaign.total_spend` or `ProductPerformance.ad_spend`.
-
-Consequence: F1's `margin_actual` ignores ad cost entirely. Not a blocker for
-calibration (Spearman is rank-based and `ad_spend` is not an input), but it
-**must** be closed before any autopilot spend decision relies on margin.
+`check_ad_performance` is now implemented: pulls live Meta spend per active
+campaign, attributes it onto today's `ProductPerformance` row, and flags
+ROAS < 2.0 with a `suggested_action` — it never pauses/scales/spends (a test
+asserts this). The sales sync no longer seeds `"ad_spend": 0.0`; ownership is
+split (sync owns sales/COGS/fees and preserves the row's ad_spend, the ad task
+owns ad_spend), pinned by an ownership-guard test. Remaining scope: only Meta
+has a metrics adapter — TikTok/Google campaigns return None (unreachable) and
+keep their stored figures; wire adapters when those platforms carry real
+campaigns.
 
 ### B2 — Migrations 009 and 012 are unguarded against the create_all race · **MEDIUM**
 
