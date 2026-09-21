@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "shopify theme check --fail-level error 2>&1 | tail -15; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

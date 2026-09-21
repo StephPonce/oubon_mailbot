@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if git diff --name-only | grep -qE '\\.py$'; then python -m pytest -q -x --ff -p no:cacheprovider tests 2>&1 | tail -15; fi; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
