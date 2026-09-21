@@ -175,15 +175,26 @@ class AIImageGenerator:
 
         prompt = self._build_prompt(product_name, scene_description, style)
 
-        # Generate based on provider
-        if provider == ImageProvider.DALLE:
-            return await self._generate_with_dalle(prompt)
-        elif provider == ImageProvider.GEMINI:
-            return await self._generate_with_gemini(prompt)
-        elif provider == ImageProvider.STABILITY:
-            return await self._generate_with_stability(prompt)
-        else:
-            return await self._generate_mock(product_name)
+        # Try the selected provider, then CASCADE through the rest. Before
+        # this, one provider's failure returned None while working
+        # alternatives sat unused — and with no keys at all the mock path
+        # returned a placeholder that LOOKED like a successful render.
+        chain = [provider] + [p for p in self._detect_providers()
+                              if p not in (provider, ImageProvider.MOCK)]
+        for prov in chain:
+            if prov == ImageProvider.DALLE:
+                result = await self._generate_with_dalle(prompt)
+            elif prov == ImageProvider.GEMINI:
+                result = await self._generate_with_gemini(prompt)
+            elif prov == ImageProvider.STABILITY:
+                result = await self._generate_with_stability(prompt)
+            else:
+                continue
+            if result:
+                return result
+            logger.warning(f"Provider {prov.value} failed, trying next in chain")
+        logger.error(f"ALL image providers failed for '{product_name}' — returning None, not a mock")
+        return None
 
     def _create_default_scene(self, product_name: str, style: str) -> str:
         """Create default scene description based on style."""
@@ -216,29 +227,46 @@ class AIImageGenerator:
         return f"{scene}. {', '.join(quality_modifiers[:4])}."
 
     async def _generate_with_dalle(self, prompt: str) -> Optional[str]:
-        """Generate image using OpenAI DALL-E 3."""
+        """Generate image using OpenAI's image model.
+
+        'dall-e-3' no longer exists on current OpenAI accounts (verified live:
+        400 invalid_value). The gpt-image-* family replaced it and returns
+        BASE64 (b64_json), not a URL — both the model name and the response
+        handling had to change together.
+        """
         try:
+            import base64
             from openai import OpenAI
 
+            model = os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2")
             client = OpenAI(api_key=self.openai_key)
-            logger.info("Generating with DALL-E 3...")
+            logger.info(f"Generating with OpenAI {model}...")
 
             response = client.images.generate(
-                model="dall-e-3",
+                model=model,
                 prompt=prompt,
                 size="1024x1024",
-                quality="standard",
                 n=1
             )
 
-            image_url = response.data[0].url
-            local_path = await self._download_and_save(image_url, 'dalle')
+            datum = response.data[0]
+            if getattr(datum, "b64_json", None):
+                out_dir = Path('generated_images')
+                out_dir.mkdir(exist_ok=True)
+                local_path = str(out_dir / f"openai_{int(time.time())}.png")
+                with open(local_path, "wb") as f:
+                    f.write(base64.b64decode(datum.b64_json))
+            elif getattr(datum, "url", None):
+                local_path = await self._download_and_save(datum.url, 'openai')
+            else:
+                logger.error("OpenAI image response had neither b64_json nor url")
+                return None
 
-            logger.info(f"[SUCCESS] DALL-E image: {local_path}")
+            logger.info(f"[SUCCESS] OpenAI image: {local_path}")
             return local_path
 
         except Exception as e:
-            logger.error(f"DALL-E error: {e}")
+            logger.error(f"OpenAI image error: {e}")
             return None
 
     async def _generate_with_gemini(self, prompt: str) -> Optional[str]:

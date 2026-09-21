@@ -1,0 +1,50 @@
+[
+ {
+  "product": "The Oubon Road Beacon",
+  "enhance": {
+   "success": true,
+   "method": "disk_cache",
+   "background_name": "Cached",
+   "estimated_cost": "$0.00",
+   "cached": true,
+   "error": null,
+   "saved": "design/renders/road-beacon-enhanced.png"
+  },
+  "scene": {
+   "path": "generated_images/openai_1790030856.png",
+   "saved": "design/renders/road-beacon-scene.png"
+  }
+ },
+ {
+  "product": "The Oubon Hood Light",
+  "enhance": {
+   "success": true,
+   "method": "disk_cache",
+   "background_name": "Cached",
+   "estimated_cost": "$0.00",
+   "cached": true,
+   "error": null,
+   "saved": "design/renders/hood-light-enhanced.png"
+  },
+  "scene": {
+   "path": "generated_images/openai_1790030871.png",
+   "saved": "design/renders/hood-light-scene.png"
+  }
+ },
+ {
+  "product": "The Oubon Sketch Panel",
+  "enhance": {
+   "success": true,
+   "method": "disk_cache",
+   "background_name": "Cached",
+   "estimated_cost": "$0.00",
+   "cached": true,
+   "error": null,
+   "saved": "design/renders/sketch-panel-enhanced.png"
+  },
+  "scene": {
+   "path": "generated_images/openai_1790030885.png",
+   "saved": "design/renders/sketch-panel-scene.png"
+  }
+ }
+]
